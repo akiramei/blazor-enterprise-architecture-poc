@@ -1,0 +1,17 @@
+@using ProductCatalog.Web.Components.ErrorBoundary
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <CustomErrorBoundary ShowDetails="@IsDevelopment">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </CustomErrorBoundary>
+    </Found>
+</Router>
+
+@code {
+    [Inject]
+    private IWebHostEnvironment Environment { get; set; } = default!;
+
+    private bool IsDevelopment => Environment.IsDevelopment();
+}

@@ -1,0 +1,109 @@
+@page "/products"
+@using Microsoft.JSInterop
+@using ProductCatalog.Domain.Identity
+@using ProductCatalog.Web.Features.Products.Store
+@using ProductCatalog.Web.Features.Products.Actions
+@using ProductCatalog.Web.Features.Products.Components
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
+@inject ProductsStore Store
+@inject ProductListActions Actions
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>商品一覧</PageTitle>
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>商品管理</h1>
+    </div>
+
+    @if (State.IsLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">読み込み中...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(State.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @State.ErrorMessage
+        </div>
+    }
+    else if (!State.Products.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            商品がありません
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var product in State.Products)
+            {
+                <div class="col">
+                    <ProductCard Product="@product" OnDelete="@(async (id) => await Actions.DeleteAsync(id))" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private ProductsState State => Store.GetState();
+    private DotNetObjectReference<ProductList>? _dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.OnChangeAsync += HandleStateChanged;
+        await Actions.LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // DotNetObjectReferenceを作成してJavaScriptに渡す
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("productHub.start", _dotNetRef);
+        }
+    }
+
+    private Task HandleStateChanged()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// SignalRからの通知を受信（JavaScript から呼ばれる）
+    /// </summary>
+    [JSInvokable]
+    public async Task OnProductChanged()
+    {
+        // 商品一覧を再読み込み
+        await Actions.LoadAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Store.OnChangeAsync -= HandleStateChanged;
+
+        // SignalR接続を停止
+        if (_dotNetRef is not null)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("productHub.stop");
+            }
+            catch (JSDisconnectedException)
+            {
+                // Blazor Serverの回路が既に切断されている場合は無視
+            }
+            finally
+            {
+                _dotNetRef.Dispose();
+            }
+        }
+    }
+}

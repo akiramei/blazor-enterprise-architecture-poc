@@ -1,0 +1,103 @@
+@page "/Account/Login"
+@using Microsoft.AspNetCore.Identity
+@using ProductCatalog.Domain.Identity
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>ログイン</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3>ログイン</h3>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@Input" OnValidSubmit="OnValidSubmitAsync" FormName="login">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        @if (!string.IsNullOrEmpty(ErrorMessage))
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @ErrorMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">メールアドレス</label>
+                            <InputText id="email" @bind-Value="Input.Email" class="form-control" autocomplete="username" />
+                            <ValidationMessage For="() => Input.Email" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">パスワード</label>
+                            <InputText id="password" type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" />
+                            <ValidationMessage For="() => Input.Password" />
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <InputCheckbox id="rememberMe" @bind-Value="Input.RememberMe" class="form-check-input" />
+                            <label class="form-check-label" for="rememberMe">
+                                ログイン状態を保持する
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">ログイン</button>
+                    </EditForm>
+
+                    <hr />
+                    <p class="text-center">
+                        <a href="/Account/Register">アカウントを作成</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginInputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    private async Task OnValidSubmitAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email,
+            Input.Password,
+            Input.RememberMe,
+            lockoutOnFailure: true);
+
+        if (result.Succeeded)
+        {
+            NavigationManager.NavigateTo(ReturnUrl ?? "/");
+        }
+        else if (result.IsLockedOut)
+        {
+            ErrorMessage = "アカウントがロックされています。しばらくしてから再度お試しください。";
+        }
+        else
+        {
+            ErrorMessage = "メールアドレスまたはパスワードが正しくありません。";
+        }
+    }
+
+    private sealed class LoginInputModel
+    {
+        [Required(ErrorMessage = "メールアドレスは必須です")]
+        [EmailAddress(ErrorMessage = "有効なメールアドレスを入力してください")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "パスワードは必須です")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}
