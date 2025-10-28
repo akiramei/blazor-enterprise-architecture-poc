@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using MediatR;
+using ProductCatalog.Application.Common;
 using ProductCatalog.Application.Features.Products.GetProducts;
 using ProductCatalog.Application.Features.Products.DeleteProduct;
+using ProductCatalog.Application.Features.Products.BulkDeleteProducts;
 
 namespace ProductCatalog.Web.Features.Products.Store;
 
@@ -147,6 +149,37 @@ public sealed class ProductsStore : IDisposable
             _logger.LogError(ex, "商品削除に失敗しました: {ProductId}", productId);
             await SetStateAsync(_state with { ErrorMessage = "削除処理に失敗しました" });
             return false;
+        }
+    }
+
+    public async Task<BulkOperationResult> BulkDeleteAsync(IEnumerable<Guid> productIds, CancellationToken ct = default)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+            var command = new BulkDeleteProductsCommand(productIds);
+            var result = await mediator.Send(command, ct);
+
+            if (result.IsSuccess)
+            {
+                await LoadAsync(ct);
+                return result.Value!;
+            }
+
+            await SetStateAsync(_state with { ErrorMessage = result.Error });
+            return BulkOperationResult.AllFailed(
+                productIds.Count(),
+                new[] { result.Error ?? "一括削除に失敗しました" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "一括削除に失敗しました");
+            await SetStateAsync(_state with { ErrorMessage = "一括削除処理に失敗しました" });
+            return BulkOperationResult.AllFailed(
+                productIds.Count(),
+                new[] { ex.Message });
         }
     }
 

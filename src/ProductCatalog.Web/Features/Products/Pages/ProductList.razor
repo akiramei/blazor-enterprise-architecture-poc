@@ -4,6 +4,7 @@
 @using ProductCatalog.Web.Features.Products.Store
 @using ProductCatalog.Web.Features.Products.Actions
 @using ProductCatalog.Web.Features.Products.Components
+@using ProductCatalog.Application.Features.Products.BulkDeleteProducts
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
 @inject ProductsStore Store
 @inject ProductListActions Actions
@@ -15,10 +16,37 @@
 <div class="container my-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>商品管理</h1>
-        <a href="/products/search" class="btn btn-primary">
-            <i class="bi bi-search"></i> 商品検索
-        </a>
+        <div class="d-flex gap-2">
+            @if (State.Products.Any())
+            {
+                <button class="btn btn-danger"
+                        @onclick="BulkDelete"
+                        disabled="@(!selectedProductIds.Any() || isDeleting)">
+                    @if (isDeleting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <text>削除中...</text>
+                    }
+                    else
+                    {
+                        <i class="bi bi-trash"></i>
+                        <text>選択を削除 (@selectedProductIds.Count)</text>
+                    }
+                </button>
+            }
+            <a href="/products/search" class="btn btn-primary">
+                <i class="bi bi-search"></i> 商品検索
+            </a>
+        </div>
     </div>
+
+    @if (!string.IsNullOrEmpty(bulkDeleteMessage))
+    {
+        <div class="alert @(bulkDeleteSuccess ? "alert-success" : "alert-warning") alert-dismissible fade show" role="alert">
+            @bulkDeleteMessage
+            <button type="button" class="btn-close" @onclick="() => bulkDeleteMessage = null"></button>
+        </div>
+    }
 
     @if (State.IsLoading)
     {
@@ -42,11 +70,29 @@
     }
     else
     {
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll"
+                       checked="@isAllSelected"
+                       @onchange="ToggleSelectAll">
+                <label class="form-check-label" for="selectAll">
+                    すべて選択
+                </label>
+            </div>
+        </div>
+
         <div class="row row-cols-1 row-cols-md-3 g-4">
             @foreach (var product in State.Products)
             {
                 <div class="col">
-                    <ProductCard Product="@product" OnDelete="@(async (id) => await Actions.DeleteAsync(id))" />
+                    <div class="position-relative">
+                        <div class="position-absolute top-0 start-0 p-2" style="z-index: 10;">
+                            <input class="form-check-input" type="checkbox"
+                                   checked="@selectedProductIds.Contains(product.Id)"
+                                   @onchange="@((ChangeEventArgs e) => ToggleSelection(product.Id, e))">
+                        </div>
+                        <ProductCard Product="@product" OnDelete="@(async (id) => await Actions.DeleteAsync(id))" />
+                    </div>
                 </div>
             }
         </div>
@@ -56,6 +102,12 @@
 @code {
     private ProductsState State => Store.GetState();
     private DotNetObjectReference<ProductList>? _dotNetRef;
+
+    private readonly HashSet<Guid> selectedProductIds = new();
+    private bool isAllSelected => State.Products.Any() && selectedProductIds.Count == State.Products.Count;
+    private bool isDeleting = false;
+    private string? bulkDeleteMessage;
+    private bool bulkDeleteSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -86,6 +138,81 @@
     {
         // 商品一覧を再読み込み
         await Actions.LoadAsync();
+    }
+
+    private void ToggleSelection(Guid productId, ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+
+        if (isChecked)
+        {
+            selectedProductIds.Add(productId);
+        }
+        else
+        {
+            selectedProductIds.Remove(productId);
+        }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+
+        selectedProductIds.Clear();
+
+        if (isChecked)
+        {
+            foreach (var product in State.Products)
+            {
+                selectedProductIds.Add(product.Id);
+            }
+        }
+    }
+
+    private async Task BulkDelete()
+    {
+        if (!selectedProductIds.Any())
+        {
+            return;
+        }
+
+        isDeleting = true;
+        bulkDeleteMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await Actions.BulkDeleteAsync(selectedProductIds);
+
+            if (result.SucceededCount > 0)
+            {
+                bulkDeleteSuccess = true;
+                bulkDeleteMessage = $"{result.SucceededCount}件の商品を削除しました。";
+
+                if (result.FailedCount > 0)
+                {
+                    bulkDeleteMessage += $" {result.FailedCount}件の削除に失敗しました。";
+                    bulkDeleteSuccess = false;
+                }
+
+                selectedProductIds.Clear();
+            }
+            else
+            {
+                bulkDeleteSuccess = false;
+                bulkDeleteMessage = $"削除に失敗しました: {string.Join(", ", result.Errors)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            bulkDeleteSuccess = false;
+            bulkDeleteMessage = $"エラーが発生しました: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+            StateHasChanged();
+        }
     }
 
     public async ValueTask DisposeAsync()

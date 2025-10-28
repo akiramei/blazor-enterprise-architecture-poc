@@ -1,3 +1,5 @@
+using ProductCatalog.Application.Common;
+using ProductCatalog.Application.Features.Products.BulkDeleteProducts;
 using ProductCatalog.Web.Features.Products.Store;
 
 namespace ProductCatalog.Web.Features.Products.Actions;
@@ -42,6 +44,29 @@ public sealed class ProductListActions
         else
         {
             _logger.LogWarning("商品削除に失敗しました: {ProductId}", productId);
+        }
+    }
+
+    public async Task<BulkOperationResult> BulkDeleteAsync(IEnumerable<Guid> productIds, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _store.BulkDeleteAsync(productIds, ct);
+
+            _logger.LogInformation(
+                "一括削除を実行しました: 成功={SucceededCount}, 失敗={FailedCount}, 合計={TotalCount}",
+                result.SucceededCount,
+                result.FailedCount,
+                result.TotalCount);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "一括削除処理に失敗しました");
+            return BulkOperationResult.AllFailed(
+                productIds.Count(),
+                new[] { ex.Message });
         }
     }
 }
