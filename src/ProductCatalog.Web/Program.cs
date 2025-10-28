@@ -110,9 +110,15 @@ builder.Services.AddScoped<IProductReadRepository, ProductCatalog.Infrastructure
 
 // Stores (Scoped for Blazor Server circuits)
 builder.Services.AddScoped<ProductsStore>();
+builder.Services.AddScoped<ProductDetailStore>();
+builder.Services.AddScoped<ProductEditStore>();
+builder.Services.AddScoped<ProductSearchStore>();
 
 // Actions (Scoped for Blazor Server circuits)
 builder.Services.AddScoped<ProductListActions>();
+builder.Services.AddScoped<ProductDetailActions>();
+builder.Services.AddScoped<ProductEditActions>();
+builder.Services.AddScoped<ProductSearchActions>();
 
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
 builder.Services.AddHostedService<ProductCatalog.Infrastructure.Outbox.OutboxBackgroundService>();

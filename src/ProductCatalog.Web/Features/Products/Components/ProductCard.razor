@@ -1,4 +1,5 @@
 @using ProductCatalog.Application.Products.DTOs
+@inject NavigationManager Navigation
 
 <div class="card h-100">
     <div class="card-body">
@@ -9,10 +10,15 @@
             <strong>在庫:</strong> @Product.Stock
         </p>
     </div>
-    <div class="card-footer">
-        <button class="btn btn-danger btn-sm"
-                @onclick="HandleDelete">
-            削除
+    <div class="card-footer d-flex gap-2">
+        <button class="btn btn-primary btn-sm" @onclick="ViewDetail">
+            <i class="bi bi-eye"></i> 詳細
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="EditProduct">
+            <i class="bi bi-pencil"></i> 編集
+        </button>
+        <button class="btn btn-danger btn-sm ms-auto" @onclick="HandleDelete">
+            <i class="bi bi-trash"></i> 削除
         </button>
     </div>
 </div>
@@ -29,6 +35,16 @@
     /// </summary>
     [Parameter]
     public EventCallback<Guid> OnDelete { get; set; }
+
+    private void ViewDetail()
+    {
+        Navigation.NavigateTo($"/products/{Product.Id}");
+    }
+
+    private void EditProduct()
+    {
+        Navigation.NavigateTo($"/products/{Product.Id}/edit");
+    }
 
     private Task HandleDelete()
     {

@@ -1,0 +1,165 @@
+@page "/products/{ProductId:guid}"
+@using ProductCatalog.Domain.Identity
+@using ProductCatalog.Web.Features.Products.Store
+@using ProductCatalog.Web.Features.Products.Actions
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
+@inject ProductDetailStore Store
+@inject ProductDetailActions Actions
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>商品詳細</PageTitle>
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>商品詳細</h1>
+        <div>
+            @if (State.Product != null)
+            {
+                <button class="btn btn-primary me-2" @onclick="EditProduct">
+                    <i class="bi bi-pencil"></i> 編集
+                </button>
+            }
+            <button class="btn btn-secondary" @onclick="BackToList">
+                <i class="bi bi-arrow-left"></i> 戻る
+            </button>
+        </div>
+    </div>
+
+    @if (State.IsLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">読み込み中...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(State.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @State.ErrorMessage
+        </div>
+    }
+    else if (State.Product == null)
+    {
+        <div class="alert alert-warning" role="alert">
+            商品が見つかりません
+        </div>
+    }
+    else
+    {
+        var product = State.Product;
+
+        <div class="card">
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">商品ID</dt>
+                    <dd class="col-sm-9"><code>@product.Id</code></dd>
+
+                    <dt class="col-sm-3">商品名</dt>
+                    <dd class="col-sm-9">@product.Name</dd>
+
+                    <dt class="col-sm-3">説明</dt>
+                    <dd class="col-sm-9">@product.Description</dd>
+
+                    <dt class="col-sm-3">価格</dt>
+                    <dd class="col-sm-9">
+                        <strong class="text-primary">¥@product.Price.ToString("N0")</strong>
+                    </dd>
+
+                    <dt class="col-sm-3">在庫数</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge @(product.Stock > 0 ? "bg-success" : "bg-danger")">
+                            @product.Stock 個
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-3">ステータス</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge @GetStatusBadgeClass(product.Status)">
+                            @GetStatusText(product.Status)
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-3">バージョン</dt>
+                    <dd class="col-sm-9">
+                        <small class="text-muted">@product.Version</small>
+                    </dd>
+                </dl>
+
+                @if (product.Images.Any())
+                {
+                    <hr />
+                    <h5>商品画像</h5>
+                    <div class="row row-cols-1 row-cols-md-4 g-3 mt-2">
+                        @foreach (var image in product.Images.OrderBy(i => i.DisplayOrder))
+                        {
+                            <div class="col">
+                                <div class="card">
+                                    <img src="@image.Url" class="card-img-top" alt="商品画像" style="height: 200px; object-fit: cover;">
+                                    <div class="card-body p-2">
+                                        <small class="text-muted">表示順: @image.DisplayOrder</small>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <hr />
+                    <p class="text-muted">画像はありません</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid ProductId { get; set; }
+
+    private ProductDetailState State => Store.GetState();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.OnChangeAsync += HandleStateChanged;
+        await Actions.LoadAsync(ProductId);
+    }
+
+    private Task HandleStateChanged()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void EditProduct()
+    {
+        Navigation.NavigateTo($"/products/{ProductId}/edit");
+    }
+
+    private void BackToList()
+    {
+        Navigation.NavigateTo("/products");
+    }
+
+    private static string GetStatusBadgeClass(string status) => status switch
+    {
+        "Draft" => "bg-secondary",
+        "Published" => "bg-success",
+        "Archived" => "bg-warning",
+        _ => "bg-secondary"
+    };
+
+    private static string GetStatusText(string status) => status switch
+    {
+        "Draft" => "下書き",
+        "Published" => "公開中",
+        "Archived" => "アーカイブ済み",
+        _ => status
+    };
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= HandleStateChanged;
+    }
+}
