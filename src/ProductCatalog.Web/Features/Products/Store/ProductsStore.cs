@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using MediatR;
-using ProductCatalog.Application.Products.Queries;
+using ProductCatalog.Application.Features.Products.GetProducts;
+using ProductCatalog.Application.Features.Products.DeleteProduct;
 
 namespace ProductCatalog.Web.Features.Products.Store;
 
@@ -129,7 +130,7 @@ public sealed class ProductsStore : IDisposable
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var command = new Application.Products.Commands.DeleteProductCommand(productId);
+            var command = new DeleteProductCommand(productId);
             var result = await mediator.Send(command, ct);
 
             if (result.IsSuccess)

@@ -54,7 +54,7 @@ public class ProductTests
 
         // Assert
         act.Should().Throw<DomainException>()
-            .WithMessage("在庫がある商品は削除できません");
+            .WithMessage("在庫がある商品は削除できません。現在在庫: 10");
         product.IsDeleted.Should().BeFalse();
     }
 

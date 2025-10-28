@@ -2,8 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Application.Products.Commands;
-using ProductCatalog.Application.Products.Handlers;
+using ProductCatalog.Application.Features.Products.DeleteProduct;
 using ProductCatalog.Domain.Products;
 
 namespace ProductCatalog.Application.UnitTests;
@@ -85,7 +84,7 @@ public class DeleteProductHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be("在庫がある商品は削除できません");
+        result.Error.Should().Be("在庫がある商品は削除できません。現在在庫: 10");
         product.IsDeleted.Should().BeFalse();
         _repositoryMock.Verify(r => r.SaveAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()), Times.Never);
     }

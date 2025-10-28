@@ -1,5 +1,172 @@
 # Blazorガイド 修正履歴
 
+## 2025年10月28日 - v2.0.0 大規模リファクタリング
+
+### 🎯 プロジェクトの再定義
+
+このプロジェクトは **AI駆動開発のための実装パターンカタログ** として再定義されました。
+
+- **以前**: VSA（Vertical Slice Architecture）の実証実装
+- **現在**: パターンカタログ型Clean Architecture - AIが参照する実装見本集
+
+### 📦 主な変更内容
+
+#### 1. ドキュメント再構成（Phase 1）
+
+**新規ドキュメント:**
+- `01_このプロジェクトについて.md` - プロジェクトの真の目的を明確化
+- `03_パターンカタログ一覧.md` - 実装パターンの完全インデックス
+- `10_AIへの実装ガイド.md` - AI向け実装ガイドとアンチパターン集
+
+**更新ドキュメント:**
+- `02_アーキテクチャ概要.md` - VSAから「パターンカタログ型Clean Architecture」に変更
+
+#### 2. Domain層の強化（Phase 2）
+
+**新規実装:**
+- `AggregateRoot<TId>` - 集約ルートの基底クラス
+  - Version フィールド（楽観的同時実行制御）
+  - ドメインイベント管理
+- `ProductStatus` - 商品ステータスEnum（Draft/Published/Archived）
+- `ProductImage` - 子エンティティ（親子関係のパターン実装）
+- `ProductImageId` - Typed ID for ProductImage
+
+**Product集約の全面書き換え:**
+- Entity → AggregateRoot<ProductId> へ変更
+- 状態管理メソッド追加: `Publish()`, `Archive()`, `Republish()`
+- 親子関係管理メソッド: `AddImage()`, `RemoveImage()`, `ReorderImage()`
+- 複雑なビジネスルール実装（50%以上の値下げ制限など）
+
+#### 3. Application層パターン実装（Phase 3）
+
+**新規パターン:**
+- `UpdateProduct` - CRUDの"U"（最重要パターン）
+  - 楽観的同時実行制御（Version check）
+  - IdempotencyKey対応
+- `GetProductById` - 単一エンティティ取得
+  - ProductDetailDto（画像、Version含む）
+- `SearchProducts` - 検索・フィルタリング・ページング
+  - 動的フィルタ対応
+  - PagedResult<T>
+- `BulkDeleteProducts` - 一括操作パターン
+  - BulkOperationResult
+
+**既存パターンの再構成:**
+- `CreateProduct` → `/Features/Products/CreateProduct/`
+- `DeleteProduct` → `/Features/Products/DeleteProduct/`
+- `GetProducts` → `/Features/Products/GetProducts/`
+- すべてにIdempotencyKey追加
+- AI向け詳細コメント追加
+
+**削除されたフォルダ:**
+- `/Products/Commands/` （旧構造）
+- `/Products/Handlers/` （旧構造）
+- `/Products/Validators/` （旧構造）
+- `/Products/Queries/` （旧構造）
+
+#### 4. Infrastructure層の対応（Phase 4）
+
+**ProductConfiguration（EF Core）:**
+- ProductStatus のマッピング追加
+- Version フィールドの設定（IsConcurrencyToken）
+- ProductImage 子エンティティのOwnsMany設定
+- Composite Key 対応（ProductId + ProductImageId）
+
+**EfProductRepository:**
+- 子エンティティ自動Include対応
+- Version自動インクリメント対応
+- AI向け詳細コメント追加
+
+**IProductReadRepository:**
+- `GetByIdAsync(Guid)` 追加
+- `SearchAsync(...)` 追加（動的フィルタ、ページング対応）
+
+**DapperProductReadRepository:**
+- Multi-mapping実装（親子関係）
+- 動的WHERE句構築（SQLインジェクション対策）
+- ページング実装（OFFSET/FETCH）
+- OrderByホワイトリスト検証
+
+**削除:**
+- `EfProductReadRepository.cs` - Dapperに統一
+
+#### 5. UI層の最小更新（Phase 5）
+
+**ProductsStore.cs:**
+- 名前空間を新構造に更新
+  - `Products.Queries` → `Features.Products.GetProducts`
+  - `Products.Commands` → `Features.Products.DeleteProduct`
+
+**Program.cs:**
+- MediatR/FluentValidation登録を新構造に更新
+
+### 🏗️ アーキテクチャ変更
+
+**フォルダ構造:**
+```
+旧: /Products/Commands/CreateProductCommand.cs
+    /Products/Handlers/CreateProductHandler.cs
+    /Products/Validators/CreateProductCommandValidator.cs
+
+新: /Features/Products/CreateProduct/CreateProductCommand.cs
+    /Features/Products/CreateProduct/CreateProductHandler.cs
+    /Features/Products/CreateProduct/CreateProductValidator.cs
+```
+
+**パターンの組織化:**
+- 機能（Feature）ごとにフォルダ分割
+- 各フォルダが1つの実装パターンを表現
+- AI が参照しやすい構造
+
+### 📊 統計
+
+- **新規ファイル**: 23個
+- **更新ファイル**: 15個
+- **削除ファイル**: 8個
+- **新規パターン**: 4個（Update, GetById, Search, BulkDelete）
+- **リファクタリング済みパターン**: 3個（Create, Delete, GetAll）
+
+### ⚠️ 破壊的変更
+
+1. **名前空間変更**
+   - `ProductCatalog.Application.Products.Commands` → `ProductCatalog.Application.Features.Products.{PatternName}`
+   - `ProductCatalog.Application.Products.Handlers` → `ProductCatalog.Application.Features.Products.{PatternName}`
+   - `ProductCatalog.Application.Products.Queries` → `ProductCatalog.Application.Features.Products.{PatternName}`
+
+2. **Domain モデル変更**
+   - `Product` が `AggregateRoot<ProductId>` を継承
+   - `Version` フィールド追加（楽観的同時実行制御）
+   - `ProductStatus` 追加
+   - `ProductImage` 子エンティティ追加
+
+3. **Repository インターフェース変更**
+   - `IProductReadRepository` に2つのメソッド追加
+
+### ✅ ビルド状態
+
+- **ビルド**: ✅ 成功
+- **警告**: 1個（Blazor PageTitle - 機能に影響なし）
+- **エラー**: 0個
+
+### 🎓 ドキュメント品質向上
+
+すべてのコードファイルに以下を追加:
+- 使用シナリオ（使用シナリオ）
+- 実装ガイド（実装ガイド）
+- AI実装時の注意（AI実装時の注意）
+- 関連パターンへのリンク
+
+### 🚀 次のステップ
+
+このリファクタリングにより、以下が可能になりました:
+1. AIが実装パターンを参照しやすい構造
+2. 新規機能追加時の明確なガイドライン
+3. ドメイン駆動設計のベストプラクティス実装
+4. 楽観的同時実行制御の完全サポート
+5. 複雑なビジネスルールの適切な配置
+
+---
+
 ## 修正日
 2025年10月22日
 

@@ -36,11 +36,11 @@ builder.Services.AddHttpContextAccessor();
 // MediatR
 builder.Services.AddMediatR(cfg =>
 {
-    cfg.RegisterServicesFromAssembly(typeof(ProductCatalog.Application.Products.Handlers.GetProductsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
 });
 
 // FluentValidation（自動検出）
-builder.Services.AddValidatorsFromAssembly(typeof(ProductCatalog.Application.Products.Handlers.GetProductsHandler).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
 
 // Pipeline Behaviors（登録順序が重要！）
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.LoggingBehavior<,>));        // 1. Logging

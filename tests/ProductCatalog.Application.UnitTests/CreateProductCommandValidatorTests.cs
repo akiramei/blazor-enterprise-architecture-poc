@@ -1,16 +1,15 @@
 using FluentAssertions;
-using ProductCatalog.Application.Products.Commands;
-using ProductCatalog.Application.Products.Validators;
+using ProductCatalog.Application.Features.Products.CreateProduct;
 
 namespace ProductCatalog.Application.UnitTests;
 
 public class CreateProductCommandValidatorTests
 {
-    private readonly CreateProductCommandValidator _validator;
+    private readonly CreateProductValidator _validator;
 
     public CreateProductCommandValidatorTests()
     {
-        _validator = new CreateProductCommandValidator();
+        _validator = new CreateProductValidator();
     }
 
     [Fact]
@@ -66,7 +65,7 @@ public class CreateProductCommandValidatorTests
 
         // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == "Price" && e.ErrorMessage == "価格は0より大きい値を入力してください");
+        result.Errors.Should().Contain(e => e.PropertyName == "Price" && e.ErrorMessage == "価格は0より大きい値を設定してください");
     }
 
     [Fact]
@@ -94,6 +93,6 @@ public class CreateProductCommandValidatorTests
 
         // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == "InitialStock" && e.ErrorMessage == "在庫数は0以上の値を入力してください");
+        result.Errors.Should().Contain(e => e.PropertyName == "InitialStock" && e.ErrorMessage == "在庫数は0以上である必要があります");
     }
 }
