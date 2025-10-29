@@ -98,9 +98,6 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         {
             imageBuilder.ToTable("ProductImages");
 
-            // Composite Key: ProductId + ProductImageId
-            imageBuilder.HasKey("_productId", "_id");
-
             // ProductImageId
             imageBuilder.Property<ProductImageId>("_id")
                 .HasColumnName("Id")
@@ -116,6 +113,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
                     id => id.Value,
                     value => new ProductId(value))
                 .IsRequired();
+
+            // Composite Key: ProductId + ProductImageId (プロパティ定義の後に設定)
+            imageBuilder.HasKey("_productId", "_id");
 
             // URL
             imageBuilder.Property<string>("_url")

@@ -68,9 +68,17 @@ builder.Services.AddScoped<ICorrelationIdAccessor, ProductCatalog.Infrastructure
 // Idempotency Store
 builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 
-// DbContext (PostgreSQL for production)
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// DbContext (PostgreSQL for production, InMemory for Test)
+if (builder.Environment.IsEnvironment("Test"))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseInMemoryDatabase("TestDatabase"));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+}
 
 // ASP.NET Core Identity（本番用認証・認可）
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -128,14 +136,16 @@ builder.Services.AddScoped<ProductCatalog.Infrastructure.Identity.IdentityDataSe
 
 var app = builder.Build();
 
-// Database migration and seed
-using (var scope = app.Services.CreateScope())
+// Database migration and seed (Skip in Test environment)
+if (!app.Environment.IsEnvironment("Test"))
 {
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var repository = scope.ServiceProvider.GetRequiredService<IProductRepository>();
+    using (var scope = app.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var repository = scope.ServiceProvider.GetRequiredService<IProductRepository>();
 
-    // Apply pending migrations
-    await context.Database.MigrateAsync();
+        // Apply pending migrations
+        await context.Database.MigrateAsync();
 
     if (!context.Products.Any())
     {
@@ -162,9 +172,10 @@ using (var scope = app.Services.CreateScope())
         await repository.SaveAsync(product3);
     }
 
-    // Seed Identity data (Roles and Users)
-    var identitySeeder = scope.ServiceProvider.GetRequiredService<ProductCatalog.Infrastructure.Identity.IdentityDataSeeder>();
-    await identitySeeder.SeedAsync();
+        // Seed Identity data (Roles and Users)
+        var identitySeeder = scope.ServiceProvider.GetRequiredService<ProductCatalog.Infrastructure.Identity.IdentityDataSeeder>();
+        await identitySeeder.SeedAsync();
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -200,3 +211,6 @@ app.MapRazorComponents<App>()
 app.MapHub<ProductCatalog.Web.Hubs.ProductHub>("/hubs/products");
 
 app.Run();
+
+// E2Eテストからアクセスできるようにするため、Programクラスを公開
+public partial class Program { }
