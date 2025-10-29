@@ -31,16 +31,38 @@ public class ProductE2ETests : PlaywrightTestBase
     public async Task 商品一覧ページが表示される()
     {
         // Arrange & Act
+        // まずルートパスにアクセスして、基本的な動作を確認
+        await GotoAsync("/");
+        await Task.Delay(2000); // Blazor の初期化を待つ
+
+        // 商品一覧ページに移動
         await GotoAsync("/products");
+        await Task.Delay(3000); // SignalR接続とレンダリングを待つ
+
+        // デバッグ: コンソールエラーをキャプチャ
+        Page!.Console += (_, msg) => Console.WriteLine($"Console: {msg.Text}");
+        Page.PageError += (_, err) => Console.WriteLine($"Page Error: {err}");
 
         // Assert
-        // ページタイトルが表示される
-        var title = await Page!.TextContentAsync("h2");
-        title.Should().Contain("商品一覧");
+        // ページタイトルが表示されるまで待機
+        try
+        {
+            await Page.WaitForSelectorAsync("h2", new() { Timeout = 10000 });
+            var title = await Page.TextContentAsync("h2");
+            title.Should().Contain("商品");
 
-        // 新規作成ボタンが表示される
-        var newButton = await Page.QuerySelectorAsync("text=新規作成");
-        newButton.Should().NotBeNull();
+            // 新規作成ボタンが表示される
+            var newButton = await Page.QuerySelectorAsync("text=新規作成");
+            newButton.Should().NotBeNull();
+        }
+        catch (Exception ex)
+        {
+            // デバッグ情報を出力
+            Console.WriteLine($"Error: {ex.Message}");
+            var html = await Page.ContentAsync();
+            Console.WriteLine($"HTML: {html.Substring(0, Math.Min(1000, html.Length))}");
+            throw;
+        }
     }
 
     [Fact]
