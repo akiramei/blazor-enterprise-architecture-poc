@@ -33,6 +33,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
         builder.ToTable("Products");
 
+        // 公開プロパティを無視（privateフィールドを直接マッピングするため）
+        builder.Ignore(p => p.Images);
+
         // 主キー
         builder.HasKey("_id");
 

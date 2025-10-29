@@ -23,6 +23,11 @@ public sealed class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     {
         base.OnModelCreating(modelBuilder);
 
+        // Value Objectsをエンティティとして扱わないように設定
+        // （EF CoreがAggregateRoot<TId>のジェネリック型パラメータをエンティティと誤認識するのを防ぐ）
+        modelBuilder.Ignore<ProductId>();
+        modelBuilder.Ignore<ProductImageId>();
+
         // Identityテーブル名のプレフィックスを設定（オプション）
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {

@@ -1,10 +1,12 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 using ProductCatalog.Infrastructure.Persistence;
-using ProductCatalog.Web;
+using ProductCatalog.Web.Components;
 
 namespace ProductCatalog.E2ETests;
 
@@ -20,7 +22,7 @@ namespace ProductCatalog.E2ETests;
 ///
 /// 実装ガイド:
 /// - IAsyncLifetimeでテスト前後のセットアップ/クリーンアップ
-/// - WebApplicationFactoryでテストサーバー起動
+/// - WebApplicationで直接テストサーバー起動
 /// - Playwrightでブラウザ制御
 ///
 /// AI実装時の注意:
@@ -33,7 +35,7 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
 {
     private IPlaywright? _playwright;
     private IBrowser? _browser;
-    private WebApplicationFactory<Program>? _factory;
+    private WebApplication? _app;
     protected string BaseUrl { get; private set; } = string.Empty;
     protected IPage? Page { get; private set; }
 
@@ -49,16 +51,30 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
             SlowMo = 0 // ミリ秒単位で操作を遅くする（デバッグ用）
         });
 
-        // テストサーバー起動
-        _factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                // テスト用の設定
-                builder.UseEnvironment("Test");
-            });
+        // テストサーバー起動（Kestrelで実際のポートをリッスン）
+        var builder = WebApplication.CreateBuilder();
+        builder.Environment.EnvironmentName = "Test";
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
 
-        var client = _factory.CreateClient();
-        BaseUrl = client.BaseAddress!.ToString().TrimEnd('/');
+        // Program.csと同じ設定を適用（簡易版）
+        builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseInMemoryDatabase("TestDatabase"));
+
+        _app = builder.Build();
+
+        // 最小限のミドルウェア設定
+        _app.UseStaticFiles();
+        _app.UseAntiforgery();
+        _app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+
+        // サーバーを起動
+        await _app.StartAsync();
+
+        // サーバーアドレスを取得
+        var addresses = _app.Services.GetRequiredService<IServer>()
+            .Features.Get<IServerAddressesFeature>();
+        BaseUrl = addresses!.Addresses.First();
 
         // 新しいページを作成
         Page = await _browser.NewPageAsync();
@@ -81,9 +97,10 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
 
         _playwright?.Dispose();
 
-        if (_factory != null)
+        if (_app != null)
         {
-            await _factory.DisposeAsync();
+            await _app.StopAsync();
+            await _app.DisposeAsync();
         }
     }
 

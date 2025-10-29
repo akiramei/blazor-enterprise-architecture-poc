@@ -213,4 +213,11 @@ app.MapHub<ProductCatalog.Web.Hubs.ProductHub>("/hubs/products");
 app.Run();
 
 // E2Eテストからアクセスできるようにするため、Programクラスを公開
-public partial class Program { }
+public partial class Program
+{
+    // E2Eテスト用: WebApplicationBuilderを作成するヘルパーメソッド
+    public static WebApplicationBuilder CreateTestBuilder(string[] args)
+    {
+        return WebApplication.CreateBuilder(args);
+    }
+}
