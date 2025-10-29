@@ -121,16 +121,29 @@ public class ImportProductsFromCsvHandler : IRequestHandler<ImportProductsFromCs
             }
 
             // 成功した商品を保存
+            var succeededCount = 0;
+            var productIndex = lineNumber - products.Count; // 保存失敗時の行番号計算用
+
             foreach (var product in products)
             {
-                await _repository.SaveAsync(product, cancellationToken);
+                productIndex++;
+                try
+                {
+                    await _repository.SaveAsync(product, cancellationToken);
+                    succeededCount++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "行{LineNumber}の保存中にエラーが発生しました", productIndex);
+                    errors.Add($"行{productIndex}: {ex.Message}");
+                }
             }
 
             _logger.LogInformation("商品CSVインポート完了: 成功{SuccessCount}件、失敗{FailCount}件",
-                products.Count, errors.Count);
+                succeededCount, errors.Count);
 
             return Result.Success(new BulkOperationResult(
-                succeededCount: products.Count,
+                succeededCount: succeededCount,
                 failedCount: errors.Count,
                 errors: errors));
         }
