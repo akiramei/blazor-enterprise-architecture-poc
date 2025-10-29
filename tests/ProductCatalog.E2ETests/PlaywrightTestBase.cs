@@ -420,4 +420,59 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         if (Page == null) throw new InvalidOperationException("Page is not initialized");
         return await Page.ScreenshotAsync();
     }
+
+    /// <summary>
+    /// テスト用商品を作成してDBに保存
+    /// </summary>
+    protected async Task<Guid> CreateTestProductAsync(
+        string name,
+        string description,
+        decimal price,
+        int stock,
+        bool publish = false)
+    {
+        // AppDbContextを取得
+        using var scope = _app!.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Productエンティティを作成
+        var product = Product.Create(
+            name,
+            description,
+            new Money(price, "JPY"),
+            stock
+        );
+
+        // 公開指定の場合は公開
+        if (publish && stock > 0)
+        {
+            product.Publish();
+        }
+
+        // DBに保存
+        await context.Products.AddAsync(product);
+        await context.SaveChangesAsync();
+
+        return product.Id.Value;
+    }
+
+    /// <summary>
+    /// テスト用商品を複数作成
+    /// </summary>
+    protected async Task<List<Guid>> CreateTestProductsAsync(int count)
+    {
+        var productIds = new List<Guid>();
+        for (int i = 0; i < count; i++)
+        {
+            var productId = await CreateTestProductAsync(
+                $"テスト商品{i + 1}",
+                $"これはテスト商品{i + 1}の説明です",
+                1000 * (i + 1),
+                10 * (i + 1),
+                publish: i % 2 == 0 // 偶数番目のみ公開
+            );
+            productIds.Add(productId);
+        }
+        return productIds;
+    }
 }
