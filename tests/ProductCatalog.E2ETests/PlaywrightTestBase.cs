@@ -25,7 +25,86 @@ using ProductCatalog.Web.Features.Products.Store;
 namespace ProductCatalog.E2ETests;
 
 /// <summary>
-/// テスト用の認証状態プロバイダー（常に認証済みとして扱う）
+/// テスト用のProductReadRepository（InMemory database用）
+/// EfProductRepositoryをラップして IProductReadRepository として提供
+/// </summary>
+internal class TestProductReadRepository : IProductReadRepository
+{
+    private readonly IProductRepository _repository;
+
+    public TestProductReadRepository(IProductRepository repository)
+    {
+        _repository = repository;
+    }
+
+    public async Task<ProductCatalog.Application.Features.Products.Dtos.ProductDto?> GetByIdAsync(
+        Guid id, CancellationToken cancellationToken = default)
+    {
+        var product = await _repository.GetAsync(new ProductId(id), cancellationToken);
+        if (product == null) return null;
+
+        return new ProductCatalog.Application.Features.Products.Dtos.ProductDto
+        {
+            Id = product.Id.Value,
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price.Amount,
+            Currency = product.Price.Currency,
+            Stock = product.Stock,
+            Status = product.Status.ToString()
+        };
+    }
+
+    public async Task<List<ProductCatalog.Application.Features.Products.Dtos.ProductDto>> GetAllAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var products = await _repository.GetAllAsync(cancellationToken);
+        return products.Select(p => new ProductCatalog.Application.Features.Products.Dtos.ProductDto
+        {
+            Id = p.Id.Value,
+            Name = p.Name,
+            Description = p.Description,
+            Price = p.Price.Amount,
+            Currency = p.Price.Currency,
+            Stock = p.Stock,
+            Status = p.Status.ToString()
+        }).ToList();
+    }
+}
+
+/// <summary>
+/// テスト用の認証ハンドラー（ASP.NET Core ミドルウェア用）
+/// すべてのリクエストを Admin ユーザーとして認証済みとして扱う
+/// </summary>
+internal class TestAuthenticationHandler : Microsoft.AspNetCore.Authentication.AuthenticationHandler<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions>
+{
+    public TestAuthenticationHandler(
+        Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions> options,
+        Microsoft.Extensions.Logging.ILoggerFactory logger,
+        System.Text.Encodings.Web.UrlEncoder encoder)
+        : base(options, logger, encoder)
+    {
+    }
+
+    protected override Task<Microsoft.AspNetCore.Authentication.AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "test-user-id"),
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "TestUser"),
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, Roles.Admin),
+        };
+
+        var identity = new System.Security.Claims.ClaimsIdentity(claims, "Test");
+        var principal = new System.Security.Claims.ClaimsPrincipal(identity);
+        var ticket = new Microsoft.AspNetCore.Authentication.AuthenticationTicket(principal, "Test");
+
+        return Task.FromResult(Microsoft.AspNetCore.Authentication.AuthenticateResult.Success(ticket));
+    }
+}
+
+/// <summary>
+/// テスト用の認証状態プロバイダー（Blazor Components用）
 /// </summary>
 internal class TestAuthenticationStateProvider : AuthenticationStateProvider
 {
@@ -33,6 +112,7 @@ internal class TestAuthenticationStateProvider : AuthenticationStateProvider
     {
         var identity = new System.Security.Claims.ClaimsIdentity(new[]
         {
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "test-user-id"),
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "TestUser"),
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, Roles.Admin),
         }, "Test");
@@ -124,17 +204,17 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.CachingBehavior<,>));
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.TransactionBehavior<,>));
 
-        // Authentication State Provider（テスト用）
+        // Authentication（テスト用の認証スキーム）
+        builder.Services.AddAuthentication("Test")
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                "Test", options => { });
+
+        // Authentication State Provider（Blazor Components用）
         builder.Services.AddScoped<AuthenticationStateProvider, TestAuthenticationStateProvider>();
         builder.Services.AddCascadingAuthenticationState();
 
-        // Authorization（テスト環境では全て許可）
-        builder.Services.AddAuthorization(options =>
-        {
-            options.FallbackPolicy = new AuthorizationPolicyBuilder()
-                .RequireAssertion(_ => true) // テスト環境では全てのリクエストを許可
-                .Build();
-        });
+        // Authorization（テスト環境）
+        builder.Services.AddAuthorization();
 
         // Memory Cache
         builder.Services.AddMemoryCache();
@@ -155,35 +235,13 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase("TestDatabase"));
 
-        // ASP.NET Core Identity
-        builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireNonAlphanumeric = true;
-            options.Password.RequiredLength = 8;
-            options.User.RequireUniqueEmail = true;
-            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-            options.Lockout.MaxFailedAccessAttempts = 5;
-            options.Lockout.AllowedForNewUsers = true;
-        })
-        .AddEntityFrameworkStores<AppDbContext>()
-        .AddDefaultTokenProviders();
+        // Note: ASP.NET Core Identity is NOT configured for tests
+        // We use TestAuthenticationHandler instead for simplified authentication
 
-        // Cookie認証設定
-        builder.Services.ConfigureApplicationCookie(options =>
-        {
-            options.LoginPath = "/Account/Login";
-            options.LogoutPath = "/Account/Logout";
-            options.AccessDeniedPath = "/Account/AccessDenied";
-            options.ExpireTimeSpan = TimeSpan.FromDays(7);
-            options.SlidingExpiration = true;
-        });
-
-        // Repositories
+        // Repositories（テスト環境ではEF Coreリポジトリを使用）
+        // Note: DapperProductReadRepository は InMemory database では動作しない（Relational database が必要）
         builder.Services.AddScoped<IProductRepository, EfProductRepository>();
-        builder.Services.AddScoped<IProductReadRepository, DapperProductReadRepository>();
+        builder.Services.AddScoped<IProductReadRepository, TestProductReadRepository>();
 
         // Stores (Scoped for Blazor Server circuits)
         builder.Services.AddScoped<ProductsStore>();

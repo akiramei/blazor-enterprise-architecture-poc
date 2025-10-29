@@ -101,6 +101,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         {
             imageBuilder.ToTable("ProductImages");
 
+            // Entityクラスの共通プロパティを無視
+            imageBuilder.Ignore(i => i.DomainEvents);
+
             // ProductImageId
             imageBuilder.Property<ProductImageId>("_id")
                 .HasColumnName("Id")
