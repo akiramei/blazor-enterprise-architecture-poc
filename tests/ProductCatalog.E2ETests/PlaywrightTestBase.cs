@@ -11,7 +11,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
+using ProductCatalog.Application.Common;
 using ProductCatalog.Application.Common.Interfaces;
+using ProductCatalog.Application.Features.Products.GetProductById;
+using ProductCatalog.Application.Products.DTOs;
 using ProductCatalog.Domain.Identity;
 using ProductCatalog.Domain.Products;
 using ProductCatalog.Infrastructure.Idempotency;
@@ -26,49 +29,138 @@ namespace ProductCatalog.E2ETests;
 
 /// <summary>
 /// テスト用のProductReadRepository（InMemory database用）
-/// EfProductRepositoryをラップして IProductReadRepository として提供
+/// AppDbContextから直接クエリして IProductReadRepository として提供
 /// </summary>
 internal class TestProductReadRepository : IProductReadRepository
 {
-    private readonly IProductRepository _repository;
+    private readonly AppDbContext _context;
 
-    public TestProductReadRepository(IProductRepository repository)
+    public TestProductReadRepository(AppDbContext context)
     {
-        _repository = repository;
+        _context = context;
     }
 
-    public async Task<ProductCatalog.Application.Features.Products.Dtos.ProductDto?> GetByIdAsync(
-        Guid id, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<ProductDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var product = await _repository.GetAsync(new ProductId(id), cancellationToken);
+        var products = await _context.Products.ToListAsync(cancellationToken);
+        return products.Select(p => new ProductDto(
+            p.Id.Value,
+            p.Name,
+            p.Description,
+            p.Price.Amount,
+            p.Price.Currency,
+            p.Stock,
+            // DisplayPriceを計算
+            p.Price.Currency == "JPY" ? $"¥{p.Price.Amount:N0}" :
+            p.Price.Currency == "USD" ? $"${p.Price.Amount:N2}" :
+            $"{p.Price.Amount:N2} {p.Price.Currency}",
+            p.Status.ToString(),
+            (int)p.Version
+        )).ToList();
+    }
+
+    public async Task<ProductDetailDto?> GetByIdAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var product = await _context.Products
+            .FirstOrDefaultAsync(p => EF.Property<ProductId>(p, "_id") == new ProductId(productId), cancellationToken);
+
         if (product == null) return null;
 
-        return new ProductCatalog.Application.Features.Products.Dtos.ProductDto
+        return new ProductDetailDto
         {
             Id = product.Id.Value,
             Name = product.Name,
             Description = product.Description,
             Price = product.Price.Amount,
-            Currency = product.Price.Currency,
             Stock = product.Stock,
-            Status = product.Status.ToString()
+            Status = product.Status.ToString(),
+            IsDeleted = product.IsDeleted,
+            Version = product.Version,
+            Images = product.Images
+                .Select(img => new ProductImageDto
+                {
+                    Id = img.Id.Value,
+                    Url = img.Url,
+                    DisplayOrder = img.DisplayOrder
+                })
+                .ToList()
         };
     }
 
-    public async Task<List<ProductCatalog.Application.Features.Products.Dtos.ProductDto>> GetAllAsync(
+    public async Task<PagedResult<ProductDto>> SearchAsync(
+        string? nameFilter,
+        decimal? minPrice,
+        decimal? maxPrice,
+        ProductStatus? status,
+        int page,
+        int pageSize,
+        string orderBy,
+        bool isDescending,
         CancellationToken cancellationToken = default)
     {
-        var products = await _repository.GetAllAsync(cancellationToken);
-        return products.Select(p => new ProductCatalog.Application.Features.Products.Dtos.ProductDto
+        var products = await _context.Products.ToListAsync(cancellationToken);
+
+        // フィルタリング
+        var filtered = products.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(nameFilter))
         {
-            Id = p.Id.Value,
-            Name = p.Name,
-            Description = p.Description,
-            Price = p.Price.Amount,
-            Currency = p.Price.Currency,
-            Stock = p.Stock,
-            Status = p.Status.ToString()
-        }).ToList();
+            filtered = filtered.Where(p => p.Name.Contains(nameFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (minPrice.HasValue)
+        {
+            filtered = filtered.Where(p => p.Price.Amount >= minPrice.Value);
+        }
+
+        if (maxPrice.HasValue)
+        {
+            filtered = filtered.Where(p => p.Price.Amount <= maxPrice.Value);
+        }
+
+        if (status.HasValue)
+        {
+            filtered = filtered.Where(p => p.Status == status.Value);
+        }
+
+        // ソート
+        filtered = orderBy switch
+        {
+            "Price" => isDescending
+                ? filtered.OrderByDescending(p => p.Price.Amount)
+                : filtered.OrderBy(p => p.Price.Amount),
+            "Stock" => isDescending
+                ? filtered.OrderByDescending(p => p.Stock)
+                : filtered.OrderBy(p => p.Stock),
+            "Status" => isDescending
+                ? filtered.OrderByDescending(p => p.Status)
+                : filtered.OrderBy(p => p.Status),
+            _ => isDescending
+                ? filtered.OrderByDescending(p => p.Name)
+                : filtered.OrderBy(p => p.Name)
+        };
+
+        var totalCount = filtered.Count();
+        var items = filtered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new ProductDto(
+                p.Id.Value,
+                p.Name,
+                p.Description,
+                p.Price.Amount,
+                p.Price.Currency,
+                p.Stock,
+                // DisplayPriceを計算
+                p.Price.Currency == "JPY" ? $"¥{p.Price.Amount:N0}" :
+                p.Price.Currency == "USD" ? $"${p.Price.Amount:N2}" :
+                $"{p.Price.Amount:N2} {p.Price.Currency}",
+                p.Status.ToString(),
+                (int)p.Version
+            ))
+            .ToList();
+
+        return PagedResult<ProductDto>.Create(items, totalCount, page, pageSize);
     }
 }
 
@@ -164,16 +256,19 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         });
 
         // テストサーバー起動（Kestrelで実際のポートをリッスン）
-        var builder = WebApplication.CreateBuilder();
-        builder.Environment.EnvironmentName = "Test";
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
-
         // wwwrootパスを設定（Web プロジェクトの wwwroot を参照）
         var webProjectPath = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
             "..", "..", "..", "..", "..", "src", "ProductCatalog.Web"));
-        builder.Environment.WebRootPath = Path.Combine(webProjectPath, "wwwroot");
-        builder.Environment.ContentRootPath = webProjectPath;
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = "Test",
+            ContentRootPath = webProjectPath,
+            WebRootPath = Path.Combine(webProjectPath, "wwwroot")
+        });
+
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
 
         // === Program.csと同じサービス設定 ===
 
