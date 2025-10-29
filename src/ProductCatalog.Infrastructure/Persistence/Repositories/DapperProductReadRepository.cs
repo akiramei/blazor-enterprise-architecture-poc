@@ -59,7 +59,9 @@ public sealed class DapperProductReadRepository : IProductReadRepository
                 ""Description"",
                 ""Price"",
                 ""Currency"",
-                ""Stock""
+                ""Stock"",
+                ""Status"",
+                ""Version""
             FROM ""Products""
             WHERE ""IsDeleted"" = false
             ORDER BY ""Name""";
@@ -78,7 +80,9 @@ public sealed class DapperProductReadRepository : IProductReadRepository
             // DisplayPriceはDTOで計算
             (r.Currency ?? "JPY") == "JPY" ? $"¥{r.Price:N0}" :
             (r.Currency ?? "JPY") == "USD" ? $"${r.Price:N2}" :
-            $"{r.Price:N2} {r.Currency}"
+            $"{r.Price:N2} {r.Currency}",
+            r.Status?.ToString() ?? "Draft",
+            r.Version
         )).ToList();
 
         _logger.LogInformation("商品一覧を取得しました: {Count}件", products.Count);
@@ -246,7 +250,9 @@ public sealed class DapperProductReadRepository : IProductReadRepository
                 ""Description"",
                 ""Price"",
                 ""Currency"",
-                ""Stock""
+                ""Stock"",
+                ""Status"",
+                ""Version""
             FROM ""Products""
             {whereClause}
             ORDER BY ""{orderBy}"" {orderDirection}
@@ -269,7 +275,9 @@ public sealed class DapperProductReadRepository : IProductReadRepository
             // DisplayPriceはDTOで計算
             (r.Currency ?? "JPY") == "JPY" ? $"¥{r.Price:N0}" :
             (r.Currency ?? "JPY") == "USD" ? $"${r.Price:N2}" :
-            $"{r.Price:N2} {r.Currency}"
+            $"{r.Price:N2} {r.Currency}",
+            r.Status?.ToString() ?? "Draft",
+            r.Version
         )).ToList();
 
         _logger.LogInformation("商品検索完了（Total: {TotalCount}, Page: {Page}/{TotalPages}）",
@@ -293,6 +301,8 @@ public sealed class DapperProductReadRepository : IProductReadRepository
         public decimal? Price { get; init; }
         public string? Currency { get; init; }
         public int Stock { get; init; }
+        public ProductStatus? Status { get; init; }
+        public int Version { get; init; }
     }
 
     private sealed record ProductDetailDapperDto

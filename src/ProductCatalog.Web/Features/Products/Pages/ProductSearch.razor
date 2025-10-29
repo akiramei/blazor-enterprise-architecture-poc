@@ -2,10 +2,12 @@
 @using ProductCatalog.Domain.Identity
 @using ProductCatalog.Web.Features.Products.Store
 @using ProductCatalog.Web.Features.Products.Actions
+@using Microsoft.JSInterop
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
 @inject ProductSearchStore Store
 @inject ProductSearchActions Actions
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 <PageTitle>商品検索</PageTitle>
@@ -83,19 +85,35 @@
                     </div>
                 </div>
 
-                <div class="d-grid gap-2 mt-3">
-                    <button type="submit" class="btn btn-primary" disabled="@State.IsSearching">
-                        @if (State.IsSearching)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                            <text>検索中...</text>
-                        }
-                        else
-                        {
-                            <i class="bi bi-search me-2"></i>
-                            <text>検索</text>
-                        }
-                    </button>
+                <div class="row g-2 mt-3">
+                    <div class="col-md-8">
+                        <button type="submit" class="btn btn-primary w-100" disabled="@State.IsSearching">
+                            @if (State.IsSearching)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <text>検索中...</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-search me-2"></i>
+                                <text>検索</text>
+                            }
+                        </button>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-success w-100" @onclick="ExportToCsv" disabled="@isExporting">
+                            @if (isExporting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <text>エクスポート中...</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-download me-2"></i>
+                                <text>CSVエクスポート</text>
+                            }
+                        </button>
+                    </div>
                 </div>
             </EditForm>
         </div>
@@ -198,6 +216,7 @@
     private string? status;
     private string orderBy = "Name";
     private bool isDescending = false;
+    private bool isExporting = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -266,6 +285,64 @@
     private void BackToList()
     {
         Navigation.NavigateTo("/products");
+    }
+
+    /// <summary>
+    /// CSVエクスポート
+    ///
+    /// 【パターン: CSVダウンロード - Blazor Server】
+    ///
+    /// 使用シナリオ:
+    /// - 検索条件に一致する商品をCSVファイルとしてダウンロード
+    /// - JavaScript Interop を使用してブラウザにファイルダウンロードを促す
+    ///
+    /// 実装ガイド:
+    /// - Actions経由でCSVバイト配列を取得
+    /// - Base64エンコードしてJavaScriptに渡す
+    /// - JavaScript側でBlobを作成してダウンロード
+    ///
+    /// AI実装時の注意:
+    /// - isExportingフラグでボタンの二重クリック防止
+    /// - エラーハンドリングを行い、ユーザーにフィードバック
+    /// - ファイル名にタイムスタンプを付けて識別しやすくする
+    /// </summary>
+    private async Task ExportToCsv()
+    {
+        isExporting = true;
+        StateHasChanged();
+
+        try
+        {
+            int? statusValue = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                statusValue = int.Parse(status);
+            }
+
+            var csvBytes = await Actions.ExportToCsvAsync(
+                nameFilter: string.IsNullOrWhiteSpace(nameFilter) ? null : nameFilter,
+                minPrice: minPrice,
+                maxPrice: maxPrice,
+                status: statusValue);
+
+            if (csvBytes != null)
+            {
+                // JavaScriptを使ってファイルダウンロード
+                var fileName = $"products_{DateTime.Now:yyyyMMddHHmmss}.csv";
+                var base64 = Convert.ToBase64String(csvBytes);
+                await JSRuntime.InvokeVoidAsync("downloadFile", fileName, "text/csv", base64);
+            }
+        }
+        catch (Exception ex)
+        {
+            // エラーログはActions側で記録済み
+            Console.WriteLine($"CSVエクスポートエラー: {ex.Message}");
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+        }
     }
 
     public void Dispose()

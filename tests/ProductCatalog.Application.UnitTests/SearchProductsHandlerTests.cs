@@ -30,8 +30,8 @@ public class SearchProductsHandlerTests
         // Arrange
         var products = new List<ProductDto>
         {
-            new(Guid.NewGuid(), "商品A", "説明A", 1000, "JPY", 10, "¥1,000"),
-            new(Guid.NewGuid(), "商品B", "説明B", 2000, "JPY", 20, "¥2,000")
+            new(Guid.NewGuid(), "商品A", "説明A", 1000, "JPY", 10, "¥1,000", "Draft", 1),
+            new(Guid.NewGuid(), "商品B", "説明B", 2000, "JPY", 20, "¥2,000", "Draft", 1)
         };
 
         var pagedResult = new PagedResult<ProductDto>
@@ -84,7 +84,7 @@ public class SearchProductsHandlerTests
         // Arrange
         var products = new List<ProductDto>
         {
-            new(Guid.NewGuid(), "ノートパソコン", "説明", 100000, "JPY", 5, "¥100,000")
+            new(Guid.NewGuid(), "ノートパソコン", "説明", 100000, "JPY", 5, "¥100,000", "Draft", 1)
         };
 
         var pagedResult = new PagedResult<ProductDto>
@@ -133,8 +133,8 @@ public class SearchProductsHandlerTests
         // Arrange
         var products = new List<ProductDto>
         {
-            new(Guid.NewGuid(), "商品A", "説明", 1500, "JPY", 10, "¥1,500"),
-            new(Guid.NewGuid(), "商品B", "説明", 2500, "JPY", 20, "¥2,500")
+            new(Guid.NewGuid(), "商品A", "説明", 1500, "JPY", 10, "¥1,500", "Draft", 1),
+            new(Guid.NewGuid(), "商品B", "説明", 2500, "JPY", 20, "¥2,500", "Draft", 1)
         };
 
         var pagedResult = new PagedResult<ProductDto>
@@ -265,9 +265,9 @@ public class SearchProductsHandlerTests
         // Arrange
         var products = new List<ProductDto>
         {
-            new(Guid.NewGuid(), "商品C", "説明", 3000, "JPY", 30, "¥3,000"),
-            new(Guid.NewGuid(), "商品B", "説明", 2000, "JPY", 20, "¥2,000"),
-            new(Guid.NewGuid(), "商品A", "説明", 1000, "JPY", 10, "¥1,000")
+            new(Guid.NewGuid(), "商品C", "説明", 3000, "JPY", 30, "¥3,000", "Draft", 1),
+            new(Guid.NewGuid(), "商品B", "説明", 2000, "JPY", 20, "¥2,000", "Draft", 1),
+            new(Guid.NewGuid(), "商品A", "説明", 1000, "JPY", 10, "¥1,000", "Draft", 1)
         };
 
         var pagedResult = new PagedResult<ProductDto>
@@ -362,8 +362,8 @@ public class SearchProductsHandlerTests
         // Arrange - Page 2 of 5
         var products = new List<ProductDto>
         {
-            new(Guid.NewGuid(), "商品11", "説明", 1000, "JPY", 10, "¥1,000"),
-            new(Guid.NewGuid(), "商品12", "説明", 2000, "JPY", 20, "¥2,000")
+            new(Guid.NewGuid(), "商品11", "説明", 1000, "JPY", 10, "¥1,000", "Draft", 1),
+            new(Guid.NewGuid(), "商品12", "説明", 2000, "JPY", 20, "¥2,000", "Draft", 1)
         };
 
         var pagedResult = new PagedResult<ProductDto>

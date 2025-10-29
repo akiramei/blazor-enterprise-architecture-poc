@@ -10,4 +10,6 @@ public sealed record ProductDto(
     decimal Price,
     string Currency,
     int Stock,
-    string DisplayPrice);
+    string DisplayPrice,
+    string Status,
+    int Version);
