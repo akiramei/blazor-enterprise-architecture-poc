@@ -1,4 +1,5 @@
 @page "/products"
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using ProductCatalog.Domain.Identity
 @using ProductCatalog.Web.Features.Products.Store
@@ -34,11 +35,34 @@
                     }
                 </button>
             }
+            <button class="btn btn-success" @onclick="TriggerFileInput" disabled="@isImporting">
+                @if (isImporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <text>インポート中...</text>
+                }
+                else
+                {
+                    <i class="bi bi-upload"></i>
+                    <text>CSVインポート</text>
+                }
+            </button>
             <a href="/products/search" class="btn btn-primary">
                 <i class="bi bi-search"></i> 商品検索
             </a>
         </div>
     </div>
+
+    @* 非表示のファイル入力 *@
+    <InputFile @ref="inputFile" OnChange="HandleFileSelected" accept=".csv" style="display: none;" />
+
+    @if (!string.IsNullOrEmpty(importMessage))
+    {
+        <div class="alert @(importSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+            @((MarkupString)importMessage)
+            <button type="button" class="btn-close" @onclick="() => importMessage = null"></button>
+        </div>
+    }
 
     @if (!string.IsNullOrEmpty(bulkDeleteMessage))
     {
@@ -108,6 +132,12 @@
     private bool isDeleting = false;
     private string? bulkDeleteMessage;
     private bool bulkDeleteSuccess;
+
+    // CSVインポート用
+    private InputFile? inputFile;
+    private bool isImporting = false;
+    private string? importMessage;
+    private bool importSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -211,6 +241,129 @@
         finally
         {
             isDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// ファイル選択ダイアログをトリガー
+    ///
+    /// 【パターン: Blazor InputFile トリガー】
+    ///
+    /// 使用シナリオ:
+    /// - ボタンクリックでファイル選択ダイアログを表示
+    ///
+    /// 実装ガイド:
+    /// - JavaScript Interop で非表示のInputFileをクリック
+    /// </summary>
+    private async Task TriggerFileInput()
+    {
+        if (inputFile?.Element != null)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('input[type=file]').click()");
+        }
+    }
+
+    /// <summary>
+    /// CSVファイル選択時の処理
+    ///
+    /// 【パターン: CSVインポート - Blazor Server】
+    ///
+    /// 使用シナリオ:
+    /// - ユーザーがCSVファイルを選択したらインポート実行
+    /// - バリデーションエラーを表示
+    ///
+    /// 実装ガイド:
+    /// - IBrowserFileからStreamを取得
+    /// - ファイルサイズ制限（10MB）
+    /// - Actions経由でインポート実行
+    /// </summary>
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file == null)
+        {
+            return;
+        }
+
+        // ファイルサイズチェック (10MB)
+        const long maxFileSize = 10 * 1024 * 1024;
+        if (file.Size > maxFileSize)
+        {
+            importSuccess = false;
+            importMessage = "ファイルサイズが大きすぎます（上限: 10MB）";
+            return;
+        }
+
+        isImporting = true;
+        importMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var result = await Actions.ImportFromCsvAsync(memoryStream);
+
+            if (result != null)
+            {
+                if (result.SucceededCount > 0)
+                {
+                    importSuccess = true;
+                    importMessage = $"<strong>{result.SucceededCount}件</strong>の商品をインポートしました。";
+
+                    if (result.FailedCount > 0)
+                    {
+                        importSuccess = false;
+                        importMessage += $"<br/><strong>{result.FailedCount}件</strong>のインポートに失敗しました。";
+
+                        if (result.Errors.Any())
+                        {
+                            var errorList = string.Join("<br/>", result.Errors.Take(5));
+                            importMessage += $"<br/><br/><small>{errorList}</small>";
+
+                            if (result.Errors.Count() > 5)
+                            {
+                                importMessage += $"<br/><small>...他{result.Errors.Count() - 5}件のエラー</small>";
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    importSuccess = false;
+                    importMessage = $"<strong>インポートに失敗しました</strong><br/>";
+
+                    if (result.Errors.Any())
+                    {
+                        var errorList = string.Join("<br/>", result.Errors.Take(5));
+                        importMessage += $"<small>{errorList}</small>";
+
+                        if (result.Errors.Count() > 5)
+                        {
+                            importMessage += $"<br/><small>...他{result.Errors.Count() - 5}件のエラー</small>";
+                        }
+                    }
+                }
+            }
+            else
+            {
+                importSuccess = false;
+                importMessage = "インポート処理に失敗しました";
+            }
+        }
+        catch (Exception ex)
+        {
+            importSuccess = false;
+            importMessage = $"エラーが発生しました: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
             StateHasChanged();
         }
     }
