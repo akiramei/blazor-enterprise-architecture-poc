@@ -129,15 +129,12 @@ public class CreateProductHandler : IRequestHandler<CreateProductCommand, Result
             return Result<Guid>.Failure("管理者権限が必要です");
         }
 
-        // ロギングにCorrelation IDを使用
-        _logger.LogInformation(
-            "商品作成: {UserName} [CorrelationId: {CorrelationId}]",
-            userName,
-            _appContext.CorrelationId);
-
         // 商品作成処理...
         var product = Product.Create(request.Name, request.Description, ...);
         await _repository.AddAsync(product, cancellationToken);
+
+        // Note: ログ出力はLoggingBehaviorが自動的に行います
+        // Note: Correlation IDはIAppContextから取得できます: _appContext.CorrelationId
 
         return Result<Guid>.Success(product.Id.Value);
     }
@@ -490,13 +487,23 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBe
 ### 5. Correlation IDを活用
 
 ```csharp
-// Good: すべてのログにCorrelation IDを含める
-_logger.LogInformation(
-    "処理開始: {Action} [CorrelationId: {CorrelationId}]",
-    action,
-    _appContext.CorrelationId);
+// Good: IAppContextからCorrelation IDにアクセス
+public class MyHandler
+{
+    private readonly IAppContext _appContext;
+    private readonly ILogger<MyHandler> _logger;
 
-// 分散トレーシングで全体の流れを追跡可能
+    public async Task Handle(...)
+    {
+        // すべてのログにCorrelation IDを含める
+        _logger.LogInformation(
+            "処理開始: {Action} [CorrelationId: {CorrelationId}]",
+            action,
+            _appContext.CorrelationId);
+
+        // 分散トレーシングで全体の流れを追跡可能
+    }
+}
 ```
 
 ---

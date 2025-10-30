@@ -20,11 +20,8 @@ namespace ProductCatalog.Infrastructure.Behaviors;
 /// - タグによる分類（request_type, success/failure）
 ///
 /// Pipeline順序:
-/// - LoggingBehaviorの後に実行（ログとメトリクスの両方を記録）
-/// - すべてのBehaviorの最外層で実行して全体の実行時間を計測
-///
-/// NOTE: 現在はLoggingBehavior の後に登録されているため、ログ出力時間も含む
-/// より正確な計測が必要な場合は、MetricsBehaviorを最初に登録
+/// - すべてのBehaviorの最外層（最初）で実行して全体の実行時間を計測
+/// - LoggingBehaviorより前に実行されるため、ログ出力時間も含めて計測
 /// </summary>
 /// <typeparam name="TRequest">リクエスト型</typeparam>
 /// <typeparam name="TResponse">レスポンス型</typeparam>
