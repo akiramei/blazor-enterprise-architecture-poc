@@ -176,10 +176,43 @@ UI → Application → Domain ← Infrastructure
 3. **ビジネスルール保護**: Product集約によるルール集約
 4. **I/O分離**: PageActionsはI/Oを持たず、Storeに完全委譲
 
-## 📖 参考ドキュメント
+## 📖 アーキテクチャドキュメント
 
-詳細なアーキテクチャ設計は、以下のドキュメントを参照してください：
-- `docs/BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md`
+このプロジェクトには、詳細なアーキテクチャ設計ドキュメントが用意されています。
+
+### 🎯 読者別の推奨スタート地点
+
+#### **3層アーキテクチャ経験者（WPF/WinForms + RESTful Web API）**
+最短3時間で学習できる最適パスです：
+1. **[3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/16_3層アーキテクチャからの移行ガイド.md)** ← まずはここから！
+2. [イントロダクション](docs/blazor-guide-package/docs/01_イントロダクション.md) - 段階的な学習パス参照
+3. [具体例: 商品管理機能](docs/blazor-guide-package/docs/06_具体例_商品管理機能.md) - 実装パターン確認
+
+#### **Blazor初心者**
+基礎から学びたい方向け（約4.5時間）：
+1. [アーキテクチャ概要](docs/blazor-guide-package/docs/02_アーキテクチャ概要.md) - 設計原則
+2. [全体アーキテクチャ図](docs/blazor-guide-package/docs/04_全体アーキテクチャ図.md) - データフロー
+3. 各層の詳細設計（07-10章）を順番に読む
+
+#### **すぐに実装を始めたい方**
+1. [具体例: 商品管理機能](docs/blazor-guide-package/docs/06_具体例_商品管理機能.md) - コードテンプレート
+2. [ベストプラクティス](docs/blazor-guide-package/docs/14_ベストプラクティス.md) - よくある落とし穴
+3. [テスト戦略](docs/blazor-guide-package/docs/13_テスト戦略.md) - テストの書き方
+
+### 📚 ドキュメント一覧
+
+**目次（全17章）:**
+- **[00_README.md](docs/blazor-guide-package/docs/00_README.md)** - 目次と推奨される読み方
+
+**主要な章:**
+- [02_アーキテクチャ概要](docs/blazor-guide-package/docs/02_アーキテクチャ概要.md) - 設計原則と3層アーキテクチャとの対応
+- [07_UI層の詳細設計](docs/blazor-guide-package/docs/07_UI層の詳細設計.md) - Store/PageActions/Component設計
+- [08_Application層の詳細設計](docs/blazor-guide-package/docs/08_Application層の詳細設計.md) - CQRS/MediatR/Pipeline Behaviors
+- [11_信頼性パターン](docs/blazor-guide-package/docs/11_信頼性パターン.md) - Outbox/リトライ/エラーハンドリング
+- [16_3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/16_3層アーキテクチャからの移行ガイド.md) - WPF/WinForms経験者向け
+
+**完全版（単一ファイル）:**
+- [BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md](docs/blazor-guide-package/BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md) - 全章を結合した完全版
 
 ## ✅ 実装済みの高度な機能
 
