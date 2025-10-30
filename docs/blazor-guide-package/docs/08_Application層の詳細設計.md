@@ -6,6 +6,305 @@
 
 ## 8. Application層の詳細設計
 
+### 8.0 なぜMediatRが必要か？ - Serviceクラス直接DIとの比較
+
+このセクションでは、3層アーキテクチャで一般的な「Serviceクラスの直接DI」と、このアーキテクチャで採用している「MediatR + Pipeline Behaviors」の違いを説明します。
+
+---
+
+#### **従来の3層アーキテクチャ（Serviceクラス直接DI）**
+
+```csharp
+// ===== Service層 =====
+public interface IProductService
+{
+    Task<Product?> GetProductAsync(Guid id);
+    Task<IEnumerable<Product>> GetAllProductsAsync();
+    Task CreateProductAsync(CreateProductDto dto);
+    Task UpdateProductAsync(UpdateProductDto dto);
+    Task DeleteProductAsync(Guid id);
+}
+
+public class ProductService : IProductService
+{
+    private readonly IProductRepository _repository;
+    private readonly AppDbContext _dbContext;
+    private readonly ILogger<ProductService> _logger;
+
+    public async Task DeleteProductAsync(Guid id)
+    {
+        // 1. ログ出力（横断的関心事）
+        _logger.LogInformation("商品削除開始: {ProductId}", id);
+
+        // 2. トランザクション開始（横断的関心事）
+        using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+        try
+        {
+            // 3. ビジネスロジック
+            var product = await _repository.GetAsync(id);
+            if (product == null)
+            {
+                _logger.LogWarning("商品が見つかりません: {ProductId}", id);
+                throw new NotFoundException();
+            }
+
+            await _repository.DeleteAsync(product);
+            await _dbContext.SaveChangesAsync();
+
+            // 4. トランザクションコミット
+            await transaction.CommitAsync();
+
+            // 5. ログ出力（横断的関心事）
+            _logger.LogInformation("商品削除完了: {ProductId}", id);
+        }
+        catch (Exception ex)
+        {
+            // 6. エラーハンドリング（横断的関心事）
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "商品削除失敗: {ProductId}", id);
+            throw;
+        }
+    }
+
+    public async Task CreateProductAsync(CreateProductDto dto)
+    {
+        // 同様に、ログ、トランザクション、エラーハンドリングを毎回実装...
+    }
+
+    // 他のメソッドも同様...
+}
+
+// ===== Controller/ViewModel =====
+public class ProductsController : Controller
+{
+    private readonly IProductService _productService;
+    private readonly IAuthorizationService _authService;
+    private readonly ILogger<ProductsController> _logger;
+
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        // 認可チェック（横断的関心事）
+        var authResult = await _authService.AuthorizeAsync(User, "DeleteProduct");
+        if (!authResult.Succeeded)
+        {
+            _logger.LogWarning("認可失敗: {ProductId}", id);
+            return Forbid();
+        }
+
+        // バリデーション（横断的関心事）
+        if (id == Guid.Empty)
+        {
+            return BadRequest("IDが不正です");
+        }
+
+        await _productService.DeleteAsync(id);
+        return Ok();
+    }
+}
+```
+
+**❌ 問題点:**
+
+1. **横断的関心事が各メソッドに散在**
+   - ログ、トランザクション、エラーハンドリングのコードが重複
+   - 新しいメソッドを追加するたびにコピペ
+   - メンテナンスコストが高い
+
+2. **追加機能の実装が困難**
+   - 監査ログを全メソッドに追加したい → すべてのメソッドを修正
+   - メトリクス収集を追加したい → すべてのメソッドを修正
+   - 冪等性保証を追加したい → すべてのメソッドを修正
+
+3. **テストが困難**
+   - ビジネスロジックと横断的関心事が混在
+   - トランザクション、ログを含めたテストが必要
+   - モックが複雑
+
+4. **責務が不明確**
+   - Serviceクラスが肥大化
+   - 「商品サービス」なのに、ログやトランザクション管理も担当
+
+---
+
+#### **このアーキテクチャ（MediatR + Pipeline Behaviors）**
+
+```csharp
+// ===== Command定義 =====
+public record DeleteProductCommand(Guid ProductId) : ICommand<Result>;
+
+// ===== Handler: ビジネスロジックのみ！ =====
+public class DeleteProductHandler : IRequestHandler<DeleteProductCommand, Result>
+{
+    private readonly IProductRepository _repository;
+
+    // ログ、トランザクション、認可等の横断的関心事は一切書かない！
+    public async Task<Result> Handle(DeleteProductCommand command, CancellationToken ct)
+    {
+        var product = await _repository.GetAsync(new ProductId(command.ProductId), ct);
+        if (product is null)
+            return Result.Fail("商品が見つかりません");
+
+        product.Delete();  // ドメインルール適用
+        await _repository.SaveAsync(product, ct);
+
+        return Result.Success();
+    }
+}
+
+// ===== Validator: バリデーションのみ =====
+public class DeleteProductCommandValidator : AbstractValidator<DeleteProductCommand>
+{
+    public DeleteProductCommandValidator()
+    {
+        RuleFor(x => x.ProductId)
+            .NotEmpty()
+            .WithMessage("商品IDは必須です");
+    }
+}
+
+// ===== UI層/Store =====
+// たった1行でCommand送信（Pipeline Behaviorsが自動適用）
+var result = await _mediator.Send(new DeleteProductCommand(productId), ct);
+
+// ===== Infrastructure層: Pipeline Behaviors（自動適用） =====
+// Program.csで登録するだけで、すべてのCommand/Queryに適用
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(MetricsBehavior<,>));        // 0. メトリクス収集
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));        // 1. ログ出力
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));     // 2. バリデーション
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));  // 3. 認可チェック
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>));    // 4. 冪等性保証
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));        // 5. キャッシング
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuditLogBehavior<,>));       // 6. 監査ログ
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));    // 7. トランザクション
+```
+
+**✅ メリット:**
+
+1. **横断的関心事が1箇所に集約**
+   - すべてのCommand/Queryに自動適用
+   - コードの重複がゼロ
+   - 一貫した動作が保証される
+
+2. **追加機能の実装が容易**
+   - 監査ログを追加したい → `AuditLogBehavior`を追加するだけ
+   - メトリクス収集を追加したい → `MetricsBehavior`を追加するだけ
+   - **既存のHandlerは一切修正不要**
+
+3. **Handlerがビジネスロジックに集中**
+   - テストが容易（ビジネスロジックのみをテスト）
+   - 可読性が高い
+   - 単一責任の原則を守る
+
+4. **実行順序を制御可能**
+   - Pipeline Behaviorsの登録順序で実行順序が決まる
+   - 例: Validation → Authorization → Transaction の順序を保証
+
+---
+
+#### **Pipeline Behaviorsの動作イメージ**
+
+```
+リクエスト: DeleteProductCommand(productId)
+  ↓
+┌─────────────────────────────────────────────────────────┐
+│ 0. MetricsBehavior                                      │
+│    - 実行時間の計測開始                                   │
+│  ↓                                                       │
+│ 1. LoggingBehavior                                      │
+│    - ログ出力: "商品削除開始: {productId}"                │
+│  ↓                                                       │
+│ 2. ValidationBehavior                                   │
+│    - FluentValidation実行（productId != Guid.Empty）    │
+│  ↓                                                       │
+│ 3. AuthorizationBehavior                                │
+│    - 認可チェック（DeleteProduct権限）                    │
+│  ↓                                                       │
+│ 4. IdempotencyBehavior                                  │
+│    - 冪等性チェック（重複実行を防止）                      │
+│  ↓                                                       │
+│ 5. CachingBehavior                                      │
+│    - （Commandなのでスキップ）                            │
+│  ↓                                                       │
+│ 6. AuditLogBehavior                                     │
+│    - 監査ログ準備                                         │
+│  ↓                                                       │
+│ 7. TransactionBehavior                                  │
+│    - トランザクション開始                                  │
+│  ↓                                                       │
+│ ┌─────────────────────────────────────────────┐         │
+│ │ DeleteProductHandler (ビジネスロジック)      │         │
+│ │  - 商品を取得                                │         │
+│ │  - product.Delete() 実行                    │         │
+│ │  - Repository.SaveAsync()                  │         │
+│ └─────────────────────────────────────────────┘         │
+│  ↓                                                       │
+│ 7. TransactionBehavior                                  │
+│    - トランザクションコミット                              │
+│  ↓                                                       │
+│ 6. AuditLogBehavior                                     │
+│    - 監査ログ保存                                         │
+│  ↓                                                       │
+│ ... (逆順で終了処理)                                      │
+│  ↓                                                       │
+│ 0. MetricsBehavior                                      │
+│    - 実行時間の計測終了、メトリクス記録                    │
+└─────────────────────────────────────────────────────────┘
+  ↓
+レスポンス: Result.Success()
+```
+
+---
+
+#### **比較表: ServiceクラスDI vs MediatR**
+
+| 観点 | Serviceクラス直接DI | MediatR + Pipeline Behaviors |
+|------|-------------------|------------------------------|
+| **横断的関心事** | 各メソッドに散在 | 1箇所に集約、自動適用 |
+| **コードの重複** | 多い（各メソッドでコピペ） | ゼロ |
+| **新機能追加** | すべてのメソッドを修正 | Behavior追加のみ |
+| **テスタビリティ** | 低い（横断的関心事も含む） | 高い（ビジネスロジックのみ） |
+| **可読性** | 低い（ログ等が混在） | 高い（ビジネスロジックのみ） |
+| **実行順序制御** | 手動（各メソッド） | 自動（登録順序） |
+| **単一責任の原則** | 違反（複数の責務） | 遵守（1 Handler = 1 UseCase） |
+
+---
+
+#### **いつMediatRを使うべきか？**
+
+**✅ MediatRが有利なケース:**
+- チーム開発（5名以上）
+- 長期保守（3年以上）
+- エンタープライズ要件（監査ログ、メトリクス、認可等）
+- 複雑なビジネスロジック
+- 横断的関心事の統一が重要
+
+**⚠️ Serviceクラス直接DIで十分なケース:**
+- 小規模プロトタイプ（< 5画面）
+- 単一開発者
+- 短期プロジェクト（< 6ヶ月）
+- 横断的関心事がほとんどない
+
+---
+
+#### **まとめ**
+
+MediatRとPipeline Behaviorsを使うことで、**横断的関心事を宣言的に適用**できます。
+
+**Before（Serviceクラス）:**
+- 各メソッドにログ、トランザクション、認可等を手動で実装
+- コードの重複が多い
+- 新機能追加が困難
+
+**After（MediatR）:**
+- Handlerはビジネスロジックのみに集中
+- 横断的関心事はPipeline Behaviorsが自動適用
+- 新機能追加が容易（既存Handlerは修正不要）
+
+このアプローチにより、**保守性、テスタビリティ、拡張性**が大幅に向上します。
+
+---
+
 ### 8.1 Command/Query定義
 
 #### **マーカーインターフェース**
