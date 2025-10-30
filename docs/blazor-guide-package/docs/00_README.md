@@ -111,6 +111,12 @@
     - 今後の発展
     - 補足資料
 
+16. **[横断的関心事の詳細設計](../../architecture/cross-cutting-concerns.md)** (24 KB)
+    - AppContext - 統合コンテキスト
+    - 監査ログ（Audit Log）
+    - メトリクス収集（OpenTelemetry）
+    - Pipeline Behaviors全体像
+
 ---
 
 ## 📦 ファイル構成
@@ -132,7 +138,9 @@ blazor-architecture-guide/
 ├── 12_パフォーマンス最適化.md
 ├── 13_テスト戦略.md
 ├── 14_ベストプラクティス.md
-└── 15_まとめ.md
+├── 15_まとめ.md
+└── ../../architecture/
+    └── cross-cutting-concerns.md     (16章: 横断的関心事)
 ```
 
 ## 🚀 推奨される読み方
@@ -148,6 +156,7 @@ blazor-architecture-guide/
 - **トランザクション管理** → [Application層の詳細設計](08_Application層の詳細設計.md)
 - **エラーハンドリング** → [信頼性パターン](11_信頼性パターン.md)
 - **パフォーマンス改善** → [パフォーマンス最適化](12_パフォーマンス最適化.md)
+- **ログ・監査・メトリクス** → [横断的関心事の詳細設計](../../architecture/cross-cutting-concerns.md)
 
 ### 実装を始める方
 1. [レイヤー構成と責務](05_レイヤー構成と責務.md) で基本構造を理解

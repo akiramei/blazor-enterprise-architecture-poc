@@ -42,9 +42,10 @@
 14. [13 テスト戦略](#13-テスト戦略)
 15. [14 ベストプラクティス](#14-ベストプラクティス)
 16. [15 まとめ](#15-まとめ)
-17. [CHANGELOG](#changelog)
-18. [Phase2改善サマリー](#phase2改善サマリー)
-19. [Phase2 1改善サマリー](#phase2-1改善サマリー)
+17. **16 横断的関心事の詳細設計** (別ファイル: [../architecture/cross-cutting-concerns.md](../architecture/cross-cutting-concerns.md))
+18. [CHANGELOG](#changelog)
+19. [Phase2改善サマリー](#phase2改善サマリー)
+20. [Phase2 1改善サマリー](#phase2-1改善サマリー)
 
 ---
 
