@@ -33,6 +33,20 @@ builder.Services.AddSignalR();
 // HttpContextAccessor（現在のユーザー情報取得に必要）
 builder.Services.AddHttpContextAccessor();
 
+// OpenTelemetry Metrics（メトリクス収集）
+builder.Services.AddSingleton<ProductCatalog.Infrastructure.Metrics.ApplicationMetrics>();
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        // ProductCatalogアプリケーションのメトリクスを収集
+        metrics.AddMeter("ProductCatalog");
+
+        // エクスポーター設定（開発環境）
+        // 本番環境では Prometheus や Azure Monitor等を使用
+        // .AddPrometheusExporter();
+        // .AddAzureMonitorMetricExporter();
+    });
+
 // MediatR
 builder.Services.AddMediatR(cfg =>
 {
@@ -43,12 +57,14 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddValidatorsFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
 
 // Pipeline Behaviors（登録順序が重要！）
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.MetricsBehavior<,>));        // 0. Metrics - 全体の実行時間を計測
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.LoggingBehavior<,>));        // 1. Logging
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.ValidationBehavior<,>));     // 2. Validation
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.AuthorizationBehavior<,>));  // 3. Authorization
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.IdempotencyBehavior<,>));    // 4. Idempotency (Command)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.TransactionBehavior<,>));    // 6. Transaction (Command)
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.TransactionBehavior<,>));    // 7. Transaction (Command)
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -58,6 +74,9 @@ builder.Services.AddMemoryCache();
 
 // Current User Service
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+// App Context (統合コンテキスト - ユーザー情報、リクエスト情報、環境情報を一元管理)
+builder.Services.AddScoped<IAppContext, ProductCatalog.Infrastructure.Services.AppContext>();
 
 // Product Notification Service (SignalR)
 builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Web.Services.ProductNotificationService>();
@@ -115,6 +134,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddScoped<IProductRepository, EfProductRepository>();
 // Dapper を使用した高速読み取りリポジトリ（本番環境で効果を発揮）
 builder.Services.AddScoped<IProductReadRepository, ProductCatalog.Infrastructure.Persistence.Repositories.DapperProductReadRepository>();
+// Audit Log Repository（監査ログ）
+builder.Services.AddScoped<IAuditLogRepository, ProductCatalog.Infrastructure.Persistence.Repositories.AuditLogRepository>();
 
 // Stores (Scoped for Blazor Server circuits)
 builder.Services.AddScoped<ProductsStore>();
