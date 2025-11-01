@@ -1,10 +1,10 @@
-# 9. Domain層の詳細設計
+# 11. Domain層の詳細設計
 
 [← 目次に戻る](00_README.md)
 
 ---
 
-## 9. Domain層の詳細設計
+## 11. Domain層の詳細設計
 
 ### 9.1 Aggregate Root(集約ルート)
 

@@ -1,10 +1,10 @@
-# 10. Infrastructure層の詳細設計
+# 12. Infrastructure層の詳細設計
 
 [← 目次に戻る](00_README.md)
 
 ---
 
-## 10. Infrastructure層の詳細設計
+## 12. Infrastructure層の詳細設計
 
 ### 10.1 Repository実装
 
@@ -302,7 +302,7 @@ public sealed record ProductDto(
     int ImageCount
 )
 {
-    public string DisplayPrice => $"Â¥{Price:N0}";
+    public string DisplayPrice => $"¥{Price:N0}";
     public bool IsLowStock => Stock < 10;
 }
 
