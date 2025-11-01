@@ -184,32 +184,35 @@ UI → Application → Domain ← Infrastructure
 
 #### **3層アーキテクチャ経験者（WPF/WinForms + RESTful Web API）**
 最短3時間で学習できる最適パスです：
-1. **[3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/16_3層アーキテクチャからの移行ガイド.md)** ← まずはここから！
+1. **[3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/18_3層アーキテクチャからの移行ガイド.md)** ← まずはここから！
 2. [イントロダクション](docs/blazor-guide-package/docs/01_イントロダクション.md) - 段階的な学習パス参照
-3. [具体例: 商品管理機能](docs/blazor-guide-package/docs/06_具体例_商品管理機能.md) - 実装パターン確認
+3. [具体例: 商品管理機能](docs/blazor-guide-package/docs/08_具体例_商品管理機能.md) - 実装パターン確認
 
 #### **Blazor初心者**
 基礎から学びたい方向け（約4.5時間）：
-1. [アーキテクチャ概要](docs/blazor-guide-package/docs/02_アーキテクチャ概要.md) - 設計原則
-2. [全体アーキテクチャ図](docs/blazor-guide-package/docs/04_全体アーキテクチャ図.md) - データフロー
-3. 各層の詳細設計（07-10章）を順番に読む
+1. [アーキテクチャ概要](docs/blazor-guide-package/docs/03_アーキテクチャ概要.md) - 設計原則
+2. [全体アーキテクチャ図](docs/blazor-guide-package/docs/06_全体アーキテクチャ図.md) - データフロー
+3. 各層の詳細設計（09-12章）を順番に読む
 
 #### **すぐに実装を始めたい方**
-1. [具体例: 商品管理機能](docs/blazor-guide-package/docs/06_具体例_商品管理機能.md) - コードテンプレート
-2. [ベストプラクティス](docs/blazor-guide-package/docs/14_ベストプラクティス.md) - よくある落とし穴
-3. [テスト戦略](docs/blazor-guide-package/docs/13_テスト戦略.md) - テストの書き方
+1. [具体例: 商品管理機能](docs/blazor-guide-package/docs/08_具体例_商品管理機能.md) - コードテンプレート
+2. [ベストプラクティス](docs/blazor-guide-package/docs/16_ベストプラクティス.md) - よくある落とし穴
+3. [テスト戦略](docs/blazor-guide-package/docs/15_テスト戦略.md) - テストの書き方
 
 ### 📚 ドキュメント一覧
 
-**目次（全17章）:**
+**目次（全20章）:**
 - **[00_README.md](docs/blazor-guide-package/docs/00_README.md)** - 目次と推奨される読み方
 
 **主要な章:**
-- [02_アーキテクチャ概要](docs/blazor-guide-package/docs/02_アーキテクチャ概要.md) - 設計原則と3層アーキテクチャとの対応
-- [07_UI層の詳細設計](docs/blazor-guide-package/docs/07_UI層の詳細設計.md) - Store/PageActions/Component設計
-- [08_Application層の詳細設計](docs/blazor-guide-package/docs/08_Application層の詳細設計.md) - CQRS/MediatR/Pipeline Behaviors
-- [11_信頼性パターン](docs/blazor-guide-package/docs/11_信頼性パターン.md) - Outbox/リトライ/エラーハンドリング
-- [16_3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/16_3層アーキテクチャからの移行ガイド.md) - WPF/WinForms経験者向け
+- [02_このプロジェクトについて](docs/blazor-guide-package/docs/02_このプロジェクトについて.md) - AI駆動開発のための実装パターンカタログ
+- [03_アーキテクチャ概要](docs/blazor-guide-package/docs/03_アーキテクチャ概要.md) - 設計原則と3層アーキテクチャとの対応
+- [05_パターンカタログ一覧](docs/blazor-guide-package/docs/05_パターンカタログ一覧.md) - 実装済み全パターンの詳細
+- [09_UI層の詳細設計](docs/blazor-guide-package/docs/09_UI層の詳細設計.md) - Store/PageActions/Component設計
+- [10_Application層の詳細設計](docs/blazor-guide-package/docs/10_Application層の詳細設計.md) - CQRS/MediatR/Pipeline Behaviors
+- [13_信頼性パターン](docs/blazor-guide-package/docs/13_信頼性パターン.md) - Outbox/リトライ/エラーハンドリング
+- [18_3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/18_3層アーキテクチャからの移行ガイド.md) - WPF/WinForms経験者向け
+- [19_AIへの実装ガイド](docs/blazor-guide-package/docs/19_AIへの実装ガイド.md) - AIが正しく実装を生成するための指針
 
 **完全版（単一ファイル）:**
 - [BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md](docs/blazor-guide-package/BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md) - 全章を結合した完全版

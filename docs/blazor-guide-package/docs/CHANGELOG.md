@@ -19,7 +19,7 @@
 - `10_AIへの実装ガイド.md` - AI向け実装ガイドとアンチパターン集
 
 **更新ドキュメント:**
-- `02_アーキテクチャ概要.md` - VSAから「パターンカタログ型Clean Architecture」に変更
+- `03_アーキテクチャ概要.md` - VSAから「パターンカタログ型Clean Architecture」に変更
 
 #### 2. Domain層の強化（Phase 2）
 
@@ -179,8 +179,8 @@
 #### 1. ICommand<r> → ICommand<r>(6箇所)
 
 **修正ファイル:**
-- `08_Application層の詳細設計.md`(4箇所)
-- `14_ベストプラクティス.md`(1箇所)
+- `10_Application層の詳細設計.md`(4箇所)
+- `16_ベストプラクティス.md`(1箇所)
 
 **詳細:**
 - 行44: `DeleteProductCommand`の戻り値型を修正
@@ -188,7 +188,7 @@
 - 行338: `DeleteProductCommand`の戻り値型を修正
 - 行707: `SaveProductCommand`の戻り値型を修正
 - 行758: `SaveProductCommand`(Idempotency対応版)の戻り値型を修正
-- 14_ベストプラクティス.md 行89: `DeleteProductCommand`の戻り値型を修正
+- 16_ベストプラクティス.md 行89: `DeleteProductCommand`の戻り値型を修正
 
 **修正前:**
 ```csharp
@@ -205,7 +205,7 @@ public async Task<r> Handle(DeleteProductCommand command, CancellationToken ct)
 #### 2. Task<r> → Task<r>(1箇所)
 
 **修正ファイル:**
-- `08_Application層の詳細設計.md` 行81
+- `10_Application層の詳細設計.md` 行81
 
 **影響:**
 これらの修正により、コードがコンパイル可能になりました。
@@ -217,7 +217,7 @@ public async Task<r> Handle(DeleteProductCommand command, CancellationToken ct)
 #### 3. コメント「更新」の文字化け修正(2箇所)
 
 **修正ファイル:**
-- `10_Infrastructure層の詳細設計.md`
+- `12_Infrastructure層の詳細設計.md`
 
 **詳細:**
 - 行56: `// æ›´æâ€"°` → `// 更新`
@@ -229,7 +229,7 @@ EF Coreのリポジトリ実装で、既存エンティティの更新処理を�
 #### 4. 円記号の文字化け修正(1箇所)
 
 **修正ファイル:**
-- `09_Domain層の詳細設計.md` 行334
+- `11_Domain層の詳細設計.md` 行334
 
 **詳細:**
 - `Â¥` → `¥`
@@ -268,10 +268,10 @@ public string ToDisplayString() => $"¥{Amount:N0}";
 
 | ファイル名 | 修正箇所数 | 修正内容 |
 |-----------|----------|---------|
-| 08_Application層の詳細設計.md | 5 | 型定義の修正 |
-| 09_Domain層の詳細設計.md | 1 | 円記号の修正 |
-| 10_Infrastructure層の詳細設計.md | 2 | コメントの文字化け修正 |
-| 14_ベストプラクティス.md | 1 | 型定義の修正 |
+| 10_Application層の詳細設計.md | 5 | 型定義の修正 |
+| 11_Domain層の詳細設計.md | 1 | 円記号の修正 |
+| 12_Infrastructure層の詳細設計.md | 2 | コメントの文字化け修正 |
+| 16_ベストプラクティス.md | 1 | 型定義の修正 |
 | **合計** | **10** | - |
 
 ---

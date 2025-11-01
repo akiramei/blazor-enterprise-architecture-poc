@@ -184,10 +184,10 @@ _logger.LogInformation("[{CorrelationId}] 処理開始: {RequestName}", correlat
 ```
 blazor-guide-v2.1/
 ├── 00_README.md                      (更新: v2.1反映)
-├── 07_UI層の詳細設計.md              (追加: 7.5節 single-flight + デバウンス)
-├── 08_Application層の詳細設計.md     (追加: 8.4節 Pipeline順序 + Idempotency伝播)
-├── 12_パフォーマンス最適化.md         (追加: 12.4節 Query最適化 + 12.5節 観測可能性)
-├── 14_ベストプラクティス.md           (追加: 14.6節 Blazor Server運用ガイド)
+├── 09_UI層の詳細設計.md              (追加: 7.5節 single-flight + デバウンス)
+├── 10_Application層の詳細設計.md     (追加: 8.4節 Pipeline順序 + Idempotency伝播)
+├── 14_パフォーマンス最適化.md         (追加: 12.4節 Query最適化 + 12.5節 観測可能性)
+├── 16_ベストプラクティス.md           (追加: 14.6節 Blazor Server運用ガイド)
 ├── Phase2.1改善サマリー.md           (このファイル)
 └── その他 13ファイル                 (v2.0から変更なし)
 ```
