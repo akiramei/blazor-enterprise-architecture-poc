@@ -1,247 +1,40 @@
 # Blazor Enterprise Architecture Guide - 完全版
-## 中規模業務アプリケーションのための決定版アーキテクチャ
 
-**Version**: 2.1.1 (修正版)  
-**統合版作成日**: 2025年10月22日  
-**Target**: Blazor Server / Blazor WebAssembly (Hosted)  
-**Team Size**: 5-20 developers  
-**Project Scale**: Medium to Large Enterprise Applications
-
----
-
-**📖 このドキュメントについて**
-
-この完全版は、Blazor Enterprise Architecture Guideの全17章とサマリーを1つのファイルに統合したものです。
-全文検索、印刷、PDF変換、オフライン閲覧に最適です。
-
----
-
-**🔖 主要な更新履歴**
-
-- **v2.1.1 Hotfix** (2025-10-22): 型定義の修正、文字化け完全修正(全ファイル)
-- **v2.1 Updates** (2025-10-22): CachingBehavior順序規約、Idempotency-Key伝播、Store single-flight、SignalRデバウンス、Query最適化チェックリスト、CorrelationId、Blazor Server運用ガイド
-- **v2.0 Updates** (2025-10): Transactionスコープ厳密化、Store並行制御強化、PageActions規約、Outbox信頼性向上
-
----
-
-## 📋 完全目次
-
-1. [00 README](#00-readme)
-2. [01 イントロダクション](#01-イントロダクション)
-3. [02 アーキテクチャ概要](#02-アーキテクチャ概要)
-4. [03 採用技術とパターン](#03-採用技術とパターン)
-5. [04 全体アーキテクチャ図](#04-全体アーキテクチャ図)
-6. [05 レイヤー構成と責務](#05-レイヤー構成と責務)
-7. [06 具体例 商品管理機能](#06-具体例-商品管理機能)
-8. [07 UI層の詳細設計](#07-ui層の詳細設計)
-9. [08 Application層の詳細設計](#08-application層の詳細設計)
-10. [09 Domain層の詳細設計](#09-domain層の詳細設計)
-11. [10 Infrastructure層の詳細設計](#10-infrastructure層の詳細設計)
-12. [11 信頼性パターン](#11-信頼性パターン)
-13. [12 パフォーマンス最適化](#12-パフォーマンス最適化)
-14. [13 テスト戦略](#13-テスト戦略)
-15. [14 ベストプラクティス](#14-ベストプラクティス)
-16. [15 まとめ](#15-まとめ)
-17. **16 3層アーキテクチャからの移行ガイド** (別ファイル: [docs/16_3層アーキテクチャからの移行ガイド.md](docs/16_3層アーキテクチャからの移行ガイド.md))
-18. **17 横断的関心事の詳細設計** (別ファイル: [../architecture/cross-cutting-concerns.md](../architecture/cross-cutting-concerns.md))
-19. [CHANGELOG](#changelog)
-19. [Phase2改善サマリー](#phase2改善サマリー)
-20. [Phase2 1改善サマリー](#phase2-1改善サマリー)
-
----
-
-
-
----
-
-<a id="00-readme"></a>
-
-# 📄 00 README
-
-*元ファイル: `00_README.md`*
-
----
-
-## 中規模業務アプリケーションのための決定版アーキテクチャ
-
-**Version**: 2.1.1 (修正版)  
-**Target**: Blazor Server / Blazor WebAssembly (Hosted)  
-**Team Size**: 5-20 developers  
-**Project Scale**: Medium to Large Enterprise Applications
-
-**v2.1.1 Hotfix** (2025-10-22):
-- **[CRITICAL]** 型定義の修正: `ICommand<r>` → `ICommand<r>` (6箇所)
-- **[CRITICAL]** 型定義の修正: `Task<r>` → `Task<r>` (1箇所)
-- **[FIX]** 文字化けコメントの修正: 「更新」の表記を正常化 (2箇所)
-- **[FIX]** 円記号の文字化け修正: Money.ToDisplayString (1箇所)
-- 詳細は `CHANGELOG.md` を参照
-
-**v2.1 Updates** (2025-10-22):
-- **[P0]** CachingBehaviorの順序規約とキー安全性の明文化(08章)
-- **[P0]** Idempotency-Keyのエンドツーエンド伝播パターン(08章)
-- **[P1]** Store single-flight パターン追加(07章)
-- **[P1]** SignalR通知のコアレス&デバウンス実装(07章)
-- **[P1]** Query最適化チェックリストと画面専用DTO徹底(12章)
-- **[P2]** CorrelationIdによる観測可能性の実装(12章)
-- **[P2]** Blazor Server運用ガイド(安全策集約)(14章)
-
-**v2.0 Updates** (2025-10):
-- Transactionスコープの厳密化とPipeline登録の最適化
-- Store並行制御パターンの強化(バージョニング + 差分判定)
-- PageActionsコーディング規約の明文化
-- Outbox Dispatcher の信頼性向上(Dead Letter対応)
-- Authorization二重化戦略の追加
-- Read最適化とキャッシュ無効化戦略の詳細化
+**Version**: 2.1.2 (自動生成版)
+**生成日**: 2025年11月02日 02:14:49
+**章数**: 19章
 
 ---
 
 ## 📋 目次
 
-### 各章へのリンク
-
-1. **[イントロダクション](01_イントロダクション.md)** (5.2 KB)
-   - このアーキテクチャが解決する課題
-   - 対象読者と前提知識
-   - ドキュメントの読み方
-
-2. **[アーキテクチャ概要](02_アーキテクチャ概要.md)** (3.6 KB)
-   - 設計原則
-   - アーキテクチャの全体像
-   - 主要な設計判断
-
-3. **[採用技術とパターン](03_採用技術とパターン.md)** (11 KB)
-   - 技術スタック
-   - 採用パターン一覧
-   - パターンの組み合わせ
-
-4. **[全体アーキテクチャ図](04_全体アーキテクチャ図.md)** (13 KB)
-   - システム全体図
-   - データフロー
-   - 責務分離
-
-5. **[レイヤー構成と責務](05_レイヤー構成と責務.md)** (5.6 KB)
-   - 4層アーキテクチャ
-   - 各層の責務
-   - 依存関係のルール
-
-6. **[具体例: 商品管理機能](06_具体例_商品管理機能.md)** (16 KB)
-   - 実装例による理解
-   - コード例
-   - ベストプラクティス
-
-7. **[UI層の詳細設計](07_UI層の詳細設計.md)** (19 KB)
-   - Blazor Componentの設計
-   - Store パターン
-   - PageActions パターン
-
-8. **[Application層の詳細設計](08_Application層の詳細設計.md)** (16 KB)
-   - Command/Query分離
-   - Transaction管理
-   - Authorization
-
-9. **[Domain層の詳細設計](09_Domain層の詳細設計.md)** (13 KB)
-   - Entityとvalue Object
-   - Domain Service
-   - Domain Event
-
-10. **[Infrastructure層の詳細設計](10_Infrastructure層の詳細設計.md)** (17 KB)
-    - Repository実装
-    - データアクセス
-    - 外部サービス連携
-
-11. **[信頼性パターン](11_信頼性パターン.md)** (17 KB)
-    - Outbox Pattern
-    - リトライ戦略
-    - エラーハンドリング
-
-12. **[パフォーマンス最適化](12_パフォーマンス最適化.md)** (3.9 KB)
-    - キャッシュ戦略
-    - クエリ最適化
-    - レンダリング最適化
-
-13. **[テスト戦略](13_テスト戦略.md)** (7.3 KB)
-    - Unit Test
-    - Integration Test
-    - E2E Test
-
-14. **[ベストプラクティス](14_ベストプラクティス.md)** (3.0 KB)
-    - コーディング規約
-    - チーム開発のヒント
-    - よくある落とし穴
-
-15. **[まとめ](15_まとめ.md)** (45 KB)
-    - アーキテクチャの振り返り
-    - 今後の発展
-    - 補足資料
+- 1. イントロダクション
+- 1. このプロジェクトについて
+- 2. アーキテクチャ概要
+- 3. 採用技術とパターン
+- 3. パターンカタログ一覧
+- 4. 全体アーキテクチャ図
+- 5. レイヤー構成と責務
+- 6. 具体例: 商品管理機能
+- 7. UI層の詳細設計
+- 8. Application層の詳細設計
+- 11. Domain層の詳細設計
+- 12. Infrastructure層の詳細設計
+- 13. 信頼性パターン
+- 14. パフォーマンス最適化
+- 15. テスト戦略
+- 16. ベストプラクティス
+- 17. まとめ
+- 18. 3層アーキテクチャからの移行ガイド
+- 19. AIへの実装ガイド
 
 ---
-
-## 📦 ファイル構成
-
-```
-blazor-architecture-guide/
-├── 00_README.md                      (このファイル)
-├── 01_イントロダクション.md
-├── 02_アーキテクチャ概要.md
-├── 03_採用技術とパターン.md
-├── 04_全体アーキテクチャ図.md
-├── 05_レイヤー構成と責務.md
-├── 06_具体例_商品管理機能.md
-├── 07_UI層の詳細設計.md
-├── 08_Application層の詳細設計.md
-├── 09_Domain層の詳細設計.md
-├── 10_Infrastructure層の詳細設計.md
-├── 11_信頼性パターン.md
-├── 12_パフォーマンス最適化.md
-├── 13_テスト戦略.md
-├── 14_ベストプラクティス.md
-└── 15_まとめ.md
-```
-
-## 🚀 推奨される読み方
-
-### 初めて読む方
-1. [イントロダクション](01_イントロダクション.md) → [アーキテクチャ概要](02_アーキテクチャ概要.md)
-2. [全体アーキテクチャ図](04_全体アーキテクチャ図.md) で全体像を把握
-3. [具体例: 商品管理機能](06_具体例_商品管理機能.md) で実装イメージを理解
-4. 各層の詳細設計(7-10章)を順番に読む
-
-### 特定の課題を解決したい方
-- **状態管理に悩んでいる** → [UI層の詳細設計](07_UI層の詳細設計.md)
-- **トランザクション管理** → [Application層の詳細設計](08_Application層の詳細設計.md)
-- **エラーハンドリング** → [信頼性パターン](11_信頼性パターン.md)
-- **パフォーマンス改善** → [パフォーマンス最適化](12_パフォーマンス最適化.md)
-
-### 実装を始める方
-1. [レイヤー構成と責務](05_レイヤー構成と責務.md) で基本構造を理解
-2. [具体例: 商品管理機能](06_具体例_商品管理機能.md) をテンプレートとして利用
-3. [ベストプラクティス](14_ベストプラクティス.md) を参照しながら実装
-
----
-
-## 📝 注意事項
-
-このドキュメントは、中規模(5-20人)のチームで開発する業務アプリケーションを想定しています。
-小規模プロジェクトや大規模エンタープライズでは、一部のパターンを簡略化または強化する必要があります。
-
----
-
-**完全版ドキュメント**: [blazor-architecture-guide-complete-fixed.md](../blazor-architecture-guide-complete-fixed.md)
-
-
 
 
 
 ---
 
-<a id="01-イントロダクション"></a>
-
-# 📄 01 イントロダクション
-
-*元ファイル: `01_イントロダクション.md`*
-
----
-
+# 1. イントロダクション
 
 
 ---
@@ -409,20 +202,391 @@ public class DeleteProductHandler : IRequestHandler<DeleteProductCommand, Result
 
 ---
 
+### 1.4 段階的な学習パス
 
+#### **3層アーキテクチャ経験者向け（推奨）**
+
+WPF/WinForms + RESTful Web API の経験がある方は、以下の順序で学習することを推奨します。
+
+**Step 1: 既知の概念から始める（30分）**
+1. [18_3層アーキテクチャからの移行ガイド](18_3層アーキテクチャからの移行ガイド.md) を読む
+2. [07_レイヤー構成と責務](07_レイヤー構成と責務.md) で3層アーキテクチャとの対応を確認
+
+**Step 2: UI層の新パターンを理解（1時間）**
+1. Dumb Component → WPFのUserControlと同じ
+2. Smart Component → WPFのWindowと同じ
+3. Store → ViewModelの状態管理部分
+4. PageActions → ViewModelのICommand部分
+
+**Step 3: MediatRとCQRSを理解（1時間）**
+1. なぜMediatRが必要か → Pipeline Behaviorsのメリット
+2. CQRSとは何か → 読み取りと書き込みの最適化
+
+**Step 4: 実装パターンを確認（30分）**
+1. [08_具体例_商品管理機能](08_具体例_商品管理機能.md) でCRUD全パターンを確認
+2. [05_パターンカタログ一覧](05_パターンカタログ一覧.md) を実装時のリファレンスに
+
+**合計学習時間: 約3時間**
+
+---
+
+#### **Blazor初心者向け**
+
+Blazor未経験の方は、以下の順序で学習することを推奨します。
+
+**Step 1: 全体像の把握（30分）**
+1. [03_アーキテクチャ概要](03_アーキテクチャ概要.md) で設計原則を理解
+2. [06_全体アーキテクチャ図](06_全体アーキテクチャ図.md) でデータフローを確認
+
+**Step 2: 各層の詳細を順番に学習（3時間）**
+1. [09_UI層の詳細設計](09_UI層の詳細設計.md) - Component, Store, Actions
+2. [10_Application層の詳細設計](10_Application層の詳細設計.md) - Command, Query, Handler
+3. [11_Domain層の詳細設計](11_Domain層の詳細設計.md) - Entity, Value Object
+4. [12_Infrastructure層の詳細設計](12_Infrastructure層の詳細設計.md) - Repository
+
+**Step 3: 実装パターンを確認（1時間）**
+1. [08_具体例_商品管理機能](08_具体例_商品管理機能.md)
+2. [05_パターンカタログ一覧](05_パターンカタログ一覧.md)
+
+**合計学習時間: 約4.5時間**
+
+---
+
+#### **実装を始める方**
+
+すぐに実装を始めたい方は、以下をクイックリファレンスとして活用してください。
+
+**実装時のチェックリスト:**
+1. [05_パターンカタログ一覧](05_パターンカタログ一覧.md) - パターン選択フローチャート
+2. [08_具体例_商品管理機能](08_具体例_商品管理機能.md) - コード例のテンプレート
+3. [16_ベストプラクティス](16_ベストプラクティス.md) - よくある落とし穴
+4. [15_テスト戦略](15_テスト戦略.md) - テストの書き方
+
+---
 
 
 
 ---
 
-<a id="02-アーキテクチャ概要"></a>
+# 1. このプロジェクトについて
 
-# 📄 02 アーキテクチャ概要
-
-*元ファイル: `02_アーキテクチャ概要.md`*
 
 ---
 
+## 🤖 AI駆動開発のための実装パターンカタログ
+
+### このプロジェクトの真の目的
+
+このプロジェクトは、**AI駆動開発における実装見本（パターンカタログ）**として設計されています。
+
+従来の「ドキュメント+サンプルコード」ではなく、AIが**直接参照して実装を生成するためのリファレンス実装**です。
+
+---
+
+## 📖 使用シナリオ
+
+### シナリオ1: 新規アプリケーション開発時
+
+```mermaid
+graph LR
+    A[要件定義] --> B[ドメイン知識]
+    A --> C[UIイメージ]
+    A --> D[DB設計]
+    B --> E[AI]
+    C --> E
+    D --> E
+    E --> F[このプロジェクトを参照]
+    F --> G[アーキテクチャ構成]
+    G --> H[プロジェクト構造生成]
+```
+
+**AIへの指示例:**
+```
+「ECサイトを構築します。以下のドメインモデルを実装してください。
+参考実装: VSASampleプロジェクトのアーキテクチャを使用」
+```
+
+**AIの動作:**
+1. VSASampleの層構成を参照
+2. Clean Architecture + CQRS + MediatRパターンを採用
+3. Domainモデル、Application層、Infrastructure層を生成
+
+---
+
+### シナリオ2: 機能実装時（パターン参照）
+
+```mermaid
+graph TD
+    A[機能要求] --> B{機能の性質は?}
+    B -->|データ取得| C[参照系パターン]
+    B -->|データ作成| D[作成系パターン]
+    B -->|データ更新| E[更新系パターン]
+    B -->|データ削除| F[削除系パターン]
+
+    C --> G[GetProducts/SearchProducts参照]
+    D --> H[CreateProduct参照]
+    E --> I[UpdateProduct参照]
+    F --> J[DeleteProduct/BulkDelete参照]
+
+    G --> K[AIが実装生成]
+    H --> K
+    I --> K
+    J --> K
+```
+
+**参照系機能の実装例:**
+
+**AIへの指示:**
+```
+「商品を名前で検索し、価格でフィルタリングして、
+ページング表示する機能を実装してください」
+```
+
+**AIの動作:**
+1. `SearchProductsQuery/Handler` パターンを参照
+2. フィルタリング条件をパラメータ化
+3. Dapper を使った最適化クエリを生成
+4. ページング処理を実装
+
+**更新系機能の実装例:**
+
+**AIへの指示:**
+```
+「商品の価格と在庫数を更新する機能を実装してください。
+楽観的排他制御を含めてください」
+```
+
+**AIの動作:**
+1. `UpdateProductCommand/Handler` パターンを参照
+2. Versionフィールドを含めた楽観的排他制御を実装
+3. `Product.ChangePrice()`, `Product.ChangeStock()` を呼び出し
+4. IdempotencyKeyで重複実行を防止
+
+---
+
+## 🗂️ パターンの分類と構成
+
+このプロジェクトのコードは、**技術的分類**ではなく**パターン単位**で整理されています。
+
+### フォルダ構造の意図
+
+```
+src/ProductCatalog.Application/
+  └── Features/
+      └── Products/
+          ├── CreateProduct/      ← 【作成パターン】
+          │   ├── CreateProductCommand.cs
+          │   ├── CreateProductHandler.cs
+          │   └── CreateProductValidator.cs
+          │
+          ├── UpdateProduct/      ← 【更新パターン】
+          │   ├── UpdateProductCommand.cs
+          │   ├── UpdateProductHandler.cs
+          │   └── UpdateProductValidator.cs
+          │
+          ├── DeleteProduct/      ← 【削除パターン】
+          ├── BulkDeleteProducts/ ← 【一括削除パターン】
+          ├── GetProducts/        ← 【一覧取得パターン】
+          ├── GetProductById/     ← 【単一取得パターン】
+          └── SearchProducts/     ← 【検索パターン】
+```
+
+**この構成の理由:**
+
+✅ **機能単位で完結** - 1つのパターンに必要なファイルが全て1箇所に
+✅ **AIが探しやすい** - 「更新機能」を実装したい → `UpdateProduct/` を見る
+✅ **パターンの全体像が明確** - Command/Handler/Validatorの関係が見える
+✅ **追加・削除が容易** - フォルダごと追加/削除すればよい
+
+---
+
+## 🎓 AIの学習パス（推奨順序）
+
+### ステップ1: 基礎理解（1日目）
+
+1. **このドキュメント** - プロジェクトの目的理解
+2. [03_アーキテクチャ概要](03_アーキテクチャ概要.md) - 全体構成の把握
+3. [05_パターンカタログ一覧](05_パターンカタログ一覧.md) - どんなパターンがあるか把握
+
+### ステップ2: 層別理解（2-3日目）
+
+1. **Domain層から** - ビジネスロジックの中核を理解
+   - [11_Domain層の詳細設計](11_Domain層の詳細設計.md)
+   - `src/ProductCatalog.Domain/Products/Product.cs` を読む
+
+2. **Application層** - ユースケース実装パターンを理解
+   - [10_Application層の詳細設計](10_Application層の詳細設計.md) (CQRS、Command/Query実装)
+   - [08_具体例_商品管理機能](08_具体例_商品管理機能.md) (具体的な実装例)
+
+3. **Infrastructure層** - 技術的詳細の実装を理解
+   - [12_Infrastructure層の詳細設計](12_Infrastructure層の詳細設計.md)
+
+4. **UI層** - ユーザーインタラクションを理解
+   - [09_UI層の詳細設計](09_UI層の詳細設計.md)
+
+### ステップ3: パターン別理解（4-5日目）
+
+実際のコードを読みながら、パターンを習得:
+
+**参照系:**
+```
+1. GetProducts (基本的な一覧取得)
+   → src/ProductCatalog.Application/Features/Products/GetProducts/
+
+2. GetProductById (単一取得)
+   → src/ProductCatalog.Application/Features/Products/GetProductById/
+
+3. SearchProducts (複雑な検索)
+   → src/ProductCatalog.Application/Features/Products/SearchProducts/
+```
+
+**更新系:**
+```
+1. CreateProduct (作成)
+   → src/ProductCatalog.Application/Features/Products/CreateProduct/
+
+2. UpdateProduct (更新)
+   → src/ProductCatalog.Application/Features/Products/UpdateProduct/
+
+3. DeleteProduct (削除)
+   → src/ProductCatalog.Application/Features/Products/DeleteProduct/
+
+4. BulkDeleteProducts (一括削除)
+   → src/ProductCatalog.Application/Features/Products/BulkDeleteProducts/
+```
+
+### ステップ4: 実践（6-7日目）
+
+[19_AIへの実装ガイド](19_AIへの実装ガイド.md) を参考に:
+- よくある実装ミスを確認
+- パターンの組み合わせ方を学習
+- 実装チェックリストで確認
+
+---
+
+## 🔍 パターンの探し方
+
+### ケース1: 「〇〇機能を実装したい」
+
+```
+Q: 商品の価格を変更する機能を実装したい
+A: 更新系パターン → UpdateProduct/ を参照
+
+Q: 商品を検索して表示したい
+A: 参照系パターン → SearchProducts/ を参照
+
+Q: 複数の商品を一度に削除したい
+A: 一括処理パターン → BulkDeleteProducts/ を参照
+```
+
+### ケース2: 「〇〇の技術的な実装を知りたい」
+
+```
+Q: 楽観的排他制御はどう実装する？
+A: UpdateProductCommand を見る（Versionフィールド）
+
+Q: ページング処理はどう実装する？
+A: SearchProductsQuery を見る（Page/PageSize）
+
+Q: 親子関係のエンティティはどう扱う？
+A: Product.Images を見る（AddImage/RemoveImageメソッド）
+
+Q: 状態遷移はどう制御する？
+A: Product.Publish() を見る（Draft→Published）
+```
+
+### ケース3: 「〇〇のビジネスルールはどこに書く？」
+
+```
+Q: 在庫がある商品は削除できない
+A: Product.Delete() 内に実装（Domain層）
+
+Q: 公開中の商品は50%以上値下げできない
+A: Product.ChangePrice() 内に実装（Domain層）
+
+Q: 商品名は200文字以内
+A: Product.ChangeName() 内に実装（Domain層）
+   または Validator で検証（Application層）
+```
+
+---
+
+## ⚙️ AIが参照すべきコンポーネント
+
+### コード内のコメント
+
+すべてのパターンには、以下の情報が含まれています:
+
+```csharp
+/// <summary>
+/// 商品更新Command
+///
+/// 【パターン: 更新系Command】
+///
+/// 使用シナリオ:
+/// - 既存データの部分的な変更が必要な場合
+/// - 楽観的排他制御が必要な場合
+///
+/// 実装ガイド:
+/// - 必ずVersionを含めて楽観的排他制御を実装
+/// - 部分更新の場合は、変更するフィールドのみをパラメータに含める
+/// - 冪等性キーを含めて重複実行を防止
+///
+/// AI実装時の注意:
+/// - Handler内でEntity.ChangeXxx()メソッドを呼ぶ
+/// - 直接フィールドを変更しない
+/// - 変更がない場合は早期リターン
+/// </summary>
+public sealed record UpdateProductCommand(...) : ICommand<Result>
+```
+
+**AIはこれらのコメントを読んで:**
+- いつこのパターンを使うべきか理解
+- 実装時の注意点を把握
+- よくあるミスを回避
+
+---
+
+## 🎯 このプロジェクトが目指すもの
+
+### ゴール
+
+**AIがこのプロジェクトだけを見れば、エンタープライズグレードのBlazorアプリケーションを実装できる**
+
+### 含まれているもの
+
+- ✅ 基本CRUD操作の完全な実装例
+- ✅ 検索、フィルタリング、ページング
+- ✅ 一括処理パターン
+- ✅ 複雑なドメインモデル（集約ルート、親子関係、状態遷移）
+- ✅ 横断的関心事（Logging, Validation, Caching, Transaction, Idempotency）
+- ✅ SignalRによるリアルタイム更新
+- ✅ 楽観的排他制御
+- ✅ Outboxパターン（分散トランザクション）
+
+### 含まれていないもの
+
+- ❌ 認証・認可の詳細実装（基本的なRoleベース認証のみ）
+- ❌ 完全なテストコード（別フェーズで追加予定）
+- ❌ Inbox/Sagaパターン（将来の拡張）
+
+---
+
+## 📚 次に読むべきドキュメント
+
+1. [03_アーキテクチャ概要](03_アーキテクチャ概要.md) - 全体構成の理解
+2. [05_パターンカタログ一覧](05_パターンカタログ一覧.md) - 利用可能なパターンの把握
+3. [19_AIへの実装ガイド](19_AIへの実装ガイド.md) - 実装時の注意点
+
+---
+
+**🤖 このドキュメントは、AIがこのプロジェクトを効果的に活用するために作成されています**
+
+
+
+---
+
+# 2. アーキテクチャ概要
 
 
 ---
@@ -485,30 +649,94 @@ Component内でDB直接アクセス、API呼び出し、ファイル操作等が
 
 このアーキテクチャは以下のスタイルを組み合わせています:
 
-#### **Vertical Slice Architecture (VSA)**
+#### **パターンカタログ型Clean Architecture**
+
+**🎯 このプロジェクトの特徴:**
+
+このプロジェクトは、**AI駆動開発のための実装パターンカタログ**として設計されています。
+従来の「層分離」と「機能凝集」のバランスを取り、AIが参照しやすいフォルダ構成を採用しています。
+
+**フォルダ構成:**
 
 ```
-/Features/
-  /Products/          ← 商品機能のすべてがここに凝集
-    /UI/
-      ProductList.razor
-      ProductList.Actions.cs
-      ProductsStore.cs
-      ProductsState.cs
-    /UseCases/
-      DeleteProduct/
-        DeleteProductCommand.cs
-        DeleteProductHandler.cs
-    /Domain/
-      Product.cs
-    /Infrastructure/
-      EfProductRepository.cs
+src/
+├── ProductCatalog.Web/                    # UI層
+│   └── Features/
+│       └── Products/                      # 機能別に整理
+│           ├── Pages/
+│           ├── Actions/
+│           ├── Store/
+│           └── Components/
+│
+├── ProductCatalog.Application/            # Application層
+│   └── Features/
+│       └── Products/                      # 機能別に整理
+│           ├── CreateProduct/             # ← パターン単位で凝集
+│           │   ├── CreateProductCommand.cs
+│           │   ├── CreateProductHandler.cs
+│           │   └── CreateProductValidator.cs
+│           ├── UpdateProduct/             # ← パターン単位で凝集
+│           │   ├── UpdateProductCommand.cs
+│           │   ├── UpdateProductHandler.cs
+│           │   └── UpdateProductValidator.cs
+│           ├── DeleteProduct/
+│           ├── GetProducts/
+│           ├── GetProductById/
+│           ├── SearchProducts/
+│           └── BulkDeleteProducts/
+│
+├── ProductCatalog.Domain/                 # Domain層
+│   ├── Common/
+│   │   ├── AggregateRoot.cs              # 集約ルート基底クラス
+│   │   ├── Entity.cs
+│   │   └── ValueObject.cs
+│   └── Products/
+│       ├── Product.cs                     # 集約ルート
+│       ├── ProductImage.cs                # 子エンティティ
+│       ├── ProductId.cs
+│       ├── Money.cs
+│       └── ProductStatus.cs
+│
+└── ProductCatalog.Infrastructure/         # Infrastructure層
+    ├── Persistence/
+    │   ├── Repositories/
+    │   └── Configurations/
+    ├── Behaviors/                         # 横断的関心事
+    └── Outbox/
 ```
+
+**なぜこの構成なのか？（AI視点）**
+
+✅ **パターン単位で完結**
+- 「更新機能を実装したい」→ `UpdateProduct/` フォルダを見るだけ
+- Command/Handler/Validatorが1箇所に集約
+- 機能の追加・削除が容易
+
+✅ **層分離は維持**
+- Clean Architectureの依存方向は厳守
+- DIP（依存性逆転の原則）を適用
+- テスタビリティを確保
+
+✅ **AIが参照しやすい**
+- 同種のパターン（全てのCommand、全てのQuery）を比較しやすい
+- CQRSの区別が明確
+- 実装パターンの発見性が高い
+
+**従来のVSA（全層を1フォルダに集約）との違い:**
+
+| 観点 | 従来のVSA | このプロジェクト |
+|-----|----------|----------------|
+| 層分離 | 機能ごとに全層を含む | 層は分離、層内で機能別整理 |
+| 依存方向 | 機能内で完結 | Clean Architectureの依存方向 |
+| AI参照 | 機能全体を見る | パターン単位で見る |
+| 適用場面 | 機能間の結合が弱い場合 | パターン学習・再利用 |
 
 **メリット:**
-- 機能追加時の影響範囲が限定的
-- チームメンバーが並行作業しやすい
-- 不要な機能の削除が容易
+- 📚 **パターンカタログとして最適** - AIが同種のパターンを比較学習しやすい
+- 🔍 **高い発見性** - 「検索機能を実装したい」→ `SearchProducts/` を参照
+- 🏗️ **拡張性** - 新しいパターンをフォルダ単位で追加
+- 🧪 **テスタビリティ** - 層分離により単体テストが容易
+- 📖 **明確な責務** - CQRS により読み取り/書き込みが明確
 
 #### **CQRS (Command Query Responsibility Segregation)**
 
@@ -549,20 +777,309 @@ await _hubContext.Clients.All.SendAsync("ProductDeleted", productId);
 
 ---
 
+### 2.3 3層アーキテクチャとの対応表
 
+**WPF/WinForms + RESTful Web API 経験者向けのマッピング**
+
+このアーキテクチャは、古典的な3層アーキテクチャの概念を踏襲しつつ、現代的なパターンで再構築しています。
+
+#### **全体対応表**
+
+| 3層アーキテクチャ | このアーキテクチャ | 主な変更点 |
+|----------------|-----------------|----------|
+| **Presentation Layer** | **UI Layer (Blazor)** | WPF/WinForms → Blazor Component |
+| ViewModel | **Store + PageActions** | 責務を分離（状態管理 + 手順） |
+| View | Smart/Dumb Component | Container/Presentational分離 |
+| **Business Logic Layer** | **Application Layer** | Service → MediatR Handler |
+| ServiceクラスのDI | MediatR + Pipeline Behaviors | 横断的関心事の統一 |
+| DTOマッピング | Command/Query | CQRS適用 |
+| **Data Access Layer** | **Infrastructure Layer** | ほぼ同じ概念 |
+| Repository | Repository | インターフェイスはDomain層に配置 |
+| DbContext | DbContext | 寿命管理が厳密化 |
+
+#### **詳細な対応: ビジネスロジック層**
+
+**3層アーキテクチャ（従来）:**
+```csharp
+// Serviceクラスに全てを実装
+public class ProductService : IProductService
+{
+    private readonly IProductRepository _repository;
+    private readonly ILogger _logger;
+    private readonly IAuthorizationService _authz;
+
+    public async Task<Result> DeleteProductAsync(Guid id)
+    {
+        // 1. ログ出力
+        _logger.LogInformation("商品削除開始: {Id}", id);
+
+        // 2. 認可チェック
+        if (!await _authz.AuthorizeAsync("Product.Delete"))
+            return Result.Fail("権限がありません");
+
+        // 3. トランザクション
+        using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        try {
+            // 4. ビジネスロジック
+            var product = await _repository.GetAsync(id);
+            await _repository.DeleteAsync(product);
+            await _dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch { await transaction.RollbackAsync(); throw; }
+
+        // 5. 監査ログ
+        await _auditLog.SaveAsync(new AuditEntry(...));
+
+        return Result.Success();
+    }
+}
+```
+
+**このアーキテクチャ:**
+```csharp
+// Handlerはビジネスロジックのみ
+public class DeleteProductHandler : IRequestHandler<DeleteProductCommand, Result>
+{
+    private readonly IProductRepository _repository;
+
+    public async Task<Result> Handle(DeleteProductCommand cmd, CancellationToken ct)
+    {
+        // ビジネスロジックのみ！
+        // ログ、認可、トランザクション、監査ログは自動適用
+        var product = await _repository.GetAsync(new ProductId(cmd.ProductId), ct);
+        if (product is null) return Result.Fail("商品が見つかりません");
+
+        product.Delete();  // ドメインルール
+        await _repository.SaveAsync(product, ct);
+        return Result.Success();
+    }
+}
+
+// Pipeline Behaviors（DI登録で自動適用）
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuditLogBehavior<,>));
+```
+
+**違い:**
+- **3層**: 横断的関心事が各Serviceクラスに散在
+- **このアーキテクチャ**: Pipeline Behaviorsで一箇所に集約、自動適用
+
+詳細は [08_Application層の詳細設計 - 8.0 なぜMediatRが必要か？](10_Application層の詳細設計.md#80-なぜmediatrが必要か-serviceクラス直接diとの比較) を参照してください。
+
+#### **詳細な対応: UI層**
+
+**3層アーキテクチャ（WPF/WinForms）:**
+```csharp
+// ViewModelに全てを実装
+public class ProductListViewModel : INotifyPropertyChanged
+{
+    private ObservableCollection<Product> _products = new();
+    public ObservableCollection<Product> Products
+    {
+        get => _products;
+        set { _products = value; OnPropertyChanged(); }
+    }
+
+    public ICommand DeleteCommand { get; }
+
+    private async Task DeleteProductAsync(Guid id)
+    {
+        var result = MessageBox.Show("削除しますか?", "確認", MessageBoxButton.YesNo);
+        if (result == MessageBoxResult.No) return;
+
+        await _productService.DeleteAsync(id);
+        Products.Remove(Products.First(p => p.Id == id));
+    }
+}
+```
+
+**このアーキテクチャ:**
+```csharp
+// Store: 状態管理のみ
+public class ProductsStore
+{
+    private ProductsState _state = new();  // 不変状態
+    public event Func<Task>? OnChangeAsync;
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // I/O実行と状態更新
+        using var scope = _scopeFactory.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+        var result = await mediator.Send(new DeleteProductCommand(id), ct);
+
+        if (result.IsSuccess)
+            await LoadAsync(ct);  // 状態再取得
+
+        return result.IsSuccess;
+    }
+}
+
+// PageActions: UI手順のオーケストレーション
+public class ProductListActions
+{
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // UI手順の制御のみ
+        if (!await _confirm.ShowAsync("削除しますか?")) return;
+
+        var result = await _store.DeleteAsync(id, ct);
+
+        if (result) _toast.Success("削除しました");
+        else _toast.Error("削除に失敗しました");
+    }
+}
+```
+
+**違い:**
+- **3層**: ViewModel に状態管理とUI手順が混在
+- **このアーキテクチャ**: Store（状態） + PageActions（手順）に分離
+
+詳細は [07_UI層の詳細設計 - 7.0 WPF/WinFormsとの比較](09_UI層の詳細設計.md#70-wpfwinformsとの比較) を参照してください。
+
+---
+
+### 2.4 フロントエンド状態管理との概念比較
+
+**React/Vue界隈の状態管理ライブラリとの関係**
+
+このアーキテクチャの**Storeパターン**は、React/Vue界隈でよく使われる以下の状態管理ライブラリと**似た概念**を採用しています。
+
+#### **参考にした概念**
+
+| ライブラリ | 概要 | このアーキテクチャでの対応 |
+|----------|------|------------------------|
+| **Jotai** | Reactのアトミック状態管理 | Store の不変状態管理 |
+| **Redux** | 単方向データフローの状態管理 | Store の単方向データフロー |
+| **Zustand** | シンプルなReact状態管理 | Store の軽量実装 |
+| **Recoil** | Facebookの状態管理 | Store のイベント駆動 |
+
+**注意:** これらのライブラリを**直接使用するわけではありません**。Blazorに最適化した独自実装を行っています。
+
+#### **共通する設計概念**
+
+##### **1. 不変（Immutable）な状態管理**
+
+```csharp
+// ✅ このアーキテクチャ（Storeパターン）
+public record ProductsState
+{
+    public ImmutableList<ProductDto> Products { get; init; } = ImmutableList<ProductDto>.Empty;
+    public bool IsLoading { get; init; }
+}
+
+// 状態更新は新しいインスタンス生成
+SetState(_state with { IsLoading = true });
+```
+
+```javascript
+// 参考: Jotai (React)
+const productsAtom = atom([]);
+const isLoadingAtom = atom(false);
+
+// 状態更新は新しい値をセット
+setProducts([...products, newProduct]);
+```
+
+**共通点:**
+- 状態オブジェクトを直接変更しない（Immutable）
+- 常に新しいインスタンスを生成して差し替える
+- 予測可能な状態遷移
+
+##### **2. 単方向データフロー**
+
+```
+[このアーキテクチャ]          [Redux/Jotai]
+Action/Event                  Action
+  ↓                            ↓
+Store.UpdateState()          Reducer/Setter
+  ↓                            ↓
+Store.OnChangeAsync          Subscriber
+  ↓                            ↓
+Component.StateHasChanged()  Component Re-render
+```
+
+**共通点:**
+- データは一方向にのみ流れる
+- 状態更新がトリガーとなって再描画
+- デバッグがしやすい
+
+##### **3. イベント駆動の再描画**
+
+```csharp
+// ✅ このアーキテクチャ
+public class ProductsStore
+{
+    public event Func<Task>? OnChangeAsync;  // イベント
+
+    private void SetState(ProductsState newState)
+    {
+        _state = newState;
+        OnChangeAsync?.Invoke();  // 購読者に通知
+    }
+}
+
+// Component での購読
+protected override void OnInitialized()
+{
+    Store.OnChangeAsync += () => InvokeAsync(StateHasChanged);
+}
+```
+
+```javascript
+// 参考: Zustand (React)
+const useProductsStore = create((set) => ({
+  products: [],
+  setProducts: (products) => set({ products }),  // 自動で購読者に通知
+}));
+
+// Component での使用
+const products = useProductsStore((state) => state.products);  // 自動購読
+```
+
+**共通点:**
+- 状態変更を購読（Subscribe）する仕組み
+- 状態が変わると自動で通知される
+- 手動でのポーリングは不要
+
+#### **WPF/WinFormsのMVVMとの違い**
+
+| 観点 | MVVM (WPF/WinForms) | Store Pattern (このアーキテクチャ) | Jotai/Redux (React) |
+|------|-------------------|-------------------------------|-------------------|
+| **状態の可変性** | 可変（Mutable） | 不変（Immutable） | 不変（Immutable） |
+| **変更通知** | INotifyPropertyChanged | OnChangeAsync イベント | Subscriber通知 |
+| **データバインディング** | 双方向バインディング | 単方向データフロー | 単方向データフロー |
+| **状態更新** | プロパティ直接変更 | 新しいインスタンス生成 | 新しいインスタンス生成 |
+
+**例: 商品リスト更新**
+
+```csharp
+// ❌ MVVM (WPF) - 可変状態
+Products.Add(newProduct);  // ObservableCollectionを直接変更
+
+// ✅ Store Pattern - 不変状態
+SetState(_state with {
+    Products = _state.Products.Add(newProduct)  // 新しいリスト生成
+});
+```
+
+**メリット:**
+- **デバッグが容易**: 状態履歴をトレースしやすい
+- **並行制御**: 不変なので競合が起きにくい
+- **時間旅行デバッグ**: 状態のスナップショットを保存可能
+
+詳細は [07_UI層の詳細設計 - 7.2 Storeパターン](09_UI層の詳細設計.md#72-storeパターン) を参照してください。
+
+---
 
 
 
 ---
 
-<a id="03-採用技術とパターン"></a>
-
-# 📄 03 採用技術とパターン
-
-*元ファイル: `03_採用技術とパターン.md`*
-
----
-
+# 3. 採用技術とパターン
 
 
 ---
@@ -974,18 +1491,715 @@ public class OrderProcessSaga
 
 
 
+---
+
+# 3. パターンカタログ一覧
 
 
 ---
 
-<a id="04-全体アーキテクチャ図"></a>
+## 📚 このプロジェクトで提供されるパターン
 
-# 📄 04 全体アーキテクチャ図
-
-*元ファイル: `04_全体アーキテクチャ図.md`*
+このドキュメントは、AI駆動開発で参照すべきパターンの完全なインデックスです。
 
 ---
 
+## 🗂️ パターン分類
+
+### 1. 参照系パターン（Query）
+
+データを取得するための読み取り専用パターン。
+
+| パターン名 | 使用シナリオ | 複雑度 | 実装場所 |
+|-----------|------------|-------|---------|
+| **GetProducts** | 全商品の一覧取得 | ⭐ 簡単 | `/Features/Products/GetProducts/` |
+| **GetProductById** | IDで単一商品を取得 | ⭐ 簡単 | `/Features/Products/GetProductById/` |
+| **SearchProducts** | 複雑な検索、フィルタリング、ページング | ⭐⭐⭐ 複雑 | `/Features/Products/SearchProducts/` |
+| **ExportProductsToCsv** | 検索結果のCSVエクスポート | ⭐⭐ 普通 | `/Features/Products/ExportProductsToCsv/` |
+
+#### GetProducts - 一覧取得パターン
+
+**いつ使うか:**
+- 全データを取得して表示したい場合
+- フィルタリングやページングが不要な場合
+- キャッシュを効かせたい場合
+
+**特徴:**
+```csharp
+// ✅ シンプルなQuery
+public sealed record GetProductsQuery() : IQuery<Result<IEnumerable<ProductDto>>>, ICacheableQuery
+{
+    public string GetCacheKey() => "products-all";
+    public int CacheDurationMinutes => 5;
+}
+
+// ✅ Dapperで最適化されたクエリ
+public async Task<IEnumerable<ProductDto>> Handle(GetProductsQuery query, CancellationToken ct)
+{
+    // Readモデル（Dapper）で高速取得
+    var sql = "SELECT Id, Name, Description, Price, Stock, Status FROM Products WHERE IsDeleted = 0";
+    return await _connection.QueryAsync<ProductDto>(sql);
+}
+```
+
+**ファイル:**
+- `GetProductsQuery.cs` - Query定義
+- `GetProductsHandler.cs` - 取得ロジック
+
+---
+
+#### GetProductById - 単一取得パターン
+
+**いつ使うか:**
+- 詳細画面で単一のエンティティを表示したい場合
+- 編集画面でデータをロードしたい場合
+
+**特徴:**
+```csharp
+// ✅ IDで検索
+public sealed record GetProductByIdQuery(Guid ProductId)
+    : IQuery<Result<ProductDetailDto>>, ICacheableQuery
+{
+    public string GetCacheKey() => $"product_{ProductId}";
+    public int CacheDurationMinutes => 10;
+}
+
+// ✅ 関連データも含めて取得
+public async Task<ProductDetailDto> Handle(GetProductByIdQuery query, CancellationToken ct)
+{
+    // Repository経由で集約全体を取得
+    var product = await _repository.GetAsync(new ProductId(query.ProductId), ct);
+
+    // DTOに変換（画像も含む）
+    return ProductDetailDto.FromDomain(product);
+}
+```
+
+**ファイル:**
+- `GetProductByIdQuery.cs`
+- `GetProductByIdHandler.cs`
+- `ProductDetailDto.cs` - 詳細情報用DTO
+
+---
+
+#### SearchProducts - 検索・フィルタリング・ページングパターン
+
+**いつ使うか:**
+- ユーザーが条件を指定してデータを検索する場合
+- 大量データをページング表示する場合
+- 複数の条件でフィルタリングする場合
+
+**特徴:**
+```csharp
+// ✅ 柔軟な検索条件
+public sealed record SearchProductsQuery(
+    string? NameFilter = null,        // 名前で部分一致検索
+    decimal? MinPrice = null,         // 最低価格
+    decimal? MaxPrice = null,         // 最高価格
+    ProductStatus? Status = null,     // ステータス
+    int Page = 1,                     // ページ番号（1始まり）
+    int PageSize = 20,                // ページサイズ
+    string OrderBy = "Name",          // ソート項目
+    bool IsDescending = false         // 降順か
+) : IQuery<Result<PagedResult<ProductDto>>>, ICacheableQuery;
+
+// ✅ 動的クエリ生成
+public async Task<PagedResult<ProductDto>> Handle(SearchProductsQuery query, CancellationToken ct)
+{
+    var sql = new StringBuilder("SELECT * FROM Products WHERE IsDeleted = 0");
+    var parameters = new DynamicParameters();
+
+    // 条件に応じてWHERE句を追加
+    if (!string.IsNullOrEmpty(query.NameFilter))
+    {
+        sql.Append(" AND Name LIKE @NameFilter");
+        parameters.Add("NameFilter", $"%{query.NameFilter}%");
+    }
+
+    if (query.MinPrice.HasValue)
+    {
+        sql.Append(" AND Price >= @MinPrice");
+        parameters.Add("MinPrice", query.MinPrice.Value);
+    }
+
+    // ソート、ページング処理...
+}
+```
+
+**ファイル:**
+- `SearchProductsQuery.cs`
+- `SearchProductsHandler.cs`
+- `PagedResult.cs` - ページング結果を表すDTO
+
+---
+
+#### ExportProductsToCsv - CSVエクスポートパターン
+
+**いつ使うか:**
+- 検索結果をCSVファイルでダウンロードしたい場合
+- Excel等の外部ツールでデータ分析したい場合
+- データバックアップやデータ移行の準備
+
+**特徴:**
+```csharp
+// ✅ 検索条件を受け取り、CSVバイナリを返す
+public sealed record ExportProductsToCsvQuery(
+    string? NameFilter = null,
+    decimal? MinPrice = null,
+    decimal? MaxPrice = null,
+    ProductStatus? Status = null
+) : IQuery<Result<byte[]>>;  // バイナリデータを返す
+
+// ✅ CsvHelperでCSV生成
+public async Task<Result<byte[]>> Handle(ExportProductsToCsvQuery query, CancellationToken ct)
+{
+    // 1. 検索条件でデータ取得（上限10,000件）
+    var products = await GetProductsByFilterAsync(query, maxResults: 10000, ct);
+
+    // 2. MemoryStreamでCSV生成
+    using var memoryStream = new MemoryStream();
+    using var writer = new StreamWriter(memoryStream, new UTF8Encoding(true)); // BOM付きUTF-8
+    using var csv = new CsvWriter(writer, CultureInfo.GetCultureInfo("ja-JP"));
+
+    // 3. ヘッダー書き込み
+    csv.WriteField("商品ID");
+    csv.WriteField("商品名");
+    csv.WriteField("価格");
+    csv.WriteField("在庫");
+    csv.NextRecord();
+
+    // 4. データ書き込み
+    foreach (var product in products)
+    {
+        csv.WriteField(product.Id);
+        csv.WriteField(product.Name);
+        csv.WriteField(product.Price);
+        csv.WriteField(product.Stock);
+        csv.NextRecord();
+    }
+
+    await writer.FlushAsync();
+    return Result.Success(memoryStream.ToArray());
+}
+```
+
+**UI側の使用例:**
+```csharp
+// PageActions
+public async Task ExportToCsvAsync(CancellationToken ct = default)
+{
+    var query = new ExportProductsToCsvQuery(
+        NameFilter: _store.GetState().SearchFilter.Name,
+        MinPrice: _store.GetState().SearchFilter.MinPrice,
+        MaxPrice: _store.GetState().SearchFilter.MaxPrice,
+        Status: _store.GetState().SearchFilter.Status
+    );
+
+    var result = await _mediator.Send(query, ct);
+
+    if (result.IsSuccess)
+    {
+        // ブラウザでダウンロード
+        var fileName = $"products_{DateTime.Now:yyyyMMddHHmmss}.csv";
+        await _jsRuntime.InvokeVoidAsync("downloadFile", fileName, "text/csv", result.Value);
+        _toast.Success("CSVファイルをダウンロードしました");
+    }
+}
+```
+
+**ファイル:**
+- `ExportProductsToCsvQuery.cs`
+- `ExportProductsToCsvHandler.cs`
+
+---
+
+### 2. 更新系パターン（Command）
+
+データを変更するための書き込みパターン。
+
+| パターン名 | 使用シナリオ | 複雑度 | 実装場所 |
+|-----------|------------|-------|---------|
+| **CreateProduct** | 新規商品の作成 | ⭐⭐ 普通 | `/Features/Products/CreateProduct/` |
+| **UpdateProduct** | 既存商品の更新 | ⭐⭐⭐ 複雑 | `/Features/Products/UpdateProduct/` |
+| **DeleteProduct** | 単一商品の削除 | ⭐⭐ 普通 | `/Features/Products/DeleteProduct/` |
+| **BulkDeleteProducts** | 複数商品の一括削除 | ⭐⭐⭐ 複雑 | `/Features/Products/BulkDeleteProducts/` |
+| **BulkUpdateProductPrices** | 複数商品の価格一括更新 | ⭐⭐⭐ 複雑 | `/Features/Products/BulkUpdateProductPrices/` |
+| **ImportProductsFromCsv** | CSVファイルから一括インポート | ⭐⭐⭐⭐ 高度 | `/Features/Products/ImportProductsFromCsv/` |
+
+#### CreateProduct - 作成パターン
+
+**いつ使うか:**
+- 新しいエンティティを作成する場合
+- ファクトリメソッドで初期化したい場合
+
+**特徴:**
+```csharp
+// ✅ 必要な情報だけをパラメータに
+public sealed record CreateProductCommand(
+    string Name,
+    string Description,
+    decimal Price,
+    int InitialStock
+) : ICommand<Result<Guid>>  // 作成されたIDを返す
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+// ✅ ファクトリメソッド経由で作成
+public async Task<Result<Guid>> Handle(CreateProductCommand command, CancellationToken ct)
+{
+    // Domainのファクトリメソッドで作成
+    var product = Product.Create(
+        command.Name,
+        command.Description,
+        new Money(command.Price),
+        command.InitialStock
+    );
+
+    await _repository.SaveAsync(product, ct);
+
+    return Result.Success(product.Id.Value);
+}
+```
+
+**ファイル:**
+- `CreateProductCommand.cs`
+- `CreateProductHandler.cs`
+- `CreateProductValidator.cs` - 入力検証
+
+---
+
+#### UpdateProduct - 更新パターン
+
+**いつ使うか:**
+- 既存データの一部または全部を変更したい場合
+- 楽観的排他制御が必要な場合
+
+**特徴:**
+```csharp
+// ✅ Versionで楽観的排他制御
+public sealed record UpdateProductCommand(
+    Guid ProductId,
+    string Name,
+    string Description,
+    decimal Price,
+    int Stock,
+    long Version  // 楽観的排他制御用
+) : ICommand<Result>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+// ✅ エンティティのメソッド経由で変更
+public async Task<Result> Handle(UpdateProductCommand command, CancellationToken ct)
+{
+    var product = await _repository.GetAsync(new ProductId(command.ProductId), ct);
+
+    if (product is null)
+        return Result.Fail("商品が見つかりません");
+
+    // Versionチェック（楽観的排他制御）
+    if (product.Version != command.Version)
+        return Result.Fail("他のユーザーによって更新されています。最新データを取得してください。");
+
+    // ドメインメソッド経由で変更
+    product.ChangeName(command.Name);
+    product.ChangeDescription(command.Description);
+    product.ChangePrice(new Money(command.Price));
+    product.ChangeStock(command.Stock);
+
+    await _repository.SaveAsync(product, ct);
+
+    return Result.Success();
+}
+```
+
+**ファイル:**
+- `UpdateProductCommand.cs`
+- `UpdateProductHandler.cs`
+- `UpdateProductValidator.cs`
+
+---
+
+#### DeleteProduct - 削除パターン
+
+**いつ使うか:**
+- 単一のエンティティを削除したい場合
+- 削除前にビジネスルールを検証したい場合（在庫チェックなど）
+
+**特徴:**
+```csharp
+// ✅ IDのみ指定
+public sealed record DeleteProductCommand(Guid ProductId) : ICommand<Result>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+// ✅ ドメインロジックで検証
+public async Task<Result> Handle(DeleteProductCommand command, CancellationToken ct)
+{
+    var product = await _repository.GetAsync(new ProductId(command.ProductId), ct);
+
+    if (product is null)
+        return Result.Fail("商品が見つかりません");
+
+    try
+    {
+        // ドメインロジックで検証（在庫がある商品は削除不可など）
+        product.Delete();
+    }
+    catch (DomainException ex)
+    {
+        return Result.Fail(ex.Message);
+    }
+
+    await _repository.SaveAsync(product, ct);
+
+    return Result.Success();
+}
+```
+
+**ファイル:**
+- `DeleteProductCommand.cs`
+- `DeleteProductHandler.cs`
+- `DeleteProductValidator.cs`
+
+---
+
+#### BulkDeleteProducts - 一括削除パターン
+
+**いつ使うか:**
+- 複数のエンティティを一度に削除したい場合
+- UI上でチェックボックスで複数選択して削除する場合
+
+**特徴:**
+```csharp
+// ✅ 複数IDを受け取る
+public sealed record BulkDeleteProductsCommand(
+    IEnumerable<Guid> ProductIds
+) : ICommand<Result<BulkOperationResult>>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+// ✅ 各削除は個別に検証
+public async Task<Result<BulkOperationResult>> Handle(BulkDeleteProductsCommand command, CancellationToken ct)
+{
+    var succeeded = 0;
+    var failed = 0;
+    var errors = new List<string>();
+
+    foreach (var productId in command.ProductIds)
+    {
+        var product = await _repository.GetAsync(new ProductId(productId), ct);
+
+        if (product is null)
+        {
+            failed++;
+            errors.Add($"商品 {productId} が見つかりません");
+            continue;
+        }
+
+        try
+        {
+            product.Delete();  // 各削除はビジネスルール検証を通す
+            await _repository.SaveAsync(product, ct);
+            succeeded++;
+        }
+        catch (DomainException ex)
+        {
+            failed++;
+            errors.Add($"商品 {productId}: {ex.Message}");
+        }
+    }
+
+    return Result.Success(new BulkOperationResult(succeeded, failed, errors));
+}
+```
+
+**ファイル:**
+- `BulkDeleteProductsCommand.cs`
+- `BulkDeleteProductsHandler.cs`
+- `BulkOperationResult.cs`
+
+---
+
+#### BulkUpdateProductPrices - 一括価格更新パターン
+
+**いつ使うか:**
+- セール時に複数商品の価格を一括変更したい場合
+- 価格改定を一括で適用したい場合
+- 商品グループごとの価格調整
+
+**特徴:**
+```csharp
+// ✅ ProductId、新価格、Versionのリストを受け取る
+public sealed record BulkUpdateProductPricesCommand(
+    IReadOnlyList<ProductPriceUpdate> Updates
+) : ICommand<Result<BulkOperationResult>>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+public record ProductPriceUpdate(
+    Guid ProductId,
+    decimal NewPrice,
+    int Version  // 楽観的排他制御
+);
+
+// ✅ 各商品のビジネスルールを個別に検証
+public async Task<Result<BulkOperationResult>> Handle(
+    BulkUpdateProductPricesCommand command,
+    CancellationToken ct)
+{
+    // 上限チェック（例: 100件まで）
+    if (command.Updates.Count > 100)
+        return Result.Fail("一度に更新できる商品は100件までです");
+
+    var succeeded = 0;
+    var failed = 0;
+    var errors = new List<string>();
+
+    foreach (var update in command.Updates)
+    {
+        var product = await _repository.GetAsync(new ProductId(update.ProductId), ct);
+
+        if (product is null)
+        {
+            failed++;
+            errors.Add($"商品 {update.ProductId} が見つかりません");
+            continue;
+        }
+
+        // Versionチェック
+        if (product.Version != update.Version)
+        {
+            failed++;
+            errors.Add($"商品 {update.ProductId} は他のユーザーによって更新されています");
+            continue;
+        }
+
+        try
+        {
+            // ドメインメソッドで価格変更（50%以上の値下げ制限などのルールを適用）
+            product.ChangePrice(new Money(update.NewPrice));
+            await _repository.SaveAsync(product, ct);
+            succeeded++;
+        }
+        catch (DomainException ex)
+        {
+            failed++;
+            errors.Add($"商品 {update.ProductId}: {ex.Message}");
+        }
+    }
+
+    return Result.Success(new BulkOperationResult(succeeded, failed, errors));
+}
+```
+
+**ファイル:**
+- `BulkUpdateProductPricesCommand.cs`
+- `BulkUpdateProductPricesHandler.cs`
+- `ProductPriceUpdate.cs`
+
+---
+
+#### ImportProductsFromCsv - CSVインポートパターン
+
+**いつ使うか:**
+- CSVファイルから商品データを一括登録したい場合
+- 外部システムからのデータ移行
+- バックアップデータの復元
+
+**特徴:**
+```csharp
+// ✅ Streamで受け取る（メモリ効率）
+public sealed record ImportProductsFromCsvCommand(
+    Stream CsvStream
+) : ICommand<Result<BulkOperationResult>>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+// ✅ ストリーム処理で大量データを効率的に処理
+public async Task<Result<BulkOperationResult>> Handle(
+    ImportProductsFromCsvCommand command,
+    CancellationToken ct)
+{
+    // ファイルサイズチェック（例: 10MB まで）
+    if (command.CsvStream.Length > 10 * 1024 * 1024)
+        return Result.Fail("ファイルサイズは10MBまでです");
+
+    var succeeded = 0;
+    var failed = 0;
+    var errors = new List<string>();
+    var rowNumber = 1;
+
+    using var reader = new StreamReader(command.CsvStream, Encoding.UTF8);
+    using var csv = new CsvReader(reader, CultureInfo.GetCultureInfo("ja-JP"));
+
+    // ヘッダー行を読み飛ばす
+    await csv.ReadAsync();
+    csv.ReadHeader();
+
+    // 行ごとに処理（最大1,000件）
+    while (await csv.ReadAsync() && rowNumber <= 1000)
+    {
+        rowNumber++;
+
+        try
+        {
+            // CSV行をパース
+            var name = csv.GetField<string>("商品名");
+            var description = csv.GetField<string>("説明");
+            var price = csv.GetField<decimal>("価格");
+            var stock = csv.GetField<int>("在庫");
+
+            // バリデーション
+            if (string.IsNullOrEmpty(name))
+            {
+                failed++;
+                errors.Add($"{rowNumber}行目: 商品名は必須です");
+                continue;
+            }
+
+            // ドメインファクトリで作成
+            var product = Product.Create(name, description, new Money(price), stock);
+            await _repository.SaveAsync(product, ct);
+            succeeded++;
+        }
+        catch (Exception ex)
+        {
+            failed++;
+            errors.Add($"{rowNumber}行目: {ex.Message}");
+        }
+    }
+
+    if (rowNumber > 1000)
+        errors.Add("1,000件を超える行は無視されました");
+
+    return Result.Success(new BulkOperationResult(succeeded, failed, errors));
+}
+```
+
+**UI側の使用例:**
+```csharp
+// PageActions
+public async Task ImportFromCsvAsync(IBrowserFile file, CancellationToken ct = default)
+{
+    // ファイルサイズチェック
+    if (file.Size > 10 * 1024 * 1024)
+    {
+        _toast.Error("ファイルサイズは10MBまでです");
+        return;
+    }
+
+    await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+    var command = new ImportProductsFromCsvCommand(stream);
+    var result = await _mediator.Send(command, ct);
+
+    if (result.IsSuccess)
+    {
+        var bulkResult = result.Value;
+        _toast.Success($"{bulkResult.Succeeded}件インポートしました");
+
+        if (bulkResult.Failed > 0)
+        {
+            // エラー詳細をダイアログ表示
+            await _dialog.ShowAsync("インポート結果", string.Join("\n", bulkResult.Errors));
+        }
+
+        await _store.LoadAsync(ct);  // リスト再読み込み
+    }
+}
+```
+
+**ファイル:**
+- `ImportProductsFromCsvCommand.cs`
+- `ImportProductsFromCsvHandler.cs`
+
+---
+
+### 3. Domain層パターン
+
+ビジネスロジックを実装するためのパターン。
+
+| パターン名 | 使用シナリオ | 実装場所 |
+|-----------|------------|---------|
+| **AggregateRoot** | 集約ルートの基底クラス | `/Domain/Common/AggregateRoot.cs` |
+| **親子関係** | Product-ProductImage | `/Domain/Products/Product.cs` |
+| **状態遷移** | ProductStatus管理 | `/Domain/Products/Product.cs` |
+| **複雑なビジネスルール** | 価格変更制限など | `/Domain/Products/Product.cs` |
+
+詳細は [11_Domain層の詳細設計](11_Domain層の詳細設計.md) を参照。
+
+---
+
+### 4. 横断的関心事パターン
+
+すべてのCommand/Queryに適用される共通機能。
+
+| パターン名 | 役割 | 実装場所 |
+|-----------|-----|---------|
+| **MetricsBehavior** | パフォーマンス・ビジネスメトリクス収集 | `/Infrastructure/Behaviors/` |
+| **LoggingBehavior** | リクエスト/レスポンスのロギング | `/Application/Common/Behaviors/` |
+| **ValidationBehavior** | FluentValidationによる入力検証 | `/Application/Common/Behaviors/` |
+| **AuthorizationBehavior** | ロールベース認可 | `/Infrastructure/Behaviors/` |
+| **IdempotencyBehavior** | 冪等性保証 | `/Infrastructure/Behaviors/` |
+| **CachingBehavior** | クエリ結果のキャッシュ | `/Infrastructure/Behaviors/` |
+| **AuditLogBehavior** | ユーザーアクション・データ変更の監査記録 | `/Infrastructure/Behaviors/` |
+| **TransactionBehavior** | トランザクション管理 | `/Infrastructure/Behaviors/` |
+
+詳細は [10_Application層の詳細設計](10_Application層の詳細設計.md) の Pipeline Behaviors を参照。
+
+---
+
+## 🎯 パターン選択フローチャート
+
+```mermaid
+graph TD
+    A[実装したい機能は?] --> B{データ取得か変更か?}
+
+    B -->|データ取得| C{取得方法は?}
+    B -->|データ変更| D{変更の種類は?}
+
+    C -->|全件取得| E[GetProducts]
+    C -->|ID指定| F[GetProductById]
+    C -->|条件検索| G[SearchProducts]
+    C -->|CSV出力| H[ExportProductsToCsv]
+
+    D -->|新規作成| I[CreateProduct]
+    D -->|更新| J{単一か複数か?}
+    D -->|削除| K{単一か複数か?}
+    D -->|CSV取込| L[ImportProductsFromCsv]
+
+    J -->|単一| M[UpdateProduct]
+    J -->|複数価格更新| N[BulkUpdateProductPrices]
+
+    K -->|単一| O[DeleteProduct]
+    K -->|複数| P[BulkDeleteProducts]
+```
+
+---
+
+## 📖 次に読むべきドキュメント
+
+### パターン別の詳細ガイド
+
+- [08_具体例_商品管理機能](08_具体例_商品管理機能.md) - 具体的な実装例（Query/Command）
+- [10_Application層の詳細設計](10_Application層の詳細設計.md) - Command/Query実装の詳細
+- [11_Domain層の詳細設計](11_Domain層の詳細設計.md) - ドメインモデルの実装
+- [19_AIへの実装ガイド](19_AIへの実装ガイド.md) - 実装時の注意点
+
+---
+
+**🤖 パターンを選択したら、該当するフォルダのコードを直接参照してください**
+
+
+
+---
+
+# 4. 全体アーキテクチャ図
 
 
 ---
@@ -1164,18 +2378,9 @@ public class OrderProcessSaga
 
 
 
-
-
 ---
 
-<a id="05-レイヤー構成と責務"></a>
-
-# 📄 05 レイヤー構成と責務
-
-*元ファイル: `05_レイヤー構成と責務.md`*
-
----
-
+# 5. レイヤー構成と責務
 
 
 ---
@@ -1312,18 +2517,9 @@ public class OrderProcessSaga
 
 
 
-
-
 ---
 
-<a id="06-具体例-商品管理機能"></a>
-
-# 📄 06 具体例 商品管理機能
-
-*元ファイル: `06_具体例_商品管理機能.md`*
-
----
-
+# 6. 具体例: 商品管理機能
 
 
 ---
@@ -1541,23 +2737,240 @@ sequenceDiagram
 
 
 
-
-
 ---
 
-<a id="07-ui層の詳細設計"></a>
-
-# 📄 07 UI層の詳細設計
-
-*元ファイル: `07_UI層の詳細設計.md`*
-
----
-
+# 7. UI層の詳細設計
 
 
 ---
 
 ## 7. UI層の詳細設計
+
+### 7.0 WPF/WinFormsとの比較
+
+このセクションでは、WPF/WinForms経験者がBlazorのUI層をスムーズに理解できるよう、既知の概念との対応関係を説明します。
+
+#### **全体的な対応表**
+
+| WPF/WinForms | このアーキテクチャ（Blazor） | 主な違い |
+|-------------|-------------------------|---------|
+| **UserControl** | **Dumb Component** | ほぼ同じ概念。表示のみを担当 |
+| **Window/Form** | **Smart Component** | イベントハンドリングのみ、I/Oは委譲 |
+| **ViewModel** | **Store** + **PageActions** | 責務を2つに分離（後述） |
+| **ICommand** | **PageActions のメソッド** | より明示的な命名 |
+| **INotifyPropertyChanged** | **Store.OnChangeAsync イベント** | 不変状態 + イベント駆動 |
+| **DataBinding** | **@State.Property** | 一方向バインディング（手動） |
+| **DependencyProperty** | **[Parameter]** | Componentへのデータ渡し |
+| **RoutedEvent** | **EventCallback** | 子→親へのイベント伝播 |
+
+---
+
+#### **ViewModelの分割: Store + PageActions**
+
+**重要な違い**: WPFのViewModelは、このアーキテクチャでは**Store（状態管理）**と**PageActions（UI手順）**に分離されます。
+
+**WPFのViewModel（従来）**
+
+```csharp
+// ViewModelがすべてを担当
+public class ProductListViewModel : INotifyPropertyChanged
+{
+    // ===== 状態 =====
+    private ObservableCollection<Product> _products = new();
+    public ObservableCollection<Product> Products
+    {
+        get => _products;
+        set { _products = value; OnPropertyChanged(); }
+    }
+
+    // ===== コマンド =====
+    public ICommand DeleteCommand { get; }
+
+    private async Task DeleteProductAsync(Guid id)
+    {
+        // ダイアログ表示
+        var result = MessageBox.Show("削除しますか?", "確認", MessageBoxButton.YesNo);
+        if (result != MessageBoxResult.Yes) return;
+
+        // I/O処理
+        await _productService.DeleteAsync(id);
+        Products.Remove(Products.First(p => p.Id == id));
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+```
+
+**このアーキテクチャ（Store + PageActions）**
+
+```csharp
+// ===== Store: 状態管理のみ =====
+public class ProductsStore
+{
+    private ProductsState _state = new();
+    public event Func<Task>? OnChangeAsync;  // INotifyPropertyChangedの代替
+
+    public ProductsState GetState() => _state;
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // I/O処理と状態更新
+        using var scope = _scopeFactory.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+        var result = await mediator.Send(new DeleteProductCommand(id), ct);
+
+        if (result.IsSuccess)
+            await LoadAsync(ct);
+
+        return result.IsSuccess;
+    }
+}
+
+// ===== 不変State（record） =====
+public record ProductsState
+{
+    public ImmutableList<ProductDto> Products { get; init; } = ImmutableList<ProductDto>.Empty;
+    public bool IsLoading { get; init; }
+}
+
+// ===== PageActions: UI手順のみ =====
+public class ProductListActions
+{
+    private readonly ProductsStore _store;
+    private readonly IConfirmDialog _confirm;  // MessageBoxの代替（テスト可能）
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // 1. 確認ダイアログ
+        if (!await _confirm.ShowAsync("削除しますか?")) return;
+
+        // 2. I/O処理はStoreに完全委譲
+        var result = await _store.DeleteAsync(id, ct);
+
+        // 3. 結果表示
+        if (result) _toast.Success("削除しました");
+    }
+}
+```
+
+**なぜ分割するのか？**
+
+| 観点 | WPFのViewModel | Store + PageActions |
+|------|---------------|---------------------|
+| **テスタビリティ** | MessageBoxでテスト困難 | IConfirmDialogでモック可能 |
+| **再利用性** | 1画面に1ViewModel | 複数コンポーネントで同じStoreを共有 |
+| **単一責任** | 状態・UI手順・I/Oが混在 | 状態管理とUI手順を分離 |
+| **並行制御** | ViewModelで個別管理 | Storeで一元管理 |
+
+---
+
+#### **DataBindingの違い**
+
+**WPF（双方向バインディング）**
+
+```xml
+<!-- XAML -->
+<TextBox Text="{Binding ProductName, Mode=TwoWay}" />
+<Button Command="{Binding DeleteCommand}" />
+```
+
+```csharp
+// ViewModel
+public string ProductName
+{
+    get => _productName;
+    set
+    {
+        _productName = value;
+        OnPropertyChanged();  // 自動通知
+    }
+}
+```
+
+**Blazor（一方向バインディング + イベント）**
+
+```csharp
+@* Razor Component *@
+<input @bind="productName" />
+<button @onclick="Actions.DeleteAsync">削除</button>
+
+@code {
+    private string productName = "";
+
+    // Storeの状態変更を購読
+    protected override void OnInitialized()
+    {
+        Store.OnChangeAsync += () => InvokeAsync(StateHasChanged);  // 手動再描画
+    }
+}
+```
+
+**主な違い:**
+- WPF: 双方向バインディング（自動）
+- Blazor: 一方向バインディング + 手動再描画（`StateHasChanged`）
+
+---
+
+#### **ICommandとPageActionsの比較**
+
+**WPF（ICommand）**
+
+```csharp
+public class ProductListViewModel
+{
+    public ICommand DeleteCommand { get; }
+
+    public ProductListViewModel()
+    {
+        DeleteCommand = new RelayCommand<Guid>(
+            execute: async id => await DeleteProductAsync(id),
+            canExecute: id => id != Guid.Empty
+        );
+    }
+}
+```
+
+**Blazor（PageActions）**
+
+```csharp
+public class ProductListActions
+{
+    // ICommandの代わりにメソッドを直接定義
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // より明示的な命名が可能
+        // ICommandの制約がないため柔軟
+    }
+}
+```
+
+**メリット:**
+- より明示的な命名（`DeleteCommand` → `DeleteAsync`）
+- `CanExecute`の代わりにメソッド内で条件分岐
+- 非同期処理がより自然（`async Task`）
+
+---
+
+#### **移行のポイント**
+
+1. **UserControl → Dumb Component**
+   - ほぼそのまま移行可能
+   - `DependencyProperty` → `[Parameter]`に変更
+
+2. **ViewModel → Store + PageActions**
+   - 状態管理部分 → `Store`
+   - ICommand部分 → `PageActions`のメソッド
+   - I/O処理 → `Store`に集約
+
+3. **DataBinding → 手動バインディング**
+   - `{Binding Property}` → `@State.Property`
+   - `OnPropertyChanged` → `Store.OnChangeAsync`
+
+4. **ICommand → PageActions メソッド**
+   - `RelayCommand` → `public async Task`メソッド
+   - より柔軟で明示的
+
+---
 
 ### 7.1 Dumb Component(純粋表示コンポーネント)
 
@@ -2614,23 +4027,313 @@ await _hubConnection.SendAsync("ProductInvalidated", "AllProducts");  // 全ユ�
 
 
 
-
-
 ---
 
-<a id="08-application層の詳細設計"></a>
-
-# 📄 08 Application層の詳細設計
-
-*元ファイル: `08_Application層の詳細設計.md`*
-
----
-
+# 8. Application層の詳細設計
 
 
 ---
 
 ## 8. Application層の詳細設計
+
+### 8.0 なぜMediatRが必要か？ - Serviceクラス直接DIとの比較
+
+このセクションでは、3層アーキテクチャで一般的な「Serviceクラスの直接DI」と、このアーキテクチャで採用している「MediatR + Pipeline Behaviors」の違いを説明します。
+
+---
+
+#### **従来の3層アーキテクチャ（Serviceクラス直接DI）**
+
+```csharp
+// ===== Service層 =====
+public interface IProductService
+{
+    Task<Product?> GetProductAsync(Guid id);
+    Task<IEnumerable<Product>> GetAllProductsAsync();
+    Task CreateProductAsync(CreateProductDto dto);
+    Task UpdateProductAsync(UpdateProductDto dto);
+    Task DeleteProductAsync(Guid id);
+}
+
+public class ProductService : IProductService
+{
+    private readonly IProductRepository _repository;
+    private readonly AppDbContext _dbContext;
+    private readonly ILogger<ProductService> _logger;
+
+    public async Task DeleteProductAsync(Guid id)
+    {
+        // 1. ログ出力（横断的関心事）
+        _logger.LogInformation("商品削除開始: {ProductId}", id);
+
+        // 2. トランザクション開始（横断的関心事）
+        using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+        try
+        {
+            // 3. ビジネスロジック
+            var product = await _repository.GetAsync(id);
+            if (product == null)
+            {
+                _logger.LogWarning("商品が見つかりません: {ProductId}", id);
+                throw new NotFoundException();
+            }
+
+            await _repository.DeleteAsync(product);
+            await _dbContext.SaveChangesAsync();
+
+            // 4. トランザクションコミット
+            await transaction.CommitAsync();
+
+            // 5. ログ出力（横断的関心事）
+            _logger.LogInformation("商品削除完了: {ProductId}", id);
+        }
+        catch (Exception ex)
+        {
+            // 6. エラーハンドリング（横断的関心事）
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "商品削除失敗: {ProductId}", id);
+            throw;
+        }
+    }
+
+    public async Task CreateProductAsync(CreateProductDto dto)
+    {
+        // 同様に、ログ、トランザクション、エラーハンドリングを毎回実装...
+    }
+
+    // 他のメソッドも同様...
+}
+
+// ===== Controller/ViewModel =====
+public class ProductsController : Controller
+{
+    private readonly IProductService _productService;
+    private readonly IAuthorizationService _authService;
+    private readonly ILogger<ProductsController> _logger;
+
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        // 認可チェック（横断的関心事）
+        var authResult = await _authService.AuthorizeAsync(User, "DeleteProduct");
+        if (!authResult.Succeeded)
+        {
+            _logger.LogWarning("認可失敗: {ProductId}", id);
+            return Forbid();
+        }
+
+        // バリデーション（横断的関心事）
+        if (id == Guid.Empty)
+        {
+            return BadRequest("IDが不正です");
+        }
+
+        await _productService.DeleteAsync(id);
+        return Ok();
+    }
+}
+```
+
+**❌ 問題点:**
+
+1. **横断的関心事が各メソッドに散在**
+   - ログ、トランザクション、エラーハンドリングのコードが重複
+   - 新しいメソッドを追加するたびにコピペ
+   - メンテナンスコストが高い
+
+2. **追加機能の実装が困難**
+   - 監査ログを全メソッドに追加したい → すべてのメソッドを修正
+   - メトリクス収集を追加したい → すべてのメソッドを修正
+   - 冪等性保証を追加したい → すべてのメソッドを修正
+
+3. **テストが困難**
+   - ビジネスロジックと横断的関心事が混在
+   - トランザクション、ログを含めたテストが必要
+   - モックが複雑
+
+4. **責務が不明確**
+   - Serviceクラスが肥大化
+   - 「商品サービス」なのに、ログやトランザクション管理も担当
+
+---
+
+#### **このアーキテクチャ（MediatR + Pipeline Behaviors）**
+
+```csharp
+// ===== Command定義 =====
+public record DeleteProductCommand(Guid ProductId) : ICommand<Result>;
+
+// ===== Handler: ビジネスロジックのみ！ =====
+public class DeleteProductHandler : IRequestHandler<DeleteProductCommand, Result>
+{
+    private readonly IProductRepository _repository;
+
+    // ログ、トランザクション、認可等の横断的関心事は一切書かない！
+    public async Task<Result> Handle(DeleteProductCommand command, CancellationToken ct)
+    {
+        var product = await _repository.GetAsync(new ProductId(command.ProductId), ct);
+        if (product is null)
+            return Result.Fail("商品が見つかりません");
+
+        product.Delete();  // ドメインルール適用
+        await _repository.SaveAsync(product, ct);
+
+        return Result.Success();
+    }
+}
+
+// ===== Validator: バリデーションのみ =====
+public class DeleteProductCommandValidator : AbstractValidator<DeleteProductCommand>
+{
+    public DeleteProductCommandValidator()
+    {
+        RuleFor(x => x.ProductId)
+            .NotEmpty()
+            .WithMessage("商品IDは必須です");
+    }
+}
+
+// ===== UI層/Store =====
+// たった1行でCommand送信（Pipeline Behaviorsが自動適用）
+var result = await _mediator.Send(new DeleteProductCommand(productId), ct);
+
+// ===== Infrastructure層: Pipeline Behaviors（自動適用） =====
+// Program.csで登録するだけで、すべてのCommand/Queryに適用
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(MetricsBehavior<,>));        // 0. メトリクス収集
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));        // 1. ログ出力
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));     // 2. バリデーション
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));  // 3. 認可チェック
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>));    // 4. 冪等性保証
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));        // 5. キャッシング
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuditLogBehavior<,>));       // 6. 監査ログ
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));    // 7. トランザクション
+```
+
+**✅ メリット:**
+
+1. **横断的関心事が1箇所に集約**
+   - すべてのCommand/Queryに自動適用
+   - コードの重複がゼロ
+   - 一貫した動作が保証される
+
+2. **追加機能の実装が容易**
+   - 監査ログを追加したい → `AuditLogBehavior`を追加するだけ
+   - メトリクス収集を追加したい → `MetricsBehavior`を追加するだけ
+   - **既存のHandlerは一切修正不要**
+
+3. **Handlerがビジネスロジックに集中**
+   - テストが容易（ビジネスロジックのみをテスト）
+   - 可読性が高い
+   - 単一責任の原則を守る
+
+4. **実行順序を制御可能**
+   - Pipeline Behaviorsの登録順序で実行順序が決まる
+   - 例: Validation → Authorization → Transaction の順序を保証
+
+---
+
+#### **Pipeline Behaviorsの動作イメージ**
+
+```
+リクエスト: DeleteProductCommand(productId)
+  ↓
+┌─────────────────────────────────────────────────────────┐
+│ 0. MetricsBehavior                                      │
+│    - 実行時間の計測開始                                   │
+│  ↓                                                       │
+│ 1. LoggingBehavior                                      │
+│    - ログ出力: "商品削除開始: {productId}"                │
+│  ↓                                                       │
+│ 2. ValidationBehavior                                   │
+│    - FluentValidation実行（productId != Guid.Empty）    │
+│  ↓                                                       │
+│ 3. AuthorizationBehavior                                │
+│    - 認可チェック（DeleteProduct権限）                    │
+│  ↓                                                       │
+│ 4. IdempotencyBehavior                                  │
+│    - 冪等性チェック（重複実行を防止）                      │
+│  ↓                                                       │
+│ 5. CachingBehavior                                      │
+│    - （Commandなのでスキップ）                            │
+│  ↓                                                       │
+│ 6. AuditLogBehavior                                     │
+│    - 監査ログ準備                                         │
+│  ↓                                                       │
+│ 7. TransactionBehavior                                  │
+│    - トランザクション開始                                  │
+│  ↓                                                       │
+│ ┌─────────────────────────────────────────────┐         │
+│ │ DeleteProductHandler (ビジネスロジック)      │         │
+│ │  - 商品を取得                                │         │
+│ │  - product.Delete() 実行                    │         │
+│ │  - Repository.SaveAsync()                  │         │
+│ └─────────────────────────────────────────────┘         │
+│  ↓                                                       │
+│ 7. TransactionBehavior                                  │
+│    - トランザクションコミット                              │
+│  ↓                                                       │
+│ 6. AuditLogBehavior                                     │
+│    - 監査ログ保存                                         │
+│  ↓                                                       │
+│ ... (逆順で終了処理)                                      │
+│  ↓                                                       │
+│ 0. MetricsBehavior                                      │
+│    - 実行時間の計測終了、メトリクス記録                    │
+└─────────────────────────────────────────────────────────┘
+  ↓
+レスポンス: Result.Success()
+```
+
+---
+
+#### **比較表: ServiceクラスDI vs MediatR**
+
+| 観点 | Serviceクラス直接DI | MediatR + Pipeline Behaviors |
+|------|-------------------|------------------------------|
+| **横断的関心事** | 各メソッドに散在 | 1箇所に集約、自動適用 |
+| **コードの重複** | 多い（各メソッドでコピペ） | ゼロ |
+| **新機能追加** | すべてのメソッドを修正 | Behavior追加のみ |
+| **テスタビリティ** | 低い（横断的関心事も含む） | 高い（ビジネスロジックのみ） |
+| **可読性** | 低い（ログ等が混在） | 高い（ビジネスロジックのみ） |
+| **実行順序制御** | 手動（各メソッド） | 自動（登録順序） |
+| **単一責任の原則** | 違反（複数の責務） | 遵守（1 Handler = 1 UseCase） |
+
+---
+
+#### **いつMediatRを使うべきか？**
+
+**✅ MediatRが有利なケース:**
+- チーム開発（5名以上）
+- 長期保守（3年以上）
+- エンタープライズ要件（監査ログ、メトリクス、認可等）
+- 複雑なビジネスロジック
+- 横断的関心事の統一が重要
+
+**⚠️ Serviceクラス直接DIで十分なケース:**
+- 小規模プロトタイプ（< 5画面）
+- 単一開発者
+- 短期プロジェクト（< 6ヶ月）
+- 横断的関心事がほとんどない
+
+---
+
+#### **まとめ**
+
+MediatRとPipeline Behaviorsを使うことで、**横断的関心事を宣言的に適用**できます。
+
+**Before（Serviceクラス）:**
+- 各メソッドにログ、トランザクション、認可等を手動で実装
+- コードの重複が多い
+- 新機能追加が困難
+
+**After（MediatR）:**
+- Handlerはビジネスロジックのみに集中
+- 横断的関心事はPipeline Behaviorsが自動適用
+- 新機能追加が容易（既存Handlerは修正不要）
+
+このアプローチにより、**保守性、テスタビリティ、拡張性**が大幅に向上します。
+
+---
 
 ### 8.1 Command/Query定義
 
@@ -3446,23 +5149,14 @@ public class RedisIdempotencyStore : IIdempotencyStore
 
 
 
+---
+
+# 11. Domain層の詳細設計
 
 
 ---
 
-<a id="09-domain層の詳細設計"></a>
-
-# 📄 09 Domain層の詳細設計
-
-*元ファイル: `09_Domain層の詳細設計.md`*
-
----
-
-
-
----
-
-## 9. Domain層の詳細設計
+## 11. Domain層の詳細設計
 
 ### 9.1 Aggregate Root(集約ルート)
 
@@ -3938,23 +5632,14 @@ public sealed class DomainException : Exception
 
 
 
+---
+
+# 12. Infrastructure層の詳細設計
 
 
 ---
 
-<a id="10-infrastructure層の詳細設計"></a>
-
-# 📄 10 Infrastructure層の詳細設計
-
-*元ファイル: `10_Infrastructure層の詳細設計.md`*
-
----
-
-
-
----
-
-## 10. Infrastructure層の詳細設計
+## 12. Infrastructure層の詳細設計
 
 ### 10.1 Repository実装
 
@@ -4252,7 +5937,7 @@ public sealed record ProductDto(
     int ImageCount
 )
 {
-    public string DisplayPrice => $"Â¥{Price:N0}";
+    public string DisplayPrice => $"¥{Price:N0}";
     public bool IsLowStock => Stock < 10;
 }
 
@@ -4524,23 +6209,14 @@ public sealed class ProductsHub : Hub
 
 
 
+---
+
+# 13. 信頼性パターン
 
 
 ---
 
-<a id="11-信頼性パターン"></a>
-
-# 📄 11 信頼性パターン
-
-*元ファイル: `11_信頼性パターン.md`*
-
----
-
-
-
----
-
-## 11. 信頼性パターン
+## 13. 信頼性パターン
 
 ### 11.1 Idempotency(冪等性)の完全実装
 
@@ -5083,23 +6759,14 @@ public class SagaCompensationException : Exception
 
 
 
+---
+
+# 14. パフォーマンス最適化
 
 
 ---
 
-<a id="12-パフォーマンス最適化"></a>
-
-# 📄 12 パフォーマンス最適化
-
-*元ファイル: `12_パフォーマンス最適化.md`*
-
----
-
-
-
----
-
-## 12. パフォーマンス最適化
+## 14. パフォーマンス最適化
 
 ### 12.1 Blazor Server固有の最適化
 
@@ -5649,23 +7316,14 @@ exceptions
 
 
 
+---
+
+# 15. テスト戦略
 
 
 ---
 
-<a id="13-テスト戦略"></a>
-
-# 📄 13 テスト戦略
-
-*元ファイル: `13_テスト戦略.md`*
-
----
-
-
-
----
-
-## 13. テスト戦略
+## 15. テスト戦略
 
 ### 13.1 テストピラミッド
 
@@ -5916,23 +7574,14 @@ public class ProductListComponentTests : TestContext
 
 
 
+---
+
+# 16. ベストプラクティス
 
 
 ---
 
-<a id="14-ベストプラクティス"></a>
-
-# 📄 14 ベストプラクティス
-
-*元ファイル: `14_ベストプラクティス.md`*
-
----
-
-
-
----
-
-## 14. ベストプラクティス
+## 16. ベストプラクティス
 
 ### 14.1 依存性注入のスコープ
 
@@ -6360,23 +8009,14 @@ builder.Services.AddServerSideBlazor(options =>
 
 
 
+---
+
+# 17. まとめ
 
 
 ---
 
-<a id="15-まとめ"></a>
-
-# 📄 15 まとめ
-
-*元ファイル: `15_まとめ.md`*
-
----
-
-
-
----
-
-## 15. まとめ
+## 17. まとめ
 
 ### 15.1 このアーキテクチャの核心
 
@@ -7853,760 +9493,1201 @@ public class ProductsStore : IDisposable
 
 
 
+---
+
+# 18. 3層アーキテクチャからの移行ガイド
 
 
 ---
 
-<a id="changelog"></a>
+## 18. 3層アーキテクチャからの移行ガイド
 
-# 📄 CHANGELOG
+このガイドは、**WPF/WinForms + RESTful Web API** の3層アーキテクチャ経験者が、このBlazor Enterprise Architectureをスムーズに理解するためのものです。
 
-*元ファイル: `CHANGELOG.md`*
+### 16.1 あなたが知っている技術との対応表
+
+#### **全体構造の比較**
+
+| 3層アーキテクチャ | このアーキテクチャ | 主な違い |
+|-----------------|-----------------|---------|
+| **Presentation層** | **UI層（Blazor）** | WPF/WinFormsからBlazorへ |
+| **Business Logic層/Service層** | **Application層** | MediatRによる疎結合化 |
+| **Data Access層** | **Infrastructure層** | ほぼ同じ概念 |
+
+#### **クライアント側（WPF/WinForms → Blazor）の対応**
+
+| WPF/WinForms | このアーキテクチャ | 概念の違い |
+|-------------|-----------------|-----------|
+| **UserControl** | **Dumb Component** | ほぼ同じ。表示のみを担当 |
+| **Window/Form** | **Smart Component** | イベントハンドリングのみ、I/Oは委譲 |
+| **ViewModel** | **Store** + **PageActions** | 責務を2つに分離（後述） |
+| **ICommand** | **PageActions のメソッド** | より明示的な命名 |
+| **INotifyPropertyChanged** | **Store.OnChangeAsync イベント** | 不変状態 + イベント駆動 |
+| **DataBinding** | **@State.Property** | 一方向バインディング |
+| **Dependency Property** | **[Parameter]** | Componentへのデータ渡し |
+| **RoutedEvent** | **EventCallback** | 子→親へのイベント伝播 |
+
+#### **サーバー側（Service層 → Application層）の対応**
+
+| 3層アーキテクチャ | このアーキテクチャ | 概念の違い |
+|-----------------|-----------------|-----------|
+| **ProductService** | **Handlers（複数）** | 単一責任に分割 |
+| **ServiceクラスのDI** | **MediatR経由の呼び出し** | 疎結合、Pipeline適用可能 |
+| **GetProduct()メソッド** | **GetProductQuery + Handler** | CQRS: Query |
+| **DeleteProduct()メソッド** | **DeleteProductCommand + Handler** | CQRS: Command |
+| **Validator** | **FluentValidation Validator** | 同じ概念 |
+| **[Authorize]属性** | **AuthorizationBehavior** | Pipeline Behavior |
+| **TransactionScope** | **TransactionBehavior** | Pipeline Behavior |
+
+#### **データアクセス層の対応**
+
+| 3層アーキテクチャ | このアーキテクチャ | 概念の違い |
+|-----------------|-----------------|-----------|
+| **Repository** | **Repository** | 同じ概念 |
+| **DbContext** | **DbContext** | 同じ |
+| **DTO** | **DTO** | 同じ |
+| **Entity** | **Domain Entity（集約ルート）** | DDDの概念を追加 |
 
 ---
 
+### 16.2 なぜViewModelを分割するのか？ - Store vs PageActions
 
-## 修正日
-2025年10月22日
+#### **WPFのViewModel（従来）**
 
-## 修正内容サマリー
-
-全10件の問題を修正しました。
-
-### 🔴 重大な問題の修正(7件)
-
-#### 1. ICommand<r> → ICommand<r>(6箇所)
-
-**修正ファイル:**
-- `08_Application層の詳細設計.md`(4箇所)
-- `14_ベストプラクティス.md`(1箇所)
-
-**詳細:**
-- 行44: `DeleteProductCommand`の戻り値型を修正
-- 行81: `DeleteProductHandler.Handle`の戻り値型を修正
-- 行338: `DeleteProductCommand`の戻り値型を修正
-- 行707: `SaveProductCommand`の戻り値型を修正
-- 行758: `SaveProductCommand`(Idempotency対応版)の戻り値型を修正
-- 14_ベストプラクティス.md 行89: `DeleteProductCommand`の戻り値型を修正
-
-**修正前:**
 ```csharp
-public sealed record DeleteProductCommand(Guid ProductId) : ICommand<r>
-public async Task<r> Handle(DeleteProductCommand command, CancellationToken ct)
+// ViewModelがすべてを担当（肥大化しやすい）
+public class ProductListViewModel : INotifyPropertyChanged
+{
+    // ===== 状態管理 =====
+    private ObservableCollection<Product> _products = new();
+    public ObservableCollection<Product> Products
+    {
+        get => _products;
+        set
+        {
+            _products = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _isLoading;
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set
+        {
+            _isLoading = value;
+            OnPropertyChanged();
+        }
+    }
+
+    // ===== UI手順 =====
+    public ICommand DeleteCommand { get; }
+
+    private async Task DeleteProductAsync(Guid id)
+    {
+        // 確認ダイアログ
+        var result = MessageBox.Show("削除しますか?", "確認", MessageBoxButton.YesNo);
+        if (result != MessageBoxResult.Yes) return;
+
+        // I/O処理
+        IsLoading = true;
+        try
+        {
+            await _productService.DeleteAsync(id);
+            Products.Remove(Products.First(p => p.Id == id));
+            MessageBox.Show("削除しました");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"エラー: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
 ```
 
-**修正後:**
+**❌ 問題点:**
+- 状態管理、UI手順、I/O処理がすべて1クラスに集中
+- テストが困難（MessageBox、I/O処理が混在）
+- 再利用性が低い
+- 並行制御が難しい
+
+---
+
+#### **このアーキテクチャ（Store + PageActions）**
+
 ```csharp
-public sealed record DeleteProductCommand(Guid ProductId) : ICommand<r>
-public async Task<r> Handle(DeleteProductCommand command, CancellationToken ct)
+// ===== Store: 状態管理のみ =====
+public class ProductsStore
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private ProductsState _state = new();
+
+    public event Func<Task>? OnChangeAsync;  // INotifyPropertyChangedの代替
+
+    // 状態の取得（不変）
+    public ProductsState GetState() => _state;
+
+    // I/O処理と状態更新
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+        var result = await mediator.Send(new DeleteProductCommand(id), ct);
+
+        if (result.IsSuccess)
+        {
+            await LoadAsync(ct);  // 最新状態を再取得
+        }
+
+        return result.IsSuccess;
+    }
+
+    private void SetState(ProductsState newState)
+    {
+        _state = newState;
+        OnChangeAsync?.Invoke();  // UI再描画をトリガー
+    }
+}
+
+// ===== 不変State =====
+public record ProductsState
+{
+    public ImmutableList<ProductDto> Products { get; init; } = ImmutableList<ProductDto>.Empty;
+    public bool IsLoading { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+// ===== PageActions: UI手順のみ =====
+public class ProductListActions
+{
+    private readonly ProductsStore _store;
+    private readonly IConfirmDialog _confirm;  // MessageBoxの代替（DI可能）
+    private readonly IToast _toast;
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // 1. 確認ダイアログ（テスト可能）
+        if (!await _confirm.ShowAsync("削除しますか?")) return;
+
+        // 2. I/O処理はStoreに完全委譲
+        var result = await _store.DeleteAsync(id, ct);
+
+        // 3. 結果表示（テスト可能）
+        if (result) _toast.Success("削除しました");
+        else _toast.Error("削除に失敗しました");
+    }
+}
 ```
 
-#### 2. Task<r> → Task<r>(1箇所)
-
-**修正ファイル:**
-- `08_Application層の詳細設計.md` 行81
-
-**影響:**
-これらの修正により、コードがコンパイル可能になりました。
+**✅ メリット:**
+- **Store**: 純粋な状態管理とI/O → 単体テスト容易
+- **PageActions**: UI手順のみ → モックで完全にテスト可能
+- **不変State**: バグの原因となるミューテーションを防止
+- **再利用性**: 複数のコンポーネントで同じStoreを共有可能
+- **並行制御**: Storeで一元管理
 
 ---
 
-### 🟡 文字化けの修正(3件)
+### 16.3 なぜMediatRを使うのか？ - Serviceクラスの直接DIとの違い
 
-#### 3. コメント「更新」の文字化け修正(2箇所)
+#### **従来の3層アーキテクチャ（Serviceクラス直接DI）**
 
-**修正ファイル:**
-- `10_Infrastructure層の詳細設計.md`
-
-**詳細:**
-- 行56: `// 更新` → `// 更新`
-- 行99: `// 更新` → `// 更新`
-
-**コンテキスト:**
-EF Coreのリポジトリ実装で、既存エンティティの更新処理を示すコメント
-
-#### 4. 円記号の文字化け修正(1箇所)
-
-**修正ファイル:**
-- `09_Domain層の詳細設計.md` 行334
-
-**詳細:**
-- `Â¥` → `¥`
-
-**コンテキスト:**
-Moneyバリューオブジェクトの`ToDisplayString`メソッド内の通貨記号
-
-**修正前:**
 ```csharp
-public string ToDisplayString() => $"Â¥{Amount:N0}";
+// ===== Controller/ViewModel =====
+public class ProductsController : Controller
+{
+    private readonly IProductService _productService;
+    private readonly ILogger<ProductsController> _logger;
+    private readonly IAuthorizationService _authService;
+
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        // 1. ログ出力（横断的関心事）
+        _logger.LogInformation("商品削除開始: {ProductId}", id);
+
+        // 2. 認可チェック（横断的関心事）
+        var authResult = await _authService.AuthorizeAsync(User, "DeleteProduct");
+        if (!authResult.Succeeded)
+        {
+            _logger.LogWarning("認可失敗: {ProductId}", id);
+            return Forbid();
+        }
+
+        // 3. バリデーション（横断的関心事）
+        if (id == Guid.Empty)
+        {
+            return BadRequest("IDが不正です");
+        }
+
+        // 4. ビジネスロジック
+        try
+        {
+            await _productService.DeleteAsync(id);
+            _logger.LogInformation("商品削除完了: {ProductId}", id);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "商品削除失敗: {ProductId}", id);
+            return StatusCode(500);
+        }
+    }
+}
+
+// ===== Service層 =====
+public class ProductService : IProductService
+{
+    private readonly IProductRepository _repository;
+    private readonly AppDbContext _dbContext;
+
+    public async Task DeleteAsync(Guid id)
+    {
+        // トランザクション開始（横断的関心事）
+        using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+        try
+        {
+            var product = await _repository.GetAsync(id);
+            if (product == null) throw new NotFoundException();
+
+            await _repository.DeleteAsync(product);
+            await _dbContext.SaveChangesAsync();
+
+            // トランザクションコミット
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+}
 ```
 
-**修正後:**
+**❌ 問題点:**
+1. **横断的関心事が各メソッドに散在**
+   - ログ、認可、バリデーション、トランザクションのコードが重複
+   - 新しいメソッドを追加するたびにコピペ
+
+2. **追加機能の実装が困難**
+   - 監査ログを追加したい → すべてのメソッドを修正
+   - メトリクス収集を追加したい → すべてのメソッドを修正
+
+3. **テストが困難**
+   - 横断的関心事とビジネスロジックが混在
+
+---
+
+#### **このアーキテクチャ（MediatR + Pipeline Behaviors）**
+
 ```csharp
-public string ToDisplayString() => $"¥{Amount:N0}";
+// ===== UI層/Store =====
+// たった1行でCommand送信
+var result = await _mediator.Send(new DeleteProductCommand(productId), ct);
+
+// ===== Application層: Handler（ビジネスロジックのみ！）=====
+public class DeleteProductHandler : IRequestHandler<DeleteProductCommand, Result>
+{
+    private readonly IProductRepository _repository;
+
+    // 横断的関心事は一切書かない！Pipeline Behaviorsが自動適用
+    public async Task<Result> Handle(DeleteProductCommand command, CancellationToken ct)
+    {
+        var product = await _repository.GetAsync(new ProductId(command.ProductId), ct);
+        if (product is null) return Result.Fail("商品が見つかりません");
+
+        product.Delete();  // ドメインルール適用
+        await _repository.SaveAsync(product, ct);
+
+        return Result.Success();
+    }
+}
+
+// ===== Infrastructure層: Pipeline Behaviors（自動適用）=====
+// Program.csで登録するだけで、すべてのCommand/Queryに適用される
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(MetricsBehavior<,>));        // 0. メトリクス収集
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));        // 1. ログ出力
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));     // 2. バリデーション
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));  // 3. 認可チェック
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>));    // 4. 冪等性保証
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));        // 5. キャッシング
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuditLogBehavior<,>));       // 6. 監査ログ
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));    // 7. トランザクション
+```
+
+**✅ メリット:**
+
+1. **横断的関心事が1箇所に集約**
+   - すべてのCommand/Queryに自動適用
+   - コードの重複がゼロ
+
+2. **追加機能の実装が容易**
+   - 監査ログを追加したい → `AuditLogBehavior`を追加するだけ
+   - メトリクス収集を追加したい → `MetricsBehavior`を追加するだけ
+   - **既存のHandler一切修正不要**
+
+3. **Handlerがビジネスロジックに集中**
+   - テストが容易（ビジネスロジックのみをテスト）
+   - 可読性が高い
+
+4. **実行順序を制御可能**
+   - Pipeline Behaviorsの登録順序で実行順序が決まる
+   - 例: Validation → Authorization → Transaction の順序を保証
+
+---
+
+### 16.4 なぜCQRSを使うのか？ - メソッド分離との違い
+
+#### **従来の3層アーキテクチャ（同一Service内のメソッド分離）**
+
+```csharp
+public interface IProductService
+{
+    // 読み取り
+    Task<Product> GetProductAsync(Guid id);
+    Task<IEnumerable<Product>> GetAllProductsAsync();
+    Task<IEnumerable<Product>> SearchProductsAsync(string keyword);
+
+    // 書き込み
+    Task CreateProductAsync(Product product);
+    Task UpdateProductAsync(Product product);
+    Task DeleteProductAsync(Guid id);
+}
+
+public class ProductService : IProductService
+{
+    // すべてのメソッドが1つのクラスに集約
+    // 読み取りも書き込みも同じDbContext、同じトランザクション
+}
+```
+
+**⚠️ 問題点:**
+- 読み取りと書き込みが同じトランザクション管理
+- 読み取り用の最適化（Dapper、AsNoTracking等）が適用しにくい
+- キャッシュ戦略が適用しにくい
+- 責務が不明確
+
+---
+
+#### **このアーキテクチャ（CQRS: Command/Query分離）**
+
+```csharp
+// ===== Query（読み取り）=====
+public record GetProductsQuery : IQuery<Result<IEnumerable<ProductDto>>>;
+
+public class GetProductsHandler : IRequestHandler<GetProductsQuery, Result<IEnumerable<ProductDto>>>
+{
+    private readonly IProductReadRepository _readRepository;  // 読み取り専用Repository
+
+    public async Task<Result<IEnumerable<ProductDto>>> Handle(GetProductsQuery query, CancellationToken ct)
+    {
+        // Dapperで高速読み取り、AsNoTrackingでトラッキング無効化
+        var products = await _readRepository.GetAllAsync(ct);
+        return Result<IEnumerable<ProductDto>>.Success(products);
+    }
+}
+
+// ===== Command（書き込み）=====
+public record DeleteProductCommand(Guid ProductId) : ICommand<Result>;
+
+public class DeleteProductHandler : IRequestHandler<DeleteProductCommand, Result>
+{
+    private readonly IProductRepository _repository;  // 書き込み用Repository
+
+    public async Task<Result> Handle(DeleteProductCommand command, CancellationToken ct)
+    {
+        // EF Coreでトラッキング、ビジネスルール適用
+        var product = await _repository.GetAsync(new ProductId(command.ProductId), ct);
+        product.Delete();
+        await _repository.SaveAsync(product, ct);
+        return Result.Success();
+    }
+}
+```
+
+**✅ メリット:**
+
+| 観点 | Query（読み取り） | Command（書き込み） |
+|------|----------------|------------------|
+| **Repository** | IProductReadRepository（Dapper） | IProductRepository（EF Core） |
+| **トラッキング** | AsNoTracking | トラッキング有効 |
+| **トランザクション** | 不要 | TransactionBehaviorで自動管理 |
+| **キャッシュ** | CachingBehaviorで自動適用 | 適用しない |
+| **ビジネスルール** | 適用しない | Domainで適用 |
+| **最適化** | JOIN、射影、ページング | 集約ルート全体を取得 |
+
+**具体例: 性能差**
+
+```csharp
+// Query: Dapper + AsNoTracking（高速）
+SELECT p.Id, p.Name, p.Price, p.Stock
+FROM Products p
+WHERE p.IsActive = true;
+// → 1,000件で 10ms
+
+// Command: EF Core + トラッキング + 集約全体
+var product = await _context.Products
+    .Include(p => p.Images)
+    .FirstOrDefaultAsync(p => p.Id == id);
+// → 1件で 50ms（トラッキングとIncludeのオーバーヘッド）
 ```
 
 ---
 
-## 修正による改善点
+### 16.5 段階的な学習パス（推奨）
 
-### ✅ コンパイルエラーの解消
-- 型定義の不備が修正され、すべてのコードサンプルがコンパイル可能に
-- MediatRパイプラインの型安全性が確保される
+#### **Step 1: 既知の概念から始める（30分）**
 
-### ✅ 可読性の向上
-- 文字化けしたコメントが正しい日本語表記に
-- コードの意図が明確に理解できるように
+1. **レイヤー構成の確認**
+   - [07_レイヤー構成と責務](07_レイヤー構成と責務.md)
+   - 3層アーキテクチャとの対応を確認
 
-### ✅ 表示の正確性
-- 円記号が正しく表示され、金額表示が適切に
-
----
-
-## ファイル別修正サマリー
-
-| ファイル名 | 修正箇所数 | 修正内容 |
-|-----------|----------|---------|
-| 08_Application層の詳細設計.md | 5 | 型定義の修正 |
-| 09_Domain層の詳細設計.md | 1 | 円記号の修正 |
-| 10_Infrastructure層の詳細設計.md | 2 | コメントの文字化け修正 |
-| 14_ベストプラクティス.md | 1 | 型定義の修正 |
-| **合計** | **10** | - |
+2. **Repository/DbContextの確認**
+   - [12_Infrastructure層の詳細設計](12_Infrastructure層の詳細設計.md)
+   - Data Access層との違いを確認（ほぼ同じ）
 
 ---
 
-## 技術的な詳細
+#### **Step 2: UI層の新パターンを理解（1時間）**
 
-### エンコーディング処理
-- すべてのファイルはUTF-8エンコーディングで保存
-- バイナリレベルでの文字列置換を実施し、エンコーディングの整合性を維持
+1. **Dumb Component**
+   - [09_UI層の詳細設計 - 7.1節](09_UI層の詳細設計.md#71-dumb-component純粋表示コンポーネント)
+   - WPFのUserControlと同じ概念
 
-### 修正方法
-1. **型定義の修正**: sedコマンドによる一括置換
-2. **文字化け修正**: Pythonスクリプトによるバイナリレベルの置換
-   - 誤ったバイト列を正しいUTF-8バイト列に変換
+2. **Smart Component**
+   - [09_UI層の詳細設計 - 7.2節](09_UI層の詳細設計.md#72-smart-componentページコンポーネント)
+   - WPFのWindowと同じ概念
 
----
+3. **Store（状態管理）**
+   - [09_UI層の詳細設計 - 7.4節](09_UI層の詳細設計.md#74-store状態管理)
+   - ViewModelの状態管理部分を分離
 
-## 品質保証
+4. **PageActions（UI手順）**
+   - [09_UI層の詳細設計 - 7.3節](09_UI層の詳細設計.md#73-pageactionsui手順オーケストレーション)
+   - ViewModelのICommand部分を分離
 
-### 修正後の検証
-- ✅ すべての型定義が正しいResult型を参照
-- ✅ 文字化けが完全に解消
-- ✅ コードサンプルの整合性を維持
-- ✅ マークダウンの構文エラーなし
-- ✅ ファイルエンコーディングの統一(UTF-8)
-
-### 影響範囲
-- 修正は純粋なタイポと文字化けのみ
-- アーキテクチャ設計、ロジック、構造には変更なし
-- すべての修正は下位互換性を維持
+**重要な違い:**
+- WPFのViewModel = Store（状態管理） + PageActions（UI手順）に分離
+- なぜ分離？ → テスタビリティと再利用性の向上
 
 ---
 
-## 今後の推奨事項
+#### **Step 3: MediatRとCQRSを理解（1時間）**
 
-### 品質管理
-1. **自動チェックの導入**
-   - コードサンプルのコンパイル検証
-   - markdownlintの導入
+1. **なぜMediatRが必要か**
+   - この章の16.3節を参照
+   - Pipeline Behaviorsによる横断的関心事の統一
 
-2. **エンコーディング管理**
-   - エディタ設定の統一(UTF-8 BOM無し)
-   - Git設定での文字エンコーディング指定
+2. **CQRSとは何か**
+   - この章の16.4節を参照
+   - 読み取りと書き込みの最適化を独立して実施
 
-3. **コードレビュー**
-   - 型定義の完全性チェック
-   - 文字エンコーディングの検証
+3. **Pipeline Behaviorsの詳細**
+   - [10_Application層の詳細設計](10_Application層の詳細設計.md)
+   - ログ、バリデーション、認可、トランザクション等の自動適用
 
 ---
 
-## 修正作業者
-**実施**: Claude (AI Assistant)  
-**日付**: 2025年10月22日  
-**バージョン**: v1.0.1(修正版)
+#### **Step 4: 横断的関心事を理解（30分）**
+
+1. **Pipeline Behaviorsの仕組み**
+   - [10_Application層の詳細設計](10_Application層の詳細設計.md) - Pipeline Behaviors参照
+   - Attribute/Filterとの違いと利点
+
+2. **監査ログ・メトリクス**
+   - エンタープライズアプリケーション要件
+   - 実装済みの機能を確認
+
+---
+
+#### **Step 5: ドメイン駆動設計（DDD）の基礎（1時間）**
+
+1. **集約ルート・エンティティ・値オブジェクト**
+   - [11_Domain層の詳細設計](11_Domain層の詳細設計.md)
+   - 従来のEntityとの違い
+
+2. **ドメインイベント**
+   - ビジネスルールの明示化
+   - 疎結合な機能連携
+
+---
+
+#### **Step 6: 実装パターンを確認（30分）**
+
+1. **具体例で全体を理解**
+   - [08_具体例_商品管理機能](08_具体例_商品管理機能.md)
+   - Create/Read/Update/Delete の全パターン
+
+2. **パターンカタログ**
+   - [05_パターンカタログ一覧](05_パターンカタログ一覧.md)
+   - 実装時のクイックリファレンス
+
+---
+
+### 16.6 よくある疑問（FAQ）
+
+#### **Q1: ServiceクラスのDIではダメなのか？**
+
+**A:** 小規模アプリケーションであれば問題ありません。しかし、以下の場合はMediatRが有利です：
+
+- チーム開発（5名以上）
+- 長期保守（3年以上）
+- エンタープライズ要件（監査ログ、メトリクス、認可等）
+- 複雑なビジネスロジック
+
+**MediatRのメリット:**
+- 横断的関心事の統一（Pipeline Behaviors）
+- 単一責任の原則（1 Handler = 1 UseCase）
+- テスタビリティの向上
+
+---
+
+#### **Q2: ViewModelを分割するメリットは？**
+
+**A:** Store（状態管理） + PageActions（UI手順）に分割することで：
+
+- **テスタビリティ**: Storeは純粋関数、Actionsは単体テスト可能
+- **再利用性**: 複数コンポーネントで同じStoreを共有
+- **単一責任**: 状態管理とUI手順を分離
+- **並行制御**: Storeで一元管理
+
+WPFのViewModelは肥大化しやすい問題がありますが、この分離により解決します。
+
+---
+
+#### **Q3: CQRSは必須か？**
+
+**A:** 必須ではありませんが、以下の場合は強く推奨：
+
+- 読み取りと書き込みの頻度が大きく異なる
+- 読み取り性能が重要（検索、レポート等）
+- キャッシュ戦略を適用したい
+- 読み取りと書き込みで異なるデータモデルが必要
+
+**CQRSのメリット:**
+- 読み取りと書き込みを独立して最適化
+- キャッシュ戦略の適用が容易
+- 責務が明確
+
+---
+
+#### **Q4: Blazorは学習コストが高いのでは？**
+
+**A:** WPF/WinForms経験者であれば学習コストは低いです：
+
+| WPF/WinForms | Blazor | 学習難易度 |
+|-------------|--------|----------|
+| XAML | Razor | 低（似ている） |
+| Code-behind | @code | 低（同じC#） |
+| DataBinding | 手動バインディング | 中（異なるが簡単） |
+| UserControl | Dumb Component | 低（同じ概念） |
+
+Blazor特有の概念（SignalR、Circuit等）は段階的に学べます。
+
+---
+
+#### **Q5: 既存の3層アプリケーションから移行できるか？**
+
+**A:** はい、段階的に移行可能です：
+
+**段階1: UI層のみBlazorに移行**
+- バックエンドはそのまま（RESTful API）
+- BlazorからHTTPClientでAPI呼び出し
+
+**段階2: Application層をMediatRに移行**
+- ServiceクラスをHandlerに分割
+- Pipeline Behaviorsを追加
+
+**段階3: Domain層をDDDに移行**
+- 集約ルート、値オブジェクトの導入
+- ビジネスルールのドメインへの移動
+
+各段階は独立しており、段階的に移行可能です。
 
 ---
 
 ## まとめ
 
-本修正により、Blazorガイドはすべてのコードサンプルが正しく動作し、
-可読性が向上した高品質なドキュメントとなりました。
+このアーキテクチャは、3層アーキテクチャの進化形です。
 
-すべての修正は技術的に正確で、実装時にそのまま使用できる
-状態になっています。
+**主な進化点:**
+1. **MediatR**: 横断的関心事の統一と疎結合化
+2. **CQRS**: 読み取りと書き込みの独立した最適化
+3. **Store/Actions分離**: ViewModelの責務分離
+4. **Pipeline Behaviors**: 宣言的な横断的関心事の適用
+5. **DDD**: ビジネスルールのドメインへの集約
 
+これらの進化により、**エンタープライズグレードの要件（監査、メトリクス、認可、トランザクション等）を満たしながら、テスタビリティと保守性を確保**できます。
 
+---
+
+**次のステップ:**
+- [01_イントロダクション](01_イントロダクション.md)で全体像を確認
+- [08_具体例_商品管理機能](08_具体例_商品管理機能.md)で実装パターンを確認
+- [09_UI層の詳細設計](09_UI層の詳細設計.md)でBlazor実装を学習
 
 
 
 ---
 
-<a id="phase2改善サマリー"></a>
+# 19. AIへの実装ガイド
 
-# 📄 Phase2改善サマリー
-
-*元ファイル: `Phase2改善サマリー.md`*
 
 ---
 
+## 🤖 このドキュメントの目的
 
-## ✅ 実施した作業
-
-### 1. 文字化けの完全修正
-- **使用ツール**: ftfy (Python ライブラリ)
-- **対象ファイル**: 
-  - `10_Infrastructure層の詳細設計.md`
-  - `15_まとめ.md`
-- **修正内容**: UTF-8バイト列がLatin-1として誤解釈された文字化けを完全修正
-
-**修正例**:
-- 修正前: `Infrastructure層ã®è©³ç´°è¨­è¨ˆ`
-- 修正後: `Infrastructure層の詳細設計`
+このガイドは、AIがこのプロジェクトを参照して**正しく実装を生成する**ための実践的な指針です。
 
 ---
 
-### 2. 内容の改善と最適化
+## 📋 実装の基本フロー
 
-#### 2.1 用語の統一と明確化
+### ステップ1: パターンを特定する
 
-| 改善項目 | 変更前 | 変更後 |
-|---------|--------|--------|
-| Transaction説明 | Transaction境界の厳密化 | Transactionスコープの厳密化 |
-| Store並行制御 | versioning + 差分判定 | バージョニング + 差分判定 |
-| ORM説明 | ORM | ORM(書き込み用) |
-| Dapper説明 | 軽量DB アクセス | 軽量DBアクセス(読み取り最適化) |
+```mermaid
+graph LR
+    A[機能要求を受け取る] --> B{機能の性質は?}
+    B -->|データ取得| C[参照系パターン]
+    B -->|データ変更| D[更新系パターン]
+    C --> E[適切なQueryパターンを選択]
+    D --> F[適切なCommandパターンを選択]
+    E --> G[実装開始]
+    F --> G
+```
 
-#### 2.2 コメントの改善
+**例:**
+```
+ユーザー: 「商品の価格を変更する機能を実装して」
+AI判断: データ変更 → 更新系パターン → UpdateProductパターンを参照
+```
 
-**UI層(07_UI層の詳細設計.md)**:
+### ステップ2: 参照すべきファイルを特定する
+
+**パターンが決まったら、対応するフォルダの全ファイルを参照:**
+
+```
+src/ProductCatalog.Application/Features/Products/UpdateProduct/
+├── UpdateProductCommand.cs      ← Commandの定義を学ぶ
+├── UpdateProductHandler.cs      ← ビジネスロジックの流れを学ぶ
+└── UpdateProductValidator.cs    ← 入力検証のパターンを学ぶ
+```
+
+### ステップ3: コード内のコメントを読む
+
+**各ファイルには、以下の情報が含まれています:**
+
 ```csharp
-// 改善前
-// ❌ Dumbコンポーネントでやってはいけないこと
-// 改善後
-// ❌ Dumbコンポーネントで禁止されている操作
-
-// 改善前
-// ✅ すべてEventCallbackで親に委譲
-// 改善後
-// ✅ すべての操作はEventCallbackで親コンポーネントに委譲
-
-// 改善前
-// 並行実行制御: 先行処理中は新規をブロック
-// 改善後
-// 並行実行制御: 先行処理中は新規リクエストをブロック
+/// <summary>
+/// 商品更新Command
+///
+/// 【パターン: 更新系Command】
+///
+/// 使用シナリオ:                    ← いつ使うか
+/// - 既存データの部分的な変更が必要な場合
+/// - 楽観的排他制御が必要な場合
+///
+/// 実装ガイド:                      ← 実装時の注意点
+/// - 必ずVersionを含めて楽観的排他制御を実装
+/// - 部分更新の場合は、変更するフィールドのみをパラメータに含める
+///
+/// AI実装時の注意:                  ← AIが特に注意すべきこと
+/// - Handler内でEntity.ChangeXxx()メソッドを呼ぶ
+/// - 直接フィールドを変更しない
+/// </summary>
 ```
 
-**Application層(08_Application層の詳細設計.md)**:
+**これらのコメントを必ず読んでから実装を開始してください。**
+
+### ステップ4: パターンを新しいドメインに適用する
+
+**例: 「注文（Order）」ドメインに適用**
+
+```
+参照: UpdateProduct/
+  ↓ パターンを抽出
+  ↓
+適用: UpdateOrder/
+  ├── UpdateOrderCommand.cs
+  │   public sealed record UpdateOrderCommand(
+  │       Guid OrderId,
+  │       OrderStatus Status,
+  │       string ShippingAddress,
+  │       long Version  ← 楽観的排他制御（パターンから学習）
+  │   ) : ICommand<Result>
+  │   {
+  │       public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+  │       ↑ 冪等性キー（パターンから学習）
+  │   }
+  │
+  ├── UpdateOrderHandler.cs
+  │   public async Task<Result> Handle(UpdateOrderCommand command, CancellationToken ct)
+  │   {
+  │       var order = await _repository.GetAsync(new OrderId(command.OrderId), ct);
+  │
+  │       if (order.Version != command.Version)  ← パターンから学習
+  │           return Result.Fail("競合が発生しました");
+  │
+  │       order.ChangeStatus(command.Status);    ← Domainメソッド経由（パターンから学習）
+  │       order.ChangeShippingAddress(command.ShippingAddress);
+  │
+  │       await _repository.SaveAsync(order, ct);
+  │       return Result.Success();
+  │   }
+  │
+  └── UpdateOrderValidator.cs
+      public class UpdateOrderValidator : AbstractValidator<UpdateOrderCommand>
+      {
+          public UpdateOrderValidator()
+          {
+              RuleFor(x => x.OrderId).NotEmpty();  ← パターンから学習
+              RuleFor(x => x.Version).GreaterThan(0);
+          }
+      }
+```
+
+---
+
+## ⚠️ よくある実装ミス（アンチパターン）
+
+### ❌ ミス1: Handler内にビジネスロジックを書く
+
+**悪い例:**
 ```csharp
-// 改善前
-// TransactionBehaviorがCommit
-// 改善後
-// TransactionBehaviorが自動的にCommit
-
-// 改善前
-// 既にトランザクションが開始されている場合はスキップ
-// 改善後
-// ネストされたトランザクションを防ぐため、既存トランザクションがあればスキップ
-```
-
-**Domain層(09_Domain層の詳細設計.md)**:
-```csharp
-// 改善前
-// ビジネスルール: 公開中の商品は50%以上の値下げ不可
-// 改善後
-// ビジネスルール制約: 公開中の商品は50%以上の値下げを禁止
-
-// 改善前
-// ビジネスルール: 画像が1枚以上必要
-// 改善後
-// ビジネスルール制約: 公開には最低1枚の画像が必須
-
-// 改善前
-// ビジネスルール: 最大10枚まで
-// 改善後
-// ビジネスルール制約: 商品画像は最大10枚まで登録可能
-```
-
-#### 2.3 説明の明確化
-
-**信頼性パターン(11_信頼性パターン.md)**:
-- `重複実行防止` → `重複実行の防止`
-- `// 補償処理(ロールバック)` → `// 補償トランザクション(Compensating Transaction)の実行`
-
-**パフォーマンス最適化(12_パフォーマンス最適化.md)**:
-- `// ✅ @key ディレクティブで効率的な差分レンダリング` 
-  → `// ✅ @key ディレクティブを使用した効率的な差分レンダリング`
-- `// ❌ 避けるべき: 巨大なStateオブジェクト` 
-  → `// ❌ アンチパターン: 巨大なStateオブジェクトの保持`
-
-**テスト戦略(13_テスト戦略.md)**:
-- `← 少数の重要シナリオのみ` → `← 少数の重要な統合シナリオのみ`
-- `← パイプライン+DB連携` → `← パイプライン全体とDB連携のテスト`
-- `← Domain, Handler, Actions` → `← Domain、Handler、Actionsの単体テスト`
-
-**ベストプラクティス(14_ベストプラクティス.md)**:
-- `# 3. 多層防御` → `# 3. 多層防御(Defense in Depth)`
-
-#### 2.4 v2.0セクションの改善
-
-**15_まとめ.md のv2.0追加内容**:
-
-1. **セクションタイトルの明確化**:
-   - `## 7.3.1 PageActions コーディング規約 (新規追加)`
-     → `## 7.3.1 PageActions コーディング規約の明文化 (v2.0新規追加)`
-   
-   - `## 7.4.1 Store 並行制御パターン (強化)`
-     → `## 7.4.1 Store 並行制御パターンの強化 (v2.0改善)`
-   
-   - `## 8.3.1 Transaction 境界の厳密化 (新規追加)`
-     → `## 8.3.1 Transactionスコープの厳密化 (v2.0改善)`
-   
-   - `## 8.3.2 Authorization 二重化 (新規追加)`
-     → `## 8.3.2 Authorization二重防御戦略 (v2.0新規追加)`
-   
-   - `## 11.1.1 Outbox Dispatcher の強化 (改善)`
-     → `## 11.1.1 Outbox Dispatcher の信頼性向上 (v2.0改善)`
-   
-   - `## 12.1.1 Read 最適化とキャッシュ戦略 (強化)`
-     → `## 12.1.1 Read最適化とキャッシュ戦略の強化 (v2.0改善)`
-
-2. **PageActionsコーディング規約のコメント改善**:
-```csharp
-// 許可される操作
-// 改善前 → 改善後
-// 1. Store 呼び出し → 1. Store メソッドの呼び出し
-// 2. Dialog 表示 → 2. 確認ダイアログの表示
-// 3. Toast 通知 → 3. トースト通知の表示
-// 4. Navigation → 4. ページナビゲーション
-// 5. ロギング → 5. ロギング出力
-
-// 禁止される操作
-// 改善前 → 改善後
-// 1. 直接 HTTP 通信 → 1. 直接的なHTTP通信(禁止)
-// 5. JS Interop (Store 経由でやる) → 5. JavaScript相互運用(Store経由で実行すること)
-// 6. ビジネスロジック → 6. ビジネスロジックの実装(禁止)
-```
-
-3. **バージョン履歴の追加**:
-```markdown
-**バージョン履歴**:
-- v1.0 (2025-10): 初版リリース
-- v2.0 (2025-10): Phase2改善版リリース  ← 追加
-```
-
----
-
-## 📊 改善統計
-
-| 項目 | 件数 |
-|-----|------|
-| 文字化け修正ファイル | 2ファイル |
-| 内容改善ファイル | 16ファイル |
-| コメント改善箇所 | 30箇所以上 |
-| 用語統一 | 10箇所以上 |
-| セクションタイトル改善 | 6箇所 |
-
----
-
-## 🎯 改善の効果
-
-### 1. 可読性の向上
-- 文字化けが完全に解消され、すべての日本語テキストが正しく表示
-- コメントがより明確で理解しやすくなった
-- 技術用語が統一され、一貫性が向上
-
-### 2. 技術的正確性の向上
-- Transaction、並行制御、ビジネスルールなどの説明がより正確に
-- アンチパターンと推奨パターンの区別が明確に
-- v2.0の改善内容が明確に文書化
-
-### 3. メンテナンス性の向上
-- セクションタイトルが明確化され、v2.0の変更箇所が一目瞭然
-- コーディング規約が明文化され、チーム開発での参照が容易
-- バージョン履歴が追加され、変更履歴の追跡が可能
-
----
-
-## 📦 成果物
-
-### ディレクトリ構成
-```
-/mnt/user-data/outputs/blazor-guide-improved/
-├── 00_README.md                      (5.5 KB)
-├── 01_イントロダクション.md            (5.2 KB)
-├── 02_アーキテクチャ概要.md            (3.6 KB)
-├── 03_採用技術とパターン.md            (11 KB)
-├── 04_全体アーキテクチャ図.md          (13 KB)
-├── 05_レイヤー構成と責務.md            (5.6 KB)
-├── 06_具体例_商品管理機能.md          (16 KB)
-├── 07_UI層の詳細設計.md              (20 KB) ✨ 改善
-├── 08_Application層の詳細設計.md     (17 KB) ✨ 改善
-├── 09_Domain層の詳細設計.md          (13 KB) ✨ 改善
-├── 10_Infrastructure層の詳細設計.md  (17 KB) ✨ 文字化け修正+改善
-├── 11_信頼性パターン.md              (17 KB) ✨ 改善
-├── 12_パフォーマンス最適化.md         (4.0 KB) ✨ 改善
-├── 13_テスト戦略.md                 (7.3 KB) ✨ 改善
-├── 14_ベストプラクティス.md           (3.0 KB) ✨ 改善
-├── 15_まとめ.md                    (45 KB) ✨ 文字化け修正+v2.0改善
-├── 作業完了サマリー.md               (5.1 KB)
-└── Phase2改善サマリー.md            (このファイル)
-```
-
-### 総ファイルサイズ
-- **合計**: 約 208 KB
-- **最大ファイル**: 15_まとめ.md (45 KB)
-- **最小ファイル**: 14_ベストプラクティス.md (3.0 KB)
-
----
-
-## 💡 次のステップ
-
-### Phase3への推奨改善項目
-
-1. **コード例の拡充**
-   - より多くの実装例を追加
-   - エッジケースのハンドリング例
-   - パフォーマンスチューニングの具体例
-
-2. **図表の追加**
-   - Mermaid図による可視化の強化
-   - シーケンス図の追加
-   - クラス図の詳細化
-
-3. **トラブルシューティングの強化**
-   - よくあるエラーと解決策の拡充
-   - デバッグ手法の追加
-   - パフォーマンス問題の診断方法
-
-4. **実装ガイドラインの追加**
-   - プロジェクトセットアップ手順
-   - CI/CD パイプラインの例
-   - デプロイメント戦略
-
----
-
-## 🔍 品質チェック
-
-### ✅ 完了項目
-- [x] すべての文字化けを修正
-- [x] コメントの明確化と改善
-- [x] 用語の統一
-- [x] v2.0セクションの明確化
-- [x] セクションタイトルの改善
-- [x] バージョン履歴の追加
-- [x] テストピラミッドの説明改善
-- [x] セキュリティセクションの改善
-
-### 📋 レビュー推奨項目
-- [ ] コード例の実行可能性確認
-- [ ] リンクの整合性チェック
-- [ ] 技術的な正確性の最終確認
-- [ ] チーム内でのレビュー
-
----
-
-**作成日時**: 2025年10月22日  
-**作業者**: Claude (Anthropic)  
-**使用ツール**: Python 3 + ftfy  
-**作業時間**: 約30分  
-
-**改善版ドキュメント**: すべてのファイルが `/mnt/user-data/outputs/blazor-guide-improved/` に保存されています。
-
-
-
-
-
----
-
-<a id="phase2-1改善サマリー"></a>
-
-# 📄 Phase2 1改善サマリー
-
-*元ファイル: `Phase2_1改善サマリー.md`*
-
----
-
-
-## ✅ v2.1 で実施した改善(2025-10-22)
-
-### 改善の背景
-
-v2.0で「Transaction境界の厳密化」「Store並行制御」「PageActions規約」「Outbox信頼性」を実装しましたが、レビューにより「最後の5%」の堅牢化ポイントが判明しました。v2.1では、実運用で発生しうる**誤配信**、**重複実行**、**性能劣化**、**追跡困難**といった"痛点"に直撃する7項目を追加実装しました。
-
----
-
-## 🎯 v2.1 追加実装項目
-
-### 優先度P0: キャッシュ誤配信防止とIdempotency完全化
-
-#### 1. CachingBehaviorの順序規約とキー安全性(08章)
-
-**問題**: キャッシュが認可チェックより前に実行されると、権限のないユーザーがキャッシュから取得できる危険性
-
-**解決策**:
-```csharp
-// ✅ Pipeline順序の厳格化(CRITICAL)
-// 1) Logging → 2) Validation → 3) Authorization → 4) Caching → 5) Handler
-
-// ✅ キーに必ずユーザー/テナント情報を含める
-var cacheKey = $"{typeof(TRequest).Name}:{tenantId}:{userId}:{requestKey}";
-//                                        ^^^^^^^^^ ^^^^^^^^
-//                                        テナント   ユーザー固有化
-```
-
-**効果**: キャッシュ誤配信を完全に防止
-
----
-
-#### 2. Idempotency-Keyのエンドツーエンド伝播(08章)
-
-**問題**: Command側のみの冪等性では、UI連打時の重複Submitを源流で止められない
-
-**解決策**:
-```csharp
-// Step 1: PageActionsでキー生成(入口)
-public async Task SaveAsync(ProductDto input, CancellationToken ct = default)
+public async Task<Result> Handle(UpdateProductCommand command, CancellationToken ct)
 {
-    var idempotencyKey = Guid.NewGuid().ToString("N");  // ✅ 連打でも同じキー
-    await _store.SaveAsync(input, idempotencyKey, ct);
-}
+    var product = await _repository.GetAsync(...);
 
-// Step 2-4: Store → Command → Behavior で伝播
-```
-
-**効果**: 重複Submit源流で防止、2回目以降はキャッシュ返却
-
----
-
-### 優先度P1: 並行制御とSignalR嵐対策
-
-#### 3. Store single-flight パターン(07章)
-
-**問題**: versioning単独では、重いQueryが連打時に多重起動してDB負荷が増大
-
-**解決策**:
-```csharp
-// ✅ versioning + single-flight の二段構え
-return _inflightRequests.GetOrAdd("key", _ => LoadInternalAsync(ct))
-    .ContinueWith(t => { _inflightRequests.TryRemove("key", out _); return t; })
-    .Unwrap();
-```
-
-**効果**:
-| パターン | 連打10回 | DB負荷 |
-|---------|---------|--------|
-| 制御なし | 10回実行 | 10回 |
-| versioningのみ | 10回実行→1回反映 | 10回 |
-| versioning + single-flight | 1回実行→1回反映 | **1回** |
-
----
-
-#### 4. SignalR通知のコアレス&デバウンス(07章)
-
-**問題**: 短時間に複数のSignalR通知が来ると、再描画が多発してUIが重くなる
-
-**解決策**:
-```csharp
-// ✅ デバウンス: 500ms以内の通知はまとめる
-private void OnProductInvalidated(string cacheKey)
-{
-    lock (_invalidationLock)
+    // ❌ ビジネスルールがHandler内に！
+    if (product.Status == ProductStatus.Published && command.Price < product.Price * 0.5m)
     {
-        _pendingInvalidations.Add(cacheKey);
-        _debounceTimer.Change(TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+        return Result.Fail("公開中の商品は50%以上値下げできません");
+    }
+
+    product.Price = command.Price;  // ❌ 直接フィールドを変更
+
+    await _repository.SaveAsync(product, ct);
+    return Result.Success();
+}
+```
+
+**良い例:**
+```csharp
+public async Task<Result> Handle(UpdateProductCommand command, CancellationToken ct)
+{
+    var product = await _repository.GetAsync(...);
+
+    try
+    {
+        // ✅ ドメインメソッドを呼ぶだけ
+        product.ChangePrice(new Money(command.Price));
+    }
+    catch (DomainException ex)
+    {
+        // ✅ ドメイン例外をResultに変換
+        return Result.Fail(ex.Message);
+    }
+
+    await _repository.SaveAsync(product, ct);
+    return Result.Success();
+}
+```
+
+**なぜ？**
+- ビジネスルールは**Domain層**に実装する
+- Handler は**オーケストレーション**のみ（取得→ドメインメソッド呼び出し→保存）
+
+---
+
+### ❌ ミス2: Validatorでビジネスルールを検証する
+
+**悪い例:**
+```csharp
+public class UpdateProductValidator : AbstractValidator<UpdateProductCommand>
+{
+    public UpdateProductValidator()
+    {
+        RuleFor(x => x.ProductId).NotEmpty();  // ✅ OK（入力検証）
+
+        RuleFor(x => x.Price)
+            .GreaterThan(0)  // ✅ OK（入力検証）
+            .Must((command, price) =>
+            {
+                // ❌ ビジネスルールをValidatorで検証！
+                // 「在庫がある商品は価格を下げられない」などのルール
+                var product = _repository.GetAsync(...).Result;
+                return product.Stock == 0 || price >= product.Price;
+            });
     }
 }
 ```
 
-**効果**:
-- 10通知 → 10回再描画 **から** 10通知 → 1回再描画 に削減
-
----
-
-### 優先度P1: Query最適化の型化
-
-#### 5. Query最適化チェックリスト(12章)
-
-**問題**: Query最適化のベストプラクティスがチーム内で共有されていない
-
-**解決策**:
-```markdown
-| 項目 | チェック内容 | ❌NG例 | ✅OK例 |
-|------|------------|--------|--------|
-| 1. DTO専用性 | 画面専用DTOを使用 | Entity直接返却 | 画面用DTO作成 |
-| 2. COUNT最適化 | FAST COUNT使用 | COUNT(*)毎回 | インデックス化ビュー |
-| 3. 投影最適化 | 必要カラムのみSELECT | SELECT * | SELECT Id, Name, ... |
-| 4. JOIN最小化 | 不要なJOINなし | .Include(x => x.All) | 必要な列のみJOIN |
-```
-
-**効果**: Pull Requestレビューが効率化、性能問題を事前検知
-
----
-
-### 優先度P2: 観測可能性とBlazor Server安全策
-
-#### 6. CorrelationIdによる観測可能性(12章)
-
-**問題**: 障害発生時、複数のログにまたがる処理を追跡するのが困難
-
-**解決策**:
+**良い例:**
 ```csharp
-// ✅ CorrelationIdをUI → Command → Outbox → SignalR で貫通
-var correlationId = Guid.NewGuid().ToString("N");
+public class UpdateProductValidator : AbstractValidator<UpdateProductCommand>
+{
+    public UpdateProductValidator()
+    {
+        // ✅ 入力検証のみ
+        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.Price).GreaterThan(0).WithMessage("価格は0より大きい必要があります");
+        RuleFor(x => x.Stock).GreaterThanOrEqualTo(0).WithMessage("在庫は0以上である必要があります");
+        RuleFor(x => x.Version).GreaterThan(0);
+    }
+}
 
-// 全ログに含める
-_logger.LogInformation("[{CorrelationId}] 処理開始: {RequestName}", correlationId, ...);
+// ビジネスルールはDomain層で
+public sealed class Product : AggregateRoot<ProductId>
+{
+    public void ChangePrice(Money newPrice)
+    {
+        // ✅ ビジネスルール
+        if (_status == ProductStatus.Published)
+        {
+            var discountRate = 1 - (newPrice.Amount / _price.Amount);
+            if (discountRate > 0.5m)
+                throw new DomainException("公開中の商品は50%以上の値下げはできません");
+        }
+
+        _price = newPrice;
+    }
+}
 ```
 
-**効果**: 障害追跡が数分 → 数秒 に短縮
+**なぜ？**
+- **Validator**: 入力値の形式チェック（null、範囲、長さなど）
+- **Domain**: ビジネスルールの検証（状態に応じた制約など）
 
 ---
 
-#### 7. Blazor Server運用ガイド(14章)
+### ❌ ミス3: 楽観的排他制御を忘れる
 
-**問題**: Blazor Server特有の注意点が文書内に散在していて参照しづらい
+**悪い例:**
+```csharp
+// Command定義
+public sealed record UpdateProductCommand(
+    Guid ProductId,
+    string Name,
+    decimal Price
+    // ❌ Versionがない！
+) : ICommand<Result>;
 
-**解決策**:
-以下を一元化:
-- 再接続時のStore再初期化
-- 回線断中の二重実行防止
-- アンチフォージェリトークン
-- サーキットごとのIServiceScope作法
-- Circuit健全性チェックリスト
+// Handler
+public async Task<Result> Handle(UpdateProductCommand command, CancellationToken ct)
+{
+    var product = await _repository.GetAsync(...);
 
-**効果**: 運用事故の予防と、新規メンバーのオンボーディング高速化
+    // ❌ バージョンチェックなし
+    product.ChangeName(command.Name);
+    product.ChangePrice(new Money(command.Price));
 
----
-
-## 📊 v2.1 改善統計
-
-| 項目 | 件数/規模 |
-|-----|----------|
-| 追加セクション数 | 7セクション |
-| 追加コード例 | 30以上 |
-| 新規チェックリスト | 3個 |
-| 影響ファイル数 | 4ファイル(07, 08, 12, 14章) |
-| 追加文字数 | 約10,000文字 |
-
----
-
-## 🎯 v2.1 で解決した課題
-
-| 課題 | v2.0まで | v2.1以降 |
-|------|---------|---------|
-| **キャッシュ誤配信** | 可能性あり | Pipeline順序規約で防止 |
-| **UI連打時の重複Submit** | Command側のみ | UI→Command全体で防止 |
-| **重いQueryの多重起動** | versioningのみ | single-flightで抑制 |
-| **SignalR通知嵐** | 再描画多発 | デバウンスで1回に集約 |
-| **Query性能レビュー** | 属人的 | チェックリストで標準化 |
-| **障害追跡** | 困難 | CorrelationIdで瞬時 |
-| **Blazor Server注意点** | 散在 | 運用ガイドに集約 |
-
----
-
-## 📦 v2.1 成果物
-
-### 更新されたファイル
-
-```
-blazor-guide-v2.1/
-├── 00_README.md                      (更新: v2.1反映)
-├── 07_UI層の詳細設計.md              (追加: 7.5節 single-flight + デバウンス)
-├── 08_Application層の詳細設計.md     (追加: 8.4節 Pipeline順序 + Idempotency伝播)
-├── 12_パフォーマンス最適化.md         (追加: 12.4節 Query最適化 + 12.5節 観測可能性)
-├── 14_ベストプラクティス.md           (追加: 14.6節 Blazor Server運用ガイド)
-├── Phase2.1改善サマリー.md           (このファイル)
-└── その他 13ファイル                 (v2.0から変更なし)
+    await _repository.SaveAsync(product, ct);  // ❌ 他のユーザーの変更を上書きするリスク
+    return Result.Success();
+}
 ```
 
----
+**良い例:**
+```csharp
+// Command定義
+public sealed record UpdateProductCommand(
+    Guid ProductId,
+    string Name,
+    decimal Price,
+    long Version  // ✅ バージョンを含める
+) : ICommand<Result>;
 
-## 💡 v2.1 実装の優先順位(導入時)
+// Handler
+public async Task<Result> Handle(UpdateProductCommand command, CancellationToken ct)
+{
+    var product = await _repository.GetAsync(...);
 
-### Phase 1: 即座に適用すべき(P0)
-1. **CachingBehavior順序規約** - 誤配信防止のため最優先
-2. **Idempotency-Key伝播** - 重複Submit防止のため早急に
+    // ✅ バージョンチェック
+    if (product.Version != command.Version)
+    {
+        return Result.Fail("他のユーザーによって更新されています。最新データを取得してください。");
+    }
 
-### Phase 2: 次に適用(P1)
-3. **Store single-flight** - 重いQueryがある画面から適用
-4. **SignalR デバウンス** - 更新頻度が高い画面から適用
-5. **Query最適化チェックリスト** - PR テンプレートに組み込み
+    product.ChangeName(command.Name);
+    product.ChangePrice(new Money(command.Price));
 
-### Phase 3: 計画的に適用(P2)
-6. **CorrelationId** - ログ基盤が整ってから実装
-7. **Blazor Server運用ガイド** - チームの共通知識として浸透
-
----
-
-## 🔍 v2.1 品質チェック
-
-### ✅ 完了項目
-- [x] CachingBehavior順序規約の明文化とコード例
-- [x] Idempotency-Key伝播の4ステップ実装
-- [x] Store single-flightパターンの実装例
-- [x] SignalRデバウンスの完全実装
-- [x] Query最適化チェックリストの作成
-- [x] CorrelationIdの貫通実装
-- [x] Blazor Server運用ガイドの集約
-
-### 📋 レビュー推奨項目
-- [ ] v2.1追加コードの実行可能性確認
-- [ ] チェックリストの実プロジェクトへの適用テスト
-- [ ] CorrelationIdのログクエリ例の検証
-- [ ] 運用ガイドの実環境での妥当性確認
+    await _repository.SaveAsync(product, ct);
+    return Result.Success();
+}
+```
 
 ---
 
-## 🎓 v2.1 主要な設計判断
+### ❌ ミス4: IdempotencyKeyを忘れる
 
-### 判断1: Pipeline順序を「規約」に昇格
-**理由**: キャッシュ誤配信は重大なセキュリティリスクのため、コメントではなくチェックリストレベルで明文化
+**悪い例:**
+```csharp
+// ❌ IdempotencyKeyがない
+public sealed record CreateProductCommand(
+    string Name,
+    string Description,
+    decimal Price
+) : ICommand<Result<Guid>>;
+```
 
-### 判断2: Idempotency-KeyをUI層から生成
-**理由**: 重複Submitの源流(ユーザーの連打)で止めるため、PageActionsでキーを生成
+**良い例:**
+```csharp
+// ✅ IdempotencyKeyを含める
+public sealed record CreateProductCommand(
+    string Name,
+    string Description,
+    decimal Price
+) : ICommand<Result<Guid>>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+```
 
-### 判断3: single-flightは「軽いQuery」には不要
-**理由**: オーバーヘッドがあるため、500ms以上の重いQueryのみに適用
-
-### 判断4: デバウンス時間は500ms
-**理由**: ユーザーが「遅い」と感じない範囲で、通知を効果的に集約できる時間
-
-### 判断5: CorrelationIdをOutboxにも含める
-**理由**: 非同期処理も含めた全フローを追跡可能にするため
-
-### 判断6: Blazor Server注意点を「運用ガイド」に集約
-**理由**: 散在していると見落としが発生するため、1箇所に集約して参照性を向上
-
----
-
-## 🚀 次のステップ(Phase 3への推奨)
-
-v2.1で「最後の5%」の堅牢化が完了しました。次のフェーズでは以下を検討:
-
-### 1. 実装ガイドの拡充
-- プロジェクトセットアップ手順(スクリプト付き)
-- CI/CDパイプライン例(GitHub Actions / Azure DevOps)
-- デプロイメント戦略(Blue-Green / Canary)
-
-### 2. 運用監視の強化
-- Prometheus / Grafana ダッシュボード例
-- Application Insights クエリ集
-- アラート設定のベストプラクティス
-
-### 3. 高度なパターンの追加
-- Event Sourcing の実装例
-- CQRS + Read Model 最適化
-- マルチテナント対応の詳細設計
+**なぜ？**
+- ネットワークエラーなどでリトライされた場合の**重複実行を防止**
+- IdempotencyBehaviorが自動的にチェックしてくれる
 
 ---
 
-**作成日時**: 2025年10月22日  
-**バージョン**: 2.1  
-**作業者**: Claude (Anthropic)  
-**作業時間**: 約2時間
+### ❌ ミス5: Domain層でInfrastructure依存する
 
-**v2.1 ドキュメント**: すべてのファイルが `/home/claude/blazor-guide-v2.1/` に保存されています。
+**悪い例:**
+```csharp
+// Domain層
+public sealed class Product : AggregateRoot<ProductId>
+{
+    private readonly IProductRepository _repository;  // ❌ Repository依存
+    private readonly IEmailService _emailService;     // ❌ Infrastructure依存
 
+    public void Delete()
+    {
+        if (_stock > 0)
+            throw new DomainException("在庫がある商品は削除できません");
 
+        _isDeleted = true;
+
+        // ❌ Domain層から直接メール送信
+        _emailService.SendAsync("admin@example.com", "商品が削除されました");
+    }
+}
+```
+
+**良い例:**
+```csharp
+// Domain層
+public sealed class Product : AggregateRoot<ProductId>
+{
+    public void Delete()
+    {
+        if (_stock > 0)
+            throw new DomainException("在庫がある商品は削除できません");
+
+        _isDeleted = true;
+
+        // ✅ ドメインイベントを発行するだけ
+        RaiseDomainEvent(new ProductDeletedDomainEvent(Id, _name));
+    }
+}
+
+// Application層
+public sealed class ProductDeletedEventHandler : INotificationHandler<ProductDeletedDomainEvent>
+{
+    private readonly IEmailService _emailService;
+
+    public async Task Handle(ProductDeletedDomainEvent notification, CancellationToken ct)
+    {
+        // ✅ Application層でメール送信
+        await _emailService.SendAsync("admin@example.com", "商品が削除されました");
+    }
+}
+```
+
+**なぜ？**
+- **Domain層は純粋にビジネスロジックのみ**
+- Infrastructure依存（DB、メール、外部API）はApplication/Infrastructure層で処理
+
+---
+
+## 🎯 パターン別の実装チェックリスト
+
+### 参照系（Query）の実装チェックリスト
+
+- [ ] Queryは `IQuery<TResponse>` を実装している
+- [ ] Queryはイミュータブル（`record` で定義）
+- [ ] キャッシュが必要な場合、`ICacheableQuery` を実装している
+- [ ] `GetCacheKey()` が一意なキーを返している
+- [ ] Handlerは `IRequestHandler<TQuery, TResponse>` を実装している
+- [ ] Handlerは**読み取り専用**（Repositoryの `GetAsync` のみ呼ぶ）
+- [ ] 複雑なクエリはDapperで最適化している
+- [ ] ページングが必要な場合、Page/PageSizeパラメータがある
+- [ ] フィルタリング条件は`null許容`で、nullの場合は条件なし
+
+**参照実装:**
+- `GetProductsQuery/Handler`
+- `GetProductByIdQuery/Handler`
+- `SearchProductsQuery/Handler`
+
+---
+
+### 更新系（Command）の実装チェックリスト
+
+#### Command定義
+
+- [ ] Commandは `ICommand<TResponse>` を実装している
+- [ ] Commandはイミュータブル（`record` で定義）
+- [ ] **IdempotencyKeyプロパティ**を含めている
+- [ ] 更新の場合、**Versionプロパティ**を含めている（楽観的排他制御）
+- [ ] パラメータは必要最小限（不要なフィールドを含めない）
+
+#### Validator
+
+- [ ] Validatorは `AbstractValidator<TCommand>` を継承している
+- [ ] 必須チェック（`NotEmpty`, `NotNull`）を実装している
+- [ ] 範囲チェック（`GreaterThan`, `Length`）を実装している
+- [ ] **ビジネスルールは含めていない**（Domain層に委譲）
+- [ ] エラーメッセージが分かりやすい（`WithMessage`）
+
+#### Handler
+
+- [ ] Handlerは `IRequestHandler<TCommand, TResponse>` を実装している
+- [ ] Repository経由でエンティティを取得している
+- [ ] エンティティが見つからない場合、`Result.Fail` を返している
+- [ ] 更新の場合、**Versionチェック**を実装している
+- [ ] **Domainメソッド経由**でエンティティを変更している（直接フィールド変更しない）
+- [ ] `DomainException` をキャッチして `Result.Fail` に変換している
+- [ ] Repository経由で保存している
+- [ ] 成功時は `Result.Success` を返している
+
+**参照実装:**
+- `CreateProductCommand/Handler/Validator`
+- `UpdateProductCommand/Handler/Validator`
+- `DeleteProductCommand/Handler/Validator`
+
+---
+
+### Domain層の実装チェックリスト
+
+#### 集約ルート（AggregateRoot）
+
+- [ ] `AggregateRoot<TId>` を継承している
+- [ ] フィールドはすべて `private` で定義している
+- [ ] 公開プロパティは読み取り専用（getter のみ）
+- [ ] EF Core用の `private` コンストラクタがある
+- [ ] ファクトリメソッド（`Create`）で初期化している
+- [ ] 変更用のメソッド（`ChangeXxx`）を提供している
+- [ ] メソッド内でビジネスルールを検証している
+- [ ] ルール違反時は `DomainException` をスローしている
+- [ ] 重要な変更時にドメインイベントを発行している（`RaiseDomainEvent`）
+
+#### 子エンティティ
+
+- [ ] 親集約からのみアクセス可能（`private` コレクション）
+- [ ] 公開プロパティは `IReadOnlyList` で公開
+- [ ] 追加/削除は親集約のメソッド経由（`AddImage`, `RemoveImage`）
+- [ ] 親集約が不変条件を保護している
+
+#### Value Object
+
+- [ ] `ValueObject` を継承している
+- [ ] すべてのフィールドがイミュータブル（`readonly`）
+- [ ] コンストラクタで検証している
+- [ ] 等価性比較を実装している（`GetEqualityComponents`）
+
+**参照実装:**
+- `Product.cs` - 集約ルート
+- `ProductImage.cs` - 子エンティティ
+- `Money.cs` - Value Object
+
+---
+
+## 📊 パターンの組み合わせ方
+
+### パターン1: 作成 → 取得
+
+```
+1. CreateProductCommand で商品を作成
+   ↓ 成功時に ProductId を返す
+2. GetProductByIdQuery で作成した商品を取得
+   ↓ 詳細情報を表示
+```
+
+### パターン2: 検索 → 更新
+
+```
+1. SearchProductsQuery で条件に合う商品を検索
+   ↓ 商品リストを表示
+2. ユーザーが商品を選択
+   ↓
+3. GetProductByIdQuery で最新データを取得
+   ↓ Version を取得
+4. UpdateProductCommand で更新
+   ↓ Version を含めて楽観的排他制御
+```
+
+### パターン3: 状態遷移 → 通知
+
+```
+1. PublishProductCommand で商品を公開
+   ↓ ProductPublishedDomainEvent が発行される
+2. ProductPublishedEventHandler がイベントを処理
+   ↓ SignalRで全クライアントに通知
+3. UI側で自動的に再読み込み
+   ↓ 最新の状態を表示
+```
+
+---
+
+## 🔍 デバッグとトラブルシューティング
+
+### 問題1: 「ビジネスルールがどこにあるか分からない」
+
+**探し方:**
+1. まず**Domain層のエンティティ**を確認
+2. 該当するメソッド（`ChangePrice`, `Delete`など）を見る
+3. そこにビジネスルールが実装されている
+
+### 問題2: 「Validationエラーが出ない」
+
+**確認ポイント:**
+1. ValidationBehaviorが登録されているか（`Program.cs`）
+2. Validatorが正しく実装されているか
+3. Validatorが自動検出されるパッケージ（`FluentValidation.DependencyInjection`）が参照されているか
+
+### 問題3: 「楽観的排他制御が動作しない」
+
+**確認ポイント:**
+1. Commandに `Version` プロパティがあるか
+2. Handler内で `Version` チェックを実装しているか
+3. EF Coreの構成で `RowVersion` が設定されているか
+
+### 問題4: 「Idempotencyが動作しない」
+
+**確認ポイント:**
+1. Commandに `IdempotencyKey` プロパティがあるか
+2. IdempotencyBehaviorが登録されているか
+3. IdempotencyStoreが実装されているか
+
+---
+
+## 📚 次のステップ
+
+実装を開始する前に、以下を確認してください:
+
+1. [05_パターンカタログ一覧](05_パターンカタログ一覧.md) で全パターンを把握
+2. [08_具体例_商品管理機能](08_具体例_商品管理機能.md) で具体的な実装例を学習
+3. [10_Application層の詳細設計](10_Application層の詳細設計.md) でQuery/Command実装を学習
+4. [11_Domain層の詳細設計](11_Domain層の詳細設計.md) でドメインモデルを学習
+5. 実際のコードを読んで理解を深める
+
+---
+
+**🤖 このガイドに従えば、AIは正しくエンタープライズグレードの実装を生成できます**
 
