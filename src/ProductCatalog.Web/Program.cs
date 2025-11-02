@@ -1,12 +1,19 @@
+using System.Text;
+using AspNetCoreRateLimit;
+using Asp.Versioning;
 using FluentValidation;
 using MediatR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using ProductCatalog.Application.Common.Behaviors;
 using ProductCatalog.Application.Common.Interfaces;
 using ProductCatalog.Domain.Identity;
 using ProductCatalog.Domain.Products;
+using ProductCatalog.Infrastructure.Authentication;
 using ProductCatalog.Infrastructure.Behaviors;
 using ProductCatalog.Infrastructure.Idempotency;
 using ProductCatalog.Infrastructure.Persistence;
@@ -130,6 +137,32 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
 });
 
+// JWT設定をバインド
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+
+// JWT Token Generator
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+
+// JWT Bearer認証設定（REST API用）
+var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
+    ?? throw new InvalidOperationException("JWT settings are not configured.");
+
+builder.Services.AddAuthentication()
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
 // Repositories
 builder.Services.AddScoped<IProductRepository, EfProductRepository>();
 // Dapper を使用した高速読み取りリポジトリ（本番環境で効果を発揮）
@@ -154,6 +187,81 @@ builder.Services.AddHostedService<ProductCatalog.Infrastructure.Outbox.OutboxBac
 
 // Identity Data Seeder
 builder.Services.AddScoped<ProductCatalog.Infrastructure.Identity.IdentityDataSeeder>();
+
+// Controllers（REST API用）
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
+
+// API Versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+})
+.AddMvc();
+
+// CORS Policy
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ApiCorsPolicy", policy =>
+    {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? Array.Empty<string>();
+
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
+// Rate Limiting（メモリベース）
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
+// Swagger / OpenAPI
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "ProductCatalog API",
+        Version = "v1",
+        Description = "Product Catalog REST API with JWT Bearer authentication"
+    });
+
+    // JWT Bearer認証をSwaggerに追加
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 var app = builder.Build();
 
@@ -207,7 +315,24 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Swagger UI（開発環境のみ）
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "ProductCatalog API v1");
+        options.RoutePrefix = "swagger"; // https://localhost:5001/swagger
+    });
+}
+
 app.UseHttpsRedirection();
+
+// Rate Limiting（レート制限を最初に適用）
+app.UseIpRateLimiting();
+
+// CORS（クロスオリジンリクエスト許可）
+app.UseCors("ApiCorsPolicy");
 
 // Correlation ID Middleware (最初に実行)
 app.UseMiddleware<ProductCatalog.Web.Middleware.CorrelationIdMiddleware>();
@@ -230,6 +355,9 @@ app.MapRazorComponents<App>()
 
 // SignalR Hub エンドポイント
 app.MapHub<ProductCatalog.Web.Hubs.ProductHub>("/hubs/products");
+
+// REST API Controllers エンドポイント
+app.MapControllers();
 
 app.Run();
 

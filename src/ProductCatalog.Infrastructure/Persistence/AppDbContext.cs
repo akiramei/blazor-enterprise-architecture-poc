@@ -5,6 +5,7 @@ using ProductCatalog.Domain.AuditLogs;
 using ProductCatalog.Domain.Identity;
 using ProductCatalog.Domain.Outbox;
 using ProductCatalog.Domain.Products;
+using ProductCatalog.Infrastructure.Authentication;
 
 namespace ProductCatalog.Infrastructure.Persistence;
 
@@ -20,6 +21,7 @@ public sealed class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRo
     public DbSet<Product> Products => Set<Product>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
