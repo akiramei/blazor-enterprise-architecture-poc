@@ -84,6 +84,13 @@
    - Store パターン
    - PageActions パターン
 
+9.5. **[状態管理の実践ガイド](09.5_状態管理の実践ガイド.md)** ⭐ NEW (18 KB)
+   - システムレベル状態管理（共通基盤）
+   - ドメイン固有状態管理（Features）
+   - SessionProvider, ThemeProvider
+   - PreferencesStore, LayoutStore, NotificationStore
+   - Store + PageActions パターンの使い分け
+
 10. **[Application層の詳細設計](10_Application層の詳細設計.md)** (23 KB)
     - なぜMediatRが必要か
     - Command/Query分離
@@ -159,6 +166,7 @@ blazor-architecture-guide/
 ├── 07_レイヤー構成と責務.md
 ├── 08_具体例_商品管理機能.md
 ├── 09_UI層の詳細設計.md
+├── 09.5_状態管理の実践ガイド.md           ⭐ NEW
 ├── 10_Application層の詳細設計.md
 ├── 11_Domain層の詳細設計.md
 ├── 12_Infrastructure層の詳細設計.md
@@ -189,7 +197,8 @@ blazor-architecture-guide/
 
 ### 特定の課題を解決したい方
 - **3層アーキテクチャから移行** → [移行ガイド](18_3層アーキテクチャからの移行ガイド.md)
-- **状態管理に悩んでいる** → [UI層の詳細設計](09_UI層の詳細設計.md)
+- **状態管理に悩んでいる** → [状態管理の実践ガイド](09.5_状態管理の実践ガイド.md) ⭐ NEW
+- **システムレベル vs ドメイン固有の状態管理** → [状態管理の実践ガイド](09.5_状態管理の実践ガイド.md)
 - **トランザクション管理** → [Application層の詳細設計](10_Application層の詳細設計.md)
 - **エラーハンドリング** → [信頼性パターン](13_信頼性パターン.md)
 - **パフォーマンス改善** → [パフォーマンス最適化](14_パフォーマンス最適化.md)
