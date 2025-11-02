@@ -1,12 +1,12 @@
-# 8. Application層の詳細設計
+# 10. Application層の詳細設計
 
 [← 目次に戻る](00_README.md)
 
 ---
 
-## 8. Application層の詳細設計
+## 10. Application層の詳細設計
 
-### 8.0 なぜMediatRが必要か？ - Serviceクラス直接DIとの比較
+### 10.0 なぜMediatRが必要か？ - Serviceクラス直接DIとの比較
 
 このセクションでは、3層アーキテクチャで一般的な「Serviceクラスの直接DI」と、このアーキテクチャで採用している「MediatR + Pipeline Behaviors」の違いを説明します。
 
@@ -305,7 +305,7 @@ MediatRとPipeline Behaviorsを使うことで、**横断的関心事を宣言�
 
 ---
 
-### 8.1 Command/Query定義
+### 10.1 Command/Query定義
 
 #### **マーカーインターフェース**
 
@@ -457,7 +457,7 @@ public sealed class GetProductsHandler : IRequestHandler<GetProductsQuery, Resul
 }
 ```
 
-### 8.2 Pipeline Behaviors
+### 10.2 Pipeline Behaviors
 
 #### **実行順序**
 
@@ -824,9 +824,9 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
 }
 ```
 
-### 8.4 Pipeline登録とBehavior順序規約 (v2.1改善)
+### 10.4 Pipeline登録とBehavior順序規約 (v2.1改善)
 
-#### 8.4.1 Query Pipeline順序とキャッシュ安全性
+#### 10.4.1 Query Pipeline順序とキャッシュ安全性
 
 **CRITICAL**: キャッシュ誤配信を防ぐため、Pipeline順序とキーの規約を厳守してください。
 
@@ -879,7 +879,7 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Authorization
 // → 権限のないユーザーがキャッシュから取得できてしまう危険性
 ```
 
-#### 8.4.2 キャッシュキーの安全性規約
+#### 10.4.2 キャッシュキーの安全性規約
 
 **CRITICAL**: キーに必ずユーザー/テナント情報を含めて誤配信を防ぐ
 
@@ -967,7 +967,7 @@ public interface ICurrentUserService
 // ❌ 機密情報を含めない(ログに出力される)
 ```
 
-#### 8.4.3 Idempotency-Keyのエンドツーエンド伝播 (v2.1改善)
+#### 10.4.3 Idempotency-Keyのエンドツーエンド伝播 (v2.1改善)
 
 **UI→Store→Commandでキーを伝播し、重複Submit源流で止める**
 
