@@ -170,7 +170,15 @@ builder.Services.AddScoped<IProductReadRepository, ProductCatalog.Infrastructure
 // Audit Log Repository（監査ログ）
 builder.Services.AddScoped<IAuditLogRepository, ProductCatalog.Infrastructure.Persistence.Repositories.AuditLogRepository>();
 
-// Stores (Scoped for Blazor Server circuits)
+// Infrastructure Services (Scoped for Blazor Server circuits)
+builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Services.LocalStorageService>();
+
+// Infrastructure Stores (Scoped for Blazor Server circuits - システムレベル状態管理)
+builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Stores.PreferencesStore>();
+builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Stores.LayoutStore>();
+builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Stores.NotificationStore>();
+
+// Feature Stores (Scoped for Blazor Server circuits - ドメイン固有状態管理)
 builder.Services.AddScoped<ProductsStore>();
 builder.Services.AddScoped<ProductDetailStore>();
 builder.Services.AddScoped<ProductEditStore>();

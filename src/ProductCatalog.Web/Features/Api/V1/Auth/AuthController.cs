@@ -130,7 +130,7 @@ public sealed class AuthController : ControllerBase
         var refreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
 
         // Refresh Token保存
-        var refreshToken = Infrastructure.Authentication.RefreshToken.Create(
+        var refreshToken = ProductCatalog.Infrastructure.Authentication.RefreshToken.Create(
             refreshTokenValue,
             user.Id.ToString(),
             DateTime.UtcNow.AddDays(7)); // appsettings.jsonから取得すべきだが簡易実装
@@ -228,7 +228,7 @@ public sealed class AuthController : ControllerBase
         var newAccessToken = await _jwtTokenGenerator.GenerateAccessTokenAsync(user);
         var newRefreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
 
-        var newRefreshToken = Infrastructure.Authentication.RefreshToken.Create(
+        var newRefreshToken = ProductCatalog.Infrastructure.Authentication.RefreshToken.Create(
             newRefreshTokenValue,
             user.Id.ToString(),
             DateTime.UtcNow.AddDays(7));

@@ -1,13 +1,18 @@
 @using ProductCatalog.Web.Components.ErrorBoundary
+@using ProductCatalog.Web.Infrastructure.Providers
 
-<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <CustomErrorBoundary ShowDetails="@IsDevelopment">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-            <FocusOnNavigate RouteData="routeData" Selector="h1" />
-        </CustomErrorBoundary>
-    </Found>
-</Router>
+<SessionProvider>
+    <ThemeProvider>
+        <Router AppAssembly="typeof(Program).Assembly">
+            <Found Context="routeData">
+                <CustomErrorBoundary ShowDetails="@IsDevelopment">
+                    <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
+                </CustomErrorBoundary>
+            </Found>
+        </Router>
+    </ThemeProvider>
+</SessionProvider>
 
 @code {
     [Inject]
