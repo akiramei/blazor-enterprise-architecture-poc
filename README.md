@@ -2,11 +2,29 @@
 
 このプロジェクトは、**Blazor Enterprise Architecture Guide**に基づいた中規模業務アプリケーションの実証実験です。
 
+> **⚠️ VSA移行中（Phase 7完了）**
+>
+> このプロジェクトは現在、**Clean Architecture（4層アーキテクチャ）** から **Vertical Slice Architecture (VSA)** への移行作業中です。
+>
+> **現在の状態:**
+> - ✅ Phase 1-7完了: VSA構造確立済み（ファイル移動、プロジェクト作成、検証）
+> - ⏳ Phase 8-10進行中: Webアプリ統合、テスト更新、ビルド確認
+>
+> **詳細:** [VSA-MIGRATION-STATUS.md](docs/architecture/VSA-MIGRATION-STATUS.md)
+>
+> **注意:** 現在のREADMEは旧構造（Clean Architecture）を説明しています。VSA構造の詳細はVSA-MIGRATION-STATUS.mdを参照してください。
+
 ## 📋 プロジェクト概要
 
-4層アーキテクチャ（UI、Application、Domain、Infrastructure）を採用し、CQRS、DDD、Vertical Slice Architectureなどのパターンを組み合わせた実践的なアプリケーション設計を示しています。
+Vertical Slice Architecture (VSA) を採用し、機能単位で完結する構造により、CQRS、DDD、Storeパターンなどを組み合わせた実践的なアプリケーション設計を示しています。
 
 ## 🏗️ アーキテクチャ構成
+
+> **注意:** 以下は旧構造（Clean Architecture）の説明です。
+> 現在のVSA構造については [VSA-MIGRATION-STATUS.md](docs/architecture/VSA-MIGRATION-STATUS.md) を参照してください。
+
+<details>
+<summary>旧構造（Clean Architecture - 参考用）</summary>
 
 ```
 ProductCatalog/
@@ -58,6 +76,8 @@ ProductCatalog/
         ├── Configurations/         # EF Core Configurations
         └── Repositories/           # Repository実装 (EF Core + Dapper)
 ```
+
+</details>
 
 ## 🎯 採用パターン
 

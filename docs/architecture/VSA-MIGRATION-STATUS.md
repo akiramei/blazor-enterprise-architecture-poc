@@ -1,7 +1,7 @@
 # VSA移行: 現在の状況と次の作業
 
-**最終更新**: 2025-11-03 19:45
-**現在のフェーズ**: Phase 3（進行中 10%）
+**最終更新**: 2025-11-03 23:00
+**現在のフェーズ**: Phase 7完了、次はPhase 8へ
 
 ---
 
@@ -27,218 +27,210 @@
     - Domain/Products: 10個（Product.cs, ProductId.cs, Money.cs等）
     - Infrastructure/Persistence: 3個（Repository, Configuration）
 
-### Phase 3: Features フォルダ作成（進行中 10%）
-- **コミット**: `6e3a080`
-- **状態**: 🔄 進行中
-- **完了した内容**:
-  - 10機能のフォルダ構造作成
-  - CreateProduct 機能の Application層コピー（3ファイル）
+### Phase 3: Features 全機能ファイル移動（完了）
+- **コミット**: `ca0ebf7`
+- **状態**: ✅ 完了
+- **内容**:
+  - 全10機能のApplication層をコピー（Command, Handler, Validator等）
+  - UI層をコピー
+    - Web Pages (Blazor): ProductList, ProductDetail, ProductEdit, ProductSearch
+    - Components: ProductCard
+    - Actions: 各ページのActions
+    - Store: State管理（ProductsStore, ProductDetailStore等）
+    - Web API Controllers/DTOs: Auth, Products API
+  - **合計50ファイル**を移動
+
+### Phase 4: 旧レイヤープロジェクト削除（完了）
+- **コミット**: `8928fd5`
+- **状態**: ✅ 完了
+- **内容**:
+  - `src/ProductCatalog.Application/` 削除
+  - `src/ProductCatalog.Domain/` 削除
+  - `src/ProductCatalog.Infrastructure/` 削除
+  - `src/ProductCatalog.Web/` 削除
+  - **213ファイル削除**（75,461行削除）
+
+### Phase 5: VSA構造のプロジェクトファイル作成（完了）
+- **コミット**: `76e44e3`
+- **状態**: ✅ 完了
+- **内容**:
+  - Sharedプロジェクト: 4個
+    - Shared.Kernel.csproj
+    - Shared.Application.csproj
+    - Shared.Domain.csproj
+    - Shared.Infrastructure.csproj
+  - ProductCatalog/Sharedプロジェクト: 2個
+    - ProductCatalog.Shared.Domain.Products.csproj
+    - ProductCatalog.Shared.Infrastructure.Persistence.csproj
+  - 各機能のApplicationプロジェクト: 10個
+  - 各機能のUIプロジェクト: 10個
+  - **合計26プロジェクト**を作成
+
+### Phase 6: ソリューションファイル更新（完了）
+- **コミット**: `417fd95`, `2f5a77b`
+- **状態**: ✅ 完了
+- **内容**:
+  - 全26プロジェクトをソリューションに追加
+  - 旧プロジェクト参照を削除
+
+### Phase 7: VSA構造検証（完了）
+- **コミット**: `2f5a77b`
+- **状態**: ✅ 完了
+- **検証結果**:
+  ```
+  ✅ PASS: No layer-based projects in src/
+  ✅ PASS: Bounded Context folder(s) found
+  ✅ PASS: Features/ folder found
+  ✅ ALL 10 feature slices have layer folders
+  ✅ ALL CHECKS PASSED
+
+  Project structure conforms to Vertical Slice Architecture.
+  ```
 
 ---
 
-## 🔄 現在の作業: Phase 3続き
+## 🔄 現在の作業: Phase 8以降
 
-### 次にやるべきこと
+### Phase 8: Webアプリケーション統合プロジェクト作成
 
-#### ステップ1: 残り9機能のApplication層をコピー
+VSA構造でアプリケーションを起動するための統合Webプロジェクトが必要です。
 
-```bash
-# UpdateProduct
-cp -r src/ProductCatalog.Application/Features/Products/UpdateProduct/* \
-      src/ProductCatalog/Features/UpdateProduct/Application/
+**作成するプロジェクト:**
+- `src/ProductCatalog.Host/` - Blazor Server/WebAssembly ホストプロジェクト
 
-# DeleteProduct
-cp -r src/ProductCatalog.Application/Features/Products/DeleteProduct/* \
-      src/ProductCatalog/Features/DeleteProduct/Application/
+**移行が必要なファイル:**
+- `Program.cs` - アプリケーションエントリポイント
+- `appsettings.json`, `appsettings.Development.json`
+- `Components/App.razor`, `Routes.razor`
+- `Components/Layout/` - MainLayout, NavMenu
+- `Components/Pages/` - Home, Error, Account pages
+- `Middleware/` - CorrelationIdMiddleware, GlobalExceptionHandlerMiddleware
+- `Hubs/` - SignalR Hubs
+- `wwwroot/` - 静的ファイル
 
-# GetProducts
-cp -r src/ProductCatalog.Application/Features/Products/GetProducts/* \
-      src/ProductCatalog/Features/GetProducts/Application/
+### Phase 9: テストプロジェクトの更新
 
-# GetProductById
-cp -r src/ProductCatalog.Application/Features/Products/GetProductById/* \
-      src/ProductCatalog/Features/GetProductById/Application/
+**更新が必要なテスト:**
+- `tests/ProductCatalog.Application.UnitTests/` - 新プロジェクト参照に変更
+- `tests/ProductCatalog.Domain.UnitTests/` - 新プロジェクト参照に変更
+- `tests/ProductCatalog.Web.IntegrationTests/` - Host プロジェクト参照に変更
+- `tests/ProductCatalog.E2ETests/` - Host プロジェクト参照に変更
 
-# SearchProducts
-cp -r src/ProductCatalog.Application/Features/Products/SearchProducts/* \
-      src/ProductCatalog/Features/SearchProducts/Application/
+### Phase 10: ビルドと動作確認
 
-# BulkDeleteProducts
-cp -r src/ProductCatalog.Application/Features/Products/BulkDeleteProducts/* \
-      src/ProductCatalog/Features/BulkDeleteProducts/Application/
-
-# BulkUpdateProductPrices
-cp -r src/ProductCatalog.Application/Features/Products/BulkUpdateProductPrices/* \
-      src/ProductCatalog/Features/BulkUpdateProductPrices/Application/
-
-# ExportProductsToCsv
-cp -r src/ProductCatalog.Application/Features/Products/ExportProductsToCsv/* \
-      src/ProductCatalog/Features/ExportProductsToCsv/Application/
-
-# ImportProductsFromCsv
-cp -r src/ProductCatalog.Application/Features/Products/ImportProductsFromCsv/* \
-      src/ProductCatalog/Features/ImportProductsFromCsv/Application/
-```
-
-#### ステップ2: 各機能のUI層をコピー
-
-**Web Pages（Blazor）:**
-```bash
-# ProductList, ProductDetail, ProductEdit, ProductSearch
-cp src/ProductCatalog.Web/Features/Products/Pages/ProductList.razor \
-   src/ProductCatalog/Features/GetProducts/UI/
-
-cp src/ProductCatalog.Web/Features/Products/Pages/ProductDetail.razor \
-   src/ProductCatalog/Features/GetProductById/UI/
-
-cp src/ProductCatalog.Web/Features/Products/Pages/ProductEdit.razor \
-   src/ProductCatalog/Features/UpdateProduct/UI/
-
-cp src/ProductCatalog.Web/Features/Products/Pages/ProductSearch.razor \
-   src/ProductCatalog/Features/SearchProducts/UI/
-```
-
-**Components:**
-```bash
-cp -r src/ProductCatalog.Web/Features/Products/Components/* \
-      src/ProductCatalog/Features/GetProducts/UI/Components/
-```
-
-**Actions:**
-```bash
-cp src/ProductCatalog.Web/Features/Products/Actions/ProductListActions.cs \
-   src/ProductCatalog/Features/GetProducts/UI/
-
-cp src/ProductCatalog.Web/Features/Products/Actions/ProductDetailActions.cs \
-   src/ProductCatalog/Features/GetProductById/UI/
-
-cp src/ProductCatalog.Web/Features/Products/Actions/ProductEditActions.cs \
-   src/ProductCatalog/Features/UpdateProduct/UI/
-
-cp src/ProductCatalog.Web/Features/Products/Actions/ProductSearchActions.cs \
-   src/ProductCatalog/Features/SearchProducts/UI/
-```
-
-**Store:**
-```bash
-cp src/ProductCatalog.Web/Features/Products/Store/* \
-   src/ProductCatalog/Features/GetProducts/UI/Store/
-```
-
-**Web API Controllers:**
-```bash
-# Auth API
-mkdir -p src/Shared/Infrastructure/Api/Auth
-cp -r src/ProductCatalog.Web/Features/Api/V1/Auth/* \
-      src/Shared/Infrastructure/Api/Auth/
-
-# Products API
-cp src/ProductCatalog.Web/Features/Api/V1/Products/ProductsController.cs \
-   src/ProductCatalog/Features/GetProducts/UI/Api/
-
-cp -r src/ProductCatalog.Web/Features/Api/V1/Products/Dtos/* \
-      src/ProductCatalog/Features/CreateProduct/UI/Api/Dtos/
-```
-
-#### ステップ3: Phase 3完了後コミット
-
-```bash
-git add src/ProductCatalog/Features/
-git commit -m "refactor: Phase 3完了 - 全10機能のファイル移動完了"
-git push
-```
+**実施項目:**
+1. `dotnet build` が成功すること
+2. すべてのテストが通ること
+3. アプリケーションが起動すること
+4. 各機能が正常に動作すること
 
 ---
 
-## ⏳ 今後の作業（Phase 4-7）
+## 📊 現在のVSA構造
 
-### Phase 4: 旧レイヤープロジェクト削除（推定: 30分）
-
-```bash
-# 旧プロジェクトを削除
-rm -rf src/ProductCatalog.Application/
-rm -rf src/ProductCatalog.Domain/
-rm -rf src/ProductCatalog.Infrastructure/
-rm -rf src/ProductCatalog.Web/
-
-git add -A
-git commit -m "refactor: Phase 4 - 旧レイヤープロジェクト削除"
-git push
 ```
-
-### Phase 5: プロジェクトファイル作成（推定: 3時間）
-
-各機能に`.csproj`ファイルを作成する必要があります。
-
-**テンプレート: Application層**
-
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="MediatR" Version="12.1.1" />
-    <PackageReference Include="FluentValidation" Version="11.8.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Shared\Domain\Products\Shared.Domain.Products.csproj" />
-    <ProjectReference Include="..\..\..\Shared\Application\Shared.Application.csproj" />
-    <ProjectReference Include="..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
-  </ItemGroup>
-</Project>
-```
-
-**作成が必要なプロジェクトファイル:**
-- 各機能 × 2層（Application, UI） = 20個のプロジェクトファイル
-- Sharedプロジェクト = 4個
-- ProductCatalog/Sharedプロジェクト = 2個
-
-**合計: 26個のプロジェクトファイル**
-
-### Phase 6: ソリューションファイル更新（推定: 1時間）
-
-```bash
-# 既存のソリューションから全プロジェクトを削除
-dotnet sln ProductCatalog.sln remove $(dotnet sln list | grep -E "\.csproj$")
-
-# 新しいプロジェクトを追加
-find src -name "*.csproj" | xargs -I {} dotnet sln add {}
-```
-
-### Phase 7: 検証とビルド（推定: 30分）
-
-```bash
-# VSA構造検証
-./scripts/validate-vsa-structure.ps1
-
-# ビルド確認
-dotnet build
-
-# テスト実行
-dotnet test
+src/
+├── Shared/                                # 共通基盤
+│   ├── Kernel/                           # ドメイン基底クラス
+│   │   ├── AggregateRoot.cs
+│   │   ├── Entity.cs
+│   │   ├── ValueObject.cs
+│   │   ├── DomainEvent.cs
+│   │   └── DomainException.cs
+│   ├── Application/                      # アプリケーション共通
+│   │   ├── Interfaces/
+│   │   │   ├── ICommand.cs
+│   │   │   ├── IQuery.cs
+│   │   │   └── ...
+│   │   ├── Behaviors/
+│   │   │   ├── LoggingBehavior.cs
+│   │   │   └── ValidationBehavior.cs
+│   │   ├── Common/
+│   │   │   ├── Result.cs
+│   │   │   ├── PagedResult.cs
+│   │   │   └── BulkOperationResult.cs
+│   │   └── ...
+│   ├── Domain/                           # ドメイン共通
+│   │   ├── AuditLog.cs
+│   │   ├── Identity/
+│   │   └── Outbox/
+│   └── Infrastructure/                   # インフラ共通
+│       ├── Authentication/
+│       ├── Behaviors/
+│       ├── Metrics/
+│       ├── Services/
+│       └── Api/
+│           └── Auth/                     # 認証API
+│               ├── AuthController.cs
+│               └── Dtos/
+└── ProductCatalog/                       # Bounded Context
+    ├── Shared/                           # BC内共通
+    │   ├── Domain/
+    │   │   └── Products/                 # Product集約
+    │   │       ├── Product.cs
+    │   │       ├── ProductId.cs
+    │   │       ├── Money.cs
+    │   │       ├── ProductStatus.cs
+    │   │       ├── IProductRepository.cs
+    │   │       └── Events/
+    │   └── Infrastructure/
+    │       └── Persistence/
+    │           ├── EfProductRepository.cs
+    │           └── ProductConfiguration.cs
+    └── Features/                         # 機能スライス（10個）
+        ├── CreateProduct/
+        │   ├── Application/
+        │   │   ├── CreateProductCommand.cs
+        │   │   ├── CreateProductHandler.cs
+        │   │   └── CreateProductValidator.cs
+        │   └── UI/
+        │       └── Api/
+        │           └── Dtos/
+        ├── UpdateProduct/
+        │   ├── Application/
+        │   └── UI/
+        ├── DeleteProduct/
+        │   ├── Application/
+        │   └── UI/
+        ├── GetProducts/
+        │   ├── Application/
+        │   └── UI/
+        │       ├── ProductList.razor
+        │       ├── ProductListActions.cs
+        │       ├── Api/
+        │       │   └── ProductsController.cs
+        │       ├── Components/
+        │       │   └── ProductCard.razor
+        │       └── Store/
+        │           ├── ProductsState.cs
+        │           └── ProductsStore.cs
+        ├── GetProductById/
+        ├── SearchProducts/
+        ├── BulkDeleteProducts/
+        ├── BulkUpdateProductPrices/
+        ├── ExportProductsToCsv/
+        └── ImportProductsFromCsv/
 ```
 
 ---
 
 ## 📊 進捗状況
 
-| Phase | タスク | 状態 | 推定時間 | 完了日 |
+| Phase | タスク | 状態 | 実績時間 | 完了日 |
 |-------|--------|------|----------|--------|
-| Phase 1 | Shared作成 | ✅ 完了 | 2時間 | 2025-11-03 |
-| Phase 2 | ProductCatalog BC作成 | ✅ 完了 | 1時間 | 2025-11-03 |
-| Phase 3 | Features移動 | 🔄 10% | 4時間 | - |
-| Phase 4 | 旧プロジェクト削除 | ⏳ 未着手 | 30分 | - |
-| Phase 5 | プロジェクトファイル作成 | ⏳ 未着手 | 3時間 | - |
-| Phase 6 | ソリューション更新 | ⏳ 未着手 | 1時間 | - |
-| Phase 7 | 検証 | ⏳ 未着手 | 30分 | - |
+| Phase 1 | Shared作成 | ✅ 完了 | - | 2025-11-03 |
+| Phase 2 | ProductCatalog BC作成 | ✅ 完了 | - | 2025-11-03 |
+| Phase 3 | Features全移動 | ✅ 完了 | - | 2025-11-03 |
+| Phase 4 | 旧プロジェクト削除 | ✅ 完了 | - | 2025-11-03 |
+| Phase 5 | プロジェクトファイル作成 | ✅ 完了 | - | 2025-11-03 |
+| Phase 6 | ソリューション更新 | ✅ 完了 | - | 2025-11-03 |
+| Phase 7 | VSA構造検証 | ✅ 完了 | - | 2025-11-03 |
+| Phase 8 | Webアプリ統合 | ⏳ 未着手 | - | - |
+| Phase 9 | テスト更新 | ⏳ 未着手 | - | - |
+| Phase 10 | ビルド・動作確認 | ⏳ 未着手 | - | - |
 
-**全体進捗**: 約25% 完了
-**残り推定時間**: 約9時間
+**全体進捗**: Phase 1-7完了（VSA構造確立完了）
+**残りタスク**: Phase 8-10（アプリケーション統合とテスト）
 
 ---
 
@@ -249,19 +241,23 @@ dotnet test
 cat docs/architecture/VSA-MIGRATION-STATUS.md
 ```
 
-### 2. 現在の構造を確認
+### 2. VSA構造の確認
 ```bash
+# ディレクトリ構造確認
 ls -la src/
 ls -la src/ProductCatalog/Features/
+
+# VSA構造検証（全てPASSするはず）
+./scripts/validate-vsa-structure.sh
 ```
 
-### 3. 検証スクリプトで現状確認
-```bash
-./scripts/validate-vsa-structure.ps1
-```
+### 3. Phase 8から開始
+Phase 1-7が完了しているため、次はPhase 8「Webアプリケーション統合プロジェクト作成」から開始してください。
 
-### 4. Phase 3の続きから開始
-上記の「ステップ1: 残り9機能のApplication層をコピー」から実施
+**Phase 8の目標:**
+- `src/ProductCatalog.Host/` プロジェクトの作成
+- 統合に必要なファイルの配置（Program.cs, appsettings等）
+- すべての機能を統合したWebアプリケーションの構築
 
 ---
 
@@ -290,15 +286,28 @@ Clean Architecture ではありません。
 3. src/ 直下にレイヤープロジェクトを作らない
 ```
 
-### 検証の重要性
+### VSA構造検証
 
 各Phase完了後、必ず検証スクリプトを実行してください：
 ```bash
-./scripts/validate-vsa-structure.ps1
+./scripts/validate-vsa-structure.sh  # Linux/Mac/Git Bash
+# または
+./scripts/validate-vsa-structure.ps1  # PowerShell
 ```
+
+現在の検証結果: ✅ ALL CHECKS PASSED
+
+---
+
+## 📈 変更履歴
+
+| 日付 | 変更内容 |
+|------|---------|
+| 2025-11-03 19:45 | Phase 1-2完了、Phase 3開始（10%） |
+| 2025-11-03 23:00 | Phase 3-7完了、VSA構造確立完了 |
 
 ---
 
 **作成日**: 2025-11-03
-**最終更新**: 2025-11-03 19:45
-**次回更新**: Phase 3完了時
+**最終更新**: 2025-11-03 23:00
+**次回更新**: Phase 8完了時
