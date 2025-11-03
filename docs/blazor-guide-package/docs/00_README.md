@@ -78,12 +78,13 @@
    - コード例
    - ベストプラクティス
 
-9. **[UI層の詳細設計](09_UI層の詳細設計.md)** (40 KB)
+9. **[UI層の詳細設計](09_UI層の詳細設計.md)** (50 KB)
    - WPF/WinFormsとの比較
    - Blazor Componentの設計
    - Store パターン
    - PageActions パターン
    - **状態管理の実践ガイド（詳細）** - システムレベル vs ドメイン固有
+   - **状態管理の運用ルール** - Single Source of Truth、メモリリーク防止、DTO設計
 
 10. **[Application層の詳細設計](10_Application層の詳細設計.md)** (23 KB)
     - なぜMediatRが必要か
