@@ -1,0 +1,392 @@
+@page "/products"
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using ProductCatalog.Domain.Identity
+@using ProductCatalog.Web.Features.Products.Store
+@using ProductCatalog.Web.Features.Products.Actions
+@using ProductCatalog.Web.Features.Products.Components
+@using ProductCatalog.Application.Features.Products.BulkDeleteProducts
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
+@inject ProductsStore Store
+@inject ProductListActions Actions
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>商品一覧</PageTitle>
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>商品管理</h1>
+        <div class="d-flex gap-2">
+            @if (State.Products.Any())
+            {
+                <button class="btn btn-danger"
+                        @onclick="BulkDelete"
+                        disabled="@(!selectedProductIds.Any() || isDeleting)">
+                    @if (isDeleting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <text>削除中...</text>
+                    }
+                    else
+                    {
+                        <i class="bi bi-trash"></i>
+                        <text>選択を削除 (@selectedProductIds.Count)</text>
+                    }
+                </button>
+            }
+            <button class="btn btn-success" @onclick="TriggerFileInput" disabled="@isImporting">
+                @if (isImporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <text>インポート中...</text>
+                }
+                else
+                {
+                    <i class="bi bi-upload"></i>
+                    <text>CSVインポート</text>
+                }
+            </button>
+            <a href="/products/search" class="btn btn-primary">
+                <i class="bi bi-search"></i> 商品検索
+            </a>
+        </div>
+    </div>
+
+    @* 非表示のファイル入力 *@
+    <InputFile @ref="inputFile" OnChange="HandleFileSelected" accept=".csv" style="display: none;" />
+
+    @if (!string.IsNullOrEmpty(importMessage))
+    {
+        <div class="alert @(importSuccess ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+            @((MarkupString)importMessage)
+            <button type="button" class="btn-close" @onclick="() => importMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(bulkDeleteMessage))
+    {
+        <div class="alert @(bulkDeleteSuccess ? "alert-success" : "alert-warning") alert-dismissible fade show" role="alert">
+            @bulkDeleteMessage
+            <button type="button" class="btn-close" @onclick="() => bulkDeleteMessage = null"></button>
+        </div>
+    }
+
+    @if (State.IsLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">読み込み中...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(State.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @State.ErrorMessage
+        </div>
+    }
+    else if (!State.Products.Any())
+    {
+        <div class="alert alert-info" role="alert">
+            商品がありません
+        </div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll"
+                       checked="@isAllSelected"
+                       @onchange="ToggleSelectAll">
+                <label class="form-check-label" for="selectAll">
+                    すべて選択
+                </label>
+            </div>
+        </div>
+
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var product in State.Products)
+            {
+                <div class="col">
+                    <div class="position-relative">
+                        <div class="position-absolute top-0 start-0 p-2" style="z-index: 10;">
+                            <input class="form-check-input" type="checkbox"
+                                   checked="@selectedProductIds.Contains(product.Id)"
+                                   @onchange="@((ChangeEventArgs e) => ToggleSelection(product.Id, e))">
+                        </div>
+                        <ProductCard Product="@product" OnDelete="@(async (id) => await Actions.DeleteAsync(id))" />
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private ProductsState State => Store.GetState();
+    private DotNetObjectReference<ProductList>? _dotNetRef;
+
+    private readonly HashSet<Guid> selectedProductIds = new();
+    private bool isAllSelected => State.Products.Any() && selectedProductIds.Count == State.Products.Count;
+    private bool isDeleting = false;
+    private string? bulkDeleteMessage;
+    private bool bulkDeleteSuccess;
+
+    // CSVインポート用
+    private InputFile? inputFile;
+    private bool isImporting = false;
+    private string? importMessage;
+    private bool importSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.OnChangeAsync += HandleStateChanged;
+        await Actions.LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // DotNetObjectReferenceを作成してJavaScriptに渡す
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("productHub.start", _dotNetRef);
+        }
+    }
+
+    private Task HandleStateChanged()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// SignalRからの通知を受信（JavaScript から呼ばれる）
+    /// </summary>
+    [JSInvokable]
+    public async Task OnProductChanged()
+    {
+        // 商品一覧を再読み込み
+        await Actions.LoadAsync();
+    }
+
+    private void ToggleSelection(Guid productId, ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+
+        if (isChecked)
+        {
+            selectedProductIds.Add(productId);
+        }
+        else
+        {
+            selectedProductIds.Remove(productId);
+        }
+    }
+
+    private void ToggleSelectAll(ChangeEventArgs e)
+    {
+        var isChecked = e.Value is bool b && b;
+
+        selectedProductIds.Clear();
+
+        if (isChecked)
+        {
+            foreach (var product in State.Products)
+            {
+                selectedProductIds.Add(product.Id);
+            }
+        }
+    }
+
+    private async Task BulkDelete()
+    {
+        if (!selectedProductIds.Any())
+        {
+            return;
+        }
+
+        isDeleting = true;
+        bulkDeleteMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await Actions.BulkDeleteAsync(selectedProductIds);
+
+            if (result.SucceededCount > 0)
+            {
+                bulkDeleteSuccess = true;
+                bulkDeleteMessage = $"{result.SucceededCount}件の商品を削除しました。";
+
+                if (result.FailedCount > 0)
+                {
+                    bulkDeleteMessage += $" {result.FailedCount}件の削除に失敗しました。";
+                    bulkDeleteSuccess = false;
+                }
+
+                selectedProductIds.Clear();
+            }
+            else
+            {
+                bulkDeleteSuccess = false;
+                bulkDeleteMessage = $"削除に失敗しました: {string.Join(", ", result.Errors)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            bulkDeleteSuccess = false;
+            bulkDeleteMessage = $"エラーが発生しました: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// ファイル選択ダイアログをトリガー
+    ///
+    /// 【パターン: Blazor InputFile トリガー】
+    ///
+    /// 使用シナリオ:
+    /// - ボタンクリックでファイル選択ダイアログを表示
+    ///
+    /// 実装ガイド:
+    /// - JavaScript Interop で非表示のInputFileをクリック
+    /// </summary>
+    private async Task TriggerFileInput()
+    {
+        if (inputFile?.Element != null)
+        {
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('input[type=file]').click()");
+        }
+    }
+
+    /// <summary>
+    /// CSVファイル選択時の処理
+    ///
+    /// 【パターン: CSVインポート - Blazor Server】
+    ///
+    /// 使用シナリオ:
+    /// - ユーザーがCSVファイルを選択したらインポート実行
+    /// - バリデーションエラーを表示
+    ///
+    /// 実装ガイド:
+    /// - IBrowserFileからStreamを取得
+    /// - ファイルサイズ制限（10MB）
+    /// - Actions経由でインポート実行
+    /// </summary>
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file == null)
+        {
+            return;
+        }
+
+        // ファイルサイズチェック (10MB)
+        const long maxFileSize = 10 * 1024 * 1024;
+        if (file.Size > maxFileSize)
+        {
+            importSuccess = false;
+            importMessage = "ファイルサイズが大きすぎます（上限: 10MB）";
+            return;
+        }
+
+        isImporting = true;
+        importMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var result = await Actions.ImportFromCsvAsync(memoryStream);
+
+            if (result != null)
+            {
+                if (result.SucceededCount > 0)
+                {
+                    importSuccess = true;
+                    importMessage = $"<strong>{result.SucceededCount}件</strong>の商品をインポートしました。";
+
+                    if (result.FailedCount > 0)
+                    {
+                        importSuccess = false;
+                        importMessage += $"<br/><strong>{result.FailedCount}件</strong>のインポートに失敗しました。";
+
+                        if (result.Errors.Any())
+                        {
+                            var errorList = string.Join("<br/>", result.Errors.Take(5));
+                            importMessage += $"<br/><br/><small>{errorList}</small>";
+
+                            if (result.Errors.Count() > 5)
+                            {
+                                importMessage += $"<br/><small>...他{result.Errors.Count() - 5}件のエラー</small>";
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    importSuccess = false;
+                    importMessage = $"<strong>インポートに失敗しました</strong><br/>";
+
+                    if (result.Errors.Any())
+                    {
+                        var errorList = string.Join("<br/>", result.Errors.Take(5));
+                        importMessage += $"<small>{errorList}</small>";
+
+                        if (result.Errors.Count() > 5)
+                        {
+                            importMessage += $"<br/><small>...他{result.Errors.Count() - 5}件のエラー</small>";
+                        }
+                    }
+                }
+            }
+            else
+            {
+                importSuccess = false;
+                importMessage = "インポート処理に失敗しました";
+            }
+        }
+        catch (Exception ex)
+        {
+            importSuccess = false;
+            importMessage = $"エラーが発生しました: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Store.OnChangeAsync -= HandleStateChanged;
+
+        // SignalR接続を停止
+        if (_dotNetRef is not null)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("productHub.stop");
+            }
+            catch (JSDisconnectedException)
+            {
+                // Blazor Serverの回路が既に切断されている場合は無視
+            }
+            finally
+            {
+                _dotNetRef.Dispose();
+            }
+        }
+    }
+}

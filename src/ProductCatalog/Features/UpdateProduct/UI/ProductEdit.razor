@@ -1,0 +1,186 @@
+@page "/products/{ProductId:guid}/edit"
+@using ProductCatalog.Domain.Identity
+@using ProductCatalog.Web.Features.Products.Store
+@using ProductCatalog.Web.Features.Products.Actions
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
+@inject ProductEditStore Store
+@inject ProductEditActions Actions
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>商品編集</PageTitle>
+
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>商品編集</h1>
+        <button class="btn btn-secondary" @onclick="BackToDetail">
+            <i class="bi bi-arrow-left"></i> 戻る
+        </button>
+    </div>
+
+    @if (State.IsLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">読み込み中...</span>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(State.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @State.ErrorMessage
+        </div>
+    }
+    else if (State.Product == null)
+    {
+        <div class="alert alert-warning" role="alert">
+            商品が見つかりません
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(State.SuccessMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @State.SuccessMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="this" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3">
+                        <label class="form-label">商品ID</label>
+                        <input type="text" class="form-control" value="@State.Product.Id" disabled />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">バージョン</label>
+                        <input type="text" class="form-control" value="@State.Product.Version" disabled />
+                        <small class="text-muted">楽観的同時実行制御用</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="name" class="form-label">商品名 <span class="text-danger">*</span></label>
+                        <input id="name" class="form-control" type="text" @bind="name" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">説明 <span class="text-danger">*</span></label>
+                        <textarea id="description" class="form-control" rows="5" @bind="description"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="price" class="form-label">価格 <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text">¥</span>
+                            <input id="price" class="form-control" type="number" step="0.01" @bind="price" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="stock" class="form-label">在庫数 <span class="text-danger">*</span></label>
+                        <input id="stock" class="form-control" type="number" @bind="stock" />
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" disabled="@State.IsSaving">
+                            @if (State.IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <text>保存中...</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-circle me-2"></i>
+                                <text>保存</text>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="BackToDetail">
+                            キャンセル
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid ProductId { get; set; }
+
+    private ProductEditState State => Store.GetState();
+
+    private string name = string.Empty;
+    private string description = string.Empty;
+    private decimal price = 0;
+    private int stock = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Store.OnChangeAsync += HandleStateChanged;
+        await Actions.LoadAsync(ProductId);
+
+        // 初期値を設定
+        if (State.Product != null)
+        {
+            name = State.Product.Name;
+            description = State.Product.Description;
+            price = State.Product.Price;
+            stock = State.Product.Stock;
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Productが読み込まれたら初期値を設定
+        if (State.Product != null)
+        {
+            name = State.Product.Name;
+            description = State.Product.Description;
+            price = State.Product.Price;
+            stock = State.Product.Stock;
+        }
+    }
+
+    private Task HandleStateChanged()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (State.Product == null) return;
+
+        var success = await Actions.SaveAsync(
+            ProductId,
+            name,
+            description,
+            price,
+            stock,
+            State.Product.Version
+        );
+
+        if (success)
+        {
+            // 3秒後に詳細画面に遷移
+            await Task.Delay(3000);
+            Navigation.NavigateTo($"/products/{ProductId}");
+        }
+    }
+
+    private void BackToDetail()
+    {
+        Navigation.NavigateTo($"/products/{ProductId}");
+    }
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= HandleStateChanged;
+    }
+}
