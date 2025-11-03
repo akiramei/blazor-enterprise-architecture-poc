@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Blazor Server -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
+
+    <!-- MediatR -->
+    <PackageReference Include="MediatR" Version="12.1.1" />
+    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="11.1.0" />
+
+    <!-- FluentValidation -->
+    <PackageReference Include="FluentValidation" Version="11.8.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.8.0" />
+
+    <!-- Entity Framework Core -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+
+    <!-- Dapper -->
+    <PackageReference Include="Dapper" Version="2.1.24" />
+
+    <!-- ASP.NET Core Identity -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+
+    <!-- SignalR -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
+
+    <!-- Prometheus -->
+    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared Projects -->
+    <ProjectReference Include="..\Shared\Kernel\Shared.Kernel.csproj" />
+    <ProjectReference Include="..\Shared\Application\Shared.Application.csproj" />
+    <ProjectReference Include="..\Shared\Domain\Shared.Domain.csproj" />
+    <ProjectReference Include="..\Shared\Infrastructure\Shared.Infrastructure.csproj" />
+
+    <!-- ProductCatalog Shared -->
+    <ProjectReference Include="..\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Shared\Infrastructure\Persistence\ProductCatalog.Shared.Infrastructure.Persistence.csproj" />
+
+    <!-- Feature Projects - Application -->
+    <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\Application\CreateProduct.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\UpdateProduct\Application\UpdateProduct.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\DeleteProduct\Application\DeleteProduct.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\GetProducts\Application\GetProducts.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\GetProductById\Application\GetProductById.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\SearchProducts\Application\SearchProducts.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\BulkDeleteProducts\Application\BulkDeleteProducts.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\BulkUpdateProductPrices\Application\BulkUpdateProductPrices.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\Application\ExportProductsToCsv.Application.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\Application\ImportProductsFromCsv.Application.csproj" />
+
+    <!-- Feature Projects - UI -->
+    <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\UI\CreateProduct.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\UpdateProduct\UI\UpdateProduct.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\DeleteProduct\UI\DeleteProduct.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\GetProducts\UI\GetProducts.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\GetProductById\UI\GetProductById.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\SearchProducts\UI\SearchProducts.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\BulkDeleteProducts\UI\BulkDeleteProducts.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\BulkUpdateProductPrices\UI\BulkUpdateProductPrices.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\UI\ExportProductsToCsv.UI.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\UI\ImportProductsFromCsv.UI.csproj" />
+  </ItemGroup>
+</Project>
