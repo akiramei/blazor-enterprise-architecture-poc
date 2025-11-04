@@ -3,7 +3,8 @@
 
 <SessionProvider>
     <ThemeProvider>
-        <Router AppAssembly="typeof(Program).Assembly">
+        <Router AppAssembly="typeof(Program).Assembly"
+                AdditionalAssemblies="Program.FeatureUIAssemblies">
             <Found Context="routeData">
                 <CustomErrorBoundary ShowDetails="@IsDevelopment">
                     <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />

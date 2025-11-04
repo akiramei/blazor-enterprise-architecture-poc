@@ -73,7 +73,7 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infras
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.IdempotencyBehavior<,>));    // 4. Idempotency (Command)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.TransactionBehavior<,>));    // 7. Transaction (Command)
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));    // 7. Transaction (Command) - BC固有
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -93,22 +93,49 @@ builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Host.Serv
 // Correlation ID Accessor (Distributed Tracing)
 builder.Services.AddScoped<ICorrelationIdAccessor, Shared.Infrastructure.Services.CorrelationIdAccessor>();
 
-// Idempotency Store
+// Infrastructure.Platform Stores (Port/Adapter Pattern)
+builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxStore, Shared.Infrastructure.Platform.Stores.OutboxStore>();
+builder.Services.AddScoped<Shared.Abstractions.Platform.IAuditLogStore, Shared.Infrastructure.Platform.Stores.AuditLogStore>();
+builder.Services.AddSingleton<Shared.Abstractions.Platform.IIdempotencyStore, Shared.Infrastructure.Platform.Stores.InMemoryIdempotencyStore>();
+
+// Outbox Readers (トランザクショナルOutboxパターン - 読み取り実装)
+builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, ProductCatalog.Shared.Infrastructure.Persistence.ProductCatalogOutboxReader>();
+
+// Legacy Idempotency Store (Old Interface - for compatibility)
 builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 
-// DbContext (PostgreSQL for production, InMemory for Test)
+// DbContext (Infrastructure.Platform Pattern)
 if (builder.Environment.IsEnvironment("Test"))
 {
+    // Test environment: InMemory databases
+    builder.Services.AddDbContext<ProductCatalogDbContext>(options =>
+        options.UseInMemoryDatabase("TestDatabase_ProductCatalog"));
+
+    builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
+        options.UseInMemoryDatabase("TestDatabase_Platform"));
+
+    // Legacy AppDbContext for compatibility
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseInMemoryDatabase("TestDatabase"));
 }
 else
 {
+    // Production environment: PostgreSQL
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    builder.Services.AddDbContext<ProductCatalogDbContext>(options =>
+        options.UseNpgsql(connectionString));
+
+    builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
+        options.UseNpgsql(connectionString));
+
+    // Legacy AppDbContext for compatibility
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseNpgsql(connectionString));
 }
 
 // ASP.NET Core Identity（本番用認証・認可）
+// Identity は技術的関心事なので PlatformDbContext を使用
 builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
 {
     // パスワード要件（本番環境では厳格に設定）
@@ -126,7 +153,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.AllowedForNewUsers = true;
 })
-.AddEntityFrameworkStores<AppDbContext>()
+.AddEntityFrameworkStores<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>()
 .AddDefaultTokenProviders();
 
 // Cookie認証設定
@@ -179,8 +206,7 @@ else
     builder.Services.AddScoped<ProductCatalog.Shared.Application.IProductReadRepository, DapperProductReadRepository>();
 }
 // Audit Log Repository（監査ログ）
-// TODO: AuditLogRepository doesn't exist in Shared.Infrastructure.Persistence.Repositories
-// builder.Services.AddScoped<IAuditLogRepository, Shared.Infrastructure.Persistence.Repositories.AuditLogRepository>();
+builder.Services.AddScoped<IAuditLogRepository, Shared.Infrastructure.Platform.Repositories.AuditLogRepository>();
 
 // Infrastructure Services (Scoped for Blazor Server circuits)
 builder.Services.AddScoped<ProductCatalog.Host.Infrastructure.Services.LocalStorageService>();
@@ -290,13 +316,18 @@ if (!app.Environment.IsEnvironment("Test"))
 {
     using (var scope = app.Services.CreateScope())
     {
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // Platform migrations (Identity, RefreshToken, Outbox, AuditLog)
+        var platformContext = scope.ServiceProvider.GetRequiredService<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>();
+        await platformContext.Database.MigrateAsync();
+
+        // ProductCatalog migrations (Product entities)
+        var productCatalogContext = scope.ServiceProvider.GetRequiredService<ProductCatalogDbContext>();
+        await productCatalogContext.Database.MigrateAsync();
+
         var repository = scope.ServiceProvider.GetRequiredService<IProductRepository>();
 
-        // Apply pending migrations
-        await context.Database.MigrateAsync();
-
-    if (!context.Products.Any())
+        // Seed sample data if empty
+        if (!productCatalogContext.Products.Any())
     {
         var product1 = Product.Create(
             "ノートパソコン",
@@ -371,7 +402,8 @@ app.UseAntiforgery();
 
 app.UseStaticFiles();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(Program.FeatureUIAssemblies);
 
 // SignalR Hub エンドポイント
 app.MapHub<ProductCatalog.Host.Hubs.ProductHub>("/hubs/products");
@@ -389,4 +421,38 @@ public partial class Program
     {
         return WebApplication.CreateBuilder(args);
     }
+
+    /// <summary>
+    /// Feature UI assemblies for Blazor route discovery.
+    ///
+    /// CRITICAL: Both MapRazorComponents (server-side) and Router component (client-side)
+    /// need this same assembly list to discover @page routes from Feature UI projects.
+    ///
+    /// Without this:
+    /// - MapRazorComponents: Returns 404 for direct URL access (e.g., browser refresh)
+    /// - Router: Can't resolve routes during in-app navigation
+    ///
+    /// VSA Pattern: Each Feature has its own UI assembly with Razor components.
+    /// This array explicitly loads all Feature UI assemblies for route discovery.
+    /// </summary>
+    public static readonly System.Reflection.Assembly[] FeatureUIAssemblies = new[]
+    {
+        "GetProducts.UI",
+        "GetProductById.UI",
+        "UpdateProduct.UI",
+        "CreateProduct.UI",
+        "DeleteProduct.UI",
+        "SearchProducts.UI",
+        "BulkDeleteProducts.UI",
+        "BulkUpdateProductPrices.UI",
+        "ExportProductsToCsv.UI",
+        "ImportProductsFromCsv.UI"
+    }
+    .Select(name =>
+    {
+        try { return System.Reflection.Assembly.Load(name); }
+        catch { return null; }
+    })
+    .Where(a => a != null)
+    .ToArray()!;
 }

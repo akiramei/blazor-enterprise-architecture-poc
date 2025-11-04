@@ -15,6 +15,9 @@ using Microsoft.Playwright;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
 using Shared.Infrastructure.Behaviors;
+using Shared.Infrastructure.Platform.Persistence;
+using ProductCatalog.Shared.Infrastructure.Persistence;
+using ProductCatalog.Shared.Infrastructure.Persistence.Behaviors;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using Shared.Domain.Identity;
@@ -84,9 +87,9 @@ internal class TestAuditLogRepository : IAuditLogRepository
 
 internal class TestProductReadRepository : IProductReadRepository
 {
-    private readonly AppDbContext _context;
+    private readonly ProductCatalogDbContext _context;
 
-    public TestProductReadRepository(AppDbContext context)
+    public TestProductReadRepository(ProductCatalogDbContext context)
     {
         _context = context;
     }
@@ -266,6 +269,21 @@ internal class TestAuthenticationStateProvider : AuthenticationStateProvider
 }
 
 /// <summary>
+/// テスト環境では全てのAuthorize要求を許可するAuthorizationHandler
+/// </summary>
+internal class AllowAnonymousAuthorizationHandler : Microsoft.AspNetCore.Authorization.IAuthorizationHandler
+{
+    public Task HandleAsync(Microsoft.AspNetCore.Authorization.AuthorizationHandlerContext context)
+    {
+        foreach (var requirement in context.PendingRequirements.ToList())
+        {
+            context.Succeed(requirement);
+        }
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
 /// Playwright E2Eテストの基底クラス
 ///
 /// 【パターン: E2Eテスト基盤】
@@ -359,8 +377,9 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         builder.Services.AddScoped<AuthenticationStateProvider, TestAuthenticationStateProvider>();
         builder.Services.AddCascadingAuthenticationState();
 
-        // Authorization（テスト環境）
+        // Authorization（テスト環境 - すべての認証要求を許可）
         builder.Services.AddAuthorization();
+        builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, AllowAnonymousAuthorizationHandler>();
 
         // Memory Cache
         builder.Services.AddMemoryCache();
@@ -378,6 +397,15 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 
         // DbContext (InMemory for Test)
+        // ProductCatalog BC DbContext (Product entities)
+        builder.Services.AddDbContext<ProductCatalogDbContext>(options =>
+            options.UseInMemoryDatabase("TestDatabase_ProductCatalog"));
+
+        // Platform DbContext (Identity, RefreshToken, Outbox, AuditLog)
+        builder.Services.AddDbContext<PlatformDbContext>(options =>
+            options.UseInMemoryDatabase("TestDatabase_Platform"));
+
+        // Legacy AppDbContext for compatibility
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase("TestDatabase"));
 
@@ -418,7 +446,8 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
 
         // Razor Components
         _app.MapRazorComponents<App>()
-            .AddInteractiveServerRenderMode();
+            .AddInteractiveServerRenderMode()
+            .AddAdditionalAssemblies(Program.FeatureUIAssemblies);
 
         // SignalR Hub
         _app.MapHub<ProductCatalog.Host.Hubs.ProductHub>("/hubs/products");
