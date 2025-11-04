@@ -67,6 +67,9 @@ public class ProductE2ETests : PlaywrightTestBase
         // Act: 商品詳細ページに移動
         await GotoAsync($"/products/{productId}");
 
+        // E2Eテスト用: データロード完了を待機（readyフラグ or 商品名表示の二重待機）
+        await WaitForReadyOrSelectorAsync($"product:{productId}", "text=詳細表示テスト商品");
+
         // Assert
         // h1タイトルが表示される
         var titleElement = await Page!.WaitForSelectorAsync("h1:has-text('商品詳細')", new() { Timeout = 30000 });
@@ -103,6 +106,9 @@ public class ProductE2ETests : PlaywrightTestBase
 
         // Act: 編集ページに直接ナビゲート
         await GotoAsync($"/products/{productId}/edit");
+
+        // E2Eテスト用: データロード完了を待機（readyフラグ or 名前入力フィールドの二重待機）
+        await WaitForReadyOrSelectorAsync($"product-edit:{productId}", "input#name");
 
         // Assert
         // h1タイトルが表示される

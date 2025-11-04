@@ -6,10 +6,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shared.Domain.Identity;
 using Shared.Infrastructure.Authentication;
-using Shared.Infrastructure.Persistence;
-using Shared.Infrastructure.Api.Auth.Dtos;
+using Shared.Infrastructure.Platform.Persistence;
+using Shared.Infrastructure.Platform.Api.Auth.Dtos;
 
-namespace Shared.Infrastructure.Api.Auth;
+namespace Shared.Infrastructure.Platform.Api.Auth;
 
 /// <summary>
 /// 認証API（Login, RefreshToken）
@@ -68,14 +68,14 @@ public sealed class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
-    private readonly AppDbContext _dbContext;
+    private readonly PlatformDbContext _dbContext;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IJwtTokenGenerator jwtTokenGenerator,
-        AppDbContext dbContext,
+        PlatformDbContext dbContext,
         ILogger<AuthController> logger)
     {
         _userManager = userManager;

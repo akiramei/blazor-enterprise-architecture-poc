@@ -21,13 +21,16 @@ public sealed class ProductDetailActions
 
     public async Task LoadAsync(Guid productId, CancellationToken ct = default)
     {
+        _logger.LogInformation("[Actions] LoadAsync started for ProductId: {ProductId}", productId);
         try
         {
+            _logger.LogInformation("[Actions] Calling Store.LoadAsync");
             await _store.LoadAsync(productId, ct);
+            _logger.LogInformation("[Actions] Store.LoadAsync completed");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "商品詳細の読み込みに失敗しました: {ProductId}", productId);
+            _logger.LogError(ex, "[Actions] 商品詳細の読み込みに失敗しました: {ProductId}", productId);
         }
     }
 }

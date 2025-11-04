@@ -1,4 +1,4 @@
-namespace Shared.Infrastructure.Api.Auth.Dtos;
+namespace Shared.Infrastructure.Platform.Api.Auth.Dtos;
 
 /// <summary>
 /// Refresh Tokenレスポンス

@@ -2,10 +2,12 @@
 @using Shared.Domain.Identity
 @using ProductCatalog.Shared.UI.Store
 @using ProductCatalog.Shared.UI.Actions
+@using Microsoft.JSInterop
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Shared.Domain.Identity.Roles.Admin)]
 @inject ProductDetailStore Store
 @inject ProductDetailActions Actions
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>商品詳細</PageTitle>
@@ -120,6 +122,7 @@
     public Guid ProductId { get; set; }
 
     private ProductDetailState State => Store.GetState();
+    private bool _readySignaled;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,9 +130,31 @@
         await Actions.LoadAsync(ProductId);
     }
 
-    private Task HandleStateChanged()
+    private async Task HandleStateChanged()
     {
-        return InvokeAsync(StateHasChanged);
+        // 再描画トリガー（OnAfterRenderAsync でデータがあれば ready フラグを立てる）
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// E2E用: JS interop は prerender 後にのみ呼べるため OnAfterRenderAsync で実行
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Prerender完了後、データが載ったら一度だけ ready を立てる
+        if (!_readySignaled && State.Product != null)
+        {
+            _readySignaled = true;
+            try
+            {
+                await JS.InvokeVoidAsync("window.__e2e.setReady", $"product:{ProductId}");
+            }
+            catch (Exception ex)
+            {
+                // E2E環境外では__e2eオブジェクトが存在しない可能性があるため無視
+                Console.WriteLine($"[E2E] setReady failed (expected outside E2E): {ex.Message}");
+            }
+        }
     }
 
     private void EditProduct()

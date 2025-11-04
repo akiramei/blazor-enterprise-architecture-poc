@@ -1,18 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 using ProductCatalog.Shared.Domain.Products;
-using Shared.Infrastructure.Persistence;
 
 namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 
 /// <summary>
 /// Product リポジトリのEF Core実装
 ///
-/// 【パターン: EF Core Repository】
+/// 【パターン: EF Core Repository + Infrastructure.Platform】
 ///
 /// 責務:
 /// - Productエンティティの永続化（追加・更新・削除）
 /// - 集約ルートとして子エンティティ（ProductImage）も含めて取得
 /// - AggregateRootの整合性を保つ
+///
+/// VSA構造:
+/// - ProductCatalogDbContextを使用（ビジネスエンティティ専用）
+/// - 技術的関心事（Outbox、AuditLog）はPlatformDbContextで管理
 ///
 /// 実装ガイド:
 /// - GetAsync()では子エンティティも含めて取得（Include）
@@ -28,9 +31,9 @@ namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 /// </summary>
 public sealed class EfProductRepository : IProductRepository
 {
-    private readonly AppDbContext _context;
+    private readonly ProductCatalogDbContext _context;
 
-    public EfProductRepository(AppDbContext context)
+    public EfProductRepository(ProductCatalogDbContext context)
     {
         _context = context;
     }

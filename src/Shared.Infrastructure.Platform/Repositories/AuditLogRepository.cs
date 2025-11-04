@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Shared.Application.Interfaces;
 using Shared.Domain.AuditLogs;
+using Shared.Infrastructure.Platform.Persistence;
 
-namespace Shared.Infrastructure.Persistence.Repositories;
+namespace Shared.Infrastructure.Platform.Repositories;
 
 /// <summary>
 /// 監査ログリポジトリ実装（EF Core）
@@ -13,12 +14,13 @@ namespace Shared.Infrastructure.Persistence.Repositories;
 /// - 監査ログは追記のみ（更新・削除不可）
 /// - 検索機能は必要に応じて拡張可能
 /// - パフォーマンスを考慮したクエリ最適化
+/// - PlatformDbContextを使用（技術的関心事）
 /// </summary>
 public sealed class AuditLogRepository : IAuditLogRepository
 {
-    private readonly AppDbContext _context;
+    private readonly PlatformDbContext _context;
 
-    public AuditLogRepository(AppDbContext context)
+    public AuditLogRepository(PlatformDbContext context)
     {
         _context = context;
     }

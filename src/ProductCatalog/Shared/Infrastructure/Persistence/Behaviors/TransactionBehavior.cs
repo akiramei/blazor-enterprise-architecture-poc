@@ -6,22 +6,33 @@ using Shared.Application;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
 using Shared.Domain.Outbox;
-using Shared.Infrastructure.Persistence;
 
-namespace Shared.Infrastructure.Behaviors;
+namespace ProductCatalog.Shared.Infrastructure.Persistence.Behaviors;
 
 /// <summary>
 /// トランザクション管理のPipeline Behavior（Command専用）
+///
+/// 【トランザクショナルOutboxパターン】
+///
+/// 責務:
+/// - ビジネスエンティティ更新とOutbox保存の原子性確保
+/// - ドメインイベントをOutboxに変換して永続化
+/// - トランザクション管理（コミット/ロールバック）
+///
+/// 設計:
+/// - ProductCatalogDbContext使用（Product + Outbox物理同居）
+/// - 単一トランザクションで原子性確保
+/// - ネストトランザクション回避
 /// </summary>
 public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : ICommand<TResponse>
     where TResponse : Result
 {
-    private readonly AppDbContext _context;
+    private readonly ProductCatalogDbContext _context;
     private readonly ILogger<TransactionBehavior<TRequest, TResponse>> _logger;
 
     public TransactionBehavior(
-        AppDbContext context,
+        ProductCatalogDbContext context,
         ILogger<TransactionBehavior<TRequest, TResponse>> logger)
     {
         _context = context;

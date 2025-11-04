@@ -11,7 +11,24 @@ namespace Shared.Infrastructure.Persistence;
 
 /// <summary>
 /// アプリケーションDbContext（ASP.NET Core Identity対応）
+///
+/// 【⚠️ LEGACY】この DbContext は互換性のために残されています
+///
+/// 新しい構造（Infrastructure.Platform パターン）:
+/// - ProductCatalogDbContext: ビジネスエンティティ（Product）を管理
+///   → ProductCatalog.Shared.Infrastructure.Persistence
+///
+/// - PlatformDbContext: 技術的関心事（Outbox、AuditLog、Identity）を管理
+///   → Shared.Infrastructure.Platform.Persistence
+///
+/// 移行ガイド:
+/// 1. ビジネスロジック（Product操作）: AppDbContext → ProductCatalogDbContext
+/// 2. 技術的操作（Outbox、AuditLog）: AppDbContext → PlatformDbContext
+/// 3. テストコード: AppDbContext → 適切なDbContextに変更
+///
+/// このクラスは次のフェーズで削除予定です
 /// </summary>
+[Obsolete("Use ProductCatalogDbContext for business entities or PlatformDbContext for platform concerns")]
 public sealed class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)

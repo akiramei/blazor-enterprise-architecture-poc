@@ -115,8 +115,11 @@ internal class TestProductReadRepository : IProductReadRepository
 
     public async Task<ProductDetailDto?> GetByIdAsync(Guid productId, CancellationToken cancellationToken = default)
     {
-        var product = await _context.Products
-            .FirstOrDefaultAsync(p => EF.Property<ProductId>(p, "_id") == new ProductId(productId), cancellationToken);
+        // InMemory Databaseでは Value Object のプロパティアクセスが変換できないため、
+        // ToListAsync() でクライアント側評価に切り替える
+        // Note: _images はOwnsMany関係なので自動的にロードされる（Includeは不要）
+        var products = await _context.Products.ToListAsync(cancellationToken);
+        var product = products.FirstOrDefault(p => p.Id.Value == productId);
 
         if (product == null) return null;
 
@@ -129,8 +132,9 @@ internal class TestProductReadRepository : IProductReadRepository
             Stock = product.Stock,
             Status = product.Status.ToString(),
             IsDeleted = product.IsDeleted,
-            Version = product.Version,
+            Version = (long)product.Version,
             Images = product.Images
+                .OrderBy(img => img.DisplayOrder)
                 .Select(img => new ProductImageDto
                 {
                     Id = img.Id.Value,
@@ -351,14 +355,35 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         // HttpContextAccessor
         builder.Services.AddHttpContextAccessor();
 
-        // MediatR
+        // MediatR - すべてのFeature Applicationアセンブリを登録
         builder.Services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssembly(typeof(GetProducts.Application.GetProductsHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(GetProductById.Application.GetProductByIdHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(CreateProduct.Application.CreateProductHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(UpdateProduct.Application.UpdateProductHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(DeleteProduct.Application.DeleteProductHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(SearchProducts.Application.SearchProductsHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly);
         });
 
-        // FluentValidation
-        builder.Services.AddValidatorsFromAssembly(typeof(GetProducts.Application.GetProductsHandler).Assembly);
+        // FluentValidation - すべてのFeature Applicationアセンブリを登録
+        builder.Services.AddValidatorsFromAssemblies(new[]
+        {
+            typeof(GetProducts.Application.GetProductsHandler).Assembly,
+            typeof(GetProductById.Application.GetProductByIdHandler).Assembly,
+            typeof(CreateProduct.Application.CreateProductHandler).Assembly,
+            typeof(UpdateProduct.Application.UpdateProductHandler).Assembly,
+            typeof(DeleteProduct.Application.DeleteProductHandler).Assembly,
+            typeof(SearchProducts.Application.SearchProductsHandler).Assembly,
+            typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly,
+            typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly,
+            typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly,
+            typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly
+        });
 
         // Pipeline Behaviors
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
@@ -463,6 +488,28 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         // 新しいページを作成
         Page = await _browser.NewPageAsync();
 
+        // ブラウザコンソールログを収集
+        Page.Console += (_, msg) =>
+        {
+            var msgType = msg.Type;
+            var msgText = msg.Text;
+            Console.WriteLine($"[BROWSER {msgType}] {msgText}");
+        };
+
+        // E2Eテスト用: window.__e2eオブジェクトを全ページで自動注入
+        await Page.AddInitScriptAsync(@"
+            window.__e2e = window.__e2e || {
+                readyFlags: {},
+                setReady: function(key) {
+                    this.readyFlags[key] = true;
+                    console.log('[E2E] Ready flag set:', key);
+                },
+                isReady: function(key) {
+                    return !!this.readyFlags[key];
+                }
+            };
+        ");
+
         // デフォルトタイムアウト設定（30秒）
         Page.SetDefaultTimeout(30000);
     }
@@ -498,6 +545,111 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
     }
 
     /// <summary>
+    /// E2Eテスト用: 指定したキーの準備完了フラグを待機
+    /// </summary>
+    protected async Task WaitForReadyAsync(string key, int timeoutMs = 10000)
+    {
+        if (Page == null) throw new InvalidOperationException("Page is not initialized");
+
+        await Page.WaitForFunctionAsync($@"
+            () => window.__e2e && window.__e2e.isReady('{key}')
+        ", new PageWaitForFunctionOptions { Timeout = timeoutMs });
+    }
+
+    /// <summary>
+    /// E2Eテスト用: readyフラグまたはセレクタのどちらか先に来た方を待機（フォールバック）
+    /// </summary>
+    protected async Task WaitForReadyOrSelectorAsync(string key, string selector, int timeoutMs = 30000)
+    {
+        if (Page == null) throw new InvalidOperationException("Page is not initialized");
+
+        Console.WriteLine($"[E2E] Waiting for ready flag '{key}' or selector '{selector}'...");
+
+        // readyフラグ待ち
+        var readyTask = Page.WaitForFunctionAsync(
+            @"(k) => window.__e2e && window.__e2e.isReady && window.__e2e.isReady(k) === true",
+            key,
+            new PageWaitForFunctionOptions { Timeout = timeoutMs });
+
+        // セレクタ可視待ち
+        var selectorTask = Page.WaitForSelectorAsync(selector,
+            new PageWaitForSelectorOptions { State = WaitForSelectorState.Visible, Timeout = timeoutMs });
+
+        // 先着勝ち（Task型の違いに対応するため、ラップする）
+        var readyCompletionTask = readyTask.ContinueWith(_ => 0);
+        var selectorCompletionTask = selectorTask.ContinueWith(_ => 1);
+
+        var completed = await Task.WhenAny(readyCompletionTask, selectorCompletionTask);
+
+        // どちらか一方が成功すればOK
+        try
+        {
+            if (completed == readyCompletionTask)
+            {
+                await readyTask; // 成功していれば正常終了
+                Console.WriteLine($"[E2E] Ready flag '{key}' set successfully");
+                return;
+            }
+            else
+            {
+                await selectorTask; // 成功していれば正常終了
+                Console.WriteLine($"[E2E] Selector '{selector}' found successfully");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            // 先に完了した方が失敗した場合、もう一方を待つ
+            try
+            {
+                if (completed == readyCompletionTask)
+                {
+                    Console.WriteLine($"[E2E] Ready flag '{key}' timed out, trying selector...");
+                    await selectorTask;
+                    Console.WriteLine($"[E2E] Selector '{selector}' found successfully (fallback)");
+                }
+                else
+                {
+                    Console.WriteLine($"[E2E] Selector '{selector}' timed out, trying ready flag...");
+                    await readyTask;
+                    Console.WriteLine($"[E2E] Ready flag '{key}' set successfully (fallback)");
+                }
+                // もう一方が成功すればOK
+                return;
+            }
+            catch (Exception ex2)
+            {
+                // 両方失敗した場合はスクリーンショットを保存して例外を投げる
+                Console.WriteLine($"[E2E] Both ready flag and selector failed");
+                await SaveScreenshotOnFailureAsync($"timeout-{key}");
+                throw new TimeoutException($"Both ready flag '{key}' and selector '{selector}' timed out. Original: {ex.Message}, Fallback: {ex2.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// テスト失敗時のスクリーンショット保存
+    /// </summary>
+    private async Task SaveScreenshotOnFailureAsync(string testName)
+    {
+        if (Page == null) return;
+
+        try
+        {
+            var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var screenshotPath = Path.Combine("screenshots", $"{testName}-{timestamp}.png");
+            Directory.CreateDirectory("screenshots");
+
+            await Page.ScreenshotAsync(new PageScreenshotOptions { Path = screenshotPath });
+            Console.WriteLine($"[E2E] Screenshot saved: {screenshotPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[E2E] Failed to save screenshot: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// スクリーンショットを保存（デバッグ用）
     /// </summary>
     protected async Task<byte[]> TakeScreenshotAsync()
@@ -516,9 +668,9 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         int stock,
         bool publish = false)
     {
-        // AppDbContextを取得
+        // ProductCatalogDbContextを取得（TestProductReadRepositoryと同じDB）
         using var scope = _app!.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<ProductCatalogDbContext>();
 
         // Productエンティティを作成
         var product = Product.Create(

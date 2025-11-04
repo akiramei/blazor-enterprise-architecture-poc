@@ -8,19 +8,22 @@ using Shared.Application.Interfaces;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using ProductCatalog.Shared.Domain.Products;
-using Shared.Infrastructure.Persistence;
 
 namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 
 /// <summary>
 /// Dapper を使用した高速読み取り専用リポジトリ（PostgreSQL対応）
 ///
-/// 【パターン: Dapper Read Repository】
+/// 【パターン: Dapper Read Repository + Infrastructure.Platform】
 ///
 /// 責務:
 /// - 参照系クエリを高速に実行
 /// - 複雑なJOINやフィルタリングに対応
 /// - DTOへの直接マッピング
+///
+/// VSA構造:
+/// - ProductCatalogDbContextを使用（ビジネスエンティティ専用）
+/// - 技術的関心事（Outbox、AuditLog）はPlatformDbContextで管理
 ///
 /// 実装ガイド:
 /// - 生SQLを使用して最適化
@@ -36,11 +39,11 @@ namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 /// </summary>
 public sealed class DapperProductReadRepository : IProductReadRepository
 {
-    private readonly AppDbContext _context;
+    private readonly ProductCatalogDbContext _context;
     private readonly ILogger<DapperProductReadRepository> _logger;
 
     public DapperProductReadRepository(
-        AppDbContext context,
+        ProductCatalogDbContext context,
         ILogger<DapperProductReadRepository> logger)
     {
         _context = context;

@@ -56,14 +56,35 @@ builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>(
 //         // .AddAzureMonitorMetricExporter();
 //     });
 
-// MediatR
+// MediatR - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssembly(typeof(GetProductsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(GetProductById.Application.GetProductByIdHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(CreateProduct.Application.CreateProductHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(UpdateProduct.Application.UpdateProductHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(DeleteProduct.Application.DeleteProductHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(SearchProducts.Application.SearchProductsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly);
 });
 
-// FluentValidation（自動検出）
-builder.Services.AddValidatorsFromAssembly(typeof(GetProductsHandler).Assembly);
+// FluentValidation - すべてのFeature Applicationアセンブリを登録
+builder.Services.AddValidatorsFromAssemblies(new[]
+{
+    typeof(GetProductsHandler).Assembly,
+    typeof(GetProductById.Application.GetProductByIdHandler).Assembly,
+    typeof(CreateProduct.Application.CreateProductHandler).Assembly,
+    typeof(UpdateProduct.Application.UpdateProductHandler).Assembly,
+    typeof(DeleteProduct.Application.DeleteProductHandler).Assembly,
+    typeof(SearchProducts.Application.SearchProductsHandler).Assembly,
+    typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly,
+    typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly,
+    typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly,
+    typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly
+});
 
 // Pipeline Behaviors（登録順序が重要！）
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.MetricsBehavior<,>));        // 0. Metrics - 全体の実行時間を計測
@@ -401,6 +422,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.UseStaticFiles();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddAdditionalAssemblies(Program.FeatureUIAssemblies);
@@ -410,6 +432,17 @@ app.MapHub<ProductCatalog.Host.Hubs.ProductHub>("/hubs/products");
 
 // REST API Controllers エンドポイント
 app.MapControllers();
+
+// === E2E Debug: Endpoint Discovery (AFTER mapping) ===
+foreach (var ds in app.Services.GetServices<Microsoft.AspNetCore.Routing.EndpointDataSource>())
+{
+    foreach (var e in ds.Endpoints.OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>())
+    {
+        app.Logger.LogInformation("[ENDPOINT] Pattern: {Pattern} => DisplayName: {DisplayName}",
+            e.RoutePattern.RawText ?? "(null)", e.DisplayName);
+    }
+}
+// === End E2E Debug ===
 
 app.Run();
 
