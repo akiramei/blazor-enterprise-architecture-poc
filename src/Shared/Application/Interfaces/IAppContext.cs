@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// アプリケーションコンテキスト - 横断的なリクエストスコープ情報へのアクセスを提供

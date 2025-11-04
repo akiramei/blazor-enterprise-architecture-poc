@@ -4,10 +4,11 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Common;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.ImportProductsFromCsv;
+namespace ImportProductsFromCsv.Application;
 
 /// <summary>
 /// 商品CSV インポートハンドラ
@@ -142,10 +143,10 @@ public class ImportProductsFromCsvHandler : IRequestHandler<ImportProductsFromCs
             _logger.LogInformation("商品CSVインポート完了: 成功{SuccessCount}件、失敗{FailCount}件",
                 succeededCount, errors.Count);
 
-            return Result.Success(new BulkOperationResult(
-                succeededCount: succeededCount,
-                failedCount: errors.Count,
-                errors: errors));
+            return Result.Success(BulkOperationResult.PartiallySucceeded(
+                succeededCount,
+                errors.Count,
+                errors));
         }
         catch (Exception ex)
         {

@@ -2,8 +2,8 @@ using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using ProductCatalog.Application.Features.Products.ImportProductsFromCsv;
-using ProductCatalog.Domain.Products;
+using ImportProductsFromCsv.Application;
+using ProductCatalog.Shared.Domain.Products;
 
 namespace ProductCatalog.Application.UnitTests;
 

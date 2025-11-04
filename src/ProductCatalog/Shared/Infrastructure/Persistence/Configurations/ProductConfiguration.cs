@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProductCatalog.Domain.Products;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Infrastructure.Persistence.Configurations;
+namespace ProductCatalog.Shared.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// Product エンティティのEF Core設定

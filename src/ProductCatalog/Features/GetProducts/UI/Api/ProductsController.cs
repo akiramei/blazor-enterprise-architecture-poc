@@ -1,17 +1,19 @@
-using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ProductCatalog.Application.Features.Products.CreateProduct;
-using ProductCatalog.Application.Features.Products.DeleteProduct;
-using ProductCatalog.Application.Features.Products.GetProductById;
-using ProductCatalog.Application.Features.Products.GetProducts;
-using ProductCatalog.Application.Features.Products.SearchProducts;
-using ProductCatalog.Application.Features.Products.UpdateProduct;
-using ProductCatalog.Application.Products.DTOs;
-using ProductCatalog.Web.Features.Api.V1.Products.Dtos;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Shared.Application;
+using Shared.Application.Common;
+using CreateProduct.Application;
+using DeleteProduct.Application;
+using GetProductById.Application;
+using GetProducts.Application;
+using SearchProducts.Application;
+using UpdateProduct.Application;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Web.Features.Api.V1.Products;
+namespace ProductCatalog.Features.Api.V1.Products;
 
 /// <summary>
 /// 商品API
@@ -89,7 +91,6 @@ namespace ProductCatalog.Web.Features.Api.V1.Products;
 /// - docs/patterns/CQRS-PATTERN-GUIDE.md - Command/Query実装
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/products")]
 [Authorize]  // ❗ JWT認証が必要（認証済みユーザーのみアクセス可）
 public sealed class ProductsController : ControllerBase
@@ -198,16 +199,9 @@ public sealed class ProductsController : ControllerBase
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<Guid>> CreateProduct(
-        [FromBody] CreateProductRequest request,
+        [FromBody] CreateProductCommand command,
         CancellationToken cancellationToken = default)
     {
-        var command = new CreateProductCommand(
-            request.Name,
-            request.Description,
-            request.PriceAmount,
-            request.PriceCurrency,
-            request.StockQuantity);
-
         var result = await _mediator.Send(command, cancellationToken);
 
         if (!result.IsSuccess)
@@ -237,18 +231,18 @@ public sealed class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateProduct(
         Guid id,
-        [FromBody] UpdateProductRequest request,
+        [FromBody] UpdateProductCommand command,
         CancellationToken cancellationToken = default)
     {
-        var command = new UpdateProductCommand(
+        var commandWithId = new UpdateProductCommand(
             id,
-            request.Name,
-            request.Description,
-            request.Price,
-            request.Stock,
-            request.Version);
+            command.Name,
+            command.Description,
+            command.Price,
+            command.Stock,
+            command.Version);
 
-        var result = await _mediator.Send(command, cancellationToken);
+        var result = await _mediator.Send(commandWithId, cancellationToken);
 
         if (!result.IsSuccess)
         {

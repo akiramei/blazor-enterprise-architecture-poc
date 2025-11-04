@@ -1,6 +1,6 @@
-using ProductCatalog.Domain.Common;
+using Shared.Kernel;
 
-namespace ProductCatalog.Domain.Products;
+namespace ProductCatalog.Shared.Domain.Products;
 
 /// <summary>
 /// 金額（Value Object）

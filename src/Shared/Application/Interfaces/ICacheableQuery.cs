@@ -1,4 +1,4 @@
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// キャッシュ可能なQueryを示すマーカーインターフェース

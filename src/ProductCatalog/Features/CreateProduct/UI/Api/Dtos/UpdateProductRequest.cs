@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ProductCatalog.Web.Features.Api.V1.Products.Dtos;
+namespace ProductCatalog.Features.Api.V1.Products.Dtos;
 
 /// <summary>
 /// 商品更新リクエスト

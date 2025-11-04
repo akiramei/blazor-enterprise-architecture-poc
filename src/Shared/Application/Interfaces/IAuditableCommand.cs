@@ -1,4 +1,4 @@
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// 監査ログ対象のCommandマーカーインターフェース

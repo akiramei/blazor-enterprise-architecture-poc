@@ -1,4 +1,4 @@
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// 商品変更通知サービス（リアルタイム更新通知）

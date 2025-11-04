@@ -1,11 +1,11 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using AuthorizeAttribute = ProductCatalog.Application.Common.Attributes.AuthorizeAttribute;
+using Shared.Application;
+using Shared.Application.Interfaces;
+using AuthorizeAttribute = Shared.Application.Attributes.AuthorizeAttribute;
 
-namespace ProductCatalog.Infrastructure.Behaviors;
+namespace Shared.Infrastructure.Behaviors;
 
 /// <summary>
 /// 認可のPipeline Behavior

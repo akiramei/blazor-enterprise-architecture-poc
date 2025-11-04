@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.AuditLogs;
+using Shared.Application.Interfaces;
+using Shared.Domain.AuditLogs;
 
-namespace ProductCatalog.Infrastructure.Persistence.Repositories;
+namespace Shared.Infrastructure.Persistence.Repositories;
 
 /// <summary>
 /// 監査ログリポジトリ実装（EF Core）

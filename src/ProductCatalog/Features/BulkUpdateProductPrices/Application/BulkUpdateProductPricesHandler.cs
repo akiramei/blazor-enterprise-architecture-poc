@@ -1,10 +1,11 @@
+using Shared.Application.Common;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Interfaces;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.BulkUpdateProductPrices;
+namespace BulkUpdateProductPrices.Application;
 
 /// <summary>
 /// 商品価格一括更新ハンドラ
@@ -108,9 +109,9 @@ public class BulkUpdateProductPricesHandler : IRequestHandler<BulkUpdateProductP
         _logger.LogInformation("一括価格更新完了: 成功={SucceededCount}, 失敗={FailedCount}",
             succeededCount, errors.Count);
 
-        return Result.Success(new BulkOperationResult(
-            succeededCount: succeededCount,
-            failedCount: errors.Count,
-            errors: errors));
+        return Result.Success(BulkOperationResult.PartiallySucceeded(
+            succeededCount,
+            errors.Count,
+            errors));
     }
 }

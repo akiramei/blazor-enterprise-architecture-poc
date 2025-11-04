@@ -1,6 +1,6 @@
-using ProductCatalog.Domain.Products;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.GetProductById;
+namespace ProductCatalog.Shared.Application.DTOs;
 
 /// <summary>
 /// 商品詳細DTO

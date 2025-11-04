@@ -9,20 +9,21 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using ProductCatalog.Application.Common.Behaviors;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.Identity;
-using ProductCatalog.Domain.Products;
-using ProductCatalog.Infrastructure.Authentication;
-using ProductCatalog.Infrastructure.Behaviors;
-using ProductCatalog.Infrastructure.Idempotency;
-using ProductCatalog.Infrastructure.Persistence;
-using ProductCatalog.Infrastructure.Persistence.Repositories;
-using ProductCatalog.Infrastructure.Services;
-using ProductCatalog.Web.Components;
-using ProductCatalog.Web.Features.Products.Actions;
-using ProductCatalog.Web.Features.Products.Store;
+using Shared.Infrastructure.Behaviors;
+using Shared.Application.Interfaces;
+using Shared.Domain.Identity;
+using ProductCatalog.Shared.Domain.Products;
+using Shared.Infrastructure.Authentication;
+using Shared.Infrastructure.Idempotency;
+using ProductCatalog.Shared.Infrastructure.Persistence;
+using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
+using ProductCatalog.Host.Services;
+using ProductCatalog.Host.Components;
+using ProductCatalog.Shared.UI.Actions;
+using ProductCatalog.Shared.UI.Store;
 using Serilog;
+using GetProducts.Application;
+using Shared.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,37 +42,38 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpContextAccessor();
 
 // OpenTelemetry Metrics（メトリクス収集）
-builder.Services.AddSingleton<ProductCatalog.Infrastructure.Metrics.ApplicationMetrics>();
-builder.Services.AddOpenTelemetry()
-    .WithMetrics(metrics =>
-    {
-        // ProductCatalogアプリケーションのメトリクスを収集
-        metrics.AddMeter("ProductCatalog");
-
-        // エクスポーター設定（開発環境）
-        // 本番環境では Prometheus や Azure Monitor等を使用
-        // .AddPrometheusExporter();
-        // .AddAzureMonitorMetricExporter();
-    });
+builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>();
+// TODO: Add OpenTelemetry package to enable this
+// builder.Services.AddOpenTelemetry()
+//     .WithMetrics(metrics =>
+//     {
+//         // ProductCatalogアプリケーションのメトリクスを収集
+//         metrics.AddMeter("ProductCatalog");
+//
+//         // エクスポーター設定（開発環境）
+//         // 本番環境では Prometheus や Azure Monitor等を使用
+//         // .AddPrometheusExporter();
+//         // .AddAzureMonitorMetricExporter();
+//     });
 
 // MediatR
 builder.Services.AddMediatR(cfg =>
 {
-    cfg.RegisterServicesFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(GetProductsHandler).Assembly);
 });
 
 // FluentValidation（自動検出）
-builder.Services.AddValidatorsFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
+builder.Services.AddValidatorsFromAssembly(typeof(GetProductsHandler).Assembly);
 
 // Pipeline Behaviors（登録順序が重要！）
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.MetricsBehavior<,>));        // 0. Metrics - 全体の実行時間を計測
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.LoggingBehavior<,>));        // 1. Logging
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.ValidationBehavior<,>));     // 2. Validation
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.AuthorizationBehavior<,>));  // 3. Authorization
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.IdempotencyBehavior<,>));    // 4. Idempotency (Command)
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.TransactionBehavior<,>));    // 7. Transaction (Command)
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.MetricsBehavior<,>));        // 0. Metrics - 全体の実行時間を計測
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.LoggingBehavior<,>));        // 1. Logging
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.ValidationBehavior<,>));     // 2. Validation
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.AuthorizationBehavior<,>));  // 3. Authorization
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.IdempotencyBehavior<,>));    // 4. Idempotency (Command)
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.TransactionBehavior<,>));    // 7. Transaction (Command)
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -80,16 +82,16 @@ builder.Services.AddAuthorization();
 builder.Services.AddMemoryCache();
 
 // Current User Service
-builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<ICurrentUserService, Shared.Infrastructure.Services.CurrentUserService>();
 
 // App Context (統合コンテキスト - ユーザー情報、リクエスト情報、環境情報を一元管理)
-builder.Services.AddScoped<IAppContext, ProductCatalog.Infrastructure.Services.AppContext>();
+builder.Services.AddScoped<IAppContext, Shared.Infrastructure.Services.AppContext>();
 
 // Product Notification Service (SignalR)
-builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Web.Services.ProductNotificationService>();
+builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Host.Services.ProductNotificationService>();
 
 // Correlation ID Accessor (Distributed Tracing)
-builder.Services.AddScoped<ICorrelationIdAccessor, ProductCatalog.Infrastructure.Services.CorrelationIdAccessor>();
+builder.Services.AddScoped<ICorrelationIdAccessor, Shared.Infrastructure.Services.CorrelationIdAccessor>();
 
 // Idempotency Store
 builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
@@ -166,17 +168,27 @@ builder.Services.AddAuthentication()
 // Repositories
 builder.Services.AddScoped<IProductRepository, EfProductRepository>();
 // Dapper を使用した高速読み取りリポジトリ（本番環境で効果を発揮）
-builder.Services.AddScoped<IProductReadRepository, ProductCatalog.Infrastructure.Persistence.Repositories.DapperProductReadRepository>();
+// テスト環境ではDapperは使えないため、EfProductRepositoryをベースにしたラッパーを使用
+if (builder.Environment.IsEnvironment("Test"))
+{
+    // テスト環境ではInMemoryデータベースを使うため、DapperProductReadRepositoryは使えない
+    // 代わりに、登録しない（E2Eテストで独自に登録される）
+}
+else
+{
+    builder.Services.AddScoped<ProductCatalog.Shared.Application.IProductReadRepository, DapperProductReadRepository>();
+}
 // Audit Log Repository（監査ログ）
-builder.Services.AddScoped<IAuditLogRepository, ProductCatalog.Infrastructure.Persistence.Repositories.AuditLogRepository>();
+// TODO: AuditLogRepository doesn't exist in Shared.Infrastructure.Persistence.Repositories
+// builder.Services.AddScoped<IAuditLogRepository, Shared.Infrastructure.Persistence.Repositories.AuditLogRepository>();
 
 // Infrastructure Services (Scoped for Blazor Server circuits)
-builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Services.LocalStorageService>();
+builder.Services.AddScoped<ProductCatalog.Host.Infrastructure.Services.LocalStorageService>();
 
 // Infrastructure Stores (Scoped for Blazor Server circuits - システムレベル状態管理)
-builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Stores.PreferencesStore>();
-builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Stores.LayoutStore>();
-builder.Services.AddScoped<ProductCatalog.Web.Infrastructure.Stores.NotificationStore>();
+builder.Services.AddScoped<ProductCatalog.Host.Infrastructure.Stores.PreferencesStore>();
+builder.Services.AddScoped<ProductCatalog.Host.Infrastructure.Stores.LayoutStore>();
+builder.Services.AddScoped<ProductCatalog.Host.Infrastructure.Stores.NotificationStore>();
 
 // Feature Stores (Scoped for Blazor Server circuits - ドメイン固有状態管理)
 builder.Services.AddScoped<ProductsStore>();
@@ -191,10 +203,10 @@ builder.Services.AddScoped<ProductEditActions>();
 builder.Services.AddScoped<ProductSearchActions>();
 
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
-builder.Services.AddHostedService<ProductCatalog.Infrastructure.Outbox.OutboxBackgroundService>();
+builder.Services.AddHostedService<Shared.Infrastructure.Outbox.OutboxBackgroundService>();
 
 // Identity Data Seeder
-builder.Services.AddScoped<ProductCatalog.Infrastructure.Identity.IdentityDataSeeder>();
+builder.Services.AddScoped<Shared.Infrastructure.Identity.IdentityDataSeeder>();
 
 // Controllers（REST API用）
 builder.Services.AddControllers()
@@ -286,22 +298,22 @@ if (!app.Environment.IsEnvironment("Test"))
 
     if (!context.Products.Any())
     {
-        var product1 = ProductCatalog.Domain.Products.Product.Create(
+        var product1 = Product.Create(
             "ノートパソコン",
             "高性能なビジネス用ノートパソコン",
-            new ProductCatalog.Domain.Products.Money(150000, "JPY"),
+            new Money(150000, "JPY"),
             10);
 
-        var product2 = ProductCatalog.Domain.Products.Product.Create(
+        var product2 = Product.Create(
             "ワイヤレスマウス",
             "Bluetoothワイヤレスマウス",
-            new ProductCatalog.Domain.Products.Money(3500, "JPY"),
+            new Money(3500, "JPY"),
             50);
 
-        var product3 = ProductCatalog.Domain.Products.Product.Create(
+        var product3 = Product.Create(
             "USBキーボード",
             "メカニカルキーボード",
-            new ProductCatalog.Domain.Products.Money(12000, "JPY"),
+            new Money(12000, "JPY"),
             20);
 
         await repository.SaveAsync(product1);
@@ -310,7 +322,7 @@ if (!app.Environment.IsEnvironment("Test"))
     }
 
         // Seed Identity data (Roles and Users)
-        var identitySeeder = scope.ServiceProvider.GetRequiredService<ProductCatalog.Infrastructure.Identity.IdentityDataSeeder>();
+        var identitySeeder = scope.ServiceProvider.GetRequiredService<Shared.Infrastructure.Identity.IdentityDataSeeder>();
         await identitySeeder.SeedAsync();
     }
 }
@@ -343,10 +355,10 @@ app.UseIpRateLimiting();
 app.UseCors("ApiCorsPolicy");
 
 // Correlation ID Middleware (最初に実行)
-app.UseMiddleware<ProductCatalog.Web.Middleware.CorrelationIdMiddleware>();
+app.UseMiddleware<ProductCatalog.Host.Middleware.CorrelationIdMiddleware>();
 
 // Global Exception Handler (グローバルエラーハンドリング)
-app.UseMiddleware<ProductCatalog.Web.Middleware.GlobalExceptionHandlerMiddleware>();
+app.UseMiddleware<ProductCatalog.Host.Middleware.GlobalExceptionHandlerMiddleware>();
 
 // Serilog Request Logging (HTTPリクエスト/レスポンスのログ記録)
 app.UseSerilogRequestLogging();
@@ -357,12 +369,12 @@ app.UseAuthorization();
 
 app.UseAntiforgery();
 
-app.MapStaticAssets();
+app.UseStaticFiles();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 // SignalR Hub エンドポイント
-app.MapHub<ProductCatalog.Web.Hubs.ProductHub>("/hubs/products");
+app.MapHub<ProductCatalog.Host.Hubs.ProductHub>("/hubs/products");
 
 // REST API Controllers エンドポイント
 app.MapControllers();

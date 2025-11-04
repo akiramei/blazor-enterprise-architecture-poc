@@ -1,4 +1,4 @@
-namespace ProductCatalog.Domain.Identity;
+namespace Shared.Domain.Identity;
 
 /// <summary>
 /// アプリケーションで使用するロール定数

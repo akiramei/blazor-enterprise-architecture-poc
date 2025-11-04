@@ -1,4 +1,4 @@
-namespace ProductCatalog.Domain.Common;
+namespace Shared.Kernel;
 
 /// <summary>
 /// 集約ルートの基底クラス

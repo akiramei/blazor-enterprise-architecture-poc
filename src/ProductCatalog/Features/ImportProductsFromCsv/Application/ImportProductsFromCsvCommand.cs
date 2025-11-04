@@ -1,7 +1,8 @@
 using MediatR;
-using ProductCatalog.Application.Common;
+using Shared.Application;
+using Shared.Application.Common;
 
-namespace ProductCatalog.Application.Features.Products.ImportProductsFromCsv;
+namespace ImportProductsFromCsv.Application;
 
 /// <summary>
 /// 商品CSV インポートコマンド

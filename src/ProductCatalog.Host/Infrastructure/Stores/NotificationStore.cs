@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
-using ProductCatalog.Web.Infrastructure.Models;
+using ProductCatalog.Host.Infrastructure.Models;
 
-namespace ProductCatalog.Web.Infrastructure.Stores;
+namespace ProductCatalog.Host.Infrastructure.Stores;
 
 /// <summary>
 /// 通知管理

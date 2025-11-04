@@ -2,13 +2,15 @@ using System.Text;
 using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Application.Features.Products.GetProductById;
-using ProductCatalog.Application.Products.DTOs;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
+using ProductCatalog.Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
+using ProductCatalog.Shared.Domain.Products;
+using Shared.Infrastructure.Persistence;
 
-namespace ProductCatalog.Infrastructure.Persistence.Repositories;
+namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 
 /// <summary>
 /// Dapper を使用した高速読み取り専用リポジトリ（PostgreSQL対応）

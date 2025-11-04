@@ -1,10 +1,10 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Idempotency;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Application;
+using Shared.Domain.Idempotency;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Infrastructure.Behaviors;
+namespace Shared.Infrastructure.Behaviors;
 
 /// <summary>
 /// 冪等性保証のPipeline Behavior（Command専用）

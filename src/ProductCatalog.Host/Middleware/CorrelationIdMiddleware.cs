@@ -1,4 +1,4 @@
-namespace ProductCatalog.Web.Middleware;
+namespace ProductCatalog.Host.Middleware;
 
 /// <summary>
 /// リクエストごとに CorrelationID を生成・管理するミドルウェア

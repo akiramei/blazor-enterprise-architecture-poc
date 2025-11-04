@@ -1,4 +1,4 @@
-namespace ProductCatalog.Domain.AuditLogs;
+namespace Shared.Domain.AuditLogs;
 
 /// <summary>
 /// 監査ログエンティティ

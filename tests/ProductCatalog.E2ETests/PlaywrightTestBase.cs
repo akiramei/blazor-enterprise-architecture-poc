@@ -10,20 +10,26 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Playwright;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Application.Features.Products.GetProductById;
-using ProductCatalog.Application.Products.DTOs;
-using ProductCatalog.Domain.Identity;
-using ProductCatalog.Domain.Products;
-using ProductCatalog.Infrastructure.Idempotency;
-using ProductCatalog.Infrastructure.Persistence;
-using ProductCatalog.Infrastructure.Persistence.Repositories;
-using ProductCatalog.Infrastructure.Services;
-using ProductCatalog.Web.Components;
-using ProductCatalog.Web.Features.Products.Actions;
-using ProductCatalog.Web.Features.Products.Store;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
+using Shared.Infrastructure.Behaviors;
+using ProductCatalog.Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
+using Shared.Domain.Identity;
+using Shared.Domain.AuditLogs;
+using ProductCatalog.Shared.Domain.Products;
+using Shared.Infrastructure.Idempotency;
+using Shared.Infrastructure.Persistence;
+using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
+using Shared.Infrastructure.Services;
+using ProductCatalog.Host.Components;
+using ProductCatalog.Host.Services;
+using ProductCatalog.Host.Hubs;
+using ProductCatalog.Shared.UI.Actions;
+using ProductCatalog.Shared.UI.Store;
+using GetProducts.Application;
 
 namespace ProductCatalog.E2ETests;
 
@@ -31,6 +37,51 @@ namespace ProductCatalog.E2ETests;
 /// テスト用のProductReadRepository（InMemory database用）
 /// AppDbContextから直接クエリして IProductReadRepository として提供
 /// </summary>
+internal class TestAuditLogRepository : IAuditLogRepository
+{
+    public Task AddAsync(AuditLog auditLog, CancellationToken cancellationToken = default)
+    {
+        // No-op for tests
+        return Task.CompletedTask;
+    }
+
+    public Task<AuditLog?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // No-op for tests
+        return Task.FromResult<AuditLog?>(null);
+    }
+
+    public Task<IEnumerable<AuditLog>> GetByEntityAsync(
+        string entityType,
+        string entityId,
+        CancellationToken cancellationToken = default)
+    {
+        // No-op for tests
+        return Task.FromResult<IEnumerable<AuditLog>>(Array.Empty<AuditLog>());
+    }
+
+    public Task<IEnumerable<AuditLog>> GetByUserAsync(
+        Guid userId,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        // No-op for tests
+        return Task.FromResult<IEnumerable<AuditLog>>(Array.Empty<AuditLog>());
+    }
+
+    public Task<IEnumerable<AuditLog>> GetByDateRangeAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        // No-op for tests
+        return Task.FromResult<IEnumerable<AuditLog>>(Array.Empty<AuditLog>());
+    }
+}
+
 internal class TestProductReadRepository : IProductReadRepository
 {
     private readonly AppDbContext _context;
@@ -256,10 +307,10 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         });
 
         // テストサーバー起動（Kestrelで実際のポートをリッスン）
-        // wwwrootパスを設定（Web プロジェクトの wwwroot を参照）
+        // wwwrootパスを設定（Host プロジェクトの wwwroot を参照）
         var webProjectPath = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory,
-            "..", "..", "..", "..", "..", "src", "ProductCatalog.Web"));
+            "..", "..", "..", "..", "..", "src", "ProductCatalog.Host"));
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -285,19 +336,19 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         // MediatR
         builder.Services.AddMediatR(cfg =>
         {
-            cfg.RegisterServicesFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(GetProducts.Application.GetProductsHandler).Assembly);
         });
 
         // FluentValidation
-        builder.Services.AddValidatorsFromAssembly(typeof(ProductCatalog.Application.Features.Products.GetProducts.GetProductsHandler).Assembly);
+        builder.Services.AddValidatorsFromAssembly(typeof(GetProducts.Application.GetProductsHandler).Assembly);
 
         // Pipeline Behaviors
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.LoggingBehavior<,>));
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Application.Common.Behaviors.ValidationBehavior<,>));
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.AuthorizationBehavior<,>));
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.IdempotencyBehavior<,>));
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.CachingBehavior<,>));
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Infrastructure.Behaviors.TransactionBehavior<,>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
+        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
         // Authentication（テスト用の認証スキーム）
         builder.Services.AddAuthentication("Test")
@@ -318,7 +369,7 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         // Product Notification Service (SignalR)
-        builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Web.Services.ProductNotificationService>();
+        builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Host.Services.ProductNotificationService>();
 
         // Correlation ID Accessor
         builder.Services.AddScoped<ICorrelationIdAccessor, CorrelationIdAccessor>();
@@ -336,7 +387,12 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         // Repositories（テスト環境ではEF Coreリポジトリを使用）
         // Note: DapperProductReadRepository は InMemory database では動作しない（Relational database が必要）
         builder.Services.AddScoped<IProductRepository, EfProductRepository>();
+        // Remove all existing IProductReadRepository registrations and add TestProductReadRepository
+        builder.Services.RemoveAll<IProductReadRepository>();
         builder.Services.AddScoped<IProductReadRepository, TestProductReadRepository>();
+        // Add stub for IAuditLogRepository if needed
+        builder.Services.RemoveAll<IAuditLogRepository>();
+        builder.Services.AddScoped<IAuditLogRepository, TestAuditLogRepository>();
 
         // Stores (Scoped for Blazor Server circuits)
         builder.Services.AddScoped<ProductsStore>();
@@ -365,7 +421,7 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
             .AddInteractiveServerRenderMode();
 
         // SignalR Hub
-        _app.MapHub<ProductCatalog.Web.Hubs.ProductHub>("/hubs/products");
+        _app.MapHub<ProductCatalog.Host.Hubs.ProductHub>("/hubs/products");
 
         // サーバーを起動
         await _app.StartAsync();

@@ -14,5 +14,12 @@
     <ProjectReference Include="..\..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
     <ProjectReference Include="..\Application\GetProducts.Application.csproj" />
     <ProjectReference Include="..\..\..\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\..\..\Shared\UI\ProductCatalog.Shared.UI.csproj" />
+    <ProjectReference Include="..\..\CreateProduct\Application\CreateProduct.Application.csproj" />
+    <ProjectReference Include="..\..\UpdateProduct\Application\UpdateProduct.Application.csproj" />
+    <ProjectReference Include="..\..\DeleteProduct\Application\DeleteProduct.Application.csproj" />
+    <ProjectReference Include="..\..\GetProductById\Application\GetProductById.Application.csproj" />
+    <ProjectReference Include="..\..\SearchProducts\Application\SearchProducts.Application.csproj" />
+    <ProjectReference Include="..\..\CreateProduct\UI\CreateProduct.UI.csproj" />
   </ItemGroup>
 </Project>

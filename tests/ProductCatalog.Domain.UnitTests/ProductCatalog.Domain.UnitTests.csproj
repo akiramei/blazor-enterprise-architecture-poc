@@ -20,7 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProductCatalog.Domain\ProductCatalog.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\..\src\Shared\Kernel\Shared.Kernel.csproj" />
   </ItemGroup>
 
 </Project>

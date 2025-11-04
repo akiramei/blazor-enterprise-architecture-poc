@@ -1,11 +1,11 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.Common;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Interfaces;
+using Shared.Kernel;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.UpdateProduct;
+namespace UpdateProduct.Application;
 
 /// <summary>
 /// 商品更新Handler

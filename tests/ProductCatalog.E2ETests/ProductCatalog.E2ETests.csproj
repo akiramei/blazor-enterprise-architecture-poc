@@ -11,7 +11,7 @@
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="Microsoft.Playwright" Version="1.55.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -23,13 +23,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProductCatalog.Web\ProductCatalog.Web.csproj" />
+    <ProjectReference Include="..\..\src\ProductCatalog.Host\ProductCatalog.Host.csproj" />
   </ItemGroup>
 
   <Target Name="CopyDepsFiles" AfterTargets="Build" Condition="'$(TargetFramework)'!=''">
     <ItemGroup>
-      <DepsFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','ProductCatalog.Web','bin','$(Configuration)','$(TargetFramework)','ProductCatalog.Web.deps.json'))" />
-      <RuntimeConfigFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','ProductCatalog.Web','bin','$(Configuration)','$(TargetFramework)','ProductCatalog.Web.runtimeconfig.json'))" />
+      <DepsFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','ProductCatalog.Host','bin','$(Configuration)','$(TargetFramework)','ProductCatalog.Host.deps.json'))" />
+      <RuntimeConfigFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','ProductCatalog.Host','bin','$(Configuration)','$(TargetFramework)','ProductCatalog.Host.runtimeconfig.json'))" />
     </ItemGroup>
     <Copy SourceFiles="@(DepsFilePaths)" DestinationFolder="$(OutDir)" Condition="Exists('%(DepsFilePaths.Identity)')" />
     <Copy SourceFiles="@(RuntimeConfigFilePaths)" DestinationFolder="$(OutDir)" Condition="Exists('%(RuntimeConfigFilePaths.Identity)')" />

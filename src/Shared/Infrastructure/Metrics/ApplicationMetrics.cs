@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace ProductCatalog.Infrastructure.Metrics;
+namespace Shared.Infrastructure.Metrics;
 
 /// <summary>
 /// アプリケーションメトリクス定義

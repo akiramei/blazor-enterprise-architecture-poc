@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ProductCatalog.Web.Features.Api.V1.Auth.Dtos;
+namespace Shared.Infrastructure.Api.Auth.Dtos;
 
 /// <summary>
 /// Refresh Tokenリクエスト

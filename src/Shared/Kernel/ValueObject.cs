@@ -1,4 +1,4 @@
-namespace ProductCatalog.Domain.Common;
+namespace Shared.Kernel;
 
 /// <summary>
 /// 値オブジェクトの基底クラス

@@ -1,4 +1,4 @@
-namespace ProductCatalog.Web.Hubs;
+namespace ProductCatalog.Host.Hubs;
 
 /// <summary>
 /// SignalR クライアント側のメソッド定義

@@ -1,6 +1,6 @@
 using FluentAssertions;
-using ProductCatalog.Application.Features.Products.SearchProducts;
-using ProductCatalog.Domain.Products;
+using SearchProducts.Application;
+using ProductCatalog.Shared.Domain.Products;
 
 namespace ProductCatalog.Application.UnitTests;
 

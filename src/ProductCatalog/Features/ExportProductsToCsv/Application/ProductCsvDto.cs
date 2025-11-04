@@ -1,6 +1,6 @@
 using CsvHelper.Configuration.Attributes;
 
-namespace ProductCatalog.Application.Features.Products.ExportProductsToCsv;
+namespace ExportProductsToCsv.Application;
 
 /// <summary>
 /// 商品CSV出力用DTO

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace ProductCatalog.Web.Infrastructure.Models;
+namespace ProductCatalog.Host.Infrastructure.Models;
 
 /// <summary>
 /// 通知状態 - トースト通知・モーダル等の表示状態を保持

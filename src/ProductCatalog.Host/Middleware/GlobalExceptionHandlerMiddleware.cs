@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Web.Middleware;
+namespace ProductCatalog.Host.Middleware;
 
 /// <summary>
 /// グローバル例外ハンドリングミドルウェア

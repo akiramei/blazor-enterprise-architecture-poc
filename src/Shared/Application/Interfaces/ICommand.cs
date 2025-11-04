@@ -1,6 +1,6 @@
 using MediatR;
 
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// Commandマーカーインターフェース（書き込み操作）

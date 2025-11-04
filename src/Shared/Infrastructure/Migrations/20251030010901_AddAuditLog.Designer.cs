@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using ProductCatalog.Infrastructure.Persistence;
+using Shared.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace ProductCatalog.Infrastructure.Migrations
+namespace Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20251030010901_AddAuditLog")]

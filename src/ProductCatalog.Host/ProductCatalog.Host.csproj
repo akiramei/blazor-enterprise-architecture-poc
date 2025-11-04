@@ -7,11 +7,12 @@
 
   <ItemGroup>
     <!-- Blazor Server -->
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
+    <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
 
     <!-- MediatR -->
-    <PackageReference Include="MediatR" Version="12.1.1" />
-    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="11.1.0" />
+    <PackageReference Include="MediatR" Version="12.2.0" />
 
     <!-- FluentValidation -->
     <PackageReference Include="FluentValidation" Version="11.8.0" />
@@ -19,12 +20,13 @@
 
     <!-- Entity Framework Core -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
 
     <!-- Dapper -->
-    <PackageReference Include="Dapper" Version="2.1.24" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
 
     <!-- ASP.NET Core Identity -->
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
@@ -35,6 +37,8 @@
 
     <!-- Prometheus -->
     <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,7 +50,9 @@
 
     <!-- ProductCatalog Shared -->
     <ProjectReference Include="..\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Shared\Application\ProductCatalog.Shared.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Shared\Infrastructure\Persistence\ProductCatalog.Shared.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\ProductCatalog\Shared\UI\ProductCatalog.Shared.UI.csproj" />
 
     <!-- Feature Projects - Application -->
     <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\Application\CreateProduct.Application.csproj" />

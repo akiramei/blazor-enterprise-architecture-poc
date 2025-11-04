@@ -1,5 +1,5 @@
 using FluentAssertions;
-using ProductCatalog.Application.Features.Products.CreateProduct;
+using CreateProduct.Application;
 
 namespace ProductCatalog.Application.UnitTests;
 

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Domain.Identity;
+using Shared.Domain.Identity;
 
-namespace ProductCatalog.Infrastructure.Identity;
+namespace Shared.Infrastructure.Identity;
 
 /// <summary>
 /// Identity初期データシーダー

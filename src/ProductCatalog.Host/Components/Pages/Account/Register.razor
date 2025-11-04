@@ -1,8 +1,6 @@
 @page "/Account/Register"
-@using Microsoft.AspNetCore.Identity
-@using ProductCatalog.Domain.Identity
-@inject UserManager<ApplicationUser> UserManager
-@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<global::Shared.Domain.Identity.ApplicationUser> UserManager
+@inject SignInManager<global::Shared.Domain.Identity.ApplicationUser> SignInManager
 @inject NavigationManager NavigationManager
 
 <PageTitle>アカウント登録</PageTitle>
@@ -82,7 +80,7 @@
 
     private async Task OnValidSubmitAsync()
     {
-        var user = new ApplicationUser
+        var user = new global::Shared.Domain.Identity.ApplicationUser
         {
             UserName = Input.Email,
             Email = Input.Email,

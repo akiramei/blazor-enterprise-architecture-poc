@@ -13,5 +13,6 @@
     <ProjectReference Include="..\..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
     <ProjectReference Include="..\Application\DeleteProduct.Application.csproj" />
     <ProjectReference Include="..\..\..\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\..\..\Shared\UI\ProductCatalog.Shared.UI.csproj" />
   </ItemGroup>
 </Project>

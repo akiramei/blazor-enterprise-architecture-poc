@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 
-namespace ProductCatalog.Infrastructure.Authentication;
+namespace Shared.Infrastructure.Authentication;
 
 /// <summary>
 /// Refresh Tokenエンティティ

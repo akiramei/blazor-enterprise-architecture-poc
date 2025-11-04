@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace ProductCatalog.Web.Infrastructure.Models;
+namespace ProductCatalog.Host.Infrastructure.Models;
 
 /// <summary>
 /// ユーザー設定状態 - 言語・タイムゾーン等のユーザー設定を保持

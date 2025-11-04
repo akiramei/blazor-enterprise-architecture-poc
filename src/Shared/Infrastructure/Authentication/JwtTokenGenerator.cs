@@ -5,9 +5,9 @@ using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using ProductCatalog.Domain.Identity;
+using Shared.Domain.Identity;
 
-namespace ProductCatalog.Infrastructure.Authentication;
+namespace Shared.Infrastructure.Authentication;
 
 /// <summary>
 /// JWTトークン生成サービス

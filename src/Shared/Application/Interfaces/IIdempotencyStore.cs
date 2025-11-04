@@ -1,6 +1,6 @@
-using ProductCatalog.Application.Common.Idempotency;
+using Shared.Domain.Idempotency;
 
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// 冪等性レコードのストア

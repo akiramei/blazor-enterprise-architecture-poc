@@ -1,8 +1,8 @@
-using ProductCatalog.Application.Features.Products.GetProductById;
-using ProductCatalog.Application.Products.DTOs;
-using ProductCatalog.Domain.Products;
+using ProductCatalog.Shared.Application.DTOs;
+using ProductCatalog.Shared.Domain.Products;
+using Shared.Application.Common;
 
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace ProductCatalog.Shared.Application;
 
 /// <summary>
 /// 商品読み取り専用リポジトリインターフェース

@@ -1,9 +1,10 @@
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Application.Products.DTOs;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
+using ProductCatalog.Shared.Application.DTOs;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.SearchProducts;
+namespace SearchProducts.Application;
 
 /// <summary>
 /// 商品検索Query

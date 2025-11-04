@@ -1,4 +1,4 @@
-namespace ProductCatalog.Domain.Products;
+namespace ProductCatalog.Shared.Domain.Products;
 
 /// <summary>
 /// 商品ステータス

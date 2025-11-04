@@ -1,6 +1,6 @@
-using ProductCatalog.Domain.Common;
+using Shared.Kernel;
 
-namespace ProductCatalog.Domain.Products;
+namespace ProductCatalog.Shared.Domain.Products;
 
 /// <summary>
 /// 商品ID（Value Object）

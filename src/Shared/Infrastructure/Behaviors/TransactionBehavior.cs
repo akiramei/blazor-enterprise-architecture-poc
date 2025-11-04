@@ -2,13 +2,13 @@ using System.Text.Json;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.Common;
-using ProductCatalog.Domain.Outbox;
-using ProductCatalog.Infrastructure.Persistence;
+using Shared.Application;
+using Shared.Application.Interfaces;
+using Shared.Kernel;
+using Shared.Domain.Outbox;
+using Shared.Infrastructure.Persistence;
 
-namespace ProductCatalog.Infrastructure.Behaviors;
+namespace Shared.Infrastructure.Behaviors;
 
 /// <summary>
 /// トランザクション管理のPipeline Behavior（Command専用）

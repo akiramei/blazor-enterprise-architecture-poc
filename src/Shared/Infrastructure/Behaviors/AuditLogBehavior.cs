@@ -1,10 +1,10 @@
 using System.Text.Json;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.AuditLogs;
+using Shared.Application.Interfaces;
+using Shared.Domain.AuditLogs;
 
-namespace ProductCatalog.Infrastructure.Behaviors;
+namespace Shared.Infrastructure.Behaviors;
 
 /// <summary>
 /// 監査ログ記録Behavior

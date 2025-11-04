@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using ProductCatalog.Domain.Products;
+using ProductCatalog.Shared.Domain.Products;
+using Shared.Infrastructure.Persistence;
 
-namespace ProductCatalog.Infrastructure.Persistence.Repositories;
+namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 
 /// <summary>
 /// Product リポジトリのEF Core実装

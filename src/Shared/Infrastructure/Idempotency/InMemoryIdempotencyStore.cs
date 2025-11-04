@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using ProductCatalog.Application.Common.Idempotency;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Domain.Idempotency;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Infrastructure.Idempotency;
+namespace Shared.Infrastructure.Idempotency;
 
 /// <summary>
 /// InMemory による冪等性レコードストア（実証実験用）

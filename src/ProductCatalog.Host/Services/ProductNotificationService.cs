@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.SignalR;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Web.Hubs;
+using Shared.Application.Interfaces;
+using ProductCatalog.Host.Hubs;
 
-namespace ProductCatalog.Web.Services;
+namespace ProductCatalog.Host.Services;
 
 /// <summary>
 /// SignalRを使用した商品変更通知サービス

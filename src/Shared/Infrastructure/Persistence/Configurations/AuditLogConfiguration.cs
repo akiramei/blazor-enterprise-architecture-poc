@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProductCatalog.Domain.AuditLogs;
+using Shared.Domain.AuditLogs;
 
-namespace ProductCatalog.Infrastructure.Persistence.Configurations;
+namespace Shared.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// AuditLog エンティティのEF Core設定

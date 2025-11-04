@@ -1,9 +1,9 @@
 using MediatR;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Infrastructure.Behaviors;
+namespace Shared.Infrastructure.Behaviors;
 
 /// <summary>
 /// キャッシュのPipeline Behavior（Query専用）

@@ -1,10 +1,11 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Application.Products.DTOs;
+using Shared.Application;
+using Shared.Application.Interfaces;
+using ProductCatalog.Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Application.Features.Products.GetProducts;
+namespace GetProducts.Application;
 
 /// <summary>
 /// 商品一覧取得Handler

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
-using ProductCatalog.Application.Products.DTOs;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品一覧画面の状態（不変）

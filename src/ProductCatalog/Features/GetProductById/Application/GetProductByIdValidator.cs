@@ -1,6 +1,7 @@
 using FluentValidation;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Application.Features.Products.GetProductById;
+namespace GetProductById.Application;
 
 /// <summary>
 /// 商品詳細取得Validator

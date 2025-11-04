@@ -1,7 +1,7 @@
-using ProductCatalog.Domain.Common;
-using ProductCatalog.Domain.Products.Events;
+using Shared.Kernel;
+using ProductCatalog.Shared.Domain.Products.Events;
 
-namespace ProductCatalog.Domain.Products;
+namespace ProductCatalog.Shared.Domain.Products;
 
 /// <summary>
 /// 商品集約ルート

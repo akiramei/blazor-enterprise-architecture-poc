@@ -1,7 +1,8 @@
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Products.DTOs;
+using Shared.Application;
+using Shared.Application.Common;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品検索画面の状態（不変）

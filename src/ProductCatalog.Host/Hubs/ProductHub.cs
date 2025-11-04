@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace ProductCatalog.Web.Hubs;
+namespace ProductCatalog.Host.Hubs;
 
 /// <summary>
 /// 商品管理用 SignalR Hub

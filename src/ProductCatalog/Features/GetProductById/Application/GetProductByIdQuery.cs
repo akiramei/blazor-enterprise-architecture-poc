@@ -1,7 +1,8 @@
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Application.Features.Products.GetProductById;
+namespace GetProductById.Application;
 
 /// <summary>
 /// 商品単一取得Query

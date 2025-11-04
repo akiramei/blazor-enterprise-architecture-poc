@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using MediatR;
-using ProductCatalog.Infrastructure.Metrics;
+using Shared.Infrastructure.Metrics;
 
-namespace ProductCatalog.Infrastructure.Behaviors;
+namespace Shared.Infrastructure.Behaviors;
 
 /// <summary>
 /// メトリクス収集Behavior

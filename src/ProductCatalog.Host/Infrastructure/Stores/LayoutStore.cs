@@ -1,7 +1,7 @@
-using ProductCatalog.Web.Infrastructure.Models;
-using ProductCatalog.Web.Infrastructure.Services;
+using ProductCatalog.Host.Infrastructure.Models;
+using ProductCatalog.Host.Infrastructure.Services;
 
-namespace ProductCatalog.Web.Infrastructure.Stores;
+namespace ProductCatalog.Host.Infrastructure.Stores;
 
 /// <summary>
 /// レイアウト状態の管理

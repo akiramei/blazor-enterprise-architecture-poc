@@ -2,10 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Domain.Outbox;
-using ProductCatalog.Infrastructure.Persistence;
+using Shared.Domain.Outbox;
+using Shared.Infrastructure.Persistence;
 
-namespace ProductCatalog.Infrastructure.Outbox;
+namespace Shared.Infrastructure.Outbox;
 
 /// <summary>
 /// Outbox メッセージを定期的に処理するバックグラウンドサービス

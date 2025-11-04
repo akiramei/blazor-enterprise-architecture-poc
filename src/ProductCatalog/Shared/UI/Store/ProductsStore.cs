@@ -1,12 +1,16 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using MediatR;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Features.Products.GetProducts;
-using ProductCatalog.Application.Features.Products.DeleteProduct;
-using ProductCatalog.Application.Features.Products.BulkDeleteProducts;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shared.Application;
+using Shared.Application.Common;
+using GetProducts.Application;
+using DeleteProduct.Application;
+using BulkDeleteProducts.Application;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品一覧の状態管理とI/O実行（並行制御強化版）
@@ -93,7 +97,7 @@ public sealed class ProductsStore : IDisposable
                 await SetStateAsync(_state with
                 {
                     IsLoading = false,
-                    Products = result.Value?.ToImmutableList() ?? ImmutableList<Application.Products.DTOs.ProductDto>.Empty,
+                    Products = result.Value?.ToImmutableList() ?? ImmutableList<ProductDto>.Empty,
                     ErrorMessage = null
                 });
             }

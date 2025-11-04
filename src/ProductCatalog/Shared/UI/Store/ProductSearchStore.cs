@@ -1,8 +1,11 @@
 using MediatR;
-using ProductCatalog.Application.Features.Products.SearchProducts;
-using ProductCatalog.Domain.Products;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shared.Application;
+using SearchProducts.Application;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品検索の状態管理とI/O実行

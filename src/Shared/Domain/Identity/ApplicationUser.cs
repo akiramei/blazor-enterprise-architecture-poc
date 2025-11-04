@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 
-namespace ProductCatalog.Domain.Identity;
+namespace Shared.Domain.Identity;
 
 /// <summary>
 /// アプリケーションユーザー

@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProductCatalog.Infrastructure.Authentication;
+using Shared.Infrastructure.Authentication;
 
-namespace ProductCatalog.Infrastructure.Persistence.Configurations;
+namespace Shared.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// RefreshToken EF Core設定

@@ -1,6 +1,6 @@
-using ProductCatalog.Domain.AuditLogs;
+using Shared.Domain.AuditLogs;
 
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// 監査ログリポジトリインターフェース

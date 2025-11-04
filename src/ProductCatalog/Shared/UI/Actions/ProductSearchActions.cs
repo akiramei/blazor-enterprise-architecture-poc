@@ -1,9 +1,10 @@
+using Microsoft.Extensions.Logging;
 using MediatR;
-using ProductCatalog.Application.Features.Products.ExportProductsToCsv;
-using ProductCatalog.Domain.Products;
-using ProductCatalog.Web.Features.Products.Store;
+using ExportProductsToCsv.Application;
+using ProductCatalog.Shared.Domain.Products;
+using ProductCatalog.Shared.UI.Store;
 
-namespace ProductCatalog.Web.Features.Products.Actions;
+namespace ProductCatalog.Shared.UI.Actions;
 
 /// <summary>
 /// 商品検索画面のUI手順を管理

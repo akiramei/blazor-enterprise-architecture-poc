@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace ProductCatalog.Application.Features.Products.UpdateProduct;
+namespace UpdateProduct.Application;
 
 /// <summary>
 /// 商品更新Validator

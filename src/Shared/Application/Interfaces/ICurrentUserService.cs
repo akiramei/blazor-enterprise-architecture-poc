@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// 現在のユーザー情報を提供するサービス

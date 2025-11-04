@@ -1,4 +1,4 @@
-namespace ProductCatalog.Application.Common;
+namespace Shared.Application;
 
 /// <summary>
 /// 処理結果を表すクラス

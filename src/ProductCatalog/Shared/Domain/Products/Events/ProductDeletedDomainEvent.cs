@@ -1,6 +1,6 @@
-using ProductCatalog.Domain.Common;
+using Shared.Kernel;
 
-namespace ProductCatalog.Domain.Products.Events;
+namespace ProductCatalog.Shared.Domain.Products.Events;
 
 /// <summary>
 /// 商品削除ドメインイベント

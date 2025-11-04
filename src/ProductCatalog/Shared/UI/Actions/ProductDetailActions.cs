@@ -1,6 +1,7 @@
-using ProductCatalog.Web.Features.Products.Store;
+using Microsoft.Extensions.Logging;
+using ProductCatalog.Shared.UI.Store;
 
-namespace ProductCatalog.Web.Features.Products.Actions;
+namespace ProductCatalog.Shared.UI.Actions;
 
 /// <summary>
 /// 商品詳細画面のUI手順を管理

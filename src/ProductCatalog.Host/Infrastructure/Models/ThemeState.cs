@@ -1,4 +1,4 @@
-namespace ProductCatalog.Web.Infrastructure.Models;
+namespace ProductCatalog.Host.Infrastructure.Models;
 
 /// <summary>
 /// テーマ状態 - アプリケーションのテーマ設定を保持

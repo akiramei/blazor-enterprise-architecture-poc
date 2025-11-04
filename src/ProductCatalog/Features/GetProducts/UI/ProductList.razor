@@ -1,12 +1,13 @@
 @page "/products"
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
-@using ProductCatalog.Domain.Identity
-@using ProductCatalog.Web.Features.Products.Store
-@using ProductCatalog.Web.Features.Products.Actions
-@using ProductCatalog.Web.Features.Products.Components
-@using ProductCatalog.Application.Features.Products.BulkDeleteProducts
-@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Roles.Admin)]
+@using Shared.Domain.Identity
+@using ProductCatalog.Shared.UI.Store
+@using ProductCatalog.Shared.UI.Actions
+@using GetProducts.Application
+@using GetProducts.UI.Components
+@using BulkDeleteProducts.Application
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Shared.Domain.Identity.Roles.Admin)]
 @inject ProductsStore Store
 @inject ProductListActions Actions
 @inject IJSRuntime JSRuntime
@@ -115,7 +116,7 @@
                                    checked="@selectedProductIds.Contains(product.Id)"
                                    @onchange="@((ChangeEventArgs e) => ToggleSelection(product.Id, e))">
                         </div>
-                        <ProductCard Product="@product" OnDelete="@(async (id) => await Actions.DeleteAsync(id))" />
+                        <ProductCard Product="@product" OnDelete="@(id => Actions.DeleteAsync(id))" />
                     </div>
                 </div>
             }

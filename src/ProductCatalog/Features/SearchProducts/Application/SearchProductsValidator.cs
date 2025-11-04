@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace ProductCatalog.Application.Features.Products.SearchProducts;
+namespace SearchProducts.Application;
 
 /// <summary>
 /// 商品検索Validator

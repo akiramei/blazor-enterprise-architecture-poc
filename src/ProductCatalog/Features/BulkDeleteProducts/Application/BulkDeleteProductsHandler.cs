@@ -1,11 +1,12 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.Common;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
+using Shared.Kernel;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.BulkDeleteProducts;
+namespace BulkDeleteProducts.Application;
 
 /// <summary>
 /// 商品一括削除Handler
@@ -134,7 +135,7 @@ public sealed class BulkDeleteProductsHandler
             await _notificationService.NotifyProductChangedAsync(cancellationToken);
         }
 
-        var result = new BulkOperationResult(succeededCount, failedCount, errors);
+        var result = BulkOperationResult.PartiallySucceeded(succeededCount, failedCount, errors);
 
         // 結果を返す（成功・失敗の詳細はBulkOperationResultに含まれる）
         // ※ 一部失敗していても、処理自体は成功として扱う

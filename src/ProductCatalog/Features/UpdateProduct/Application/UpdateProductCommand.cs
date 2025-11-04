@@ -1,7 +1,7 @@
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Application;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Application.Features.Products.UpdateProduct;
+namespace UpdateProduct.Application;
 
 /// <summary>
 /// 商品更新Command

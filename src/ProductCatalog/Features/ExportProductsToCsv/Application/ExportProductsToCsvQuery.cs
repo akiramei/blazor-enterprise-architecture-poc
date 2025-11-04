@@ -1,8 +1,8 @@
 using MediatR;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.ExportProductsToCsv;
+namespace ExportProductsToCsv.Application;
 
 /// <summary>
 /// 商品一覧CSV エクスポートクエリ

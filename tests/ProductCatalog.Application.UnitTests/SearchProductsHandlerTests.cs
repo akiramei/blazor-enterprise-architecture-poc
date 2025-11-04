@@ -1,11 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Application.Features.Products.SearchProducts;
-using ProductCatalog.Application.Products.DTOs;
-using ProductCatalog.Domain.Products;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
+using SearchProducts.Application;
+using ProductCatalog.Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
+using ProductCatalog.Shared.Domain.Products;
 
 namespace ProductCatalog.Application.UnitTests;
 

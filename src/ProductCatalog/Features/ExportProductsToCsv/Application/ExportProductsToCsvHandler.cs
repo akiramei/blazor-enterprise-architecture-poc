@@ -4,11 +4,12 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using MediatR;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
-using ProductCatalog.Domain.Products;
+using Shared.Application;
+using Shared.Application.Interfaces;
+using ProductCatalog.Shared.Application;
+using ProductCatalog.Shared.Domain.Products;
 
-namespace ProductCatalog.Application.Features.Products.ExportProductsToCsv;
+namespace ExportProductsToCsv.Application;
 
 /// <summary>
 /// 商品CSV エクスポートハンドラ

@@ -1,7 +1,8 @@
+using Shared.Application.Common;
 using MediatR;
-using ProductCatalog.Application.Common;
+using Shared.Application;
 
-namespace ProductCatalog.Application.Features.Products.BulkUpdateProductPrices;
+namespace BulkUpdateProductPrices.Application;
 
 /// <summary>
 /// 商品価格一括更新コマンド

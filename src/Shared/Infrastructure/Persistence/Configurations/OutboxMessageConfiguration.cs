@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProductCatalog.Domain.Outbox;
+using Shared.Domain.Outbox;
 
-namespace ProductCatalog.Infrastructure.Persistence.Configurations;
+namespace Shared.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// OutboxMessage エンティティの設定

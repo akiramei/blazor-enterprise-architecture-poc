@@ -1,7 +1,5 @@
 @page "/Account/Logout"
-@using Microsoft.AspNetCore.Identity
-@using ProductCatalog.Domain.Identity
-@inject SignInManager<ApplicationUser> SignInManager
+@inject SignInManager<global::Shared.Domain.Identity.ApplicationUser> SignInManager
 @inject NavigationManager NavigationManager
 
 <PageTitle>ログアウト</PageTitle>

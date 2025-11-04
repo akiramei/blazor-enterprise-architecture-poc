@@ -1,14 +1,15 @@
-using Asp.Versioning;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using ProductCatalog.Domain.Identity;
-using ProductCatalog.Infrastructure.Authentication;
-using ProductCatalog.Infrastructure.Persistence;
-using ProductCatalog.Web.Features.Api.V1.Auth.Dtos;
+using Microsoft.Extensions.Logging;
+using Shared.Domain.Identity;
+using Shared.Infrastructure.Authentication;
+using Shared.Infrastructure.Persistence;
+using Shared.Infrastructure.Api.Auth.Dtos;
 
-namespace ProductCatalog.Web.Features.Api.V1.Auth;
+namespace Shared.Infrastructure.Api.Auth;
 
 /// <summary>
 /// 認証API（Login, RefreshToken）
@@ -130,7 +131,7 @@ public sealed class AuthController : ControllerBase
         var refreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
 
         // Refresh Token保存
-        var refreshToken = ProductCatalog.Infrastructure.Authentication.RefreshToken.Create(
+        var refreshToken = Authentication.RefreshToken.Create(
             refreshTokenValue,
             user.Id.ToString(),
             DateTime.UtcNow.AddDays(7)); // appsettings.jsonから取得すべきだが簡易実装
@@ -228,7 +229,7 @@ public sealed class AuthController : ControllerBase
         var newAccessToken = await _jwtTokenGenerator.GenerateAccessTokenAsync(user);
         var newRefreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
 
-        var newRefreshToken = ProductCatalog.Infrastructure.Authentication.RefreshToken.Create(
+        var newRefreshToken = Authentication.RefreshToken.Create(
             newRefreshTokenValue,
             user.Id.ToString(),
             DateTime.UtcNow.AddDays(7));

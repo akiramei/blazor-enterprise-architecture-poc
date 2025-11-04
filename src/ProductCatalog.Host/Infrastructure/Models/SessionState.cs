@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace ProductCatalog.Web.Infrastructure.Models;
+namespace ProductCatalog.Host.Infrastructure.Models;
 
 /// <summary>
 /// セッション状態 - 現在のユーザー情報を保持

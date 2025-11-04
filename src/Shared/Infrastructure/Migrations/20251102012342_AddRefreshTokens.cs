@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ProductCatalog.Infrastructure.Migrations
+namespace Shared.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class AddRefreshTokens : Migration

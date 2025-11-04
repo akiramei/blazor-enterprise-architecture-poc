@@ -1,4 +1,4 @@
-namespace ProductCatalog.Application.Common.Interfaces;
+namespace Shared.Application.Interfaces;
 
 /// <summary>
 /// CorrelationID アクセサー（分散トレーシング用）

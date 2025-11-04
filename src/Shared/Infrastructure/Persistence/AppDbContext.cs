@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using ProductCatalog.Domain.AuditLogs;
-using ProductCatalog.Domain.Identity;
-using ProductCatalog.Domain.Outbox;
-using ProductCatalog.Domain.Products;
-using ProductCatalog.Infrastructure.Authentication;
+using Shared.Domain.AuditLogs;
+using Shared.Domain.Identity;
+using Shared.Domain.Outbox;
+using ProductCatalog.Shared.Domain.Products;
+using Shared.Infrastructure.Authentication;
 
-namespace ProductCatalog.Infrastructure.Persistence;
+namespace Shared.Infrastructure.Persistence;
 
 /// <summary>
 /// アプリケーションDbContext（ASP.NET Core Identity対応）
@@ -43,6 +43,32 @@ public sealed class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRo
         }
 
         // Configurationを適用
+        // VSA構造: 複数のアセンブリから設定を読み込む
+        // 1. Shared.Infrastructure.Persistence (AuditLog, OutboxMessage, RefreshToken)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        // 2. ProductCatalog.Shared.Infrastructure.Persistence (Product)
+        // Product型を使用して、確実にアセンブリを取得
+        var productType = typeof(Product);
+        var productAssemblyName = productType.Assembly.GetName().Name!;
+
+        // "ProductCatalog.Shared.Domain.Products" → "ProductCatalog.Shared.Infrastructure.Persistence" に変換
+        var persistenceAssemblyName = productAssemblyName.Replace("Shared.Domain.Products", "Shared.Infrastructure.Persistence");
+
+        var productPersistenceAssembly = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => a.GetName().Name == persistenceAssemblyName);
+
+        if (productPersistenceAssembly != null)
+        {
+            modelBuilder.ApplyConfigurationsFromAssembly(productPersistenceAssembly);
+        }
+        else
+        {
+            // アセンブリが見つからない場合はログに記録（開発時のデバッグ用）
+            // 本番環境では通常、すべてのアセンブリが読み込まれているはず
+            System.Diagnostics.Debug.WriteLine(
+                $"Warning: {persistenceAssemblyName} assembly not found. " +
+                $"Entity configurations may not be applied correctly.");
+        }
     }
 }

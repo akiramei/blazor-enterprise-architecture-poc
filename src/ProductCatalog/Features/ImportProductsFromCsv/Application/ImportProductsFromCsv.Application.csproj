@@ -6,12 +6,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MediatR" Version="12.1.1" />
+    <PackageReference Include="MediatR" Version="12.2.0" />
+    <PackageReference Include="CsvHelper" Version="30.0.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
     <ProjectReference Include="..\..\..\..\Shared\Application\Shared.Application.csproj" />
     <ProjectReference Include="..\..\..\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Application\ProductCatalog.Shared.Application.csproj" />
   </ItemGroup>
 </Project>

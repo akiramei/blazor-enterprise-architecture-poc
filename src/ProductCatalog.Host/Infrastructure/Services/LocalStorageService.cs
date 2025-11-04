@@ -1,7 +1,7 @@
 using Microsoft.JSInterop;
 using System.Text.Json;
 
-namespace ProductCatalog.Web.Infrastructure.Services;
+namespace ProductCatalog.Host.Infrastructure.Services;
 
 /// <summary>
 /// LocalStorage アクセス用サービス

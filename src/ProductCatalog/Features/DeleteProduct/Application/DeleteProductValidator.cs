@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace ProductCatalog.Application.Features.Products.DeleteProduct;
+namespace DeleteProduct.Application;
 
 /// <summary>
 /// 商品削除Validator

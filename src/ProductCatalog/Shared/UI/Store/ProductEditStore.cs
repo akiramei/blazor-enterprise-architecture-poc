@@ -1,8 +1,12 @@
 using MediatR;
-using ProductCatalog.Application.Features.Products.GetProductById;
-using ProductCatalog.Application.Features.Products.UpdateProduct;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
+using UpdateProduct.Application;
+using GetProductById.Application;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品編集の状態管理とI/O実行

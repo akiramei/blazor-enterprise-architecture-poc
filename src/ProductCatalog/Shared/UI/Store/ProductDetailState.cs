@@ -1,6 +1,6 @@
-using ProductCatalog.Application.Features.Products.GetProductById;
+using ProductCatalog.Shared.Application.DTOs;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品詳細画面の状態（不変）

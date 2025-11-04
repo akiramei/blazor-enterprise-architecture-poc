@@ -1,9 +1,11 @@
-namespace ProductCatalog.Domain.Products;
+using Shared.Kernel;
+
+namespace ProductCatalog.Shared.Domain.Products;
 
 /// <summary>
 /// 商品画像ID（Value Object）
 /// </summary>
-public sealed class ProductImageId : Common.ValueObject
+public sealed class ProductImageId : ValueObject
 {
     public Guid Value { get; }
 

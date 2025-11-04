@@ -1,4 +1,4 @@
-namespace ProductCatalog.Web.Infrastructure.Models;
+namespace ProductCatalog.Host.Infrastructure.Models;
 
 /// <summary>
 /// レイアウト状態 - UI要素の表示/非表示状態を保持

@@ -1,4 +1,4 @@
-namespace ProductCatalog.Domain.Outbox;
+namespace Shared.Domain.Outbox;
 
 /// <summary>
 /// Outbox パターン用のメッセージエンティティ

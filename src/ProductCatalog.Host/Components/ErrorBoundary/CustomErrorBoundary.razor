@@ -1,7 +1,6 @@
-@using ProductCatalog.Application.Common.Interfaces
 @inherits ErrorBoundary
 @inject ILogger<CustomErrorBoundary> Logger
-@inject ICorrelationIdAccessor CorrelationIdAccessor
+@inject global::Shared.Application.Interfaces.ICorrelationIdAccessor CorrelationIdAccessor
 
 @if (CurrentException is null)
 {

@@ -1,7 +1,8 @@
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Common.Interfaces;
+using Shared.Application;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
 
-namespace ProductCatalog.Application.Features.Products.BulkDeleteProducts;
+namespace BulkDeleteProducts.Application;
 
 /// <summary>
 /// 商品一括削除Command

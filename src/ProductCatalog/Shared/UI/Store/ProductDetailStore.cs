@@ -1,7 +1,11 @@
 using MediatR;
-using ProductCatalog.Application.Features.Products.GetProductById;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
+using GetProductById.Application;
 
-namespace ProductCatalog.Web.Features.Products.Store;
+namespace ProductCatalog.Shared.UI.Store;
 
 /// <summary>
 /// 商品詳細の状態管理とI/O実行

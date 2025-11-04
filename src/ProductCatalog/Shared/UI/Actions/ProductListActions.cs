@@ -1,10 +1,12 @@
+using Microsoft.Extensions.Logging;
 using MediatR;
-using ProductCatalog.Application.Common;
-using ProductCatalog.Application.Features.Products.BulkDeleteProducts;
-using ProductCatalog.Application.Features.Products.ImportProductsFromCsv;
-using ProductCatalog.Web.Features.Products.Store;
+using Shared.Application;
+using Shared.Application.Common;
+using BulkDeleteProducts.Application;
+using ImportProductsFromCsv.Application;
+using ProductCatalog.Shared.UI.Store;
 
-namespace ProductCatalog.Web.Features.Products.Actions;
+namespace ProductCatalog.Shared.UI.Actions;
 
 /// <summary>
 /// 商品一覧画面のUI手順を管理
