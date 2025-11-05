@@ -46,8 +46,7 @@ function Get-CatalogIndex {
     if ($CatalogUrl -match "^\.") {
         if (Test-Path $CatalogUrl) {
             try {
-                # -AsHashtable を使用してキーの大文字小文字の衝突を回避
-                $content = Get-Content $CatalogUrl -Raw | ConvertFrom-Json -AsHashtable
+                $content = Get-Content $CatalogUrl -Raw | ConvertFrom-Json
                 Write-Success "カタログインデックスを読み込みました（ローカル）"
                 return $content
             }
