@@ -12,6 +12,70 @@ layers:
   - application
   - ui
 
+ai_selection_hints:
+  trigger_phrases:
+    - "を検索"
+    - "検索機能"
+    - "一覧.*表示"
+    - "フィルタリング"
+    - "絞り込み"
+    - "ページング"
+
+  confidence_keywords:
+    high:    ["検索", "一覧", "フィルタ", "ページング"]
+    medium:  ["探す", "見つける", "表示"]
+    low:     ["リスト"]
+
+  anti_patterns:
+    - "だけ"
+    - "のみ"
+    - "修正"
+    - "最適化"
+
+  typical_requests:
+    - "商品を検索する機能を追加してください"
+    - "顧客一覧を表示する画面を実装してください"
+    - "注文をフィルタリングできるようにしてください"
+    - "ページング付きの商品検索を実装してください"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. エンティティの検索・一覧表示が必要
+    2. フィルタリング・ソート・ページングが必要
+    3. 大量データの効率的な取得が必要
+
+    このパターンを選択すべきでない条件:
+    1. 単純な全件取得 → query-get-list
+    2. ID指定の単一取得 → query-get-by-id
+    3. Store だけの追加 → layer-store
+
+relationship:
+  contains:
+    - layer-store
+    - layer-pageactions
+    - query-pattern
+    - handler-pattern
+
+  works_with:
+    - caching-behavior
+    - validation-behavior
+
+  related_features:
+    - feature-create-entity
+    - feature-update-entity
+    - feature-delete-entity
+
+  composition_note: |
+    このFeature Sliceは以下のLayer Elementsを含みます:
+    - layer-store（検索状態管理）
+    - layer-pageactions（検索UI手順）
+
+    検索機能は通常、以下を含みます:
+    - 検索条件の入力フォーム
+    - 検索結果の一覧表示
+    - ページング制御
+    - ソート制御
+
 dependencies:
   patterns:
     - caching-behavior

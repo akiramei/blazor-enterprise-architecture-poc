@@ -14,6 +14,76 @@ layers:
   - ui
   - api
 
+ai_selection_hints:
+  trigger_phrases:
+    - "を作成する機能"
+    - "を登録できるように"
+    - "の追加フォーム"
+    - "新規.*画面"
+    - ".*を作成"
+    - ".*作成機能"
+
+  confidence_keywords:
+    high:    ["機能", "追加", "画面", "フォーム", "実装"]
+    medium:  ["作る", "できるように", "新規"]
+    low:     ["作成"]
+
+  anti_patterns:
+    - "だけ"
+    - "のみ"
+    - "一部"
+    - "修正"
+    - "変更"
+    - "最適化"
+
+  typical_requests:
+    - "商品を作成する機能を追加してください"
+    - "顧客登録フォームを実装してください"
+    - "注文の新規作成画面を作ってください"
+    - "ユーザーを登録できるようにしてください"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 新しいエンティティの作成機能が必要
+    2. フォーム画面からの登録処理が必要
+    3. Application層、UI層、API層すべてが必要
+
+    このパターンを選択すべきでない条件:
+    1. 既存エンティティの更新 → feature-update-entity
+    2. Store だけの追加 → layer-store
+    3. 横断的関心事 → pipeline-behavior
+
+relationship:
+  contains:
+    - layer-store
+    - layer-pageactions
+    - command-pattern
+    - handler-pattern
+    - validator-pattern
+
+  works_with:
+    - validation-behavior
+    - transaction-behavior
+    - idempotency-behavior
+    - authorization-behavior
+
+  related_features:
+    - feature-update-entity
+    - feature-search-entity
+    - feature-delete-entity
+
+  composition_note: |
+    このFeature Sliceは以下のLayer Elementsを含みます:
+    - layer-store（状態管理+I/O）
+    - layer-pageactions（UI手順）
+
+    これらは通常、Feature Slice生成時に自動的に含まれます。
+
+    layer-storeやlayer-pageactionsを単独で使うのは:
+    - 既存ファイルの修正時
+    - パターンの学習・理解時
+    のみです。
+
 dependencies:
   patterns:
     - validation-behavior

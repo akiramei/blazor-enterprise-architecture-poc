@@ -194,14 +194,69 @@
       ]
     }
   ],
+  "ai_decision_matrix": {
+    "user_intent_to_pattern": {
+      "新機能追加": {
+        "pattern_category": "feature-slice",
+        "confidence": 0.95,
+        "trigger_keywords": ["機能", "追加", "実装", "画面", "できるように"],
+        "examples": [
+          "商品を作成する機能を追加してください → feature-create-entity",
+          "検索画面を実装してください → feature-search-entity",
+          "顧客を編集できるようにしてください → feature-update-entity"
+        ],
+        "decision_rule": "ユーザーが「新しい機能」を求めている場合、まず feature-slice を検討する"
+      },
+      "システム全体の機能追加": {
+        "pattern_category": "pipeline-behavior",
+        "confidence": 0.90,
+        "trigger_keywords": ["すべて", "全体", "システム", "共通", "横断的"],
+        "examples": [
+          "すべてのCommandに入力検証を追加してください → validation-behavior",
+          "トランザクション管理を有効にしてください → transaction-behavior"
+        ],
+        "decision_rule": "「すべての〜」「システム全体の〜」という要求は pipeline-behavior"
+      },
+      "既存ファイルの修正": {
+        "pattern_category": "layer-element",
+        "confidence": 0.85,
+        "trigger_keywords": ["修正", "変更", "最適化", "だけ", "のみ"],
+        "examples": [
+          "ProductEditStoreのLoadAsyncを最適化してください → layer-store",
+          "PageActionsのキャンセル処理を修正してください → layer-pageactions"
+        ],
+        "decision_rule": "特定のファイル名が含まれ、修正を求めている場合は layer-element"
+      },
+      "パターン理解・学習": {
+        "pattern_category": "layer-element",
+        "confidence": 1.0,
+        "trigger_keywords": ["例", "見せて", "教えて", "どう", "実装方法"],
+        "examples": [
+          "Storeパターンの実装例を見せてください → layer-store",
+          "PageActionsの使い方を教えてください → layer-pageactions"
+        ],
+        "decision_rule": "学習目的の場合は layer-element を参照用として提示"
+      }
+    },
+    "selection_algorithm": {
+      "step1": "ユーザーの要求からキーワードを抽出",
+      "step2": "ai_decision_matrix でカテゴリを特定",
+      "step3": "該当カテゴリ内でパターンを検索",
+      "step4": "パターンのai_selection_hintsで最終確認",
+      "step5": "confidence > 0.8 なら採用、そうでなければユーザーに確認"
+    },
+    "fallback_strategy": "判断に迷った場合は feature-slice をデフォルトで選択（垂直スライスが基本）"
+  },
   "ai_usage_guide": {
     "how_to_reference": "AI は catalog/index.json を読み込み、必要なパターンの YAML ファイルを取得します",
     "pattern_selection_flow": [
       "1. ユーザーの要求を分析",
-      "2. catalog/index.json から適切なパターンを検索",
-      "3. パターンの YAML ファイルを読み込み",
-      "4. テンプレートを実際のエンティティ名で置換",
-      "5. 生成されたコードを提示"
+      "2. ai_decision_matrix で適切なカテゴリを判定",
+      "3. catalog/index.json から該当パターンを検索",
+      "4. パターンの YAML ファイルを読み込み",
+      "5. ai_selection_hints で最終確認",
+      "6. テンプレートを実際のエンティティ名で置換",
+      "7. 生成されたコードを提示"
     ],
     "template_variables": {
       "{Entity}": "エンティティ名（PascalCase）例: Product, Order, Customer",
