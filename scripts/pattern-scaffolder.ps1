@@ -42,6 +42,25 @@ function Get-CatalogIndex {
 
     Write-Info "カタログインデックスを取得中: $CatalogUrl"
 
+    # ローカルファイルパスの場合
+    if ($CatalogUrl -match "^\.") {
+        if (Test-Path $CatalogUrl) {
+            try {
+                $content = Get-Content $CatalogUrl -Raw | ConvertFrom-Json
+                Write-Success "カタログインデックスを読み込みました（ローカル）"
+                return $content
+            }
+            catch {
+                Write-Error "カタログインデックスの読み込みに失敗しました: $_"
+                exit 1
+            }
+        }
+        else {
+            Write-Error "カタログファイルが見つかりません: $CatalogUrl"
+            exit 1
+        }
+    }
+
     # github: プレフィックスを実際のURLに変換
     if ($CatalogUrl -match "^github:(.+)/(.+)/(.+)@(.+)$") {
         $org = $matches[1]
@@ -53,7 +72,7 @@ function Get-CatalogIndex {
 
     try {
         $response = Invoke-RestMethod -Uri $CatalogUrl -Method Get
-        Write-Success "カタログインデックスを取得しました"
+        Write-Success "カタログインデックスを取得しました（リモート）"
         return $response
     }
     catch {

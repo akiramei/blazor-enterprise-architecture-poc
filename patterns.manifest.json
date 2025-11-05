@@ -1,6 +1,6 @@
 {
   "$schema": "./patterns.manifest.schema.json",
-  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11",
+  "catalog_index": "./catalog/index.json",
   "selected_patterns": [
     {
       "id": "metrics-behavior",
