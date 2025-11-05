@@ -1,0 +1,188 @@
+id: metrics-behavior
+version: 1.4.0
+name: MetricsBehavior
+category: pipeline-behavior
+intent: ビジネスメトリクスとパフォーマンスメトリクスを自動収集
+order_hint: 50
+description: |
+  すべての Command/Query の実行回数、実行時間、成功/失敗を記録します。
+  Application Insights や Prometheus 等の監視システムに送信できます。
+
+wiring:
+  service_registrations:
+    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(MetricsBehavior<,>))"
+  dependencies:
+    nuget:
+      - System.Diagnostics.DiagnosticSource: "^8.0.0"
+
+preconditions:
+  - "IMetricsCollector が実装されている"
+
+implementation:
+  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/MetricsBehavior.cs"
+  template: |
+    public interface IMetricsCollector
+    {
+        void RecordRequestDuration(string requestName, long durationMs, bool success);
+        void IncrementRequestCount(string requestName);
+        void IncrementErrorCount(string requestName, string errorType);
+    }
+
+    public sealed class MetricsBehavior<TRequest, TResponse>
+        : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        private readonly IMetricsCollector _metricsCollector;
+
+        public MetricsBehavior(IMetricsCollector metricsCollector)
+        {
+            _metricsCollector = metricsCollector;
+        }
+
+        public async Task<TResponse> Handle(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken)
+        {
+            var requestName = typeof(TRequest).Name;
+            _metricsCollector.IncrementRequestCount(requestName);
+
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                var response = await next();
+                stopwatch.Stop();
+
+                var success = IsSuccessfulResponse(response);
+                _metricsCollector.RecordRequestDuration(
+                    requestName,
+                    stopwatch.ElapsedMilliseconds,
+                    success);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+
+                _metricsCollector.RecordRequestDuration(
+                    requestName,
+                    stopwatch.ElapsedMilliseconds,
+                    success: false);
+
+                _metricsCollector.IncrementErrorCount(
+                    requestName,
+                    ex.GetType().Name);
+
+                throw;
+            }
+        }
+
+        private static bool IsSuccessfulResponse(TResponse response)
+        {
+            if (response is IResult result)
+                return result.IsSuccess;
+
+            return true; // Result型以外はデフォルトで成功扱い
+        }
+    }
+
+    // Application Insights 実装例
+    public sealed class ApplicationInsightsMetricsCollector : IMetricsCollector
+    {
+        private readonly TelemetryClient _telemetryClient;
+
+        public ApplicationInsightsMetricsCollector(TelemetryClient telemetryClient)
+        {
+            _telemetryClient = telemetryClient;
+        }
+
+        public void RecordRequestDuration(string requestName, long durationMs, bool success)
+        {
+            _telemetryClient.TrackMetric(
+                $"request.duration.{requestName}",
+                durationMs,
+                new Dictionary<string, string> { ["success"] = success.ToString() });
+        }
+
+        public void IncrementRequestCount(string requestName)
+        {
+            _telemetryClient.TrackMetric($"request.count.{requestName}", 1);
+        }
+
+        public void IncrementErrorCount(string requestName, string errorType)
+        {
+            _telemetryClient.TrackMetric(
+                $"request.error.{requestName}",
+                1,
+                new Dictionary<string, string> { ["errorType"] = errorType });
+        }
+    }
+
+example_usage: |
+  // 自動的にすべての Command/Query のメトリクスが収集される
+  // Application Insights ダッシュボードで以下が確認可能:
+  // - CreateProductCommand の実行回数（時系列）
+  // - CreateProductCommand の平均実行時間
+  // - CreateProductCommand のエラー率
+  // - 最も遅い Command Top 10
+
+tests:
+  - name: "実行時間が記録される"
+    given: "任意の Command/Query"
+    when: "リクエストを実行"
+    then: "実行時間（ms）が記録される"
+    expect: "メトリクス記録"
+
+  - name: "成功/失敗が記録される"
+    given: "Result.Success を返す Command"
+    when: "リクエストを実行"
+    then: "success=true が記録される"
+    expect: "成功メトリクス"
+
+  - name: "例外が記録される"
+    given: "例外が発生する Command"
+    when: "リクエストを実行"
+    then: "エラータイプと回数が記録される"
+    expect: "エラーメトリクス"
+
+metrics:
+  performance_impact: "極低 (通常 < 1ms)"
+  execution_order: 50
+
+ai_guidance:
+  when_to_use:
+    - "すべてのプロジェクト（デフォルト有効推奨）"
+    - "本番環境のパフォーマンス監視"
+    - "SLO/SLA の監視"
+
+  when_not_to_use:
+    - "開発環境でメトリクス収集が不要な場合（DI登録をスキップ）"
+
+  common_mistakes:
+    - mistake: "IMetricsCollector を DI 登録し忘れる"
+      solution: "services.AddSingleton<IMetricsCollector, ApplicationInsightsMetricsCollector>()"
+
+    - mistake: "メトリクス送信の失敗で処理が止まる"
+      solution: "IMetricsCollector 内で例外をキャッチして無視する"
+
+changelog:
+  - version: 1.4.0
+    date: 2025-11-05
+    changes:
+      - "Result 型の成功/失敗を自動判定"
+      - "エラータイプの記録を追加"
+
+  - version: 1.3.0
+    date: 2025-10-20
+    changes:
+      - "Application Insights サンプル実装を追加"
+
+  - version: 1.0.0
+    date: 2025-09-01
+    changes:
+      - "初版リリース"
+
+evidence:
+  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/MetricsBehavior.cs"
+  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/MetricsBehaviorTests.cs"

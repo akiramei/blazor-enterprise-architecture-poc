@@ -1,0 +1,192 @@
+id: command-create
+version: 1.0.0
+name: CreateCommand Pattern
+category: command-pattern
+intent: 新規エンティティ作成コマンドのテンプレート
+description: |
+  ドメインファクトリメソッドを使用して新規エンティティを作成するパターン。
+  検証、認可、トランザクション、冪等性が自動的に適用されます。
+
+dependencies:
+  patterns:
+    - validation-behavior
+    - transaction-behavior
+    - idempotency-behavior
+  nuget:
+    - FluentValidation: "^11.0.0"
+
+implementation:
+  file_path: "src/{BoundedContext}/Features/Create{Entity}/Create{Entity}Command.cs"
+  template: |
+    // Command 定義
+    public sealed record Create{Entity}Command(
+        string Name,
+        string Description,
+        decimal Price,
+        int InitialStock
+    ) : ICommand<Result<Guid>>
+    {
+        public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+    }
+
+    // Validator 定義
+    public sealed class Create{Entity}Validator : AbstractValidator<Create{Entity}Command>
+    {
+        public Create{Entity}Validator()
+        {
+            RuleFor(x => x.Name)
+                .NotEmpty().WithMessage("{Entity}名は必須です")
+                .MaximumLength(200).WithMessage("{Entity}名は200文字以内です");
+
+            RuleFor(x => x.Description)
+                .MaximumLength(2000).WithMessage("説明は2000文字以内です");
+
+            RuleFor(x => x.Price)
+                .GreaterThan(0).WithMessage("価格は0より大きい値を指定してください");
+
+            RuleFor(x => x.InitialStock)
+                .GreaterThanOrEqualTo(0).WithMessage("在庫数は0以上を指定してください");
+        }
+    }
+
+    // Handler 実装
+    public sealed class Create{Entity}Handler
+        : IRequestHandler<Create{Entity}Command, Result<Guid>>
+    {
+        private readonly I{Entity}Repository _repository;
+
+        public Create{Entity}Handler(I{Entity}Repository repository)
+        {
+            _repository = repository;
+        }
+
+        public async Task<Result<Guid>> Handle(
+            Create{Entity}Command command,
+            CancellationToken cancellationToken)
+        {
+            // ドメインファクトリメソッドで作成
+            var entity = {Entity}.Create(
+                command.Name,
+                command.Description,
+                new Money(command.Price),
+                command.InitialStock
+            );
+
+            // Repository に保存
+            await _repository.SaveAsync(entity, cancellationToken);
+
+            // 作成されたIDを返す
+            return Result.Success(entity.Id.Value);
+        }
+    }
+
+example_usage: |
+  // UI から使用
+  public sealed class ProductCreateActions
+  {
+      private readonly IMediator _mediator;
+      private readonly IToastService _toast;
+      private readonly NavigationManager _navigation;
+      private readonly string _idempotencyKey = Guid.NewGuid().ToString();
+
+      public async Task CreateAsync(ProductCreateForm form, CancellationToken ct)
+      {
+          var command = new CreateProductCommand(
+              Name: form.Name,
+              Description: form.Description,
+              Price: form.Price,
+              InitialStock: form.Stock
+          )
+          {
+              IdempotencyKey = _idempotencyKey
+          };
+
+          var result = await _mediator.Send(command, ct);
+
+          if (result.IsSuccess)
+          {
+              _toast.Success("商品を作成しました");
+              _navigation.NavigateTo($"/products/{result.Value}");
+          }
+          else
+          {
+              _toast.Error(result.ErrorMessage);
+          }
+      }
+  }
+
+file_structure: |
+  src/{BoundedContext}/Features/Create{Entity}/
+  ├── Create{Entity}Command.cs       # Command定義
+  ├── Create{Entity}Handler.cs       # Handler実装
+  └── Create{Entity}Validator.cs     # 入力検証
+
+tests:
+  - name: "正常に作成できる"
+    given: "正常な入力パラメータ"
+    when: "Create{Entity}Command を実行"
+    then: "エンティティが作成され、IDが返される"
+    expect: "作成成功"
+
+  - name: "未入力でエラー"
+    given: "Name が空文字列"
+    when: "Create{Entity}Command を実行"
+    then: "ValidationBehavior がエラーを返す"
+    expect: "検証エラー"
+
+  - name: "同じ IdempotencyKey で2回実行しても1回だけ作成"
+    given: "同じ IdempotencyKey を持つ2つの Command"
+    when: "連続して実行"
+    then: "1回目は作成され、2回目はキャッシュから返される"
+    expect: "重複防止"
+
+  - name: "例外発生時にロールバック"
+    given: "Repository.SaveAsync が例外を投げる"
+    when: "Create{Entity}Command を実行"
+    then: "TransactionBehavior がロールバックする"
+    expect: "ロールバック"
+
+ai_guidance:
+  when_to_use:
+    - "新規エンティティの作成"
+    - "ドメインファクトリメソッドで初期化したい場合"
+    - "重複作成を防ぎたい場合"
+
+  when_not_to_use:
+    - "既存エンティティの更新 → UpdateCommand を使用"
+    - "一括作成 → BulkCreateCommand を使用"
+
+  common_mistakes:
+    - mistake: "ドメインロジックを Handler に書く"
+      solution: "ビジネスルールは Domain/{Entity}.cs に実装"
+
+    - mistake: "SaveChangesAsync を呼び出す"
+      solution: "TransactionBehavior が自動で SaveChangesAsync を呼ぶため不要"
+
+    - mistake: "IdempotencyKey を毎回新しく生成する"
+      solution: "画面表示時に1回だけ生成し、再試行時は同じ値を使う"
+
+    - mistake: "作成後にキャッシュをクリアしない"
+      solution: "一覧画面のキャッシュを無効化する（Create後にStore.LoadAsync()を呼ぶ）"
+
+performance:
+  typical_duration: "20-50ms"
+  bottleneck: "データベース書き込み"
+
+pipeline_execution_order: |
+  1. MetricsBehavior (order: 50)
+  2. ValidationBehavior (order: 100)
+  3. AuthorizationBehavior (order: 200) - 属性があれば
+  4. IdempotencyBehavior (order: 300)
+  5. TransactionBehavior (order: 400)
+  6. Handler 実行
+  7. LoggingBehavior (order: 600)
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース"
+
+evidence:
+  implementation_example: "src/ProductCatalog/Features/CreateProduct/"

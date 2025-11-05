@@ -1,0 +1,147 @@
+id: query-get-list
+version: 1.0.0
+name: GetListQuery Pattern
+category: query-pattern
+intent: 全件取得クエリのテンプレート（キャッシュ対応）
+description: |
+  エンティティの全件を取得するシンプルなクエリパターン。
+  キャッシュを有効化して、頻繁にアクセスされるデータの取得を高速化できます。
+
+dependencies:
+  patterns:
+    - caching-behavior
+  nuget:
+    - Dapper: "^2.1.0"
+
+implementation:
+  file_path: "src/{BoundedContext}/Features/Get{Entity}s/Get{Entity}sQuery.cs"
+  template: |
+    // Query 定義
+    public sealed record Get{Entity}sQuery()
+        : IQuery<Result<IEnumerable<{Entity}Dto>>>, ICacheableQuery
+    {
+        public string GetCacheKey() => "{entity}-all";
+        public int CacheDurationMinutes => 5;
+    }
+
+    // Handler 実装
+    public sealed class Get{Entity}sHandler
+        : IRequestHandler<Get{Entity}sQuery, Result<IEnumerable<{Entity}Dto>>>
+    {
+        private readonly IDbConnection _connection;
+
+        public Get{Entity}sHandler(IDbConnection connection)
+        {
+            _connection = connection;
+        }
+
+        public async Task<Result<IEnumerable<{Entity}Dto>>> Handle(
+            Get{Entity}sQuery query,
+            CancellationToken cancellationToken)
+        {
+            var sql = @"
+                SELECT Id, Name, Description, Price, Stock, Status
+                FROM {Entity}s
+                WHERE IsDeleted = 0
+                ORDER BY CreatedAt DESC";
+
+            var items = await _connection.QueryAsync<{Entity}Dto>(sql);
+
+            return Result.Success(items);
+        }
+    }
+
+    // DTO 定義
+    public sealed record {Entity}Dto(
+        Guid Id,
+        string Name,
+        string Description,
+        decimal Price,
+        int Stock,
+        string Status
+    );
+
+example_usage: |
+  // ProductCatalog の場合
+  public sealed record GetProductsQuery()
+      : IQuery<Result<IEnumerable<ProductDto>>>, ICacheableQuery
+  {
+      public string GetCacheKey() => "products-all";
+      public int CacheDurationMinutes => 5;
+  }
+
+  // UI から使用
+  public sealed class ProductListStore
+  {
+      public async Task LoadAsync(CancellationToken ct)
+      {
+          var query = new GetProductsQuery();
+          var result = await _mediator.Send(query, ct);
+
+          if (result.IsSuccess)
+          {
+              _state = _state with { Products = result.Value.ToList() };
+              await NotifyStateChangedAsync();
+          }
+      }
+  }
+
+file_structure: |
+  src/{BoundedContext}/Features/Get{Entity}s/
+  ├── Get{Entity}sQuery.cs       # Query定義
+  ├── Get{Entity}sHandler.cs     # Handler実装
+  └── {Entity}Dto.cs             # DTO定義
+
+tests:
+  - name: "全件取得が成功する"
+    given: "データベースに複数の {Entity} が存在"
+    when: "Get{Entity}sQuery を実行"
+    then: "すべてのアクティブな {Entity} が返される"
+    expect: "全件取得成功"
+
+  - name: "削除済みは含まれない"
+    given: "削除済みの {Entity} が存在"
+    when: "Get{Entity}sQuery を実行"
+    then: "IsDeleted = 0 のデータのみ返される"
+    expect: "論理削除済みを除外"
+
+  - name: "キャッシュが有効になる"
+    given: "CachingBehavior が有効"
+    when: "同じクエリを2回実行"
+    then: "2回目はキャッシュから返される"
+    expect: "キャッシュヒット"
+
+ai_guidance:
+  when_to_use:
+    - "マスタデータの一覧表示"
+    - "ドロップダウンリストのデータソース"
+    - "データ件数が1000件未満の場合"
+
+  when_not_to_use:
+    - "大量データ（1000件以上）→ SearchQuery + Paging を使用"
+    - "リアルタイム性が必要な場合 → キャッシュを無効化"
+    - "条件検索が必要な場合 → SearchQuery を使用"
+
+  common_mistakes:
+    - mistake: "ICacheableQuery を実装し忘れる"
+      solution: "頻繁にアクセスされるクエリには必ずキャッシュを実装"
+
+    - mistake: "大量データを全件取得しようとする"
+      solution: "1000件以上の場合は SearchQuery + Paging パターンを使用"
+
+    - mistake: "削除済みデータをフィルタしない"
+      solution: "WHERE IsDeleted = 0 を必ず追加"
+
+performance:
+  without_cache: "50-100ms (データベースクエリ)"
+  with_cache: "< 1ms (メモリから取得)"
+  recommended_cache_duration: "5分"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース"
+
+evidence:
+  implementation_example: "src/ProductCatalog/Features/GetProducts/"

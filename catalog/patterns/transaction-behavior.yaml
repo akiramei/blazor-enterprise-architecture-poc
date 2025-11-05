@@ -1,0 +1,184 @@
+id: transaction-behavior
+version: 2.0.0
+name: TransactionBehavior
+category: pipeline-behavior
+intent: Command を単一トランザクションで実行し、エラー時に自動ロールバック
+order_hint: 400
+description: |
+  ICommand を実装したリクエストを単一トランザクション内で実行します。
+  Handler 内で例外が発生した場合は自動的にロールバックされます。
+  Query (IQuery) には適用されません。
+
+wiring:
+  service_registrations:
+    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>))"
+  dependencies:
+    nuget:
+      - Microsoft.EntityFrameworkCore: "^8.0.0"
+
+preconditions:
+  - "AppDbContext が DbContext を継承している"
+  - "ICommand インターフェースが定義されている"
+  - "すべての Command が ICommand を実装している"
+
+implementation:
+  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/TransactionBehavior.cs"
+  template: |
+    public sealed class TransactionBehavior<TRequest, TResponse>
+        : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        private readonly AppDbContext _dbContext;
+        private readonly ILogger<TransactionBehavior<TRequest, TResponse>> _logger;
+
+        public TransactionBehavior(
+            AppDbContext dbContext,
+            ILogger<TransactionBehavior<TRequest, TResponse>> logger)
+        {
+            _dbContext = dbContext;
+            _logger = logger;
+        }
+
+        public async Task<TResponse> Handle(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken)
+        {
+            // Query の場合はトランザクション不要
+            if (request is not ICommand)
+                return await next();
+
+            // すでにトランザクション内にいる場合はスキップ
+            if (_dbContext.Database.CurrentTransaction != null)
+                return await next();
+
+            var requestName = typeof(TRequest).Name;
+            _logger.LogInformation("トランザクション開始: {RequestName}", requestName);
+
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var response = await next();
+
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+
+                _logger.LogInformation("トランザクションコミット成功: {RequestName}", requestName);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "トランザクションロールバック: {RequestName}", requestName);
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        }
+    }
+
+example_usage: |
+  // Command の定義（自動的にトランザクション内で実行される）
+  public sealed record CreateProductCommand(
+      string Name,
+      string Description,
+      decimal Price,
+      int InitialStock
+  ) : ICommand<Result<Guid>>
+  {
+      public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+  }
+
+  // Handler の実装
+  public sealed class CreateProductHandler
+      : IRequestHandler<CreateProductCommand, Result<Guid>>
+  {
+      private readonly IProductRepository _repository;
+
+      public CreateProductHandler(IProductRepository repository)
+      {
+          _repository = repository;
+      }
+
+      public async Task<Result<Guid>> Handle(
+          CreateProductCommand command,
+          CancellationToken cancellationToken)
+      {
+          // この処理全体が TransactionBehavior によってトランザクション内で実行される
+          var product = Product.Create(
+              command.Name,
+              command.Description,
+              new Money(command.Price),
+              command.InitialStock
+          );
+
+          await _repository.SaveAsync(product, cancellationToken);
+
+          // SaveChangesAsync と Commit は TransactionBehavior が自動実行
+          return Result.Success(product.Id.Value);
+      }
+  }
+
+tests:
+  - name: "例外発生時にロールバックされる"
+    given: "Handler 内で例外が発生"
+    when: "Command を実行"
+    then: "データベースへの変更がロールバックされる"
+    expect: "未コミット"
+
+  - name: "Query にはトランザクションが適用されない"
+    given: "IQuery を実装したリクエスト"
+    when: "Query を実行"
+    then: "TransactionBehavior がスキップされる"
+    expect: "トランザクション未開始"
+
+  - name: "正常終了時にコミットされる"
+    given: "Handler が正常終了"
+    when: "Command を実行"
+    then: "データベースへの変更がコミットされる"
+    expect: "コミット成功"
+
+metrics:
+  performance_impact: "中 (トランザクション開始/コミット: 5-10ms)"
+  execution_order: 400
+
+ai_guidance:
+  when_to_use:
+    - "データベースへの書き込みを伴う Command"
+    - "複数テーブルへの変更を原子性を保って実行したい場合"
+    - "エラー時に自動ロールバックさせたい場合"
+
+  when_not_to_use:
+    - "Query (読み取り専用操作)"
+    - "外部API呼び出しのみの処理"
+    - "ファイルシステム操作"
+
+  common_mistakes:
+    - mistake: "Handler 内で SaveChangesAsync を呼び出す"
+      solution: "TransactionBehavior が自動で SaveChangesAsync を呼ぶため不要"
+
+    - mistake: "ネストしたトランザクションを開始しようとする"
+      solution: "CurrentTransaction をチェックしてスキップする"
+
+    - mistake: "Query に ICommand を実装する"
+      solution: "Query は IQuery、Command は ICommand を実装する"
+
+changelog:
+  - version: 2.0.0
+    date: 2025-11-05
+    changes:
+      - "ネストしたトランザクションのチェック機能追加"
+      - "ロギングの改善"
+
+  - version: 1.5.0
+    date: 2025-10-10
+    changes:
+      - "SaveChangesAsync の自動呼び出しを追加"
+
+  - version: 1.0.0
+    date: 2025-09-01
+    changes:
+      - "初版リリース"
+
+evidence:
+  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/TransactionBehavior.cs"
+  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/TransactionBehaviorTests.cs"
+  example_command: "src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs"

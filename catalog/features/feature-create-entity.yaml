@@ -1,0 +1,533 @@
+id: feature-create-entity
+version: 1.0.0
+name: Create Entity Feature Slice
+category: feature-slice
+intent: エンティティ作成の完全な垂直スライス（Application + UI + API）
+description: |
+  新規エンティティ作成機能の完全な実装パターン。
+  Command、Handler、Validator、Store、PageActions、Component、API Endpoint の全レイヤーを含みます。
+  これは「垂直スライス」パターンで、1つの機能に必要なすべての層を提供します。
+
+scope: vertical-slice
+layers:
+  - application
+  - ui
+  - api
+
+dependencies:
+  patterns:
+    - validation-behavior
+    - transaction-behavior
+    - idempotency-behavior
+    - authorization-behavior
+  nuget:
+    - FluentValidation: "^11.0.0"
+    - MediatR: "^12.0.0"
+
+file_structure: |
+  src/{BoundedContext}/Features/Create{Entity}/
+  ├── Application/
+  │   ├── Create{Entity}Command.cs         # Command定義
+  │   ├── Create{Entity}Handler.cs         # Handler実装
+  │   ├── Create{Entity}Validator.cs       # FluentValidation
+  │   └── Create{Entity}.Application.csproj
+  ├── UI/
+  │   ├── Api/
+  │   │   └── Dtos/
+  │   │       └── Create{Entity}Request.cs # API DTO
+  │   └── Create{Entity}.UI.csproj
+  └── README.md                            # 機能の説明
+
+  src/{BoundedContext}/Shared/UI/
+  ├── Store/
+  │   ├── {Entity}EditState.cs             # 編集状態
+  │   └── {Entity}EditStore.cs             # 状態管理+I/O
+  ├── Actions/
+  │   └── {Entity}EditActions.cs           # UI手順
+  └── Components/
+      └── {Entity}EditForm.razor           # フォームコンポーネント
+
+implementation:
+  # ===== Application Layer =====
+  command:
+    file_path: "src/{BoundedContext}/Features/Create{Entity}/Application/Create{Entity}Command.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Create{Entity}.Application;
+
+      /// <summary>
+      /// {Entity}作成Command
+      ///
+      /// 【パターン: 作成系Command】
+      ///
+      /// 使用シナリオ:
+      /// - 新しいエンティティを作成する場合
+      /// - 登録フォームからの保存処理
+      ///
+      /// AI実装時の注意:
+      /// - ファクトリメソッド（{Entity}.Create()）経由で作成
+      /// - ビジネスルールはDomain層のファクトリメソッド内で検証
+      /// - Handler内では取得・保存のオーケストレーションのみ
+      /// </summary>
+      public sealed record Create{Entity}Command(
+          string Name,
+          string Description,
+          decimal Price,
+          string Currency,
+          int InitialStock
+      ) : ICommand<Result<Guid>>
+      {
+          /// <summary>
+          /// 冪等性キー（重複実行防止）
+          /// </summary>
+          public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+      }
+
+  handler:
+    file_path: "src/{BoundedContext}/Features/Create{Entity}/Application/Create{Entity}Handler.cs"
+    template: |
+      using MediatR;
+      using Microsoft.Extensions.Logging;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+      using Shared.Kernel;
+      using {BoundedContext}.Shared.Domain.{Entity}s;
+
+      namespace Create{Entity}.Application;
+
+      /// <summary>
+      /// {Entity}作成Handler
+      ///
+      /// 【パターン: 作成系Handler】
+      ///
+      /// 処理フロー:
+      /// 1. Domainのファクトリメソッド経由で集約を作成
+      /// 2. Repository経由で保存
+      /// 3. 作成されたIDを返す
+      /// </summary>
+      public sealed class Create{Entity}Handler : IRequestHandler<Create{Entity}Command, Result<Guid>>
+      {
+          private readonly I{Entity}Repository _repository;
+          private readonly ILogger<Create{Entity}Handler> _logger;
+
+          public Create{Entity}Handler(
+              I{Entity}Repository repository,
+              ILogger<Create{Entity}Handler> logger)
+          {
+              _repository = repository;
+              _logger = logger;
+          }
+
+          public async Task<Result<Guid>> Handle(Create{Entity}Command command, CancellationToken cancellationToken)
+          {
+              try
+              {
+                  // ファクトリメソッド経由で集約を作成
+                  var price = new Money(command.Price, command.Currency);
+                  var {entity} = {Entity}.Create(
+                      command.Name,
+                      command.Description,
+                      price,
+                      command.InitialStock);
+
+                  // Repository経由で保存
+                  await _repository.SaveAsync({entity}, cancellationToken);
+
+                  _logger.LogInformation(
+                      "{Entity}を作成しました: {Id}, Name: {Name}",
+                      {entity}.Id.Value,
+                      command.Name);
+
+                  return Result.Success({entity}.Id.Value);
+              }
+              catch (DomainException ex)
+              {
+                  _logger.LogWarning(ex, "{Entity}作成がドメインルールにより拒否されました: Name={Name}", command.Name);
+                  return Result.Fail<Guid>(ex.Message);
+              }
+          }
+      }
+
+  validator:
+    file_path: "src/{BoundedContext}/Features/Create{Entity}/Application/Create{Entity}Validator.cs"
+    template: |
+      using FluentValidation;
+
+      namespace Create{Entity}.Application;
+
+      /// <summary>
+      /// {Entity}作成Validator
+      ///
+      /// 【パターン: Validator（入力検証）】
+      ///
+      /// 責務:
+      /// - 入力値の形式検証（null、範囲、長さ、フォーマットなど）
+      /// - ビジネスルールの検証は含めない（Domain層に委譲）
+      /// </summary>
+      public sealed class Create{Entity}Validator : AbstractValidator<Create{Entity}Command>
+      {
+          public Create{Entity}Validator()
+          {
+              RuleFor(x => x.Name)
+                  .NotEmpty().WithMessage("{Entity}名は必須です")
+                  .MaximumLength(200).WithMessage("{Entity}名は200文字以内で入力してください");
+
+              RuleFor(x => x.Description)
+                  .NotEmpty().WithMessage("説明は必須です")
+                  .MaximumLength(2000).WithMessage("説明は2000文字以内で入力してください");
+
+              RuleFor(x => x.Price)
+                  .GreaterThan(0).WithMessage("価格は0より大きい値を設定してください")
+                  .LessThanOrEqualTo(1_000_000).WithMessage("価格は1,000,000以下で設定してください");
+
+              RuleFor(x => x.Currency)
+                  .NotEmpty().WithMessage("通貨は必須です")
+                  .Must(c => c == "JPY" || c == "USD" || c == "EUR")
+                  .WithMessage("通貨はJPY、USD、EURのいずれかを指定してください");
+
+              RuleFor(x => x.InitialStock)
+                  .GreaterThanOrEqualTo(0).WithMessage("在庫数は0以上である必要があります")
+                  .LessThanOrEqualTo(100_000).WithMessage("在庫数は100,000以下で設定してください");
+          }
+      }
+
+  # ===== UI Layer (API DTO) =====
+  api_dto:
+    file_path: "src/{BoundedContext}/Features/Create{Entity}/UI/Api/Dtos/Create{Entity}Request.cs"
+    template: |
+      using System.ComponentModel.DataAnnotations;
+
+      namespace {BoundedContext}.Features.Api.V1.{Entity}s.Dtos;
+
+      /// <summary>
+      /// {Entity}作成リクエスト
+      /// </summary>
+      public sealed record Create{Entity}Request
+      {
+          [Required(ErrorMessage = "Name is required")]
+          [StringLength(200, MinimumLength = 1)]
+          public string Name { get; init; } = default!;
+
+          [Required(ErrorMessage = "Description is required")]
+          [StringLength(2000)]
+          public string Description { get; init; } = default!;
+
+          [Required]
+          [Range(0.01, double.MaxValue)]
+          public decimal PriceAmount { get; init; }
+
+          [Required]
+          [StringLength(3, MinimumLength = 3)]
+          public string PriceCurrency { get; init; } = default!;
+
+          [Required]
+          [Range(0, int.MaxValue)]
+          public int StockQuantity { get; init; }
+      }
+
+  # ===== UI Layer (Store) =====
+  store_state:
+    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}EditState.cs"
+    template: |
+      namespace {BoundedContext}.Shared.UI.Store;
+
+      /// <summary>
+      /// {Entity}編集状態（作成・更新共通）
+      /// </summary>
+      public sealed record {Entity}EditState
+      {
+          public Guid? {Entity}Id { get; init; }
+          public string Name { get; init; } = string.Empty;
+          public string Description { get; init; } = string.Empty;
+          public decimal Price { get; init; }
+          public string Currency { get; init; } = "JPY";
+          public int Stock { get; init; }
+          public bool IsLoading { get; init; }
+          public string? ErrorMessage { get; init; }
+          public bool IsDirty { get; init; }
+
+          public static {Entity}EditState Empty => new();
+
+          public static {Entity}EditState ForCreate() => new()
+          {
+              Currency = "JPY",
+              Stock = 0
+          };
+      }
+
+  store:
+    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}EditStore.cs"
+    template: |
+      using MediatR;
+      using Microsoft.Extensions.DependencyInjection;
+      using Create{Entity}.Application;
+
+      namespace {BoundedContext}.Shared.UI.Store;
+
+      /// <summary>
+      /// {Entity}編集Store（作成・更新共通）
+      ///
+      /// 【パターン: Store（状態管理+I/O）】
+      ///
+      /// 責務:
+      /// - 編集中のフォーム状態を管理
+      /// - Command/Queryの送信
+      /// - ローディング状態の管理
+      /// </summary>
+      public sealed class {Entity}EditStore
+      {
+          private readonly IServiceScopeFactory _scopeFactory;
+          private {Entity}EditState _state = {Entity}EditState.Empty;
+
+          public {Entity}EditStore(IServiceScopeFactory scopeFactory)
+          {
+              _scopeFactory = scopeFactory;
+          }
+
+          public {Entity}EditState GetState() => _state;
+          public event Func<Task>? OnChangeAsync;
+
+          public void UpdateField(Action<{Entity}EditState> updater)
+          {
+              var newState = _state with { IsDirty = true };
+              updater(newState);
+              _state = newState;
+              OnChangeAsync?.Invoke();
+          }
+
+          public async Task<Guid?> CreateAsync(CancellationToken ct = default)
+          {
+              _state = _state with { IsLoading = true, ErrorMessage = null };
+              await NotifyStateChangedAsync();
+
+              try
+              {
+                  using var scope = _scopeFactory.CreateScope();
+                  var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+                  var command = new Create{Entity}Command(
+                      _state.Name,
+                      _state.Description,
+                      _state.Price,
+                      _state.Currency,
+                      _state.Stock
+                  );
+
+                  var result = await mediator.Send(command, ct);
+
+                  if (result.IsSuccess)
+                  {
+                      _state = _state with { IsLoading = false, IsDirty = false };
+                      await NotifyStateChangedAsync();
+                      return result.Value;
+                  }
+                  else
+                  {
+                      _state = _state with { IsLoading = false, ErrorMessage = result.ErrorMessage };
+                      await NotifyStateChangedAsync();
+                      return null;
+                  }
+              }
+              catch (Exception ex)
+              {
+                  _state = _state with { IsLoading = false, ErrorMessage = ex.Message };
+                  await NotifyStateChangedAsync();
+                  return null;
+              }
+          }
+
+          private async Task NotifyStateChangedAsync()
+          {
+              if (OnChangeAsync != null)
+                  await OnChangeAsync.Invoke();
+          }
+      }
+
+  # ===== UI Layer (PageActions) =====
+  page_actions:
+    file_path: "src/{BoundedContext}/Shared/UI/Actions/{Entity}EditActions.cs"
+    template: |
+      using Microsoft.AspNetCore.Components;
+
+      namespace {BoundedContext}.Shared.UI.Actions;
+
+      /// <summary>
+      /// {Entity}編集Actions（UI手順のオーケストレーション）
+      ///
+      /// 【パターン: PageActions（UI手順のみ）】
+      ///
+      /// 責務:
+      /// - UI手順のオーケストレーション（確認ダイアログ、トースト、画面遷移）
+      /// - Store への委譲
+      /// </summary>
+      public sealed class {Entity}EditActions
+      {
+          private readonly {Entity}EditStore _store;
+          private readonly NavigationManager _navigation;
+          private readonly IToastService _toast;
+          private readonly IConfirmService _confirm;
+
+          public {Entity}EditActions(
+              {Entity}EditStore store,
+              NavigationManager navigation,
+              IToastService toast,
+              IConfirmService confirm)
+          {
+              _store = store;
+              _navigation = navigation;
+              _toast = toast;
+              _confirm = confirm;
+          }
+
+          public async Task CreateAsync(CancellationToken ct = default)
+          {
+              var {entity}Id = await _store.CreateAsync(ct);
+
+              if ({entity}Id.HasValue)
+              {
+                  _toast.Success("{Entity}を作成しました");
+                  _navigation.NavigateTo($"/{entity}s/{{0}}", {entity}Id.Value);
+              }
+              else
+              {
+                  var errorMessage = _store.GetState().ErrorMessage ?? "作成に失敗しました";
+                  _toast.Error(errorMessage);
+              }
+          }
+
+          public async Task CancelAsync()
+          {
+              if (_store.GetState().IsDirty)
+              {
+                  var confirmed = await _confirm.ShowAsync(
+                      "確認",
+                      "編集内容が保存されていません。破棄してよろしいですか？");
+
+                  if (!confirmed) return;
+              }
+
+              _navigation.NavigateTo("/{entity}s");
+          }
+      }
+
+example_usage: |
+  // UI Component での使用例
+  @page "/{entity}s/create"
+  @inject {Entity}EditStore Store
+  @inject {Entity}EditActions Actions
+
+  <EditForm Model="@Store.GetState()" OnValidSubmit="@HandleSubmit">
+      <DataAnnotationsValidator />
+
+      <InputText @bind-Value="@Store.GetState().Name" />
+      <InputTextArea @bind-Value="@Store.GetState().Description" />
+      <InputNumber @bind-Value="@Store.GetState().Price" />
+
+      <button type="submit" disabled="@Store.GetState().IsLoading">
+          @if (Store.GetState().IsLoading)
+          {
+              <span>作成中...</span>
+          }
+          else
+          {
+              <span>作成</span>
+          }
+      </button>
+  </EditForm>
+
+  @code {
+      private async Task HandleSubmit()
+      {
+          await Actions.CreateAsync();
+      }
+  }
+
+tests:
+  - name: "正常に作成できる"
+    layers: ["Application", "UI"]
+    scenario: |
+      Given: 正常な入力パラメータ
+      When: Create{Entity}Command を実行
+      Then: エンティティが作成され、IDが返される
+
+  - name: "未入力でエラー"
+    layers: ["Application"]
+    scenario: |
+      Given: Name が空文字列
+      When: Create{Entity}Command を実行
+      Then: ValidationBehavior がエラーを返す
+
+  - name: "UI手順のテスト"
+    layers: ["UI"]
+    scenario: |
+      Given: {Entity}EditActions を初期化
+      When: CreateAsync() を実行
+      Then: 成功時に詳細画面に遷移し、トーストが表示される
+
+ai_guidance:
+  when_to_use:
+    - "新規エンティティの作成機能を追加する場合"
+    - "登録フォームを実装する場合"
+    - "API Endpoint + UI の完全なスライスが必要な場合"
+
+  when_not_to_use:
+    - "既存エンティティの更新 → feature-update-entity を使用"
+    - "削除機能 → feature-delete-entity を使用"
+    - "検索機能 → feature-search-entity を使用"
+
+  implementation_steps:
+    - step: 1
+      description: "Command + Handler + Validator を Application/ に作成"
+      files: ["Create{Entity}Command.cs", "Create{Entity}Handler.cs", "Create{Entity}Validator.cs"]
+
+    - step: 2
+      description: "API DTO を UI/Api/Dtos/ に作成"
+      files: ["Create{Entity}Request.cs"]
+
+    - step: 3
+      description: "Store + State を Shared/UI/Store/ に作成"
+      files: ["{Entity}EditState.cs", "{Entity}EditStore.cs"]
+
+    - step: 4
+      description: "PageActions を Shared/UI/Actions/ に作成"
+      files: ["{Entity}EditActions.cs"]
+
+    - step: 5
+      description: "Component を Shared/UI/Components/ に作成"
+      files: ["{Entity}EditForm.razor"]
+
+  common_mistakes:
+    - mistake: "Handler内でビジネスルールを実装する"
+      solution: "ビジネスルールはDomain層のファクトリメソッド（{Entity}.Create()）に実装"
+
+    - mistake: "Store に UI手順（確認ダイアログ、画面遷移）を実装する"
+      solution: "UI手順はPageActionsに実装。StoreはI/Oと状態管理のみ"
+
+    - mistake: "Validatorでデータベースアクセスする"
+      solution: "Validatorは入力値の形式検証のみ。データベース検証はHandlerで実施"
+
+    - mistake: "IdempotencyKeyを毎回新しく生成する"
+      solution: "画面表示時に1回だけ生成し、再試行時は同じ値を使う"
+
+evidence:
+  application_layer:
+    command: "src/ProductCatalog/Features/CreateProduct/Application/CreateProductCommand.cs"
+    handler: "src/ProductCatalog/Features/CreateProduct/Application/CreateProductHandler.cs"
+    validator: "src/ProductCatalog/Features/CreateProduct/Application/CreateProductValidator.cs"
+  ui_layer:
+    api_dto: "src/ProductCatalog/Features/CreateProduct/UI/Api/Dtos/CreateProductRequest.cs"
+    store_state: "src/ProductCatalog/Shared/UI/Store/ProductEditState.cs"
+    store: "src/ProductCatalog/Shared/UI/Store/ProductEditStore.cs"
+    page_actions: "src/ProductCatalog/Shared/UI/Actions/ProductEditActions.cs"
+  tests:
+    handler_test: "tests/ProductCatalog.Application.Tests/Features/CreateProduct/CreateProductHandlerTests.cs"
+    validator_test: "tests/ProductCatalog.Application.Tests/Features/CreateProduct/CreateProductValidatorTests.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース"
+      - "完全な垂直スライスパターンを定義"

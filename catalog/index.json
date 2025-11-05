@@ -1,0 +1,222 @@
+{
+  "$schema": "../patterns.manifest.schema.json",
+  "version": "v2025.11.0",
+  "last_updated": "2025-11-05",
+  "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
+  "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
+  "categories": {
+    "pipeline-behavior": {
+      "name": "Pipeline Behaviors",
+      "description": "MediatR パイプラインで実行される横断的関心事",
+      "execution_order": "order_hint に従って実行される"
+    },
+    "feature-slice": {
+      "name": "Feature Slices",
+      "description": "完全な垂直スライス（Application + UI + API）",
+      "scope": "複数レイヤーにまたがる機能全体"
+    },
+    "layer-element": {
+      "name": "Layer Elements",
+      "description": "個別レイヤーの要素（Command, Handler, Store, PageActions など）",
+      "scope": "単一レイヤーの個別ファイル"
+    },
+    "query-pattern": {
+      "name": "Query Patterns",
+      "description": "データ取得パターン（CQRS の Query 側）"
+    },
+    "command-pattern": {
+      "name": "Command Patterns",
+      "description": "データ変更パターン（CQRS の Command 側）"
+    },
+    "domain-pattern": {
+      "name": "Domain Patterns",
+      "description": "ドメインモデルの実装パターン"
+    },
+    "ui-pattern": {
+      "name": "UI Patterns",
+      "description": "Blazor UI の実装パターン（Store, PageActions, Component）"
+    }
+  },
+  "patterns": [
+    {
+      "id": "metrics-behavior",
+      "name": "MetricsBehavior",
+      "category": "pipeline-behavior",
+      "version": "1.4.0",
+      "order_hint": 50,
+      "file": "patterns/metrics-behavior.yaml",
+      "intent": "ビジネスメトリクスとパフォーマンスメトリクスを自動収集",
+      "tags": ["observability", "performance", "monitoring"],
+      "stability": "stable"
+    },
+    {
+      "id": "validation-behavior",
+      "name": "ValidationBehavior",
+      "category": "pipeline-behavior",
+      "version": "1.3.0",
+      "order_hint": 100,
+      "file": "patterns/validation-behavior.yaml",
+      "intent": "FluentValidation による入力検証を MediatR パイプラインで自動実行",
+      "tags": ["validation", "fluent-validation"],
+      "stability": "stable"
+    },
+    {
+      "id": "authorization-behavior",
+      "name": "AuthorizationBehavior",
+      "category": "pipeline-behavior",
+      "version": "1.2.1",
+      "order_hint": 200,
+      "file": "patterns/authorization-behavior.yaml",
+      "intent": "ロールベース認可チェックを MediatR パイプラインで自動実行",
+      "tags": ["authorization", "security", "role-based"],
+      "stability": "stable"
+    },
+    {
+      "id": "idempotency-behavior",
+      "name": "IdempotencyBehavior",
+      "category": "pipeline-behavior",
+      "version": "0.9.0",
+      "order_hint": 300,
+      "file": "patterns/idempotency-behavior.yaml",
+      "intent": "Command の冪等性を保証し、重複実行を防止",
+      "tags": ["idempotency", "cache", "reliability"],
+      "stability": "beta"
+    },
+    {
+      "id": "transaction-behavior",
+      "name": "TransactionBehavior",
+      "category": "pipeline-behavior",
+      "version": "2.0.0",
+      "order_hint": 400,
+      "file": "patterns/transaction-behavior.yaml",
+      "intent": "Command を単一トランザクションで実行し、エラー時に自動ロールバック",
+      "tags": ["transaction", "entity-framework", "database"],
+      "stability": "stable"
+    },
+    {
+      "id": "logging-behavior",
+      "name": "LoggingBehavior",
+      "category": "pipeline-behavior",
+      "version": "1.1.0",
+      "order_hint": 600,
+      "file": "patterns/logging-behavior.yaml",
+      "intent": "すべての Command/Query のリクエスト・レスポンス・実行時間をログ出力",
+      "tags": ["logging", "observability"],
+      "stability": "stable"
+    },
+    {
+      "id": "query-get-list",
+      "name": "GetListQuery Pattern",
+      "category": "query-pattern",
+      "version": "1.0.0",
+      "file": "patterns/query-get-list.yaml",
+      "intent": "全件取得クエリのテンプレート（キャッシュ対応）",
+      "tags": ["query", "cqrs", "cache", "dapper"],
+      "stability": "stable"
+    },
+    {
+      "id": "command-create",
+      "name": "CreateCommand Pattern",
+      "category": "command-pattern",
+      "version": "1.0.0",
+      "file": "patterns/command-create.yaml",
+      "intent": "新規エンティティ作成コマンドのテンプレート",
+      "tags": ["command", "cqrs", "create", "idempotency"],
+      "stability": "stable"
+    },
+    {
+      "id": "feature-create-entity",
+      "name": "Create Entity Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-create-entity.yaml",
+      "intent": "エンティティ作成の完全な垂直スライス（Application + UI + API）",
+      "tags": ["feature-slice", "create", "vertical-slice", "full-stack"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
+      "id": "feature-search-entity",
+      "name": "Search Entity Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-search-entity.yaml",
+      "intent": "エンティティ検索・フィルタリング・ページングの完全な垂直スライス",
+      "tags": ["feature-slice", "search", "filtering", "paging"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
+      "id": "layer-store",
+      "name": "Store Pattern (State Management + I/O)",
+      "category": "layer-element",
+      "version": "1.0.0",
+      "file": "layers/layer-store.yaml",
+      "intent": "UI層の状態管理とI/Oを担当するStoreパターン",
+      "tags": ["ui", "state-management", "store", "blazor"],
+      "stability": "stable",
+      "layer": "UI"
+    },
+    {
+      "id": "layer-pageactions",
+      "name": "PageActions Pattern (UI Procedures)",
+      "category": "layer-element",
+      "version": "1.0.0",
+      "file": "layers/layer-pageactions.yaml",
+      "intent": "UI手順のオーケストレーションを担当するPageActionsパターン",
+      "tags": ["ui", "orchestration", "pageactions", "blazor"],
+      "stability": "stable",
+      "layer": "UI"
+    }
+  ],
+  "recommended_combinations": [
+    {
+      "name": "標準的な CQRS + Behaviors",
+      "description": "ほとんどの業務アプリで推奨される基本構成",
+      "patterns": [
+        "metrics-behavior",
+        "validation-behavior",
+        "authorization-behavior",
+        "transaction-behavior",
+        "logging-behavior"
+      ]
+    },
+    {
+      "name": "高信頼性構成（冪等性あり）",
+      "description": "支払い処理など、重複実行が致命的な処理を含む場合",
+      "patterns": [
+        "metrics-behavior",
+        "validation-behavior",
+        "authorization-behavior",
+        "idempotency-behavior",
+        "transaction-behavior",
+        "logging-behavior"
+      ]
+    }
+  ],
+  "ai_usage_guide": {
+    "how_to_reference": "AI は catalog/index.json を読み込み、必要なパターンの YAML ファイルを取得します",
+    "pattern_selection_flow": [
+      "1. ユーザーの要求を分析",
+      "2. catalog/index.json から適切なパターンを検索",
+      "3. パターンの YAML ファイルを読み込み",
+      "4. テンプレートを実際のエンティティ名で置換",
+      "5. 生成されたコードを提示"
+    ],
+    "template_variables": {
+      "{Entity}": "エンティティ名（PascalCase）例: Product, Order, Customer",
+      "{entity}": "エンティティ名（camelCase）例: product, order, customer",
+      "{BoundedContext}": "境界づけられたコンテキスト名 例: ProductCatalog, OrderManagement"
+    },
+    "evidence_traceability": "各パターンの evidence フィールドに実装例のファイルパスが記載されています"
+  },
+  "version_policy": {
+    "stability_levels": {
+      "stable": "本番環境で使用可能。破壊的変更はメジャーバージョンアップ時のみ",
+      "beta": "機能は動作するが、APIが変更される可能性あり",
+      "alpha": "実験的機能。本番環境では使用非推奨",
+      "deprecated": "非推奨。将来のバージョンで削除予定"
+    },
+    "versioning": "セマンティックバージョニング（major.minor.patch）に従います"
+  }
+}

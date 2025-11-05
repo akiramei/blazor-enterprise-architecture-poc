@@ -1,0 +1,380 @@
+# AI Usage Guide - Pattern Catalog
+
+このドキュメントは、AI（Claude、ChatGPT等）がこのカタログを参照して業務アプリケーションを実装する際のガイドラインです。
+
+---
+
+## 📚 カタログの構造
+
+```
+catalog/
+├── index.json                        # パターンカタログの索引（必ず最初に読む）
+├── patterns/                         # 個別パターン定義（YAML形式）
+│   ├── validation-behavior.yaml
+│   ├── transaction-behavior.yaml
+│   ├── authorization-behavior.yaml
+│   ├── logging-behavior.yaml
+│   ├── metrics-behavior.yaml
+│   ├── idempotency-behavior.yaml
+│   ├── query-get-list.yaml
+│   └── command-create.yaml
+└── AI_USAGE_GUIDE.md                 # このファイル
+```
+
+---
+
+## 🤖 AI の参照フロー
+
+### 1. 初回アクセス時
+
+```mermaid
+graph TD
+    A[ユーザーの要求を受け取る] --> B[catalog/index.json を読み込む]
+    B --> C[categories と patterns を理解]
+    C --> D[ユーザーの要求に合致するパターンを検索]
+    D --> E[該当パターンの YAML ファイルを読み込む]
+    E --> F[テンプレートを実際のエンティティ名で置換]
+    F --> G[生成されたコードをユーザーに提示]
+```
+
+### 2. パターン検索の優先順位
+
+1. **ユーザーの要求を分類する**
+   - データ取得? → `query-pattern` カテゴリを検索
+   - データ変更? → `command-pattern` カテゴリを検索
+   - 横断的関心事? → `pipeline-behavior` カテゴリを検索
+   - UI実装? → `ui-pattern` カテゴリを検索
+
+2. **intent フィールドで絞り込む**
+   - `catalog/index.json` の各パターンの `intent` を確認
+   - ユーザーの要求に最も近い `intent` を持つパターンを選択
+
+3. **tags で追加検索**
+   - `tags` フィールドで技術スタックを確認
+   - 例: `["dapper", "cache"]` → Dapper と キャッシュを使った実装
+
+---
+
+## 📖 パターン定義の読み方
+
+各パターンの YAML ファイルは以下の構造になっています:
+
+```yaml
+id: validation-behavior              # 一意のパターンID
+version: 1.3.0                        # セマンティックバージョニング
+name: ValidationBehavior              # パターン名
+category: pipeline-behavior           # カテゴリ
+intent: "FluentValidation による..."  # このパターンの目的（AI検索用）
+order_hint: 100                       # 実行順序（Behaviorの場合）
+
+wiring:                               # DI登録とNuGet依存関係
+  service_registrations:
+    - "services.AddScoped(...)"
+  dependencies:
+    nuget:
+      - FluentValidation: "^11.0.0"
+
+preconditions:                        # 前提条件
+  - "FluentValidation がインストールされている"
+
+implementation:                       # 実装テンプレート
+  file_path: "src/{BoundedContext}/..."
+  template: |
+    public sealed class ValidationBehavior<TRequest, TResponse>
+    {
+      // ...
+    }
+
+example_usage: |                     # 使用例
+  public sealed record CreateProductCommand(...);
+
+tests:                                # テストケース
+  - name: "未入力で検証エラー"
+    given: "Name が空文字列"
+    when: "CreateProductCommand を実行"
+    then: "Result.IsSuccess == false"
+    expect: "検証エラー"
+
+ai_guidance:                          # AI向けガイダンス
+  when_to_use:
+    - "Command の入力検証が必要な場合"
+  when_not_to_use:
+    - "ドメインロジック内のビジネスルール検証"
+  common_mistakes:
+    - mistake: "Validator を DI 登録し忘れる"
+      solution: "services.AddValidatorsFromAssembly()"
+
+changelog:                            # 変更履歴
+  - version: 1.3.0
+    date: 2025-11-05
+    changes:
+      - "Result 型への対応を強化"
+
+evidence:                             # エビデンス（実装例）
+  implementation_file: "src/ProductCatalog/..."
+  test_file: "tests/..."
+```
+
+---
+
+## 🎯 AIが実装を生成する手順
+
+### ステップ1: パターンの選択
+
+```
+ユーザーの要求: "商品を作成する機能を追加してください"
+
+→ AI の判断:
+  1. データ変更なので `command-pattern` カテゴリ
+  2. 新規作成なので `command-create` パターンが適切
+  3. catalog/patterns/command-create.yaml を読み込む
+```
+
+### ステップ2: テンプレート変数の置換
+
+```yaml
+# command-create.yaml のテンプレート
+template: |
+  public sealed record Create{Entity}Command(
+      string Name,
+      decimal Price
+  ) : ICommand<Result<Guid>>
+```
+
+→ 置換後:
+
+```csharp
+public sealed record CreateProductCommand(
+    string Name,
+    decimal Price
+) : ICommand<Result<Guid>>
+```
+
+**テンプレート変数:**
+- `{Entity}` → `Product` (PascalCase)
+- `{entity}` → `product` (camelCase)
+- `{BoundedContext}` → `ProductCatalog`
+
+### ステップ3: 依存パターンの確認
+
+```yaml
+dependencies:
+  patterns:
+    - validation-behavior
+    - transaction-behavior
+    - idempotency-behavior
+```
+
+→ これらのパターンも読み込み、必要に応じて生成する
+
+### ステップ4: 配置場所の決定
+
+```yaml
+implementation:
+  file_path: "src/{BoundedContext}/Features/Create{Entity}/Create{Entity}Command.cs"
+```
+
+→ 実際のパス:
+```
+src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs
+```
+
+### ステップ5: エビデンスの提示
+
+```yaml
+evidence:
+  implementation_example: "src/ProductCatalog/Features/CreateProduct/"
+```
+
+→ AIはユーザーに対して:
+```
+実装例はこちらで確認できます:
+src/ProductCatalog/Features/CreateProduct/
+```
+
+---
+
+## 🧪 テストケースの活用
+
+各パターンには `tests` フィールドがあります。AIはこれを参考に:
+
+1. **期待される動作を理解する**
+   ```yaml
+   tests:
+     - name: "未入力で検証エラー"
+       given: "Name が空文字列"
+       when: "CreateProductCommand を実行"
+       then: "Result.IsSuccess == false"
+   ```
+
+2. **テストコードを生成する**
+   ```csharp
+   [Fact]
+   public async Task 未入力で検証エラーが返される()
+   {
+       // Arrange
+       var command = new CreateProductCommand(Name: "", ...);
+
+       // Act
+       var result = await _mediator.Send(command);
+
+       // Assert
+       Assert.False(result.IsSuccess);
+       Assert.Contains("商品名は必須です", result.ErrorMessage);
+   }
+   ```
+
+---
+
+## ⚠️ AI が注意すべき点
+
+### 1. common_mistakes を必ず確認
+
+各パターンの `ai_guidance.common_mistakes` には、AIが陥りやすいミスと解決策が記載されています。
+
+```yaml
+ai_guidance:
+  common_mistakes:
+    - mistake: "SaveChangesAsync を呼び出す"
+      solution: "TransactionBehavior が自動で SaveChangesAsync を呼ぶため不要"
+```
+
+→ AIはこれを読み、**意図的に SaveChangesAsync を生成しない** ように注意する
+
+### 2. when_not_to_use を確認
+
+```yaml
+ai_guidance:
+  when_not_to_use:
+    - "大量データ（1000件以上）→ SearchQuery + Paging を使用"
+```
+
+→ AIは、ユーザーの要求が「大量データの取得」である場合、別のパターンを提案する
+
+### 3. stability レベルを確認
+
+```json
+{
+  "id": "idempotency-behavior",
+  "stability": "beta"
+}
+```
+
+→ `beta` の場合、AIはユーザーに「この機能はベータ版です」と明示する
+
+---
+
+## 📊 エビデンスのトレーサビリティ
+
+各パターンの `evidence` フィールドには、実際の実装例のファイルパスが記載されています。
+
+```yaml
+evidence:
+  implementation_file: "src/ProductCatalog/Application/Common/Behaviors/ValidationBehavior.cs"
+  test_file: "tests/ProductCatalog.Application.Tests/Behaviors/ValidationBehaviorTests.cs"
+  example_command: "src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs"
+```
+
+AIは、コード生成後にこれらのファイルパスをユーザーに提示することで:
+
+1. **実装例を参照できる**
+2. **テストコードを参照できる**
+3. **実際に動作するコードを確認できる**
+
+---
+
+## 🚀 実践例: 商品作成機能の実装
+
+### ユーザーの要求
+
+```
+「商品を作成する機能を追加してください」
+```
+
+### AI の処理フロー
+
+1. **catalog/index.json を読み込む**
+   ```json
+   {
+     "id": "command-create",
+     "intent": "新規エンティティ作成コマンドのテンプレート"
+   }
+   ```
+
+2. **catalog/patterns/command-create.yaml を読み込む**
+
+3. **テンプレート変数を置換**
+   - `{Entity}` → `Product`
+   - `{BoundedContext}` → `ProductCatalog`
+
+4. **依存パターンを確認**
+   - `validation-behavior` が必要
+   - `transaction-behavior` が必要
+   - `idempotency-behavior` が必要
+
+5. **ファイルを生成**
+   - `CreateProductCommand.cs`
+   - `CreateProductHandler.cs`
+   - `CreateProductValidator.cs`
+
+6. **エビデンスを提示**
+   ```
+   実装例:
+   src/ProductCatalog/Features/CreateProduct/
+   ```
+
+7. **注意点を伝える**
+   ```
+   ⚠️ common_mistakes より:
+   - SaveChangesAsync は TransactionBehavior が自動で呼ぶため不要です
+   - IdempotencyKey は画面表示時に1回だけ生成してください
+   ```
+
+---
+
+## 📝 AIへの推奨プロンプト
+
+ユーザーが AI にこのカタログを使わせる場合の推奨プロンプト:
+
+```
+このプロジェクトには catalog/ ディレクトリにパターンカタログがあります。
+新機能を実装する際は、必ず以下の手順で進めてください:
+
+1. catalog/index.json を読み込み、適切なパターンを検索
+2. 該当パターンの YAML ファイルを読み込み
+3. テンプレート変数を置換してコードを生成
+4. ai_guidance の common_mistakes を確認
+5. evidence のファイルパスを提示
+
+必ず catalog/ を参照し、既存のパターンに従ってコードを生成してください。
+```
+
+---
+
+## 🔄 バージョン管理とタグ固定
+
+AIがカタログを参照する際は、**必ずタグ固定**してください。
+
+```json
+{
+  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11"
+}
+```
+
+これにより:
+- **再現性**: 同じバージョンのパターンを常に取得
+- **安定性**: カタログの更新による影響を受けない
+- **トレーサビリティ**: どのバージョンのパターンを使ったかが明確
+
+---
+
+## 📞 サポート
+
+このカタログについて質問がある場合:
+- GitHub Issues: https://github.com/akiramei/blazor-enterprise-architecture-poc/issues
+- ドキュメント: docs/blazor-guide-package/
+
+---
+
+**最終更新: 2025-11-05**
+**カタログバージョン: v2025.11.0**

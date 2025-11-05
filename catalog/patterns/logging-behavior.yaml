@@ -1,0 +1,143 @@
+id: logging-behavior
+version: 1.1.0
+name: LoggingBehavior
+category: pipeline-behavior
+intent: すべての Command/Query のリクエスト・レスポンス・実行時間をログ出力
+order_hint: 600
+description: |
+  MediatR パイプラインで実行されるすべてのリクエストとレスポンスを自動的にログ出力します。
+  実行時間も記録され、パフォーマンス分析に利用できます。
+
+wiring:
+  service_registrations:
+    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>))"
+  dependencies:
+    nuget:
+      - Microsoft.Extensions.Logging: "^8.0.0"
+
+preconditions:
+  - "ILogger が DI 登録されている"
+
+implementation:
+  file_path: "src/{BoundedContext}/Application/Common/Behaviors/LoggingBehavior.cs"
+  template: |
+    public sealed class LoggingBehavior<TRequest, TResponse>
+        : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
+
+        public LoggingBehavior(ILogger<LoggingBehavior<TRequest, TResponse>> logger)
+        {
+            _logger = logger;
+        }
+
+        public async Task<TResponse> Handle(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken)
+        {
+            var requestName = typeof(TRequest).Name;
+            var requestId = Guid.NewGuid().ToString("N")[..8];
+
+            _logger.LogInformation(
+                "[{RequestId}] 開始: {RequestName} {@Request}",
+                requestId, requestName, request);
+
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                var response = await next();
+                stopwatch.Stop();
+
+                _logger.LogInformation(
+                    "[{RequestId}] 完了: {RequestName} - {ElapsedMs}ms",
+                    requestId, requestName, stopwatch.ElapsedMilliseconds);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+
+                _logger.LogError(
+                    ex,
+                    "[{RequestId}] エラー: {RequestName} - {ElapsedMs}ms",
+                    requestId, requestName, stopwatch.ElapsedMilliseconds);
+
+                throw;
+            }
+        }
+    }
+
+example_usage: |
+  // 自動的にすべての Command/Query がログ出力される
+  public sealed record CreateProductCommand(
+      string Name,
+      string Description,
+      decimal Price,
+      int InitialStock
+  ) : ICommand<Result<Guid>>;
+
+  // ログ出力例:
+  // [INFO] [a3b2c1d4] 開始: CreateProductCommand { Name="Sample", Price=1000, ... }
+  // [INFO] [a3b2c1d4] 完了: CreateProductCommand - 45ms
+
+  // エラー時のログ出力例:
+  // [ERROR] [a3b2c1d4] エラー: CreateProductCommand - 12ms
+  // System.InvalidOperationException: 商品名が重複しています
+
+tests:
+  - name: "リクエスト開始時にログ出力される"
+    given: "任意の Command/Query"
+    when: "リクエストを実行"
+    then: "'開始:' で始まるログが出力される"
+    expect: "ログ出力"
+
+  - name: "正常終了時に実行時間が記録される"
+    given: "正常に完了する Command/Query"
+    when: "リクエストを実行"
+    then: "'完了:' と実行時間（ms）が出力される"
+    expect: "ログ出力"
+
+  - name: "例外発生時にエラーログが出力される"
+    given: "例外が発生する Command/Query"
+    when: "リクエストを実行"
+    then: "'エラー:' と例外情報が出力される"
+    expect: "エラーログ"
+
+metrics:
+  performance_impact: "極低 (通常 < 1ms)"
+  execution_order: 600
+
+ai_guidance:
+  when_to_use:
+    - "すべてのプロジェクト（デフォルト有効推奨）"
+    - "本番環境のトラブルシューティング"
+    - "パフォーマンス分析"
+
+  when_not_to_use:
+    - "機密情報を含むリクエスト（パスワード変更など）→ カスタムログフィルタを実装"
+
+  common_mistakes:
+    - mistake: "機密情報をログ出力してしまう"
+      solution: "パスワード、クレジットカード番号などは事前にマスクする"
+
+    - mistake: "ログレベルを誤って設定する"
+      solution: "開発環境: Debug、本番環境: Information"
+
+changelog:
+  - version: 1.1.0
+    date: 2025-11-05
+    changes:
+      - "リクエストIDの追加（トレーサビリティ向上）"
+      - "Stopwatch による精密な時間計測"
+
+  - version: 1.0.0
+    date: 2025-09-01
+    changes:
+      - "初版リリース"
+
+evidence:
+  implementation_file: "src/ProductCatalog/Application/Common/Behaviors/LoggingBehavior.cs"
+  test_file: "tests/ProductCatalog.Application.Tests/Behaviors/LoggingBehaviorTests.cs"

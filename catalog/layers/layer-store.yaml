@@ -1,0 +1,206 @@
+id: layer-store
+version: 1.0.0
+name: Store Pattern (State Management + I/O)
+category: layer-element
+intent: UI層の状態管理とI/Oを担当するStoreパターン
+description: |
+  Blazor UI層で使用するStoreパターン。
+  フォームの状態管理、Command/Queryの送信、ローディング状態の管理を行います。
+  WPF/WinFormsのViewModelに相当します。
+
+layer: UI
+responsibility:
+  - フォーム状態の管理
+  - Command/Queryの送信（MediatR経由）
+  - ローディング状態の管理
+  - エラー状態の管理
+  - 変更通知（OnChangeAsync イベント）
+
+comparison:
+  wpf_winforms: "ViewModel"
+  redux: "Store + Actions"
+  mvc: "Controller (部分的)"
+
+implementation:
+  state:
+    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}{Operation}State.cs"
+    template: |
+      namespace {BoundedContext}.Shared.UI.Store;
+
+      /// <summary>
+      /// {Entity}{Operation}状態
+      ///
+      /// 【パターン: State（不変オブジェクト）】
+      ///
+      /// 責務:
+      /// - UIの状態を保持する不変オブジェクト
+      /// - record型でイミュータブルに実装
+      /// </summary>
+      public sealed record {Entity}{Operation}State
+      {
+          public Guid? {Entity}Id { get; init; }
+          public string Name { get; init; } = string.Empty;
+          public bool IsLoading { get; init; }
+          public string? ErrorMessage { get; init; }
+          public bool IsDirty { get; init; }
+
+          public static {Entity}{Operation}State Empty => new();
+      }
+
+  store:
+    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}{Operation}Store.cs"
+    template: |
+      using MediatR;
+      using Microsoft.Extensions.DependencyInjection;
+
+      namespace {BoundedContext}.Shared.UI.Store;
+
+      /// <summary>
+      /// {Entity}{Operation}Store
+      ///
+      /// 【パターン: Store（状態管理+I/O）】
+      ///
+      /// 責務:
+      /// - 状態の保持と更新
+      /// - MediatRを使用したCommand/Queryの送信
+      /// - 変更通知（OnChangeAsync イベント）
+      ///
+      /// AI実装時の注意:
+      /// - UI手順（確認ダイアログ、画面遷移、トースト）はPageActionsに実装
+      /// - Storeは純粋にI/Oと状態管理のみ
+      /// - IServiceScopeFactoryを使ってMediatRを取得（スコープ管理）
+      /// </summary>
+      public sealed class {Entity}{Operation}Store
+      {
+          private readonly IServiceScopeFactory _scopeFactory;
+          private {Entity}{Operation}State _state = {Entity}{Operation}State.Empty;
+
+          public {Entity}{Operation}Store(IServiceScopeFactory scopeFactory)
+          {
+              _scopeFactory = scopeFactory;
+          }
+
+          /// <summary>
+          /// 現在の状態を取得
+          /// </summary>
+          public {Entity}{Operation}State GetState() => _state;
+
+          /// <summary>
+          /// 状態変更時のイベント（Componentが購読）
+          /// </summary>
+          public event Func<Task>? OnChangeAsync;
+
+          /// <summary>
+          /// フィールドを更新
+          /// </summary>
+          public void UpdateField(Func<{Entity}{Operation}State, {Entity}{Operation}State> updater)
+          {
+              _state = updater(_state) with { IsDirty = true };
+              OnChangeAsync?.Invoke();
+          }
+
+          /// <summary>
+          /// Command/Queryを実行
+          /// </summary>
+          public async Task<bool> ExecuteAsync(CancellationToken ct = default)
+          {
+              _state = _state with { IsLoading = true, ErrorMessage = null };
+              await NotifyStateChangedAsync();
+
+              try
+              {
+                  using var scope = _scopeFactory.CreateScope();
+                  var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+                  // Command/Queryの送信
+                  // ...
+
+                  _state = _state with { IsLoading = false, IsDirty = false };
+                  await NotifyStateChangedAsync();
+                  return true;
+              }
+              catch (Exception ex)
+              {
+                  _state = _state with { IsLoading = false, ErrorMessage = ex.Message };
+                  await NotifyStateChangedAsync();
+                  return false;
+              }
+          }
+
+          private async Task NotifyStateChangedAsync()
+          {
+              if (OnChangeAsync != null)
+                  await OnChangeAsync.Invoke();
+          }
+      }
+
+example_usage: |
+  // Component での使用例
+  @page "/{entity}s/edit"
+  @inject {Entity}EditStore Store
+  @implements IDisposable
+
+  <EditForm Model="@Store.GetState()">
+      <InputText @bind-Value="@Store.GetState().Name"
+                 @oninput="@(e => Store.UpdateField(s => s with { Name = e.Value?.ToString() ?? "" }))" />
+
+      <button type="submit" disabled="@Store.GetState().IsLoading">
+          保存
+      </button>
+  </EditForm>
+
+  @code {
+      protected override void OnInitialized()
+      {
+          Store.OnChangeAsync += StateHasChanged;
+      }
+
+      public void Dispose()
+      {
+          Store.OnChangeAsync -= StateHasChanged;
+      }
+  }
+
+tests:
+  - name: "UpdateField で状態が更新される"
+    scenario: |
+      Given: Store を初期化
+      When: UpdateField で Name を更新
+      Then: GetState().Name が更新され、IsDirty = true
+
+  - name: "ExecuteAsync 成功時に IsLoading が false になる"
+    scenario: |
+      Given: Store を初期化
+      When: ExecuteAsync を実行
+      Then: 実行中は IsLoading = true、完了後は IsLoading = false
+
+ai_guidance:
+  when_to_use:
+    - "フォームの状態管理が必要な場合"
+    - "Command/Queryの送信とローディング状態の管理"
+    - "複数のComponentで状態を共有したい場合"
+
+  when_not_to_use:
+    - "UI手順のオーケストレーション → PageActionsを使用"
+    - "認証状態など、システムレベルの状態 → SessionProviderを使用"
+
+  common_mistakes:
+    - mistake: "Store に UI手順（確認ダイアログ、画面遷移）を実装する"
+      solution: "UI手順はPageActionsに実装。StoreはI/Oと状態管理のみ"
+
+    - mistake: "Stateをミュータブルに実装する"
+      solution: "record型とwith式でイミュータブルに実装"
+
+    - mistake: "MediatRを直接DIで受け取る"
+      solution: "IServiceScopeFactoryを使ってスコープ管理"
+
+evidence:
+  implementation: "src/ProductCatalog/Shared/UI/Store/ProductEditStore.cs"
+  state: "src/ProductCatalog/Shared/UI/Store/ProductEditState.cs"
+  test: "tests/ProductCatalog.UI.Tests/Store/ProductEditStoreTests.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース"

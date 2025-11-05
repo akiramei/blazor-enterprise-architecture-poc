@@ -1,0 +1,196 @@
+id: authorization-behavior
+version: 1.2.1
+name: AuthorizationBehavior
+category: pipeline-behavior
+intent: ロールベース認可チェックを MediatR パイプラインで自動実行
+order_hint: 200
+description: |
+  Command/Query に [RequireRole] 属性が付いている場合、
+  現在のユーザーが必要なロールを持っているかをチェックします。
+  権限がない場合は Result.Fail("権限がありません") を返します。
+
+wiring:
+  service_registrations:
+    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>))"
+  dependencies:
+    nuget:
+      - Microsoft.AspNetCore.Http: "^8.0.0"
+
+preconditions:
+  - "IHttpContextAccessor が DI 登録されている"
+  - "認証ミドルウェアが有効"
+  - "[RequireRole] 属性が定義されている"
+
+implementation:
+  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/AuthorizationBehavior.cs"
+  template: |
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class RequireRoleAttribute : Attribute
+    {
+        public string[] Roles { get; }
+
+        public RequireRoleAttribute(params string[] roles)
+        {
+            Roles = roles;
+        }
+    }
+
+    public sealed class AuthorizationBehavior<TRequest, TResponse>
+        : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ILogger<AuthorizationBehavior<TRequest, TResponse>> _logger;
+
+        public AuthorizationBehavior(
+            IHttpContextAccessor httpContextAccessor,
+            ILogger<AuthorizationBehavior<TRequest, TResponse>> logger)
+        {
+            _httpContextAccessor = httpContextAccessor;
+            _logger = logger;
+        }
+
+        public async Task<TResponse> Handle(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken)
+        {
+            var requireRoleAttribute = typeof(TRequest)
+                .GetCustomAttribute<RequireRoleAttribute>();
+
+            if (requireRoleAttribute == null)
+                return await next();
+
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null || !user.Identity?.IsAuthenticated == true)
+            {
+                _logger.LogWarning("未認証ユーザーによるアクセス: {RequestName}", typeof(TRequest).Name);
+                return CreateUnauthorizedResult<TResponse>();
+            }
+
+            var hasRequiredRole = requireRoleAttribute.Roles.Any(role => user.IsInRole(role));
+            if (!hasRequiredRole)
+            {
+                var userName = user.Identity.Name ?? "Unknown";
+                var requiredRoles = string.Join(", ", requireRoleAttribute.Roles);
+                _logger.LogWarning(
+                    "権限不足: User={UserName}, Required={RequiredRoles}, Request={RequestName}",
+                    userName, requiredRoles, typeof(TRequest).Name);
+                return CreateUnauthorizedResult<TResponse>();
+            }
+
+            return await next();
+        }
+
+        private static TResult CreateUnauthorizedResult<TResult>()
+        {
+            var resultType = typeof(TResult);
+            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(Result<>))
+            {
+                var valueType = resultType.GetGenericArguments()[0];
+                var failMethod = typeof(Result<>)
+                    .MakeGenericType(valueType)
+                    .GetMethod("Fail", new[] { typeof(string) });
+                return (TResult)failMethod!.Invoke(null, new object[] { "権限がありません" })!;
+            }
+            else if (resultType == typeof(Result))
+            {
+                return (TResult)(object)Result.Fail("権限がありません");
+            }
+            throw new InvalidOperationException($"Unsupported result type: {resultType}");
+        }
+    }
+
+example_usage: |
+  // Admin ロールが必要な Command
+  [RequireRole("Admin")]
+  public sealed record DeleteProductCommand(Guid ProductId)
+      : ICommand<Result>
+  {
+      public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+  }
+
+  // Admin または Manager ロールが必要な Command
+  [RequireRole("Admin", "Manager")]
+  public sealed record BulkUpdateProductPricesCommand(
+      IReadOnlyList<ProductPriceUpdate> Updates
+  ) : ICommand<Result<BulkOperationResult>>
+  {
+      public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+  }
+
+  // ロール制限なし（すべての認証済みユーザーが実行可能）
+  public sealed record GetProductsQuery()
+      : IQuery<Result<IEnumerable<ProductDto>>>;
+
+tests:
+  - name: "必要なロールを持つユーザーは通過"
+    given: "User が Admin ロールを持つ"
+    when: "[RequireRole('Admin')] が付いた Command を実行"
+    then: "Handler が実行される"
+    expect: "認可成功"
+
+  - name: "ロールを持たないユーザーは拒否"
+    given: "User が一般ユーザー"
+    when: "[RequireRole('Admin')] が付いた Command を実行"
+    then: "Result.Fail('権限がありません') が返される"
+    expect: "認可失敗"
+
+  - name: "未認証ユーザーは拒否"
+    given: "未認証ユーザー"
+    when: "[RequireRole('Admin')] が付いた Command を実行"
+    then: "Result.Fail('権限がありません') が返される"
+    expect: "認可失敗"
+
+  - name: "属性なしの場合はスキップ"
+    given: "User が一般ユーザー"
+    when: "属性なしの Query を実行"
+    then: "認可チェックがスキップされ Handler が実行される"
+    expect: "スキップ"
+
+metrics:
+  performance_impact: "極低 (通常 < 1ms)"
+  execution_order: 200
+
+ai_guidance:
+  when_to_use:
+    - "管理者専用の Command（削除、一括更新など）"
+    - "特定のロールのみ実行可能な処理"
+    - "部門管理者、システム管理者などの階層的な権限管理"
+
+  when_not_to_use:
+    - "データレベルの権限（所有者のみ編集可能など）→ Handler 内で実装"
+    - "認証チェック（認証ミドルウェアで実装）"
+    - "属性ベースの複雑な認可（ASP.NET Core の Policy を使用）"
+
+  common_mistakes:
+    - mistake: "[RequireRole] をつけ忘れる"
+      solution: "削除・更新系 Command には必ず付ける習慣をつける"
+
+    - mistake: "データレベル認可を AuthorizationBehavior で実装しようとする"
+      solution: "データレベル認可は Handler 内で実装（例: product.OwnerId == userId）"
+
+    - mistake: "IHttpContextAccessor を DI 登録し忘れる"
+      solution: "Program.cs で services.AddHttpContextAccessor() を呼び出す"
+
+changelog:
+  - version: 1.2.1
+    date: 2025-11-05
+    changes:
+      - "ロギングメッセージの改善"
+      - "複数ロール対応の OR 条件を明示"
+
+  - version: 1.2.0
+    date: 2025-10-15
+    changes:
+      - "複数ロール指定のサポート（OR条件）"
+
+  - version: 1.0.0
+    date: 2025-09-01
+    changes:
+      - "初版リリース"
+
+evidence:
+  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/AuthorizationBehavior.cs"
+  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/AuthorizationBehaviorTests.cs"
+  example_command: "src/ProductCatalog/Features/DeleteProduct/DeleteProductCommand.cs"

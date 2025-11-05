@@ -1,0 +1,313 @@
+id: feature-search-entity
+version: 1.0.0
+name: Search Entity Feature Slice
+category: feature-slice
+intent: エンティティ検索・フィルタリング・ページングの完全な垂直スライス
+description: |
+  検索・フィルタリング・ページング機能の完全な実装パターン。
+  Query、Handler、Store、PageActions、Component の全レイヤーを含みます。
+
+scope: vertical-slice
+layers:
+  - application
+  - ui
+
+dependencies:
+  patterns:
+    - caching-behavior
+    - validation-behavior
+  nuget:
+    - Dapper: "^2.1.0"
+
+file_structure: |
+  src/{BoundedContext}/Features/Search{Entity}s/
+  ├── Application/
+  │   ├── Search{Entity}sQuery.cs          # Query定義
+  │   ├── Search{Entity}sHandler.cs        # Handler実装
+  │   └── Search{Entity}s.Application.csproj
+  └── README.md
+
+  src/{BoundedContext}/Shared/UI/
+  ├── Store/
+  │   ├── {Entity}SearchState.cs           # 検索状態
+  │   └── {Entity}SearchStore.cs           # 状態管理+I/O
+  ├── Actions/
+  │   └── {Entity}SearchActions.cs         # UI手順
+  └── Components/
+      └── {Entity}SearchForm.razor         # 検索フォーム
+
+implementation:
+  query:
+    file_path: "src/{BoundedContext}/Features/Search{Entity}s/Application/Search{Entity}sQuery.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Search{Entity}s.Application;
+
+      /// <summary>
+      /// {Entity}検索Query
+      ///
+      /// 【パターン: 検索・フィルタリング・ページングQuery】
+      ///
+      /// 使用シナリオ:
+      /// - ユーザーが条件を指定してデータを検索する場合
+      /// - 大量データをページング表示する場合
+      /// </summary>
+      public sealed record Search{Entity}sQuery(
+          string? NameFilter = null,
+          decimal? MinPrice = null,
+          decimal? MaxPrice = null,
+          string? Status = null,
+          int Page = 1,
+          int PageSize = 20,
+          string OrderBy = "CreatedAt",
+          bool IsDescending = true
+      ) : IQuery<Result<PagedResult<{Entity}Dto>>>, ICacheableQuery
+      {
+          public string GetCacheKey() =>
+              $"{entity}-search-{{NameFilter}}-{{MinPrice}}-{{MaxPrice}}-{{Status}}-{{Page}}-{{PageSize}}-{{OrderBy}}-{{IsDescending}}";
+          public int CacheDurationMinutes => 2;
+      }
+
+      public sealed record {Entity}Dto(
+          Guid Id,
+          string Name,
+          string Description,
+          decimal Price,
+          string Currency,
+          int Stock,
+          string Status,
+          DateTime CreatedAt
+      );
+
+  handler:
+    file_path: "src/{BoundedContext}/Features/Search{Entity}s/Application/Search{Entity}sHandler.cs"
+    template: |
+      using System.Data;
+      using System.Text;
+      using Dapper;
+      using MediatR;
+      using Shared.Application;
+
+      namespace Search{Entity}s.Application;
+
+      public sealed class Search{Entity}sHandler
+          : IRequestHandler<Search{Entity}sQuery, Result<PagedResult<{Entity}Dto>>>
+      {
+          private readonly IDbConnection _connection;
+
+          public Search{Entity}sHandler(IDbConnection connection)
+          {
+              _connection = connection;
+          }
+
+          public async Task<Result<PagedResult<{Entity}Dto>>> Handle(
+              Search{Entity}sQuery query,
+              CancellationToken cancellationToken)
+          {
+              var sql = new StringBuilder(@"
+                  SELECT Id, Name, Description, PriceAmount AS Price, PriceCurrency AS Currency,
+                         StockQuantity AS Stock, Status, CreatedAt
+                  FROM {Entity}s
+                  WHERE IsDeleted = 0");
+
+              var parameters = new DynamicParameters();
+
+              // 条件の追加
+              if (!string.IsNullOrEmpty(query.NameFilter))
+              {
+                  sql.Append(" AND Name LIKE @NameFilter");
+                  parameters.Add("NameFilter", $"%{{query.NameFilter}}%");
+              }
+
+              if (query.MinPrice.HasValue)
+              {
+                  sql.Append(" AND PriceAmount >= @MinPrice");
+                  parameters.Add("MinPrice", query.MinPrice.Value);
+              }
+
+              if (query.MaxPrice.HasValue)
+              {
+                  sql.Append(" AND PriceAmount <= @MaxPrice");
+                  parameters.Add("MaxPrice", query.MaxPrice.Value);
+              }
+
+              if (!string.IsNullOrEmpty(query.Status))
+              {
+                  sql.Append(" AND Status = @Status");
+                  parameters.Add("Status", query.Status);
+              }
+
+              // 件数取得
+              var countSql = sql.ToString().Replace(
+                  "SELECT Id, Name, Description, PriceAmount AS Price, PriceCurrency AS Currency, StockQuantity AS Stock, Status, CreatedAt",
+                  "SELECT COUNT(*)");
+              var totalCount = await _connection.ExecuteScalarAsync<int>(countSql, parameters);
+
+              // ソート
+              sql.Append($" ORDER BY {{query.OrderBy}} {{(query.IsDescending ? "DESC" : "ASC")}}");
+
+              // ページング
+              var offset = (query.Page - 1) * query.PageSize;
+              sql.Append(" OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY");
+              parameters.Add("Offset", offset);
+              parameters.Add("PageSize", query.PageSize);
+
+              var items = await _connection.QueryAsync<{Entity}Dto>(sql.ToString(), parameters);
+
+              var result = new PagedResult<{Entity}Dto>(
+                  items.ToList(),
+                  totalCount,
+                  query.Page,
+                  query.PageSize);
+
+              return Result.Success(result);
+          }
+      }
+
+  store_state:
+    template: |
+      public sealed record {Entity}SearchState
+      {
+          public List<{Entity}Dto> Items { get; init; } = [];
+          public string? NameFilter { get; init; }
+          public decimal? MinPrice { get; init; }
+          public decimal? MaxPrice { get; init; }
+          public string? StatusFilter { get; init; }
+          public int CurrentPage { get; init; } = 1;
+          public int PageSize { get; init; } = 20;
+          public int TotalCount { get; init; }
+          public string OrderBy { get; init; } = "CreatedAt";
+          public bool IsDescending { get; init; } = true;
+          public bool IsLoading { get; init; }
+
+          public int TotalPages => (TotalCount + PageSize - 1) / PageSize;
+          public bool HasPreviousPage => CurrentPage > 1;
+          public bool HasNextPage => CurrentPage < TotalPages;
+
+          public static {Entity}SearchState Empty => new();
+      }
+
+  store:
+    template: |
+      public sealed class {Entity}SearchStore
+      {
+          private readonly IServiceScopeFactory _scopeFactory;
+          private {Entity}SearchState _state = {Entity}SearchState.Empty;
+
+          public {Entity}SearchStore(IServiceScopeFactory scopeFactory)
+          {
+              _scopeFactory = scopeFactory;
+          }
+
+          public {Entity}SearchState GetState() => _state;
+          public event Func<Task>? OnChangeAsync;
+
+          public async Task SearchAsync(CancellationToken ct = default)
+          {
+              _state = _state with { IsLoading = true };
+              await NotifyStateChangedAsync();
+
+              try
+              {
+                  using var scope = _scopeFactory.CreateScope();
+                  var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+                  var query = new Search{Entity}sQuery(
+                      _state.NameFilter,
+                      _state.MinPrice,
+                      _state.MaxPrice,
+                      _state.StatusFilter,
+                      _state.CurrentPage,
+                      _state.PageSize,
+                      _state.OrderBy,
+                      _state.IsDescending
+                  );
+
+                  var result = await mediator.Send(query, ct);
+
+                  if (result.IsSuccess)
+                  {
+                      _state = _state with
+                      {
+                          Items = result.Value.Items,
+                          TotalCount = result.Value.TotalCount,
+                          IsLoading = false
+                      };
+                  }
+
+                  await NotifyStateChangedAsync();
+              }
+              catch
+              {
+                  _state = _state with { IsLoading = false };
+                  await NotifyStateChangedAsync();
+              }
+          }
+
+          public async Task SetFilterAsync(Action<{Entity}SearchState> updater)
+          {
+              updater(_state);
+              _state = _state with { CurrentPage = 1 }; // フィルタ変更時は1ページ目に戻す
+              await SearchAsync();
+          }
+
+          public async Task GoToPageAsync(int page)
+          {
+              _state = _state with { CurrentPage = page };
+              await SearchAsync();
+          }
+
+          private async Task NotifyStateChangedAsync()
+          {
+              if (OnChangeAsync != null)
+                  await OnChangeAsync.Invoke();
+          }
+      }
+
+tests:
+  - name: "名前で部分一致検索"
+    scenario: |
+      Given: NameFilter = "Product"
+      When: Search{Entity}sQuery を実行
+      Then: 名前に"Product"を含むエンティティが返される
+
+  - name: "価格範囲でフィルタリング"
+    scenario: |
+      Given: MinPrice = 100, MaxPrice = 500
+      When: Search{Entity}sQuery を実行
+      Then: 価格が100～500のエンティティが返される
+
+  - name: "ページング機能"
+    scenario: |
+      Given: Page = 2, PageSize = 20
+      When: Search{Entity}sQuery を実行
+      Then: 21～40件目のエンティティが返される
+
+ai_guidance:
+  when_to_use:
+    - "検索機能を追加する場合"
+    - "データ一覧画面にフィルタリングが必要な場合"
+    - "大量データをページング表示する場合"
+
+  common_mistakes:
+    - mistake: "SQLインジェクション対策を忘れる"
+      solution: "必ずDapperのパラメータを使用する"
+
+    - mistake: "全件取得してからメモリでフィルタリング"
+      solution: "SQLのWHERE句でフィルタリングする"
+
+    - mistake: "キャッシュキーが適切でない"
+      solution: "すべての検索条件をキャッシュキーに含める"
+
+evidence:
+  query: "src/ProductCatalog/Features/SearchProducts/Application/SearchProductsQuery.cs"
+  handler: "src/ProductCatalog/Features/SearchProducts/Application/SearchProductsHandler.cs"
+  store: "src/ProductCatalog/Shared/UI/Store/ProductSearchStore.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース"

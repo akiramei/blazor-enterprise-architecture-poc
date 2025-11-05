@@ -1,0 +1,76 @@
+name: Validate Pattern Manifest
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'patterns.manifest.json'
+      - 'catalog/**'
+      - '.github/workflows/validate-patterns.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'patterns.manifest.json'
+      - 'catalog/**'
+
+jobs:
+  validate:
+    name: Validate Pattern Manifest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Validate manifest
+        shell: pwsh
+        run: |
+          Write-Host "パターンマニフェストを検証中..." -ForegroundColor Cyan
+          ./scripts/pattern-scaffolder.ps1 -Command validate
+
+      - name: List patterns
+        shell: pwsh
+        run: |
+          Write-Host "選択されたパターンを一覧表示..." -ForegroundColor Cyan
+          ./scripts/pattern-scaffolder.ps1 -Command list
+
+      - name: Validate catalog index
+        shell: pwsh
+        run: |
+          Write-Host "カタログインデックスを検証中..." -ForegroundColor Cyan
+
+          $catalogIndex = Get-Content ./catalog/index.json -Raw | ConvertFrom-Json
+
+          # バージョンチェック
+          if (-not $catalogIndex.version) {
+            Write-Error "catalog/index.json に version フィールドがありません"
+            exit 1
+          }
+
+          # パターンファイルの存在チェック
+          $missingFiles = @()
+          foreach ($pattern in $catalogIndex.patterns) {
+            $filePath = "./catalog/$($pattern.file)"
+            if (-not (Test-Path $filePath)) {
+              $missingFiles += $filePath
+            }
+          }
+
+          if ($missingFiles.Count -gt 0) {
+            Write-Error "以下のパターンファイルが見つかりません:"
+            $missingFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+            exit 1
+          }
+
+          Write-Host "✓ カタログインデックスは有効です" -ForegroundColor Green
+
+      - name: Validate JSON schema
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: 'patterns.manifest.json'
+          schema: 'patterns.manifest.schema.json'

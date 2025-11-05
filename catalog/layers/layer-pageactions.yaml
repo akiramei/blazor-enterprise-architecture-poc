@@ -1,0 +1,214 @@
+id: layer-pageactions
+version: 1.0.0
+name: PageActions Pattern (UI Procedures Orchestration)
+category: layer-element
+intent: UI手順のオーケストレーションを担当するPageActionsパターン
+description: |
+  Blazor UI層で使用するPageActionsパターン。
+  確認ダイアログ、トースト通知、画面遷移などのUI手順をオーケストレーションします。
+  WPF/WinFormsのICommandに相当します。
+
+layer: UI
+responsibility:
+  - UI手順のオーケストレーション
+  - 確認ダイアログの表示
+  - トースト通知の表示
+  - 画面遷移
+  - Storeへの委譲
+
+comparison:
+  wpf_winforms: "ICommand"
+  mvc: "Controller"
+  redux: "Action Creators"
+
+implementation:
+  file_path: "src/{BoundedContext}/Shared/UI/Actions/{Entity}{Operation}Actions.cs"
+  template: |
+    using Microsoft.AspNetCore.Components;
+
+    namespace {BoundedContext}.Shared.UI.Actions;
+
+    /// <summary>
+    /// {Entity}{Operation}Actions
+    ///
+    /// 【パターン: PageActions（UI手順のみ）】
+    ///
+    /// 責務:
+    /// - UI手順のオーケストレーション（確認、通知、遷移）
+    /// - Storeへの委譲
+    ///
+    /// AI実装時の注意:
+    /// - I/Oや状態管理はStoreに委譲
+    /// - PageActionsは「UIフロー」のみを実装
+    /// - ビジネスロジックはDomain層に実装
+    /// </summary>
+    public sealed class {Entity}{Operation}Actions
+    {
+        private readonly {Entity}{Operation}Store _store;
+        private readonly NavigationManager _navigation;
+        private readonly IToastService _toast;
+        private readonly IConfirmService _confirm;
+
+        public {Entity}{Operation}Actions(
+            {Entity}{Operation}Store store,
+            NavigationManager navigation,
+            IToastService toast,
+            IConfirmService confirm)
+        {
+            _store = store;
+            _navigation = navigation;
+            _toast = toast;
+            _confirm = confirm;
+        }
+
+        /// <summary>
+        /// 保存処理（UI手順）
+        /// </summary>
+        public async Task SaveAsync(CancellationToken ct = default)
+        {
+            // Storeに委譲してI/O実行
+            var success = await _store.ExecuteAsync(ct);
+
+            if (success)
+            {
+                // 成功時のUI手順
+                _toast.Success("{Entity}を保存しました");
+                _navigation.NavigateTo($"/{entity}s");
+            }
+            else
+            {
+                // 失敗時のUI手順
+                var errorMessage = _store.GetState().ErrorMessage ?? "保存に失敗しました";
+                _toast.Error(errorMessage);
+            }
+        }
+
+        /// <summary>
+        /// キャンセル処理（UI手順）
+        /// </summary>
+        public async Task CancelAsync()
+        {
+            // 変更がある場合は確認ダイアログ
+            if (_store.GetState().IsDirty)
+            {
+                var confirmed = await _confirm.ShowAsync(
+                    "確認",
+                    "編集内容が保存されていません。破棄してよろしいですか？");
+
+                if (!confirmed) return;
+            }
+
+            // 前の画面に戻る
+            _navigation.NavigateTo($"/{entity}s");
+        }
+
+        /// <summary>
+        /// 削除処理（UI手順）
+        /// </summary>
+        public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+        {
+            // 確認ダイアログ
+            var confirmed = await _confirm.ShowAsync(
+                "削除確認",
+                "本当に削除してよろしいですか？この操作は取り消せません。");
+
+            if (!confirmed) return;
+
+            // Storeに委譲してI/O実行
+            var success = await _store.DeleteAsync(id, ct);
+
+            if (success)
+            {
+                _toast.Success("{Entity}を削除しました");
+                await _store.LoadAsync(ct); // リスト再読み込み
+            }
+            else
+            {
+                var errorMessage = _store.GetState().ErrorMessage ?? "削除に失敗しました";
+                _toast.Error(errorMessage);
+            }
+        }
+    }
+
+example_usage: |
+  // Component での使用例
+  @page "/{entity}s/edit/@{Entity}Id"
+  @inject {Entity}EditActions Actions
+
+  <EditForm OnValidSubmit="@HandleSubmit">
+      <!-- フォーム内容 -->
+
+      <button type="submit">保存</button>
+      <button type="button" @onclick="@Actions.CancelAsync">キャンセル</button>
+  </EditForm>
+
+  @code {
+      [Parameter]
+      public Guid {Entity}Id { get; set; }
+
+      private async Task HandleSubmit()
+      {
+          await Actions.SaveAsync();
+      }
+  }
+
+tests:
+  - name: "SaveAsync 成功時にトーストと画面遷移"
+    scenario: |
+      Given: Store.ExecuteAsync() が成功を返す
+      When: SaveAsync() を実行
+      Then: トーストが表示され、一覧画面に遷移
+
+  - name: "CancelAsync で変更がある場合は確認ダイアログ"
+    scenario: |
+      Given: Store.GetState().IsDirty = true
+      When: CancelAsync() を実行
+      Then: 確認ダイアログが表示される
+
+  - name: "DeleteAsync で確認ダイアログ後に削除"
+    scenario: |
+      Given: {Entity}が存在
+      When: DeleteAsync() を実行し、確認ダイアログで「はい」を選択
+      Then: 削除が実行され、トーストが表示される
+
+ai_guidance:
+  when_to_use:
+    - "UI手順のオーケストレーションが必要な場合"
+    - "確認ダイアログやトースト通知を表示する場合"
+    - "画面遷移のロジックを集約したい場合"
+
+  when_not_to_use:
+    - "I/Oや状態管理 → Storeを使用"
+    - "ビジネスルール → Domain層に実装"
+
+  store_vs_pageactions:
+    store:
+      - "状態管理（State）"
+      - "I/O（Command/Query送信）"
+      - "ローディング状態管理"
+      - "エラー状態管理"
+    pageactions:
+      - "確認ダイアログの表示"
+      - "トースト通知の表示"
+      - "画面遷移"
+      - "Storeへの委譲"
+
+  common_mistakes:
+    - mistake: "PageActions に I/O を実装する"
+      solution: "I/Oは Store に委譲。PageActionsはUI手順のみ"
+
+    - mistake: "PageActions に状態を持たせる"
+      solution: "状態はStoreが管理。PageActionsはステートレス"
+
+    - mistake: "Store に確認ダイアログを表示する"
+      solution: "確認ダイアログはPageActionsで表示。StoreはI/Oのみ"
+
+evidence:
+  implementation: "src/ProductCatalog/Shared/UI/Actions/ProductEditActions.cs"
+  test: "tests/ProductCatalog.UI.Tests/Actions/ProductEditActionsTests.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース"

@@ -1,0 +1,203 @@
+id: idempotency-behavior
+version: 0.9.0
+name: IdempotencyBehavior
+category: pipeline-behavior
+intent: Command の冪等性を保証し、重複実行を防止
+order_hint: 300
+description: |
+  同じ IdempotencyKey を持つ Command が複数回実行された場合、
+  2回目以降はキャッシュされた結果を返します。
+  これにより、ネットワークエラー等での再試行時にデータの重複作成を防ぎます。
+
+wiring:
+  service_registrations:
+    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>))"
+  dependencies:
+    nuget:
+      - Microsoft.Extensions.Caching.Memory: "^8.0.0"
+
+preconditions:
+  - "IMemoryCache が DI 登録されている"
+  - "すべての Command が IdempotencyKey プロパティを持つ"
+
+implementation:
+  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/IdempotencyBehavior.cs"
+  template: |
+    public sealed class IdempotencyBehavior<TRequest, TResponse>
+        : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        private readonly IMemoryCache _cache;
+        private readonly ILogger<IdempotencyBehavior<TRequest, TResponse>> _logger;
+
+        public IdempotencyBehavior(
+            IMemoryCache cache,
+            ILogger<IdempotencyBehavior<TRequest, TResponse>> logger)
+        {
+            _cache = cache;
+            _logger = logger;
+        }
+
+        public async Task<TResponse> Handle(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken)
+        {
+            // Query の場合はスキップ
+            if (request is not ICommand)
+                return await next();
+
+            // IdempotencyKey を取得
+            var idempotencyKeyProperty = typeof(TRequest).GetProperty("IdempotencyKey");
+            if (idempotencyKeyProperty == null)
+            {
+                _logger.LogWarning(
+                    "{RequestName} に IdempotencyKey プロパティがありません",
+                    typeof(TRequest).Name);
+                return await next();
+            }
+
+            var idempotencyKey = idempotencyKeyProperty.GetValue(request) as string;
+            if (string.IsNullOrEmpty(idempotencyKey))
+                return await next();
+
+            var cacheKey = $"idempotency_{typeof(TRequest).Name}_{idempotencyKey}";
+
+            // キャッシュから取得
+            if (_cache.TryGetValue<TResponse>(cacheKey, out var cachedResponse))
+            {
+                _logger.LogInformation(
+                    "冪等性: キャッシュから返却 {RequestName} - {IdempotencyKey}",
+                    typeof(TRequest).Name, idempotencyKey);
+                return cachedResponse!;
+            }
+
+            // 処理実行
+            var response = await next();
+
+            // 成功した場合のみキャッシュ
+            if (IsSuccessfulResponse(response))
+            {
+                var cacheOptions = new MemoryCacheEntryOptions()
+                    .SetAbsoluteExpiration(TimeSpan.FromHours(24));
+
+                _cache.Set(cacheKey, response, cacheOptions);
+
+                _logger.LogInformation(
+                    "冪等性: キャッシュに保存 {RequestName} - {IdempotencyKey}",
+                    typeof(TRequest).Name, idempotencyKey);
+            }
+
+            return response;
+        }
+
+        private static bool IsSuccessfulResponse(TResponse response)
+        {
+            if (response is IResult result)
+                return result.IsSuccess;
+
+            return true;
+        }
+    }
+
+example_usage: |
+  // IdempotencyKey を持つ Command
+  public sealed record CreateProductCommand(
+      string Name,
+      string Description,
+      decimal Price,
+      int InitialStock
+  ) : ICommand<Result<Guid>>
+  {
+      // フロントエンドで生成されたGUIDを使用
+      public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+  }
+
+  // UI側の実装例
+  public sealed class ProductCreateActions
+  {
+      private readonly IMediator _mediator;
+      private readonly string _idempotencyKey = Guid.NewGuid().ToString(); // 画面ごとに1回生成
+
+      public async Task CreateAsync()
+      {
+          // 同じ IdempotencyKey で複数回実行しても、2回目以降はキャッシュが返される
+          var command = new CreateProductCommand(
+              Name: "Sample Product",
+              Description: "Description",
+              Price: 1000,
+              InitialStock: 100
+          )
+          {
+              IdempotencyKey = _idempotencyKey
+          };
+
+          var result = await _mediator.Send(command);
+          // ...
+      }
+  }
+
+tests:
+  - name: "同じ IdempotencyKey で2回実行しても1回だけ処理される"
+    given: "同じ IdempotencyKey を持つ2つの Command"
+    when: "連続して実行"
+    then: "1回目は処理され、2回目はキャッシュから返される"
+    expect: "重複防止"
+
+  - name: "失敗した場合はキャッシュされない"
+    given: "Result.Fail を返す Command"
+    when: "実行"
+    then: "キャッシュに保存されず、次回も再実行される"
+    expect: "キャッシュなし"
+
+  - name: "Query にはスキップされる"
+    given: "IQuery を実装したリクエスト"
+    when: "実行"
+    then: "冪等性チェックがスキップされる"
+    expect: "スキップ"
+
+metrics:
+  performance_impact: "低 (キャッシュヒット: < 1ms、ミス: Handler の実行時間)"
+  execution_order: 300
+
+ai_guidance:
+  when_to_use:
+    - "作成系 Command（CreateProductCommand など）"
+    - "支払い処理などの重複実行が致命的な処理"
+    - "ネットワークエラー時の再試行が必要な処理"
+
+  when_not_to_use:
+    - "Query（読み取り専用操作）"
+    - "更新系 Command（楽観的排他制御で対応）"
+    - "削除系 Command（削除済みのエンティティに対する削除は冪等）"
+
+  common_mistakes:
+    - mistake: "IdempotencyKey を毎回新しく生成する"
+      solution: "画面表示時に1回だけ生成し、再試行時は同じ値を使う"
+
+    - mistake: "IMemoryCache を DI 登録し忘れる"
+      solution: "Program.cs で services.AddMemoryCache() を呼び出す"
+
+    - mistake: "更新系 Command に IdempotencyKey をつける"
+      solution: "更新は楽観的排他制御（Version）で対応。冪等性は作成系のみ"
+
+changelog:
+  - version: 0.9.0
+    date: 2025-11-05
+    changes:
+      - "初版リリース（ベータ版）"
+      - "MemoryCache ベースの実装"
+
+  - version: 1.0.0
+    date: 2025-12-01
+    changes:
+      - "Redis ベースの分散キャッシュ対応（予定）"
+
+evidence:
+  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/IdempotencyBehavior.cs"
+  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/IdempotencyBehaviorTests.cs"
+  example_command: "src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs"
+
+notes: |
+  現在はメモリキャッシュベースですが、本番環境では Redis 等の分散キャッシュの使用を推奨します。
+  複数サーバー構成の場合、サーバー間で冪等性が保証されません。

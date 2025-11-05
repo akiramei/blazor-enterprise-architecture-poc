@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/akiramei/blazor-enterprise-architecture-poc/schemas/patterns-manifest.schema.json",
+  "title": "Patterns Manifest",
+  "description": "プロジェクトで使用するパターンの採用結果を定義するマニフェストファイル",
+  "type": "object",
+  "required": ["catalog_index", "selected_patterns"],
+  "properties": {
+    "catalog_index": {
+      "type": "string",
+      "description": "参照するカタログのURL（GitHubタグ固定推奨）",
+      "examples": [
+        "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11",
+        "https://raw.githubusercontent.com/akiramei/blazor-enterprise-architecture-poc/v2025.11/catalog/index.json"
+      ]
+    },
+    "selected_patterns": {
+      "type": "array",
+      "description": "このプロジェクトで使用するパターンのリスト",
+      "items": {
+        "$ref": "#/definitions/pattern_selection"
+      }
+    },
+    "assembly_order": {
+      "type": "array",
+      "description": "Pipeline Behaviors の実行順序（パターンIDのリスト）",
+      "items": {
+        "type": "string"
+      },
+      "examples": [
+        ["Metrics", "Validation", "Authorization", "Idempotency", "Transaction", "Logging"]
+      ]
+    },
+    "custom_patterns": {
+      "type": "array",
+      "description": "プロジェクト固有のカスタムパターン",
+      "items": {
+        "$ref": "#/definitions/custom_pattern"
+      }
+    }
+  },
+  "definitions": {
+    "pattern_selection": {
+      "type": "object",
+      "required": ["id", "version", "mode"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "パターンID（カタログ内のパターンID）",
+          "examples": ["validation-behavior", "transaction-behavior", "command-create"]
+        },
+        "version": {
+          "type": "string",
+          "description": "使用するバージョン（セマンティックバージョニング）",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["1.3.0", "2.0.0", "0.9.0"]
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["package", "copy"],
+          "description": "適用方法: package=NuGet/npm参照、copy=スケルトンコピー"
+        },
+        "config": {
+          "type": "object",
+          "description": "パターン固有の設定",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "有効/無効"
+            },
+            "order": {
+              "type": "integer",
+              "description": "実行順序のオーバーライド"
+            }
+          }
+        }
+      }
+    },
+    "custom_pattern": {
+      "type": "object",
+      "required": ["id", "name", "file_path"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "カスタムパターンのID"
+        },
+        "name": {
+          "type": "string",
+          "description": "パターン名"
+        },
+        "file_path": {
+          "type": "string",
+          "description": "実装ファイルのパス"
+        },
+        "order": {
+          "type": "integer",
+          "description": "実行順序"
+        },
+        "category": {
+          "type": "string",
+          "description": "カテゴリ"
+        }
+      }
+    }
+  }
+}
