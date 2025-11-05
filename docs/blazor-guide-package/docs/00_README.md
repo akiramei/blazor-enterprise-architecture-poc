@@ -68,9 +68,9 @@
    - データフロー
    - 責務分離
 
-7. **[レイヤー構成と責務](07_レイヤー構成と責務.md)** (5.6 KB)
-   - 4層アーキテクチャ
-   - 各層の責務
+7. **[VSA構成と責務](07_レイヤー構成と責務.md)** (5.6 KB)
+   - Vertical Slice Architecture
+   - 機能スライス内の各層の責務
    - 依存関係のルール
 
 8. **[具体例: 商品管理機能](08_具体例_商品管理機能.md)** (16 KB)
@@ -199,7 +199,7 @@ blazor-architecture-guide/
 - **ログ・監査・メトリクス** → [横断的関心事の詳細設計](../../architecture/cross-cutting-concerns.md)
 
 ### 実装を始める方
-1. [レイヤー構成と責務](07_レイヤー構成と責務.md) で基本構造を理解
+1. [VSA構成と責務](07_レイヤー構成と責務.md) で基本構造を理解
 2. [具体例: 商品管理機能](08_具体例_商品管理機能.md) をテンプレートとして利用
 3. [ベストプラクティス](16_ベストプラクティス.md) を参照しながら実装
 
@@ -212,4 +212,4 @@ blazor-architecture-guide/
 
 ---
 
-**完全版ドキュメント**: [blazor-architecture-guide-complete-fixed.md](../blazor-architecture-guide-complete-fixed.md)
+**完全版ドキュメント**: [BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md](../BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md)

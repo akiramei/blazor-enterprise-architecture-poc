@@ -2,82 +2,51 @@
 
 このプロジェクトは、**Blazor Enterprise Architecture Guide**に基づいた中規模業務アプリケーションの実証実験です。
 
-> **⚠️ VSA移行中（Phase 7完了）**
->
-> このプロジェクトは現在、**Clean Architecture（4層アーキテクチャ）** から **Vertical Slice Architecture (VSA)** への移行作業中です。
->
-> **現在の状態:**
-> - ✅ Phase 1-7完了: VSA構造確立済み（ファイル移動、プロジェクト作成、検証）
-> - ⏳ Phase 8-10進行中: Webアプリ統合、テスト更新、ビルド確認
->
-> **詳細:** [VSA-MIGRATION-STATUS.md](docs/architecture/VSA-MIGRATION-STATUS.md)
->
-> **注意:** 現在のREADMEは旧構造（Clean Architecture）を説明しています。VSA構造の詳細はVSA-MIGRATION-STATUS.mdを参照してください。
-
 ## 📋 プロジェクト概要
 
-Vertical Slice Architecture (VSA) を採用し、機能単位で完結する構造により、CQRS、DDD、Storeパターンなどを組み合わせた実践的なアプリケーション設計を示しています。
+**Vertical Slice Architecture (VSA)** を採用し、機能単位で完結する構造により、CQRS、DDD、Storeパターンなどを組み合わせた実践的なアプリケーション設計を示しています。
 
 ## 🏗️ アーキテクチャ構成
 
-> **注意:** 以下は旧構造（Clean Architecture）の説明です。
-> 現在のVSA構造については [VSA-MIGRATION-STATUS.md](docs/architecture/VSA-MIGRATION-STATUS.md) を参照してください。
-
-<details>
-<summary>旧構造（Clean Architecture - 参考用）</summary>
+### VSA (Vertical Slice Architecture) 構造
 
 ```
-ProductCatalog/
-├── ProductCatalog.Web              # UI層 (Blazor Server)
-│   ├── Features/Products/
-│   │   ├── Store/                  # Store Pattern (状態管理)
-│   │   ├── Actions/                # PageActions (UI手順)
-│   │   ├── Pages/                  # Smart Components
-│   │   └── Components/             # Dumb Components
+src/
+├── ProductCatalog/                    # Bounded Context
+│   ├── Features/                      # 機能スライス（Feature Slices）
+│   │   ├── CreateProduct/             # 機能1: 商品作成
+│   │   │   ├── Application/           # Command/Handler/Validator
+│   │   │   ├── Domain/                # ドメインロジック（この機能固有）
+│   │   │   ├── Infrastructure/        # Repository実装（この機能固有）
+│   │   │   └── UI/                    # Component/Page（この機能固有）
+│   │   ├── GetProducts/               # 機能2: 商品一覧取得
+│   │   │   ├── Application/
+│   │   │   └── Infrastructure/
+│   │   ├── DeleteProduct/             # 機能3: 商品削除
+│   │   │   └── Application/
+│   │   └── UpdateProduct/             # 機能4: 商品更新
+│   │       └── Application/
+│   │
+│   └── Shared/                        # 機能横断の共通コード
+│       ├── Application/               # 共通インターフェース（ICommand, IQuery, Result）
+│       ├── Domain/                    # 共通ドメイン（Product集約、ValueObject）
+│       ├── Infrastructure/            # 共通インフラ（DbContext, Behaviors）
+│       └── UI/                        # 共通UIコンポーネント
+│           ├── Store/                 # Store Pattern（状態管理）
+│           ├── Actions/               # PageActions Pattern（UI手順）
+│           ├── Pages/                 # Smart Components
+│           └── Components/            # Dumb Components
 │
-├── ProductCatalog.Application      # Application層
-│   ├── Common/
-│   │   ├── Interfaces/             # ICommand, IQuery
-│   │   └── Result.cs               # 処理結果型
-│   └── Products/
-│       ├── Commands/               # DeleteProductCommand等
-│       ├── Queries/                # GetProductsQuery等
-│       ├── Handlers/               # MediatR Handlers
-│       └── DTOs/                   # ProductDto等
-│
-├── ProductCatalog.Domain           # Domain層
-│   ├── Common/
-│   │   ├── Entity.cs
-│   │   ├── ValueObject.cs
-│   │   ├── DomainEvent.cs
-│   │   └── DomainException.cs
-│   └── Products/
-│       ├── Product.cs              # 集約ルート
-│       ├── ProductId.cs            # Value Object
-│       ├── Money.cs                # Value Object
-│       ├── IProductRepository.cs   # Repository Interface
-│       └── Events/                 # Domain Events
-│
-└── ProductCatalog.Infrastructure   # Infrastructure層
-    ├── Behaviors/                  # Pipeline Behaviors実装
-    │   ├── AuthorizationBehavior
-    │   ├── CachingBehavior
-    │   ├── IdempotencyBehavior
-    │   └── TransactionBehavior
-    ├── Identity/                   # ASP.NET Core Identity
-    │   └── IdentityDataSeeder.cs
-    ├── Idempotency/               # 冪等性ストア
-    ├── Outbox/                    # Outbox Pattern実装
-    ├── Services/                  # インフラサービス
-    │   ├── CurrentUserService
-    │   └── CorrelationIdAccessor
-    └── Persistence/
-        ├── AppDbContext.cs         # EF Core DbContext (PostgreSQL)
-        ├── Configurations/         # EF Core Configurations
-        └── Repositories/           # Repository実装 (EF Core + Dapper)
+└── ProductCatalog.Host/               # Blazor Server ホストプロジェクト
+    ├── Program.cs                     # DI登録、パイプライン設定
+    └── Infrastructure/                # 認証・認可、グローバルサービス
 ```
 
-</details>
+**VSAの特徴:**
+- **機能ファースト**: 機能（Feature）が最上位の構造単位
+- **垂直統合**: 各機能が UI → Application → Domain → Infrastructure を含む完結した垂直スライス
+- **疎結合**: 機能間の依存を最小化（Shared経由でのみ共有）
+- **変更容易性**: 機能追加・変更時の影響範囲が明確
 
 ## 🎯 採用パターン
 
@@ -132,7 +101,7 @@ podman exec -it postgres-productcatalog psql -U postgres -d productcatalog
 dotnet build ProductCatalog.sln
 
 # Webアプリを起動（初回起動時に自動でマイグレーション実行）
-cd src/ProductCatalog.Web
+cd src/ProductCatalog.Host
 dotnet run
 ```
 
@@ -179,22 +148,31 @@ dotnet run
 
 ## 🧪 アーキテクチャの特徴
 
-### 依存関係の方向
+### VSAにおける依存関係
+
+**機能スライス内の依存方向:**
 ```
 UI → Application → Domain ← Infrastructure
 ```
 
-- **UI層**: Application層に依存
-- **Application層**: Domain層に依存
+- **UI層**: Application層のCommand/Queryを呼び出し
+- **Application層**: Domain層に依存（ビジネスルール適用）
 - **Domain層**: 他の層に依存しない（ピュアなビジネスロジック）
-- **Infrastructure層**: Domain層とApplication層に依存（DIP）
+- **Infrastructure層**: Domain層とApplication層に依存（依存性逆転の原則）
+
+**機能スライス間の依存:**
+```
+各Feature → Shared（共通コード）のみ依存可能
+Feature間の直接依存は禁止
+```
 
 ### 主要な設計判断
 
-1. **都度スコープ作成**: `IServiceScopeFactory`を使用してDbContextリークを防止
-2. **不変State**: `record`による不変状態オブジェクト
-3. **ビジネスルール保護**: Product集約によるルール集約
-4. **I/O分離**: PageActionsはI/Oを持たず、Storeに完全委譲
+1. **VSA採用**: 機能単位の垂直スライスによる高凝集・疎結合
+2. **都度スコープ作成**: `IServiceScopeFactory`を使用してDbContextリークを防止
+3. **不変State**: `record`による不変状態オブジェクト
+4. **ビジネスルール保護**: Product集約によるルール集約
+5. **I/O分離**: PageActionsはI/Oを持たず、Storeに完全委譲
 
 ## 📖 アーキテクチャドキュメント
 

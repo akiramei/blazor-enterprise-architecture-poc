@@ -52,9 +52,9 @@
   - BulkOperationResult
 
 **既存パターンの再構成:**
-- `CreateProduct` → `/Features/Products/CreateProduct/`
-- `DeleteProduct` → `/Features/Products/DeleteProduct/`
-- `GetProducts` → `/Features/Products/GetProducts/`
+- `CreateProduct` → `src/ProductCatalog/Features/CreateProduct/` (現在のVSA構造)
+- `DeleteProduct` → `src/ProductCatalog/Features/DeleteProduct/` (現在のVSA構造)
+- `GetProducts` → `src/ProductCatalog/Features/GetProducts/` (現在のVSA構造)
 - すべてにIdempotencyKey追加
 - AI向け詳細コメント追加
 
@@ -108,9 +108,9 @@
     /Products/Handlers/CreateProductHandler.cs
     /Products/Validators/CreateProductCommandValidator.cs
 
-新: /Features/Products/CreateProduct/CreateProductCommand.cs
-    /Features/Products/CreateProduct/CreateProductHandler.cs
-    /Features/Products/CreateProduct/CreateProductValidator.cs
+現在(VSA): src/ProductCatalog/Features/CreateProduct/Application/CreateProductCommand.cs
+          src/ProductCatalog/Features/CreateProduct/Application/CreateProductHandler.cs
+          src/ProductCatalog/Features/CreateProduct/Application/CreateProductValidator.cs
 ```
 
 **パターンの組織化:**
