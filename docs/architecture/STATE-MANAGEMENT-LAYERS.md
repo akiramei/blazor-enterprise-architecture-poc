@@ -280,7 +280,7 @@
 
 ```csharp
 // Infrastructure/Blazor/Session/SessionProvider.razor
-@using ProductCatalog.Application.Common.Interfaces
+@using Shared.Application.Interfaces
 
 <CascadingValue Value="@Session">
     @ChildContent
@@ -463,10 +463,10 @@
 
 ## 📦 AIテンプレートとして提供すべきもの
 
-### 1. 共通プラットフォームSDK（NuGetパッケージ化）
+### 1. 共通プラットフォームSDK（将来的にNuGetパッケージ化も可能）
 
 ```
-ProductCatalog.Platform.Blazor/
+src/ProductCatalog/Shared/UI/Providers/
 ├── Session/
 │   ├── SessionProvider.razor
 │   ├── SessionState.cs
@@ -494,7 +494,7 @@ ProductCatalog.Platform.Blazor/
 ### 2. サーバーサイド共通基盤（プロジェクトテンプレート）
 
 ```
-ProductCatalog.Platform.Infrastructure/
+src/ProductCatalog/Shared/Infrastructure/
 ├── Authentication/
 │   ├── JwtSettings.cs
 │   ├── JwtTokenGenerator.cs
@@ -592,10 +592,10 @@ ProductCatalog.Platform.Infrastructure/
   - LocalStorageService.cs
   - theme.js（テーマ切り替えJSモジュール）
 
-### 次のアクション
+### 次のアクション（将来の拡張案）
 
-1. **Phase 2**: NuGetパッケージ化（`ProductCatalog.Platform.Blazor`）
-2. **Phase 3**: プロジェクトテンプレート化（`dotnet new productcatalog`）
+1. **Phase 2**: NuGetパッケージ化（共通UIコンポーネント）
+2. **Phase 3**: プロジェクトテンプレート化（`dotnet new vsa-blazor`）
 3. **Phase 4**: ドキュメント整備（新規プロジェクト開発ガイド）
 4. **Phase 5**: 実装ドキュメントの充実化（使用例、ベストプラクティス）
 

@@ -1,5 +1,87 @@
 # Blazorガイド 修正履歴
 
+## 2025年11月5日 - v2.1.3 VSA構造への完全移行
+
+### 🎯 アーキテクチャの最終確定
+
+プロジェクトを **Vertical Slice Architecture (VSA)** に完全移行しました。
+
+- **以前**: パターンカタログ型Clean Architecture（レイヤー構造の残滓あり）
+- **現在**: 純粋なVSA - 機能スライス単位の垂直統合アーキテクチャ
+
+### 📦 主な変更内容
+
+#### 1. ドキュメント全体のVSA準拠化
+
+**README.md（ルート）:**
+- VSA移行完了宣言（移行中の警告を削除）
+- VSA構造の詳細なフォルダツリーを追加
+- 実行パス修正: `src/ProductCatalog.Web` → `src/ProductCatalog.Host`
+- 依存関係のルールをVSAの文脈で書き直し
+
+**アーキテクチャ説明の全面改訂:**
+- `03_アーキテクチャ概要.md`: "関心事の分離" → "機能による垂直分割"に変更
+- `06_全体アーキテクチャ図.md`: レイヤー構造図 → VSA構造図に変更
+- `07_レイヤー構成と責務.md`: タイトル変更「VSA構成と責務」、VSA原則を追加
+
+**パス・リンクの統一:**
+- 全ドキュメントのサンプルコードパスをVSA構造に修正
+  - 誤: `/Features/Products/GetProducts/`
+  - 正: `src/ProductCatalog/Features/GetProducts/`
+- リンク切れ修正（13箇所）
+  - ファイルリンク: `BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md`
+  - アンカーリンク: 09_UI層（#7x → #9x）、10_Application層（#8x → #10x）
+
+#### 2. ドキュメント構造の整理とガバナンス確立
+
+**一時的ドキュメントの削除（4ファイル）:**
+- `docs/architecture/VSA-MIGRATION-PLAN.md`（移行完了済み）
+- `docs/architecture/VSA-MIGRATION-STATUS.md`（移行完了済み）
+- `docs/blazor-guide-package/docs/Phase2改善サマリー.md`（CHANGELOG統合済み）
+- `docs/blazor-guide-package/docs/Phase2_1改善サマリー.md`（CHANGELOG統合済み）
+
+**docs/README.md の新規作成:**
+- フォルダ構造の明文化（4カテゴリの役割定義）
+- ドキュメント管理ポリシー（追加可/不可の基準）
+- ライフサイクル管理（作成→運用→削除の判断基準）
+- フォルダ乱立防止のための体系確立
+
+#### 3. 統合版ドキュメントの再生成
+
+**BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md:**
+- `build-complete.sh` による自動再生成
+- Clean Architecture の記述を完全除去
+- VSA構造への統一完了
+
+### 🔍 修正された残滓
+
+**v2.0.0時点で残存していた問題:**
+- ❌ "Clean Architecture + CQRS" の記述
+- ❌ `src/ProductCatalog.Application/Features/...` 構造の例
+- ❌ "パターンカタログ型Clean Architecture" の宣言
+
+**v2.1.3で完全解決:**
+- ✅ すべてのドキュメントがVSA構造を正確に反映
+- ✅ レイヤードアーキテクチャの記述を完全除去
+- ✅ 機能スライス（Feature Slice）が最上位の構造単位
+
+### 📊 統計
+
+- **更新ファイル**: 13ファイル（ドキュメント）
+- **削除ファイル**: 4ファイル（一時的文書）
+- **新規ファイル**: 2ファイル（docs/README.md、再生成されたCOMPLETE.md）
+- **修正リンク**: 13箇所
+- **検証対象**: 全20章 + アーキテクチャ文書
+
+### ✅ 検証完了項目
+
+- ✅ 全ドキュメントのVSA準拠確認
+- ✅ 全ファイルリンク・アンカーリンクの検証
+- ✅ サンプルコードのパス表記統一
+- ✅ 実行可能なコマンドの検証（build-complete.sh 動作確認）
+
+---
+
 ## 2025年10月28日 - v2.0.0 大規模リファクタリング
 
 ### 🎯 プロジェクトの再定義
