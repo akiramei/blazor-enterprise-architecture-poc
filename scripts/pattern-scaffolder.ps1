@@ -46,7 +46,8 @@ function Get-CatalogIndex {
     if ($CatalogUrl -match "^\.") {
         if (Test-Path $CatalogUrl) {
             try {
-                $content = Get-Content $CatalogUrl -Raw | ConvertFrom-Json
+                # -AsHashtable を使用してキーの大文字小文字の衝突を回避
+                $content = Get-Content $CatalogUrl -Raw | ConvertFrom-Json -AsHashtable
                 Write-Success "カタログインデックスを読み込みました（ローカル）"
                 return $content
             }
@@ -115,24 +116,33 @@ function Validate-Manifest {
 
     # 選択されたパターンがカタログに存在するか確認
     foreach ($selected in $Manifest.selected_patterns) {
-        $pattern = $CatalogIndex.patterns | Where-Object { $_.id -eq $selected.id }
+        # Hashtable の場合は ["key"] でアクセス
+        $selectedId = if ($selected -is [hashtable]) { $selected["id"] } else { $selected.id }
+        $selectedVersion = if ($selected -is [hashtable]) { $selected["version"] } else { $selected.version }
+
+        $pattern = $CatalogIndex["patterns"] | Where-Object {
+            $patternId = if ($_ -is [hashtable]) { $_["id"] } else { $_.id }
+            $patternId -eq $selectedId
+        }
 
         if (-not $pattern) {
-            $errors += "パターン '$($selected.id)' がカタログに存在しません"
+            $errors += "パターン '$selectedId' がカタログに存在しません"
             continue
         }
 
         # バージョンチェック
-        if ($pattern.version -ne $selected.version) {
-            $warnings += "パターン '$($selected.id)' のバージョンが異なります (カタログ: $($pattern.version), マニフェスト: $($selected.version))"
+        $patternVersion = if ($pattern -is [hashtable]) { $pattern["version"] } else { $pattern.version }
+        if ($patternVersion -ne $selectedVersion) {
+            $warnings += "パターン '$selectedId' のバージョンが異なります (カタログ: $patternVersion, マニフェスト: $selectedVersion)"
         }
 
         # 安定性チェック
-        if ($pattern.stability -eq "beta") {
-            $warnings += "パターン '$($selected.id)' はベータ版です"
+        $patternStability = if ($pattern -is [hashtable]) { $pattern["stability"] } else { $pattern.stability }
+        if ($patternStability -eq "beta") {
+            $warnings += "パターン '$selectedId' はベータ版です"
         }
-        elseif ($pattern.stability -eq "alpha") {
-            $warnings += "パターン '$($selected.id)' はアルファ版です（本番環境では非推奨）"
+        elseif ($patternStability -eq "alpha") {
+            $warnings += "パターン '$selectedId' はアルファ版です（本番環境では非推奨）"
         }
     }
 
@@ -182,11 +192,25 @@ function List-Patterns {
     Write-Host "=" * 80
 
     foreach ($selected in $Manifest.selected_patterns) {
-        $pattern = $CatalogIndex.patterns | Where-Object { $_.id -eq $selected.id }
+        # Hashtable 対応
+        $selectedId = if ($selected -is [hashtable]) { $selected["id"] } else { $selected.id }
+        $selectedVersion = if ($selected -is [hashtable]) { $selected["version"] } else { $selected.version }
+        $selectedMode = if ($selected -is [hashtable]) { $selected["mode"] } else { $selected.mode }
+        $selectedConfig = if ($selected -is [hashtable]) { $selected["config"] } else { $selected.config }
+        $configEnabled = if ($selectedConfig -is [hashtable]) { $selectedConfig["enabled"] } else { $selectedConfig.enabled }
+
+        $pattern = $CatalogIndex["patterns"] | Where-Object {
+            $patternId = if ($_ -is [hashtable]) { $_["id"] } else { $_.id }
+            $patternId -eq $selectedId
+        }
 
         if ($pattern) {
-            $statusIcon = if ($selected.config.enabled) { "✓" } else { "✗" }
-            $stabilityColor = switch ($pattern.stability) {
+            $patternName = if ($pattern -is [hashtable]) { $pattern["name"] } else { $pattern.name }
+            $patternStability = if ($pattern -is [hashtable]) { $pattern["stability"] } else { $pattern.stability }
+            $patternIntent = if ($pattern -is [hashtable]) { $pattern["intent"] } else { $pattern.intent }
+
+            $statusIcon = if ($configEnabled) { "✓" } else { "✗" }
+            $stabilityColor = switch ($patternStability) {
                 "stable" { "Green" }
                 "beta" { "Yellow" }
                 "alpha" { "Red" }
@@ -195,12 +219,12 @@ function List-Patterns {
 
             Write-Host ""
             Write-Host "  $statusIcon " -NoNewline
-            Write-Host "$($pattern.name) " -ForegroundColor White -NoNewline
-            Write-Host "[$($pattern.stability)]" -ForegroundColor $stabilityColor
-            Write-Host "     ID: $($pattern.id)" -ForegroundColor Gray
-            Write-Host "     バージョン: $($selected.version)" -ForegroundColor Gray
-            Write-Host "     モード: $($selected.mode)" -ForegroundColor Gray
-            Write-Host "     $($pattern.intent)" -ForegroundColor Gray
+            Write-Host "$patternName " -ForegroundColor White -NoNewline
+            Write-Host "[$patternStability]" -ForegroundColor $stabilityColor
+            Write-Host "     ID: $selectedId" -ForegroundColor Gray
+            Write-Host "     バージョン: $selectedVersion" -ForegroundColor Gray
+            Write-Host "     モード: $selectedMode" -ForegroundColor Gray
+            Write-Host "     $patternIntent" -ForegroundColor Gray
         }
     }
 
@@ -226,20 +250,33 @@ function Apply-Patterns {
     Write-Info "パターンを適用中..."
 
     foreach ($selected in $Manifest.selected_patterns) {
-        if (-not $selected.config.enabled) {
-            Write-Host "  ⊘ $($selected.id) (無効)" -ForegroundColor Gray
+        # Hashtable 対応
+        $selectedId = if ($selected -is [hashtable]) { $selected["id"] } else { $selected.id }
+        $selectedMode = if ($selected -is [hashtable]) { $selected["mode"] } else { $selected.mode }
+        $selectedConfig = if ($selected -is [hashtable]) { $selected["config"] } else { $selected.config }
+        $configEnabled = if ($selectedConfig -is [hashtable]) { $selectedConfig["enabled"] } else { $selectedConfig.enabled }
+
+        if (-not $configEnabled) {
+            Write-Host "  ⊘ $selectedId (無効)" -ForegroundColor Gray
             continue
         }
 
-        $pattern = $CatalogIndex.patterns | Where-Object { $_.id -eq $selected.id }
-
-        if ($selected.mode -eq "package") {
-            Write-Info "  [package] $($pattern.name)"
-            # TODO: NuGet パッケージの追加
+        $pattern = $CatalogIndex["patterns"] | Where-Object {
+            $patternId = if ($_ -is [hashtable]) { $_["id"] } else { $_.id }
+            $patternId -eq $selectedId
         }
-        elseif ($selected.mode -eq "copy") {
-            Write-Info "  [copy] $($pattern.name)"
-            # TODO: テンプレートのコピー
+
+        if ($pattern) {
+            $patternName = if ($pattern -is [hashtable]) { $pattern["name"] } else { $pattern.name }
+
+            if ($selectedMode -eq "package") {
+                Write-Info "  [package] $patternName"
+                # TODO: NuGet パッケージの追加
+            }
+            elseif ($selectedMode -eq "copy") {
+                Write-Info "  [copy] $patternName"
+                # TODO: テンプレートのコピー
+            }
         }
     }
 
