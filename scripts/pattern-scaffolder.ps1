@@ -167,10 +167,11 @@ function Validate-Manifest {
     # 実行順序の検証（Behaviors）
     Write-Host "  [デバッグ] assembly_order検証を開始" -ForegroundColor Gray
     if ($Manifest.assembly_order) {
-        # Behaviorパターンのみを抽出
+        # 有効化されているBehaviorパターンのみを抽出
         $behaviorPatterns = @()
         foreach ($selected in $Manifest.selected_patterns) {
             $selectedId = $selected.id
+            $isEnabled = $selected.config.enabled -eq $true
 
             # カタログからパターンを検索
             $pattern = $null
@@ -181,17 +182,21 @@ function Validate-Manifest {
                 }
             }
 
-            # pipeline-behaviorカテゴリのみ対象
+            # pipeline-behaviorカテゴリかつ有効化されているもののみ対象
             if ($pattern -and $pattern.category -eq "pipeline-behavior") {
-                $behaviorPatterns += $selected
-                Write-Host "  [デバッグ] Behavior検出: $selectedId" -ForegroundColor Gray
+                if ($isEnabled) {
+                    $behaviorPatterns += $selected
+                    Write-Host "  [デバッグ] Behavior検出（有効）: $selectedId" -ForegroundColor Gray
+                } else {
+                    Write-Host "  [デバッグ] Behavior検出（無効）: $selectedId - assembly_order検証をスキップ" -ForegroundColor Gray
+                }
             }
         }
 
         $orderedIds = $Manifest.assembly_order
         $selectedBehaviorIds = $behaviorPatterns | ForEach-Object { $_.id }
 
-        Write-Host "  [デバッグ] 選択されたBehavior: $($selectedBehaviorIds -join ', ')" -ForegroundColor Gray
+        Write-Host "  [デバッグ] 有効な選択されたBehavior: $($selectedBehaviorIds -join ', ')" -ForegroundColor Gray
         Write-Host "  [デバッグ] assembly_order: $($orderedIds -join ', ')" -ForegroundColor Gray
 
         foreach ($behaviorId in $selectedBehaviorIds) {
