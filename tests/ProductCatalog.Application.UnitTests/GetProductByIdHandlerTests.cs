@@ -2,23 +2,23 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using GetProductById.Application;
-using ProductCatalog.Shared.Domain.Products;
 using ProductCatalog.Shared.Application;
+using ProductCatalog.Shared.Application.DTOs;
 
 namespace ProductCatalog.Application.UnitTests;
 
 public class GetProductByIdHandlerTests
 {
-    private readonly Mock<IProductReadRepository> _repositoryMock;
+    private readonly Mock<IProductReadRepository> _readRepositoryMock;
     private readonly Mock<ILogger<GetProductByIdHandler>> _loggerMock;
     private readonly GetProductByIdHandler _handler;
 
     public GetProductByIdHandlerTests()
     {
-        _repositoryMock = new Mock<IProductReadRepository>();
+        _readRepositoryMock = new Mock<IProductReadRepository>();
         _loggerMock = new Mock<ILogger<GetProductByIdHandler>>();
         _handler = new GetProductByIdHandler(
-            _repositoryMock.Object,
+            _readRepositoryMock.Object,
             _loggerMock.Object);
     }
 
@@ -27,13 +27,23 @@ public class GetProductByIdHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var product = Product.Create("商品名", "商品説明", new Money(1000, "JPY"), 10);
+        var productDto = new ProductDetailDto
+        {
+            Id = productId,
+            Name = "商品名",
+            Description = "商品説明",
+            Price = 1000,
+            Stock = 10,
+            Status = "Draft",
+            Version = 1,
+            Images = Array.Empty<ProductImageDto>()
+        };
 
         var query = new GetProductByIdQuery(productId);
 
-        _repositoryMock
-            .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
+        _readRepositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(productDto);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -46,7 +56,7 @@ public class GetProductByIdHandlerTests
         result.Value.Price.Should().Be(1000);
         result.Value.Stock.Should().Be(10);
         result.Value.Status.Should().Be("Draft");
-        result.Value.Version.Should().Be(product.Version);
+        result.Value.Version.Should().Be(1);
     }
 
     [Fact]
@@ -54,17 +64,27 @@ public class GetProductByIdHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var product = Product.Create("商品名", "商品説明", new Money(1000, "JPY"), 10);
-
-        // 画像を追加
-        product.AddImage("https://example.com/image1.jpg");
-        product.AddImage("https://example.com/image2.jpg");
+        var productDto = new ProductDetailDto
+        {
+            Id = productId,
+            Name = "商品名",
+            Description = "商品説明",
+            Price = 1000,
+            Stock = 10,
+            Status = "Draft",
+            Version = 1,
+            Images = new List<ProductImageDto>
+            {
+                new() { Id = Guid.NewGuid(), Url = "https://example.com/image1.jpg", DisplayOrder = 0 },
+                new() { Id = Guid.NewGuid(), Url = "https://example.com/image2.jpg", DisplayOrder = 1 }
+            }
+        };
 
         var query = new GetProductByIdQuery(productId);
 
-        _repositoryMock
-            .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
+        _readRepositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(productDto);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -84,9 +104,9 @@ public class GetProductByIdHandlerTests
         var productId = Guid.NewGuid();
         var query = new GetProductByIdQuery(productId);
 
-        _repositoryMock
-            .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Product?)null);
+        _readRepositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductDetailDto?)null);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -101,16 +121,23 @@ public class GetProductByIdHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var product = Product.Create("商品名", "商品説明", new Money(1000, "JPY"), 10);
-
-        // 商品を公開
-        product.Publish();
+        var productDto = new ProductDetailDto
+        {
+            Id = productId,
+            Name = "商品名",
+            Description = "商品説明",
+            Price = 1000,
+            Stock = 10,
+            Status = "Published",
+            Version = 2,
+            Images = Array.Empty<ProductImageDto>()
+        };
 
         var query = new GetProductByIdQuery(productId);
 
-        _repositoryMock
-            .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
+        _readRepositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(productDto);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -126,17 +153,23 @@ public class GetProductByIdHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var product = Product.Create("商品名", "商品説明", new Money(1000, "JPY"), 10);
-
-        // 商品を公開してからアーカイブ
-        product.Publish();
-        product.Archive();
+        var productDto = new ProductDetailDto
+        {
+            Id = productId,
+            Name = "商品名",
+            Description = "商品説明",
+            Price = 1000,
+            Stock = 10,
+            Status = "Archived",
+            Version = 3,
+            Images = Array.Empty<ProductImageDto>()
+        };
 
         var query = new GetProductByIdQuery(productId);
 
-        _repositoryMock
-            .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
+        _readRepositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(productDto);
 
         // Act
         var result = await _handler.Handle(query, CancellationToken.None);
@@ -152,20 +185,30 @@ public class GetProductByIdHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var product = Product.Create("商品名", "商品説明", new Money(1000, "JPY"), 10);
+        var productDto = new ProductDetailDto
+        {
+            Id = productId,
+            Name = "商品名",
+            Description = "商品説明",
+            Price = 1000,
+            Stock = 10,
+            Status = "Draft",
+            Version = 1,
+            Images = Array.Empty<ProductImageDto>()
+        };
         var query = new GetProductByIdQuery(productId);
 
-        _repositoryMock
-            .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
+        _readRepositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(productDto);
 
         // Act
         await _handler.Handle(query, CancellationToken.None);
 
         // Assert
-        _repositoryMock.Verify(
-            r => r.GetAsync(
-                It.Is<ProductId>(id => id.Value == productId),
+        _readRepositoryMock.Verify(
+            r => r.GetByIdAsync(
+                productId,
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
