@@ -113,17 +113,42 @@ function Validate-Manifest {
     $errors = @()
     $warnings = @()
 
+    # カタログパターン数の確認（デバッグ）
+    if (-not $CatalogIndex.patterns) {
+        Write-Error "カタログインデックスにpatternsプロパティがありません"
+        exit 1
+    }
+
+    $catalogPatternCount = ($CatalogIndex.patterns | Measure-Object).Count
+    Write-Host "  [デバッグ] カタログ内パターン数: $catalogPatternCount" -ForegroundColor Gray
+
+    # カタログ内のパターンIDをリスト表示（デバッグ）
+    $catalogIds = $CatalogIndex.patterns | ForEach-Object { $_.id }
+    Write-Host "  [デバッグ] カタログパターンID: $($catalogIds -join ', ')" -ForegroundColor Gray
+
     # 選択されたパターンがカタログに存在するか確認
     foreach ($selected in $Manifest.selected_patterns) {
         $selectedId = $selected.id
         $selectedVersion = $selected.version
 
-        $pattern = $CatalogIndex.patterns | Where-Object { $_.id -eq $selectedId }
+        Write-Host "  [デバッグ] 検証中: $selectedId" -ForegroundColor Gray
+
+        # パターンを検索
+        $pattern = $null
+        foreach ($p in $CatalogIndex.patterns) {
+            if ($p.id -eq $selectedId) {
+                $pattern = $p
+                break
+            }
+        }
 
         if (-not $pattern) {
             $errors += "パターン '$selectedId' がカタログに存在しません"
+            Write-Host "  [デバッグ] パターン '$selectedId' が見つかりませんでした" -ForegroundColor Red
             continue
         }
+
+        Write-Host "  [デバッグ] パターン '$selectedId' を発見しました" -ForegroundColor Green
 
         # バージョンチェック
         if ($pattern.version -ne $selectedVersion) {
@@ -140,15 +165,34 @@ function Validate-Manifest {
     }
 
     # 実行順序の検証（Behaviors）
+    Write-Host "  [デバッグ] assembly_order検証を開始" -ForegroundColor Gray
     if ($Manifest.assembly_order) {
-        $behaviorPatterns = $Manifest.selected_patterns | Where-Object {
-            $selectedId = $_.id
-            $pattern = $CatalogIndex.patterns | Where-Object { $_.id -eq $selectedId }
-            $pattern -and $pattern.category -eq "pipeline-behavior"
+        # Behaviorパターンのみを抽出
+        $behaviorPatterns = @()
+        foreach ($selected in $Manifest.selected_patterns) {
+            $selectedId = $selected.id
+
+            # カタログからパターンを検索
+            $pattern = $null
+            foreach ($p in $CatalogIndex.patterns) {
+                if ($p.id -eq $selectedId) {
+                    $pattern = $p
+                    break
+                }
+            }
+
+            # pipeline-behaviorカテゴリのみ対象
+            if ($pattern -and $pattern.category -eq "pipeline-behavior") {
+                $behaviorPatterns += $selected
+                Write-Host "  [デバッグ] Behavior検出: $selectedId" -ForegroundColor Gray
+            }
         }
 
         $orderedIds = $Manifest.assembly_order
         $selectedBehaviorIds = $behaviorPatterns | ForEach-Object { $_.id }
+
+        Write-Host "  [デバッグ] 選択されたBehavior: $($selectedBehaviorIds -join ', ')" -ForegroundColor Gray
+        Write-Host "  [デバッグ] assembly_order: $($orderedIds -join ', ')" -ForegroundColor Gray
 
         foreach ($behaviorId in $selectedBehaviorIds) {
             if ($behaviorId -notin $orderedIds) {

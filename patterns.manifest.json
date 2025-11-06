@@ -58,11 +58,11 @@
     }
   ],
   "assembly_order": [
-    "Metrics",
-    "Validation",
-    "Authorization",
-    "Transaction",
-    "Logging"
+    "metrics-behavior",
+    "validation-behavior",
+    "authorization-behavior",
+    "transaction-behavior",
+    "logging-behavior"
   ],
   "custom_patterns": []
 }
