@@ -23,8 +23,6 @@ using ProductCatalog.Shared.Application.DTOs;
 using Shared.Domain.Identity;
 using Shared.Domain.AuditLogs;
 using ProductCatalog.Shared.Domain.Products;
-using Shared.Infrastructure.Platform.Stores;
-using Shared.Infrastructure.Platform.Persistence;
 using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 using Shared.Infrastructure.Services;
 using ProductCatalog.Host.Components;
@@ -389,7 +387,8 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
-        builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>));
+        // Note: IdempotencyBehavior is disabled for E2E tests
+        // builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>));
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>));
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
 
@@ -418,8 +417,8 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         // Correlation ID Accessor
         builder.Services.AddScoped<ICorrelationIdAccessor, CorrelationIdAccessor>();
 
-        // Idempotency Store
-        builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
+        // Note: Idempotency Store is disabled for E2E tests (IdempotencyBehavior is not used)
+        // builder.Services.AddSingleton<Shared.Abstractions.Platform.IIdempotencyStore, InMemoryIdempotencyStore>();
 
         // DbContext (InMemory for Test)
         // ProductCatalog BC DbContext (Product entities)
@@ -429,10 +428,6 @@ public abstract class PlaywrightTestBase : IAsyncLifetime
         // Platform DbContext (Identity, RefreshToken, Outbox, AuditLog)
         builder.Services.AddDbContext<PlatformDbContext>(options =>
             options.UseInMemoryDatabase("TestDatabase_Platform"));
-
-        // Legacy AppDbContext for compatibility
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseInMemoryDatabase("TestDatabase"));
 
         // Note: ASP.NET Core Identity is NOT configured for tests
         // We use TestAuthenticationHandler instead for simplified authentication

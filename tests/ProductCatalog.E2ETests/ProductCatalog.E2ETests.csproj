@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProductCatalog.Host\ProductCatalog.Host.csproj" />
     <ProjectReference Include="..\..\src\ProductCatalog\Shared\Infrastructure\Persistence\ProductCatalog.Shared.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Shared\Abstractions\Shared.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
 
     <!-- Feature UI projects - Required for Blazor Router to discover @page routes -->
