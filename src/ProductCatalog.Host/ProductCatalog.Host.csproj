@@ -77,7 +77,7 @@
     <ProjectReference Include="..\ProductCatalog\Features\BulkUpdateProductPrices\UI\BulkUpdateProductPrices.UI.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\UI\ExportProductsToCsv.UI.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\UI\ImportProductsFromCsv.UI.csproj" />
-    <ProjectReference Include="..\Shared.Infrastructure.Platform\Shared.Infrastructure.Platform.csproj" />
-    <ProjectReference Include="..\Shared.Abstractions\Shared.Abstractions.csproj" />
+    <ProjectReference Include="..\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
+    <ProjectReference Include="..\Shared\Abstractions\Shared.Abstractions.csproj" />
   </ItemGroup>
 </Project>

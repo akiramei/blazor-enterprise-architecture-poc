@@ -16,7 +16,7 @@
     <ProjectReference Include="..\..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
     <ProjectReference Include="..\..\..\..\Shared\Application\Shared.Application.csproj" />
     <ProjectReference Include="..\..\..\..\Shared\Infrastructure\Shared.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\..\..\Shared.Abstractions\Shared.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Shared\Abstractions\Shared.Abstractions.csproj" />
     <ProjectReference Include="..\..\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
     <ProjectReference Include="..\..\Application\ProductCatalog.Shared.Application.csproj" />
   </ItemGroup>

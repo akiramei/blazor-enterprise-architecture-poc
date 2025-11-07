@@ -5,6 +5,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Exclude Platform folder which is a separate project -->
+  <ItemGroup>
+    <Compile Remove="Platform\**" />
+    <EmbeddedResource Remove="Platform\**" />
+    <None Remove="Platform\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
@@ -22,7 +29,7 @@
     <ProjectReference Include="..\Kernel\Shared.Kernel.csproj" />
     <ProjectReference Include="..\Application\Shared.Application.csproj" />
     <ProjectReference Include="..\Domain\Shared.Domain.csproj" />
-    <ProjectReference Include="..\..\Shared.Abstractions\Shared.Abstractions.csproj" />
+    <ProjectReference Include="..\Abstractions\Shared.Abstractions.csproj" />
     <ProjectReference Include="..\..\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
   </ItemGroup>
 </Project>

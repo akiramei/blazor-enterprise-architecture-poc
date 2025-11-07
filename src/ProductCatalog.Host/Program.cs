@@ -14,7 +14,7 @@ using Shared.Application.Interfaces;
 using Shared.Domain.Identity;
 using ProductCatalog.Shared.Domain.Products;
 using Shared.Infrastructure.Authentication;
-using Shared.Infrastructure.Idempotency;
+using Shared.Infrastructure.Platform.Stores;
 using ProductCatalog.Shared.Infrastructure.Persistence;
 using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 using ProductCatalog.Host.Services;
@@ -23,7 +23,7 @@ using ProductCatalog.Shared.UI.Actions;
 using ProductCatalog.Shared.UI.Store;
 using Serilog;
 using GetProducts.Application;
-using Shared.Infrastructure.Persistence;
+using Shared.Infrastructure.Platform.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -122,8 +122,7 @@ builder.Services.AddSingleton<Shared.Abstractions.Platform.IIdempotencyStore, Sh
 // Outbox Readers (トランザクショナルOutboxパターン - 読み取り実装)
 builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, ProductCatalog.Shared.Infrastructure.Persistence.ProductCatalogOutboxReader>();
 
-// Legacy Idempotency Store (Old Interface - for compatibility)
-builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
+// Legacy Idempotency Store (Old Interface - for compatibility) - removed as it's deprecated
 
 // DbContext (Infrastructure.Platform Pattern)
 if (builder.Environment.IsEnvironment("Test"))
@@ -134,10 +133,6 @@ if (builder.Environment.IsEnvironment("Test"))
 
     builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
         options.UseInMemoryDatabase("TestDatabase_Platform"));
-
-    // Legacy AppDbContext for compatibility
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase"));
 }
 else
 {
@@ -148,10 +143,6 @@ else
         options.UseNpgsql(connectionString));
 
     builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
-        options.UseNpgsql(connectionString));
-
-    // Legacy AppDbContext for compatibility
-    builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(connectionString));
 }
 
@@ -250,10 +241,12 @@ builder.Services.AddScoped<ProductEditActions>();
 builder.Services.AddScoped<ProductSearchActions>();
 
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
-builder.Services.AddHostedService<Shared.Infrastructure.Outbox.OutboxBackgroundService>();
+// TODO: Restore when OutboxBackgroundService is moved to correct location
+// builder.Services.AddHostedService<Shared.Infrastructure.Platform.Outbox.OutboxBackgroundService>();
 
 // Identity Data Seeder
-builder.Services.AddScoped<Shared.Infrastructure.Identity.IdentityDataSeeder>();
+// TODO: Restore when IdentityDataSeeder is moved to correct location
+// builder.Services.AddScoped<Shared.Infrastructure.Platform.Identity.IdentityDataSeeder>();
 
 // Controllers（REST API用）
 builder.Services.AddControllers()
@@ -374,8 +367,9 @@ if (!app.Environment.IsEnvironment("Test"))
     }
 
         // Seed Identity data (Roles and Users)
-        var identitySeeder = scope.ServiceProvider.GetRequiredService<Shared.Infrastructure.Identity.IdentityDataSeeder>();
-        await identitySeeder.SeedAsync();
+        // TODO: Restore when IdentityDataSeeder is moved to correct location
+        // var identitySeeder = scope.ServiceProvider.GetRequiredService<Shared.Infrastructure.Platform.Identity.IdentityDataSeeder>();
+        // await identitySeeder.SeedAsync();
     }
 }
 
