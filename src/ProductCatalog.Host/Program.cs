@@ -115,11 +115,12 @@ builder.Services.AddScoped<IProductNotificationService, ProductCatalog.Host.Serv
 builder.Services.AddScoped<ICorrelationIdAccessor, Shared.Infrastructure.Services.CorrelationIdAccessor>();
 
 // Infrastructure.Platform Stores (Port/Adapter Pattern)
-builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxStore, Shared.Infrastructure.Platform.Stores.OutboxStore>();
 builder.Services.AddScoped<Shared.Abstractions.Platform.IAuditLogStore, Shared.Infrastructure.Platform.Stores.AuditLogStore>();
 builder.Services.AddSingleton<Shared.Abstractions.Platform.IIdempotencyStore, Shared.Infrastructure.Platform.Stores.InMemoryIdempotencyStore>();
 
 // Outbox Readers (トランザクショナルOutboxパターン - 読み取り実装)
+// NOTE: IOutboxStoreは使用しない。理由: TransactionBehaviorが直接DbContextに書き込むことで
+//       トランザクション保証を確保するため。詳細: docs/architecture/OUTBOX_PATTERN.md
 builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, ProductCatalog.Shared.Infrastructure.Persistence.ProductCatalogOutboxReader>();
 
 // Legacy Idempotency Store (Old Interface - for compatibility) - removed as it's deprecated
@@ -241,12 +242,10 @@ builder.Services.AddScoped<ProductEditActions>();
 builder.Services.AddScoped<ProductSearchActions>();
 
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
-// TODO: Restore when OutboxBackgroundService is moved to correct location
-// builder.Services.AddHostedService<Shared.Infrastructure.Platform.Outbox.OutboxBackgroundService>();
+builder.Services.AddHostedService<Shared.Infrastructure.Platform.OutboxBackgroundService>();
 
 // Identity Data Seeder
-// TODO: Restore when IdentityDataSeeder is moved to correct location
-// builder.Services.AddScoped<Shared.Infrastructure.Platform.Identity.IdentityDataSeeder>();
+builder.Services.AddScoped<Shared.Infrastructure.Platform.IdentityDataSeeder>();
 
 // Controllers（REST API用）
 builder.Services.AddControllers()
@@ -367,9 +366,8 @@ if (!app.Environment.IsEnvironment("Test"))
     }
 
         // Seed Identity data (Roles and Users)
-        // TODO: Restore when IdentityDataSeeder is moved to correct location
-        // var identitySeeder = scope.ServiceProvider.GetRequiredService<Shared.Infrastructure.Platform.Identity.IdentityDataSeeder>();
-        // await identitySeeder.SeedAsync();
+        var identitySeeder = scope.ServiceProvider.GetRequiredService<Shared.Infrastructure.Platform.IdentityDataSeeder>();
+        await identitySeeder.SeedAsync();
     }
 }
 

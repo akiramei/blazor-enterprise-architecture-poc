@@ -94,7 +94,7 @@ public sealed class Product : AggregateRoot<ProductId>
         var product = new Product(ProductId.New(), name, description, price, initialStock);
 
         // ドメインイベントを発行（統合イベント配信、通知などに使用）
-        // product.RaiseDomainEvent(new ProductCreatedDomainEvent(product.Id, name, price));
+        product.RaiseDomainEvent(new ProductCreatedDomainEvent(product.Id, name, price, initialStock));
 
         return product;
     }
@@ -115,6 +115,9 @@ public sealed class Product : AggregateRoot<ProductId>
         }
 
         _name = name;
+
+        // 商品更新イベントを発行
+        RaiseDomainEvent(new ProductUpdatedDomainEvent(Id, name));
     }
 
     /// <summary>

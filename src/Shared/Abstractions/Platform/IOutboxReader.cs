@@ -48,3 +48,26 @@ public interface IOutboxReader
     /// <param name="cancellationToken">キャンセルトークン</param>
     Task MarkFailedAsync(Guid id, string error, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// OutboxメッセージDTO（Platform層のデータ転送オブジェクト）
+///
+/// 【重要】これはドメインモデルではなく、Platform層のDTOです。
+///
+/// 目的:
+/// - BC間のデータ転送用の軽量オブジェクト
+/// - IOutboxReaderが各BCのドメインモデルから変換して返す
+///
+/// 変換例:
+/// - Shared.Domain.Outbox.OutboxMessage (ドメインモデル)
+///   → Shared.Abstractions.Platform.OutboxMessage (DTO)
+/// </summary>
+public sealed class OutboxMessage
+{
+    public Guid Id { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTime OccurredOnUtc { get; set; }
+    public DateTime? ProcessedOnUtc { get; set; }
+    public string? Error { get; set; }
+}

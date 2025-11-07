@@ -1,0 +1,4 @@
+- Coding style: file-scoped namespaces, `sealed` classes/records, immutable constructor parameters, nullable + implicit usings enabled. Commands/queries follow CQRS naming (`*Command`, `*Query`) with matching `*Handler` and `*Validator` classes. DTOs end with `Dto`, store state records end with `State`, and UI actions live under `UI/Actions`.
+- Documentation: XML doc comments (Japanese) describe intent and must be kept in sync; README + docs include architecture rationale and AI-facing instructions.
+- Testing style: xUnit with FluentAssertions/Moq, tests named `Method_ShouldOutcome_WhenCondition`, and coverage via coverlet.
+- Tools/scripts: `scripts/validate-vsa-structure.sh` enforces Vertical Slice layout; docs stress avoiding layered architecture regressions.

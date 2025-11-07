@@ -21,13 +21,29 @@ podman compose logs postgres
 
 ```bash
 # プロジェクトルートディレクトリで実行
-dotnet ef database update --project src/ProductCatalog.Infrastructure --startup-project src/ProductCatalog.Web
+
+# PlatformDbContext (Identity, Outbox, AuditLog)
+dotnet ef migrations add InitialPlatform \
+  --context PlatformDbContext \
+  --project src/Shared/Infrastructure/Platform/Shared.Infrastructure.Platform.csproj \
+  --startup-project src/ProductCatalog.Host/ProductCatalog.Host.csproj \
+  --output-dir Persistence/Migrations
+
+# ProductCatalogDbContext (Product entities)
+dotnet ef migrations add InitialProductCatalog \
+  --context ProductCatalogDbContext \
+  --project src/ProductCatalog/Shared/Infrastructure/Persistence/ProductCatalog.Shared.Infrastructure.Persistence.csproj \
+  --startup-project src/ProductCatalog.Host/ProductCatalog.Host.csproj \
+  --output-dir Migrations
+
+# マイグレーションを適用（アプリケーション起動時に自動実行されます）
+# dotnet ef database update は不要です（Program.csで自動実行）
 ```
 
 ### 3. アプリケーションの起動
 
 ```bash
-dotnet run --project src/ProductCatalog.Web
+dotnet run --project src/ProductCatalog.Host
 ```
 
 ブラウザで `https://localhost:5001` にアクセスしてください。
@@ -115,21 +131,29 @@ podman exec -it productcatalog-postgres psql -U postgres -d ProductCatalogDb
 ### マイグレーションの作成
 
 ```bash
-dotnet ef migrations add <MigrationName> --project src/ProductCatalog.Infrastructure --startup-project src/ProductCatalog.Web
+# PlatformDbContextのマイグレーション
+dotnet ef migrations add <MigrationName> --context PlatformDbContext --startup-project src/ProductCatalog.Host --output-dir ../Shared/Infrastructure/Platform/Persistence/Migrations
+
+# ProductCatalogDbContextのマイグレーション
+dotnet ef migrations add <MigrationName> --context ProductCatalogDbContext --startup-project src/ProductCatalog.Host --output-dir Shared/Infrastructure/Persistence/Migrations
 ```
 
 ### マイグレーションの取り消し
 
 ```bash
-dotnet ef migrations remove --project src/ProductCatalog.Infrastructure --startup-project src/ProductCatalog.Web
+# PlatformDbContext
+dotnet ef migrations remove --context PlatformDbContext --startup-project src/ProductCatalog.Host
+
+# ProductCatalogDbContext
+dotnet ef migrations remove --context ProductCatalogDbContext --startup-project src/ProductCatalog.Host
 ```
 
 ### データベースのリセット
 
 ```bash
 # 1. データベースを削除
-dotnet ef database drop --project src/ProductCatalog.Infrastructure --startup-project src/ProductCatalog.Web --force
+dotnet ef database drop --context PlatformDbContext --startup-project src/ProductCatalog.Host --force
 
-# 2. マイグレーションを再適用
-dotnet ef database update --project src/ProductCatalog.Infrastructure --startup-project src/ProductCatalog.Web
+# 2. マイグレーションを再適用（アプリケーション起動時に自動実行）
+dotnet run --project src/ProductCatalog.Host
 ```

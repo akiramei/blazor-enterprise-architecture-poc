@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProductCatalog.Host\ProductCatalog.Host.csproj" />
+    <ProjectReference Include="..\..\src\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
   </ItemGroup>
 
 </Project>

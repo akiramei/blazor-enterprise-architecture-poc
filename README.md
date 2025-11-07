@@ -68,7 +68,7 @@ src/
 │
 ├── Shared/                            # グローバル共通コード（全BC共有）
 │   ├── Abstractions/                  # プラットフォーム抽象化
-│   │   └── Platform/                  # IOutboxStore, IIdempotencyStore等
+│   │   └── Platform/                  # IOutboxReader, IIdempotencyStore, IAuditLogStore等
 │   ├── Application/                   # ICommand, IQuery, Result
 │   │   ├── Attributes/                # AuthorizeAttribute等
 │   │   ├── Common/                    # PagedResult, BulkOperationResult
@@ -77,13 +77,13 @@ src/
 │   │   ├── Identity/                  # ApplicationUser, Roles
 │   │   ├── AuditLogs/                 # AuditLog
 │   │   ├── Idempotency/               # IdempotencyRecord
-│   │   └── Outbox/                    # OutboxMessage
+│   │   └── Outbox/                    # OutboxMessage (ドメインモデル)
 │   ├── Infrastructure/                # グローバル横断的関心事
 │   │   ├── Platform/                  # プラットフォーム実装
 │   │   │   ├── Api/                   # 認証API（AuthController）
 │   │   │   ├── Persistence/           # PlatformDbContext
 │   │   │   ├── Repositories/          # AuditLogRepository等
-│   │   │   └── Stores/                # OutboxStore, AuditLogStore等
+│   │   │   └── Stores/                # AuditLogStore, IdempotencyStore等
 │   │   ├── Authentication/            # JWT生成/検証
 │   │   ├── Behaviors/                 # MediatR Pipeline Behaviors
 │   │   ├── Metrics/                   # ApplicationMetrics
@@ -166,12 +166,12 @@ dotnet run
 
 **管理者アカウント:**
 - メールアドレス: `admin@example.com`
-- パスワード: `Admin@123456`
+- パスワード: `Admin@123`
 - ロール: Admin
 
 **一般ユーザーアカウント:**
 - メールアドレス: `user@example.com`
-- パスワード: `User@123456`
+- パスワード: `User@123`
 - ロール: User
 
 ブラウザで `https://localhost:5001` を開き、上記アカウントでログイン後、「商品管理」を選択します（管理者のみアクセス可）。
