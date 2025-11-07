@@ -67,6 +67,8 @@ src/
 │   └── Services/                      # ホストレベルサービス
 │
 ├── Shared/                            # グローバル共通コード（全BC共有）
+│   ├── Abstractions/                  # プラットフォーム抽象化
+│   │   └── Platform/                  # IOutboxStore, IIdempotencyStore等
 │   ├── Application/                   # ICommand, IQuery, Result
 │   │   ├── Attributes/                # AuthorizeAttribute等
 │   │   ├── Common/                    # PagedResult, BulkOperationResult
@@ -77,13 +79,14 @@ src/
 │   │   ├── Idempotency/               # IdempotencyRecord
 │   │   └── Outbox/                    # OutboxMessage
 │   ├── Infrastructure/                # グローバル横断的関心事
+│   │   ├── Platform/                  # プラットフォーム実装
+│   │   │   ├── Api/                   # 認証API（AuthController）
+│   │   │   ├── Persistence/           # PlatformDbContext
+│   │   │   ├── Repositories/          # AuditLogRepository等
+│   │   │   └── Stores/                # OutboxStore, AuditLogStore等
 │   │   ├── Authentication/            # JWT生成/検証
 │   │   ├── Behaviors/                 # MediatR Pipeline Behaviors
-│   │   ├── Identity/                  # IdentityDataSeeder
-│   │   ├── Idempotency/               # InMemoryIdempotencyStore
 │   │   ├── Metrics/                   # ApplicationMetrics
-│   │   ├── Outbox/                    # OutboxBackgroundService
-│   │   ├── Persistence/               # AppDbContext, EF Configurations
 │   │   └── Services/                  # CurrentUserService等
 │   └── Kernel/                        # ドメイン基底クラス
 │       ├── Entity.cs
@@ -91,15 +94,6 @@ src/
 │       ├── ValueObject.cs
 │       ├── DomainEvent.cs
 │       └── DomainException.cs
-│
-├── Shared.Abstractions/               # プラットフォーム抽象化
-│   └── Platform/                      # IOutboxStore, IIdempotencyStore等
-│
-└── Shared.Infrastructure.Platform/    # プラットフォーム実装
-    ├── Api/                           # 認証API（AuthController）
-    ├── Persistence/                   # PlatformDbContext
-    ├── Repositories/                  # AuditLogRepository等
-    └── Stores/                        # OutboxStore, AuditLogStore等
 ```
 
 **VSAの特徴:**
@@ -246,7 +240,7 @@ ProductCatalog/Shared → Shared（グローバル共通）
 2. **共通ドメイン集約**: Product集約を`ProductCatalog/Shared/Domain`に集約し、全機能で共有
 3. **グローバル共通とBC共通の分離**:
    - `Shared/`（全BC共有）と`ProductCatalog/Shared`（BC内共有）を明確に分離
-   - `Shared.Abstractions/`でプラットフォーム抽象化、`Shared.Infrastructure.Platform/`で実装
+   - `Shared/Abstractions/`でプラットフォーム抽象化、`Shared/Infrastructure/Platform/`で実装
 4. **都度スコープ作成**: `IServiceScopeFactory`を使用してDbContextリークを防止
 5. **不変State**: `record`による不変状態オブジェクト
 6. **ビジネスルール保護**: Product集約によるルール集約
