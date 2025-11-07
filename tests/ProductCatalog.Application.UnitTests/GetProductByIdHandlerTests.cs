@@ -3,18 +3,19 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using GetProductById.Application;
 using ProductCatalog.Shared.Domain.Products;
+using ProductCatalog.Shared.Application;
 
 namespace ProductCatalog.Application.UnitTests;
 
 public class GetProductByIdHandlerTests
 {
-    private readonly Mock<IProductRepository> _repositoryMock;
+    private readonly Mock<IProductReadRepository> _repositoryMock;
     private readonly Mock<ILogger<GetProductByIdHandler>> _loggerMock;
     private readonly GetProductByIdHandler _handler;
 
     public GetProductByIdHandlerTests()
     {
-        _repositoryMock = new Mock<IProductRepository>();
+        _repositoryMock = new Mock<IProductReadRepository>();
         _loggerMock = new Mock<ILogger<GetProductByIdHandler>>();
         _handler = new GetProductByIdHandler(
             _repositoryMock.Object,
