@@ -142,6 +142,7 @@ builder.Services.AddSingleton<Shared.Application.Interfaces.IIdempotencyStore>(i
 // NOTE: IOutboxStoreは使用しない。理由: TransactionBehaviorが直接DbContextに書き込むことで
 //       トランザクション保証を確保するため。詳細: docs/architecture/OUTBOX_PATTERN.md
 builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, ProductCatalog.Shared.Infrastructure.Persistence.ProductCatalogOutboxReader>();
+builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, PurchaseManagement.Infrastructure.Persistence.PurchaseManagementOutboxReader>();
 
 // Legacy Idempotency Store (Old Interface - for compatibility) - removed as it's deprecated
 

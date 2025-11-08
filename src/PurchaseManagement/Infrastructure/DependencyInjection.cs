@@ -56,6 +56,8 @@ public static class DependencyInjection
         // TODO: Shared.Infrastructure.Services.CurrentUserServiceを使用するよう変更
         services.AddScoped<PurchaseManagement.Shared.Application.ICurrentUserService, CurrentUserServiceAdapter>();
 
+        // NOTE: OutboxReaderはProgram.csで登録される（ProductCatalogと同じパターンに従う）
+
         return services;
     }
 }
