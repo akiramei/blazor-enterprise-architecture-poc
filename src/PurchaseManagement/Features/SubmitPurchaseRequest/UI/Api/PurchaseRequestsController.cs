@@ -13,6 +13,7 @@ using CancelPurchaseRequest.Application;
 using GetPurchaseRequests.Application;
 using GetPurchaseRequestById.Application;
 using GetPendingApprovals.Application;
+using GetDashboardStatistics.Application;
 
 namespace PurchaseManagement.Features.Api.V1.PurchaseRequests;
 
@@ -336,6 +337,46 @@ public sealed class PurchaseRequestsController : ControllerBase
             return BadRequest(new ProblemDetails
             {
                 Title = "Failed to retrieve pending approvals",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// ダッシュボード統計情報取得
+    /// </summary>
+    /// <param name="monthsToInclude">月次統計の取得月数（デフォルト: 12）</param>
+    /// <param name="topRequestsCount">トップ申請の取得件数（デフォルト: 10）</param>
+    /// <param name="topDepartmentsCount">部門統計の取得件数（デフォルト: 5）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>ダッシュボード統計情報</returns>
+    [HttpGet("dashboard/statistics")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Approver}")]
+    [ProducesResponseType(typeof(DashboardStatisticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<DashboardStatisticsDto>> GetDashboardStatistics(
+        [FromQuery] int monthsToInclude = 12,
+        [FromQuery] int topRequestsCount = 10,
+        [FromQuery] int topDepartmentsCount = 5,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetDashboardStatisticsQuery
+        {
+            MonthsToInclude = monthsToInclude,
+            TopRequestsCount = topRequestsCount,
+            TopDepartmentsCount = topDepartmentsCount
+        };
+
+        var result = await _mediator.Send(query, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Failed to retrieve dashboard statistics",
                 Detail = result.Error,
                 Status = StatusCodes.Status400BadRequest
             });
