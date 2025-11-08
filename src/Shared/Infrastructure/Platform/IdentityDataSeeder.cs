@@ -137,6 +137,24 @@ public sealed class IdentityDataSeeder
         if (existingUser != null)
         {
             _logger.LogInformation("User '{Email}' already exists", email);
+
+            // Check if user has TenantId claim and add if missing
+            var claims = await _userManager.GetClaimsAsync(existingUser);
+            if (!claims.Any(c => c.Type == "TenantId"))
+            {
+                var tenantClaim = new Claim("TenantId", tenantId.ToString());
+                var claimResult = await _userManager.AddClaimAsync(existingUser, tenantClaim);
+                if (claimResult.Succeeded)
+                {
+                    _logger.LogInformation("TenantId claim '{TenantId}' added to existing user '{Email}'", tenantId, email);
+                }
+                else
+                {
+                    _logger.LogError("Failed to add TenantId claim to existing user '{Email}': {Errors}",
+                        email,
+                        string.Join(", ", claimResult.Errors.Select(e => e.Description)));
+                }
+            }
             return;
         }
 

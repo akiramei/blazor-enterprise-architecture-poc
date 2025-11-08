@@ -84,6 +84,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(GetPendingApprovals.Application.GetPendingApprovalsHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(GetDashboardStatistics.Application.GetDashboardStatisticsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(UploadAttachment.Application.UploadAttachmentHandler).Assembly);
 });
 
 // FluentValidation - すべてのFeature Applicationアセンブリを登録
@@ -109,7 +110,8 @@ builder.Services.AddValidatorsFromAssemblies(new[]
     typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly,
     typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly,
     typeof(GetPendingApprovals.Application.GetPendingApprovalsHandler).Assembly,
-    typeof(GetDashboardStatistics.Application.GetDashboardStatisticsHandler).Assembly
+    typeof(GetDashboardStatistics.Application.GetDashboardStatisticsHandler).Assembly,
+    typeof(UploadAttachment.Application.UploadAttachmentHandler).Assembly
 });
 
 // Pipeline Behaviors（登録順序が重要！）

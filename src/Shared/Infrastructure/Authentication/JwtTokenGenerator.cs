@@ -38,6 +38,7 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
     public async Task<string> GenerateAccessTokenAsync(ApplicationUser user)
     {
         var roles = await _userManager.GetRolesAsync(user);
+        var userClaims = await _userManager.GetClaimsAsync(user);
 
         var claims = new List<Claim>
         {
@@ -49,6 +50,9 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 
         // ロールをClaimsに追加
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+        // ユーザーのカスタムClaimsを追加（TenantIdなど）
+        claims.AddRange(userClaims);
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
