@@ -25,6 +25,9 @@ using Serilog;
 using GetProducts.Application;
 using Shared.Infrastructure.Platform.Persistence;
 using PurchaseManagement.Infrastructure;
+using Hangfire;
+using Hangfire.PostgreSql;
+using ProductCatalog.Host.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -288,6 +291,22 @@ builder.Services.AddScoped<ProductSearchActions>();
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
 builder.Services.AddHostedService<Shared.Infrastructure.Platform.OutboxBackgroundService>();
 
+// Hangfire (Background Job Processing)
+builder.Services.AddHangfire(configuration => configuration
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options =>
+        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+// Hangfire Server (Background Job Processor)
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = Environment.ProcessorCount * 2; // CPU コア数 × 2
+    options.Queues = new[] { "default", "critical", "low" }; // 優先度付きキュー
+    options.ServerName = $"{Environment.MachineName}-{Guid.NewGuid().ToString()[..8]}";
+});
+
 // Identity Data Seeder
 builder.Services.AddScoped<Shared.Infrastructure.Platform.IdentityDataSeeder>();
 
@@ -459,6 +478,12 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Hangfire Dashboard (管理者のみアクセス可能)
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new HangfireAuthorizationFilter() }
+});
+
 app.UseAntiforgery();
 
 app.UseStaticFiles();
@@ -483,6 +508,33 @@ foreach (var ds in app.Services.GetServices<Microsoft.AspNetCore.Routing.Endpoin
     }
 }
 // === End E2E Debug ===
+
+// Hangfire Recurring Jobs (定期実行ジョブの登録)
+// 開発環境では無効化（テストデータが汚染されるのを防ぐため）
+if (!app.Environment.IsEnvironment("Test"))
+{
+    // 毎日午前3時に古いデータをクリーンアップ
+    RecurringJob.AddOrUpdate<ProductCatalog.Host.Jobs.SampleBackgroundJobs>(
+        "daily-cleanup",
+        job => job.CleanupOldData(default),
+        Cron.Daily(3), // 午前3時
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time")
+        });
+
+    // 毎月1日の午前2時に月次レポート生成
+    RecurringJob.AddOrUpdate<ProductCatalog.Host.Jobs.SampleBackgroundJobs>(
+        "monthly-report",
+        job => job.GenerateMonthlyReport(default),
+        Cron.Monthly(1, 2), // 毎月1日の午前2時
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time")
+        });
+
+    app.Logger.LogInformation("Hangfire recurring jobs registered successfully");
+}
 
 app.Run();
 
