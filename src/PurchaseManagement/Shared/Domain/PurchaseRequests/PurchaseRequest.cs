@@ -8,11 +8,14 @@ namespace PurchaseManagement.Shared.Domain.PurchaseRequests;
 /// <summary>
 /// 購買申請（集約ルート）
 /// </summary>
-public class PurchaseRequest : AggregateRoot<Guid>
+public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
 {
     private readonly PurchaseRequestStateMachine _stateMachine = new();
     private readonly List<ApprovalStep> _approvalSteps = new();
     private readonly List<PurchaseRequestItem> _items = new();
+
+    // マルチテナント対応
+    public Guid TenantId { get; private set; }
 
     // 基本情報
     public PurchaseRequestNumber RequestNumber { get; private set; } = null!;
@@ -53,10 +56,14 @@ public class PurchaseRequest : AggregateRoot<Guid>
         Guid requesterId,
         string requesterName,
         string title,
-        string description)
+        string description,
+        Guid tenantId)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new DomainException("タイトルは必須です");
+
+        if (tenantId == Guid.Empty)
+            throw new DomainException("TenantIdは必須です");
 
         var request = new PurchaseRequest
         {
@@ -66,6 +73,7 @@ public class PurchaseRequest : AggregateRoot<Guid>
             RequesterName = requesterName,
             Title = title,
             Description = description,
+            TenantId = tenantId,
             Status = PurchaseRequestStatus.Draft,
             CreatedAt = DateTime.UtcNow
         };

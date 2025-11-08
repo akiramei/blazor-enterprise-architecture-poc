@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using PurchaseManagement.Shared.Domain;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
+using Shared.Application.Interfaces;
 using Shared.Domain.Outbox;
+using Shared.Kernel;
 
 namespace PurchaseManagement.Infrastructure.Persistence;
 
@@ -34,8 +36,13 @@ namespace PurchaseManagement.Infrastructure.Persistence;
 /// </summary>
 public sealed class PurchaseManagementDbContext : DbContext
 {
-    public PurchaseManagementDbContext(DbContextOptions<PurchaseManagementDbContext> options) : base(options)
+    private readonly IAppContext _appContext;
+
+    public PurchaseManagementDbContext(
+        DbContextOptions<PurchaseManagementDbContext> options,
+        IAppContext appContext) : base(options)
     {
+        _appContext = appContext;
     }
 
     // ビジネスエンティティ
@@ -56,5 +63,51 @@ public sealed class PurchaseManagementDbContext : DbContext
         // PurchaseManagement BC のConfiguration適用
         // PurchaseManagement.Infrastructure.Persistence アセンブリから設定を読み込む
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PurchaseManagementDbContext).Assembly);
+
+        // Global Query Filter: マルチテナント分離
+        ApplyGlobalFilters(modelBuilder);
+    }
+
+    /// <summary>
+    /// Global Query Filterの適用
+    /// </summary>
+    /// <remarks>
+    /// IMultiTenantインターフェースを実装する全てのエンティティに対して、
+    /// 現在のユーザーのTenantIdでフィルタリングを自動適用します。
+    ///
+    /// フィルタの動作:
+    /// - TenantIdがnullの場合（未認証ユーザー）: 全てのデータを除外
+    /// - TenantIdが設定されている場合: そのテナントのデータのみ取得
+    ///
+    /// 全テナントのデータを取得する場合（管理者機能など）:
+    /// context.PurchaseRequests.IgnoreQueryFilters().ToList()
+    /// </remarks>
+    private void ApplyGlobalFilters(ModelBuilder modelBuilder)
+    {
+        // IMultiTenantを実装する全てのエンティティに対してテナント分離フィルタを適用
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(IMultiTenant).IsAssignableFrom(entityType.ClrType))
+            {
+                // 動的にメソッドを呼び出してフィルタを適用
+                var method = typeof(PurchaseManagementDbContext)
+                    .GetMethod(nameof(SetMultiTenantFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                    .MakeGenericMethod(entityType.ClrType);
+
+                method?.Invoke(this, new object[] { modelBuilder });
+            }
+        }
+    }
+
+    /// <summary>
+    /// マルチテナントフィルタを設定（ジェネリックメソッド）
+    /// </summary>
+    private void SetMultiTenantFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, IMultiTenant
+    {
+        var tenantId = _appContext.TenantId;
+
+        modelBuilder.Entity<TEntity>()
+            .HasQueryFilter(e => tenantId == null || e.TenantId == tenantId.Value);
     }
 }

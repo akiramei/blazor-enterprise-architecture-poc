@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PurchaseManagement.Shared.Application;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
 using Shared.Application;
+using Shared.Application.Interfaces;
 using Shared.Kernel;
 
 namespace SubmitPurchaseRequest.Application;
@@ -11,18 +12,18 @@ public class SubmitPurchaseRequestHandler : IRequestHandler<SubmitPurchaseReques
 {
     private readonly IPurchaseRequestRepository _repository;
     private readonly IApprovalFlowService _approvalFlowService;
-    private readonly ICurrentUserService _currentUserService;
+    private readonly IAppContext _appContext;
     private readonly ILogger<SubmitPurchaseRequestHandler> _logger;
 
     public SubmitPurchaseRequestHandler(
         IPurchaseRequestRepository repository,
         IApprovalFlowService approvalFlowService,
-        ICurrentUserService currentUserService,
+        IAppContext appContext,
         ILogger<SubmitPurchaseRequestHandler> logger)
     {
         _repository = repository;
         _approvalFlowService = approvalFlowService;
-        _currentUserService = currentUserService;
+        _appContext = appContext;
         _logger = logger;
     }
 
@@ -31,11 +32,14 @@ public class SubmitPurchaseRequestHandler : IRequestHandler<SubmitPurchaseReques
         try
         {
             // 1. 購買申請を作成
+            var tenantId = _appContext.TenantId ?? throw new InvalidOperationException("TenantIdが設定されていません");
+
             var request = PurchaseRequest.Create(
-                _currentUserService.UserId!.Value,
-                _currentUserService.UserName ?? "Unknown",
+                _appContext.UserId,
+                _appContext.UserName,
                 command.Title,
-                command.Description
+                command.Description,
+                tenantId
             );
 
             // 2. 明細を追加

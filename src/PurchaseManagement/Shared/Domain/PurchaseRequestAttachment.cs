@@ -27,7 +27,7 @@ namespace PurchaseManagement.Shared.Domain;
 /// - このエンティティはメタデータのみを保持
 /// - ダウンロード時はストレージパスを使用してファイルを取得
 /// </summary>
-public sealed class PurchaseRequestAttachment : Entity
+public sealed class PurchaseRequestAttachment : Entity, IMultiTenant
 {
     /// <summary>
     /// 許可するファイル拡張子
@@ -46,6 +46,11 @@ public sealed class PurchaseRequestAttachment : Entity
     /// 添付ファイルID
     /// </summary>
     public Guid Id { get; private set; }
+
+    /// <summary>
+    /// テナントID（マルチテナント対応）
+    /// </summary>
+    public Guid TenantId { get; private set; }
 
     /// <summary>
     /// 購買申請ID（外部キー）
@@ -135,6 +140,7 @@ public sealed class PurchaseRequestAttachment : Entity
         string contentType,
         Guid uploadedBy,
         string uploadedByName,
+        Guid tenantId,
         string? description = null)
     {
         // ファイルサイズの検証
@@ -148,6 +154,10 @@ public sealed class PurchaseRequestAttachment : Entity
         if (string.IsNullOrWhiteSpace(originalFileName))
             throw new ArgumentException("ファイル名は必須です", nameof(originalFileName));
 
+        // TenantIDの検証
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("TenantIdは必須です", nameof(tenantId));
+
         // 拡張子の検証
         var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
@@ -156,12 +166,13 @@ public sealed class PurchaseRequestAttachment : Entity
         // ストレージファイル名の生成（UUID + 拡張子）
         var storageFileName = $"{Guid.NewGuid()}{extension}";
 
-        // ストレージパスの生成（purchase-requests/{PurchaseRequestId}/{ファイル名}）
-        var storagePath = $"purchase-requests/{purchaseRequestId}/{storageFileName}";
+        // ストレージパスの生成（tenants/{TenantId}/purchase-requests/{PurchaseRequestId}/{ファイル名}）
+        var storagePath = $"tenants/{tenantId}/purchase-requests/{purchaseRequestId}/{storageFileName}";
 
         return new PurchaseRequestAttachment
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId,
             PurchaseRequestId = purchaseRequestId,
             OriginalFileName = originalFileName,
             StorageFileName = storageFileName,

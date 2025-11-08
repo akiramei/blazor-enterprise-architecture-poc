@@ -52,6 +52,11 @@ public sealed class PurchaseRequestConfiguration : IEntityTypeConfiguration<Purc
                 .IsRequired();
         });
 
+        // マルチテナント対応
+        builder.Property(pr => pr.TenantId)
+            .HasColumnName("TenantId")
+            .IsRequired();
+
         // 申請者
         builder.Property(pr => pr.RequesterId)
             .HasColumnName("RequesterId")
@@ -201,5 +206,23 @@ public sealed class PurchaseRequestConfiguration : IEntityTypeConfiguration<Purc
                     .IsRequired();
             });
         });
+
+        // インデックス
+        builder.HasIndex(pr => pr.TenantId)
+            .HasDatabaseName("IX_PurchaseRequests_TenantId");
+
+        builder.HasIndex(pr => pr.Status)
+            .HasDatabaseName("IX_PurchaseRequests_Status");
+
+        builder.HasIndex(pr => pr.RequesterId)
+            .HasDatabaseName("IX_PurchaseRequests_RequesterId");
+
+        builder.HasIndex(pr => pr.CreatedAt)
+            .HasDatabaseName("IX_PurchaseRequests_CreatedAt");
+
+        // Global Query Filter: マルチテナント分離
+        // NOTE: IAppContextはDbContext内で解決され、現在のユーザーのTenantIdでフィルタリング
+        // 管理者が全テナントのデータを見る必要がある場合は IgnoreQueryFilters() を使用
+        // 例: context.PurchaseRequests.IgnoreQueryFilters().Where(...)
     }
 }

@@ -18,6 +18,9 @@ public sealed class PurchaseRequestAttachmentConfiguration : IEntityTypeConfigur
         builder.Property(x => x.Id)
             .IsRequired();
 
+        builder.Property(x => x.TenantId)
+            .IsRequired();
+
         builder.Property(x => x.PurchaseRequestId)
             .IsRequired();
 
@@ -69,6 +72,9 @@ public sealed class PurchaseRequestAttachmentConfiguration : IEntityTypeConfigur
         builder.Property(x => x.DeletedAt);
 
         // Indexes
+        builder.HasIndex(x => x.TenantId)
+            .HasDatabaseName("IX_PurchaseRequestAttachments_TenantId");
+
         builder.HasIndex(x => x.PurchaseRequestId)
             .HasDatabaseName("IX_PurchaseRequestAttachments_PurchaseRequestId");
 
@@ -79,6 +85,7 @@ public sealed class PurchaseRequestAttachmentConfiguration : IEntityTypeConfigur
             .HasDatabaseName("IX_PurchaseRequestAttachments_UploadedAt");
 
         // Global Query Filter: 論理削除されたファイルを除外
+        // Note: IMultiTenantによるテナント分離フィルタは DbContext で自動適用されます
         builder.HasQueryFilter(x => !x.IsDeleted);
     }
 }
