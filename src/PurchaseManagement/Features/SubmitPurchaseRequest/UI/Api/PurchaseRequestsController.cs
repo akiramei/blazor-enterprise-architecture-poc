@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
+using Shared.Domain.Identity;
 using SubmitPurchaseRequest.Application;
 using ApprovePurchaseRequest.Application;
 using RejectPurchaseRequest.Application;
@@ -56,7 +57,6 @@ namespace PurchaseManagement.Features.Api.V1.PurchaseRequests;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/purchase-requests")]
-[Authorize]  // JWT認証が必要
 public sealed class PurchaseRequestsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -82,6 +82,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>購買申請一覧</returns>
     [HttpGet]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Requester},{Roles.Approver}")]
     [ProducesResponseType(typeof(List<PurchaseRequestListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<PurchaseRequestListItemDto>>> GetPurchaseRequests(
@@ -125,6 +126,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>購買申請詳細</returns>
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Requester},{Roles.Approver}")]
     [ProducesResponseType(typeof(PurchaseRequestDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PurchaseRequestDetailDto>> GetPurchaseRequestById(
@@ -154,6 +156,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>作成された購買申請ID</returns>
     [HttpPost]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Requester}")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<Guid>> SubmitPurchaseRequest(
@@ -187,6 +190,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>承認結果</returns>
     [HttpPost("{id:guid}/approve")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Approver}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -226,6 +230,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>却下結果</returns>
     [HttpPost("{id:guid}/reject")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Approver}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -265,6 +270,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>キャンセル結果</returns>
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Requester}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -305,6 +311,7 @@ public sealed class PurchaseRequestsController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>承認待ち申請一覧</returns>
     [HttpGet("pending-approvals")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Approver}")]
     [ProducesResponseType(typeof(List<PendingApprovalDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<PendingApprovalDto>>> GetPendingApprovals(
