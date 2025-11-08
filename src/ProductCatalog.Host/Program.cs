@@ -363,6 +363,10 @@ if (!app.Environment.IsEnvironment("Test"))
         var productCatalogContext = scope.ServiceProvider.GetRequiredService<ProductCatalogDbContext>();
         await productCatalogContext.Database.MigrateAsync();
 
+        // PurchaseManagement migrations (PurchaseRequest entities)
+        var purchaseManagementContext = scope.ServiceProvider.GetRequiredService<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>();
+        await purchaseManagementContext.Database.MigrateAsync();
+
         var repository = scope.ServiceProvider.GetRequiredService<IProductRepository>();
 
         // Seed sample data if empty
@@ -488,6 +492,7 @@ public partial class Program
     /// </summary>
     public static readonly System.Reflection.Assembly[] FeatureUIAssemblies = new[]
     {
+        // ProductCatalog BC
         "GetProducts.UI",
         "GetProductById.UI",
         "UpdateProduct.UI",
@@ -497,7 +502,12 @@ public partial class Program
         "BulkDeleteProducts.UI",
         "BulkUpdateProductPrices.UI",
         "ExportProductsToCsv.UI",
-        "ImportProductsFromCsv.UI"
+        "ImportProductsFromCsv.UI",
+
+        // PurchaseManagement BC
+        "SubmitPurchaseRequest.UI",
+        "GetPurchaseRequests.UI",
+        "GetPurchaseRequestById.UI"
     }
     .Select(name =>
     {
