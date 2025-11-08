@@ -150,13 +150,16 @@ if (builder.Environment.IsEnvironment("Test"))
 {
     // Test environment: InMemory databases
     builder.Services.AddDbContext<ProductCatalogDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase_ProductCatalog"));
+        options.UseInMemoryDatabase("TestDatabase_ProductCatalog")
+               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
 
     builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase_Platform"));
+        options.UseInMemoryDatabase("TestDatabase_Platform")
+               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
 
     builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase_PurchaseManagement"));
+        options.UseInMemoryDatabase("TestDatabase_PurchaseManagement")
+               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
 }
 else
 {

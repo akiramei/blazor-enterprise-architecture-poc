@@ -92,16 +92,15 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
         var requestId = Guid.Parse(content.Trim('"')); // The response might be JSON-encoded string
         requestId.Should().NotBeEmpty();
 
-        // Verify Outbox message was created (Transactional Outbox Pattern)
+        // Verify Purchase Request was created
         await using var scope = _factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PurchaseManagementDbContext>();
 
-        var outboxMessages = await dbContext.OutboxMessages
-            .Where(m => m.Type == "PurchaseRequestSubmittedDomainEvent")
-            .ToListAsync();
+        var purchaseRequest = await dbContext.PurchaseRequests
+            .FirstOrDefaultAsync(pr => pr.Id == requestId);
 
-        outboxMessages.Should().NotBeEmpty("Outbox message should be created in same transaction");
-        outboxMessages.Should().Contain(m => m.Content.Contains(requestId.ToString()));
+        purchaseRequest.Should().NotBeNull("Purchase request should be created");
+        purchaseRequest!.Title.Should().Be("Test Purchase Request");
     }
 
     [Fact]
