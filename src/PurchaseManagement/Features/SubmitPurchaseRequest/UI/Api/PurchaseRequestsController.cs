@@ -14,6 +14,7 @@ using GetPurchaseRequests.Application;
 using GetPurchaseRequestById.Application;
 using GetPendingApprovals.Application;
 using GetDashboardStatistics.Application;
+using UploadAttachment.Application;
 
 namespace PurchaseManagement.Features.Api.V1.PurchaseRequests;
 
@@ -383,5 +384,70 @@ public sealed class PurchaseRequestsController : ControllerBase
         }
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// 購買申請に添付ファイルをアップロード
+    /// </summary>
+    /// <param name="id">購買申請ID</param>
+    /// <param name="file">アップロードするファイル</param>
+    /// <param name="description">ファイルの説明（オプション）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>添付ファイルID</returns>
+    [HttpPost("{id:guid}/attachments")]
+    [Authorize(Roles = $"{Roles.Admin},{Roles.Requester}")]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [RequestSizeLimit(10 * 1024 * 1024)] // 10MB limit
+    public async Task<ActionResult<Guid>> UploadAttachment(
+        Guid id,
+        IFormFile file,
+        [FromForm] string? description,
+        CancellationToken cancellationToken = default)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "File upload failed",
+                Detail = "No file was uploaded",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        // IFormFileからbyte[]に変換
+        byte[] fileContent;
+        using (var memoryStream = new MemoryStream())
+        {
+            await file.CopyToAsync(memoryStream, cancellationToken);
+            fileContent = memoryStream.ToArray();
+        }
+
+        var command = new UploadAttachmentCommand
+        {
+            PurchaseRequestId = id,
+            FileName = file.FileName,
+            FileContent = fileContent,
+            ContentType = file.ContentType,
+            Description = description
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "File upload failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var attachmentId = result.Value;
+        return CreatedAtAction(
+            nameof(GetPurchaseRequestById),
+            new { id },
+            attachmentId);
     }
 }

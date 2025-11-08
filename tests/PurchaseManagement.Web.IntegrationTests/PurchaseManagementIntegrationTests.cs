@@ -630,4 +630,93 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
     }
 
     #endregion
+
+    #region ファイルアップロード統合テスト
+
+    [Fact]
+    public async Task UploadAttachment_ValidFile_ShouldSucceed()
+    {
+        // Arrange: 購買申請を作成
+        var requestId = await SeedTestPurchaseRequestAsync();
+
+        // テスト用ファイルを作成
+        var fileName = "test-document.pdf";
+        var fileContent = System.Text.Encoding.UTF8.GetBytes("This is a test PDF content");
+        var contentType = "application/pdf";
+
+        using var content = new MultipartFormDataContent();
+        using var fileContentBytes = new ByteArrayContent(fileContent);
+        fileContentBytes.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        content.Add(fileContentBytes, "file", fileName);
+        content.Add(new StringContent("Test file description"), "description");
+
+        // Act: ファイルアップロード
+        var response = await _client.PostAsync($"/api/v1/purchase-requests/{requestId}/attachments", content);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var attachmentId = await response.Content.ReadFromJsonAsync<Guid>();
+        attachmentId.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task UploadAttachment_EmptyFile_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var requestId = await SeedTestPurchaseRequestAsync();
+
+        using var content = new MultipartFormDataContent();
+        using var emptyFileContent = new ByteArrayContent(Array.Empty<byte>());
+        emptyFileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        content.Add(emptyFileContent, "file", "empty.pdf");
+
+        // Act
+        var response = await _client.PostAsync($"/api/v1/purchase-requests/{requestId}/attachments", content);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_InvalidFileExtension_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var requestId = await SeedTestPurchaseRequestAsync();
+
+        var fileContent = System.Text.Encoding.UTF8.GetBytes("Malicious executable content");
+        using var content = new MultipartFormDataContent();
+        using var fileBytes = new ByteArrayContent(fileContent);
+        fileBytes.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+        content.Add(fileBytes, "file", "malware.exe");
+
+        // Act
+        var response = await _client.PostAsync($"/api/v1/purchase-requests/{requestId}/attachments", content);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_NonExistentPurchaseRequest_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var token = await GetAuthTokenAsync();
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var nonExistentId = Guid.NewGuid();
+        var fileContent = System.Text.Encoding.UTF8.GetBytes("Test content");
+        using var content = new MultipartFormDataContent();
+        using var fileBytes = new ByteArrayContent(fileContent);
+        fileBytes.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        content.Add(fileBytes, "file", "test.pdf");
+
+        // Act
+        var response = await _client.PostAsync($"/api/v1/purchase-requests/{nonExistentId}/attachments", content);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    #endregion
 }
