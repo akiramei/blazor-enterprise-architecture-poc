@@ -60,6 +60,9 @@ public sealed class PurchaseManagementDbContext : DbContext
         modelBuilder.Ignore<PurchaseRequestNumber>();
         modelBuilder.Ignore<ProductCatalog.Shared.Domain.Products.Money>();
 
+        // DomainEventは別テーブルで管理されるため無視
+        modelBuilder.Ignore<DomainEvent>();
+
         // PurchaseManagement BC のConfiguration適用
         // PurchaseManagement.Infrastructure.Persistence アセンブリから設定を読み込む
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PurchaseManagementDbContext).Assembly);

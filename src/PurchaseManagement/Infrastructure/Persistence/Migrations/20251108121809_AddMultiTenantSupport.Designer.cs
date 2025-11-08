@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PurchaseManagement.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using PurchaseManagement.Infrastructure.Persistence;
 namespace PurchaseManagement.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PurchaseManagementDbContext))]
-    partial class PurchaseManagementDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251108121809_AddMultiTenantSupport")]
+    partial class AddMultiTenantSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
