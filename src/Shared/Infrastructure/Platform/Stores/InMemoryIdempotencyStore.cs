@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Shared.Abstractions.Platform;
+using Shared.Domain.Idempotency;
 
 namespace Shared.Infrastructure.Platform.Stores;
 
@@ -25,9 +26,9 @@ namespace Shared.Infrastructure.Platform.Stores;
 /// - アプリケーション再起動でデータ消失
 /// - 本番環境ではRedisIdempotencyStoreを使用すること
 /// </summary>
-public sealed class InMemoryIdempotencyStore : IIdempotencyStore
+public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Application.Interfaces.IIdempotencyStore
 {
-    private readonly ConcurrentDictionary<string, IdempotencyRecord> _store = new();
+    private readonly ConcurrentDictionary<string, LocalIdempotencyRecord> _store = new();
     private readonly ILogger<InMemoryIdempotencyStore> _logger;
 
     public InMemoryIdempotencyStore(ILogger<InMemoryIdempotencyStore> logger)
@@ -53,7 +54,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
             ? JsonSerializer.Serialize(result)
             : null;
 
-        var record = new IdempotencyRecord
+        var record = new LocalIdempotencyRecord
         {
             RequestId = requestId,
             Result = serializedResult,
@@ -83,6 +84,40 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         return Task.FromResult<object?>(null);
     }
 
+    // Shared.Application.Interfaces.IIdempotencyStore implementation
+    public Task<IdempotencyRecord?> GetAsync(string key, CancellationToken ct = default)
+    {
+        if (_store.TryGetValue(key, out var record))
+        {
+            // Convert local record to domain record using reflection (not ideal, but works)
+            // Create using the static Create method - we don't have the generic type here, so we use the deserialized object
+            var domainRecord = IdempotencyRecord.Create(
+                key,
+                "Unknown", // CommandType not stored in old format
+                record.Result ?? "null");
+
+            return Task.FromResult<IdempotencyRecord?>(domainRecord);
+        }
+
+        return Task.FromResult<IdempotencyRecord?>(null);
+    }
+
+    public Task SaveAsync(IdempotencyRecord record, CancellationToken ct = default)
+    {
+        var localRecord = new LocalIdempotencyRecord
+        {
+            RequestId = record.Key,
+            Result = record.ResultJson,
+            ProcessedAt = record.CreatedAt
+        };
+
+        _store[record.Key] = localRecord;
+
+        _logger.LogDebug("冪等性レコードを保存しました。[Key: {Key}]", record.Key);
+
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// 有効期限切れレコードのクリーンアップ
     /// （バックグラウンドサービスから定期実行）
@@ -109,7 +144,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         return Task.CompletedTask;
     }
 
-    private sealed record IdempotencyRecord
+    private sealed record LocalIdempotencyRecord
     {
         public required string RequestId { get; init; }
         public string? Result { get; init; }

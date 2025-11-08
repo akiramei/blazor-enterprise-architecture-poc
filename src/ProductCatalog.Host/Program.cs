@@ -133,7 +133,10 @@ builder.Services.AddScoped<ICorrelationIdAccessor, Shared.Infrastructure.Service
 
 // Infrastructure.Platform Stores (Port/Adapter Pattern)
 builder.Services.AddScoped<Shared.Abstractions.Platform.IAuditLogStore, Shared.Infrastructure.Platform.Stores.AuditLogStore>();
-builder.Services.AddSingleton<Shared.Abstractions.Platform.IIdempotencyStore, Shared.Infrastructure.Platform.Stores.InMemoryIdempotencyStore>();
+var idempotencyStore = new Shared.Infrastructure.Platform.Stores.InMemoryIdempotencyStore(
+    LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<Shared.Infrastructure.Platform.Stores.InMemoryIdempotencyStore>());
+builder.Services.AddSingleton<Shared.Abstractions.Platform.IIdempotencyStore>(idempotencyStore);
+builder.Services.AddSingleton<Shared.Application.Interfaces.IIdempotencyStore>(idempotencyStore);
 
 // Outbox Readers (トランザクショナルOutboxパターン - 読み取り実装)
 // NOTE: IOutboxStoreは使用しない。理由: TransactionBehaviorが直接DbContextに書き込むことで
@@ -215,7 +218,12 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings are not configured.");
 
-builder.Services.AddAuthentication()
+builder.Services.AddAuthentication(options =>
+    {
+        // API endpoints use JWT Bearer by default
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters

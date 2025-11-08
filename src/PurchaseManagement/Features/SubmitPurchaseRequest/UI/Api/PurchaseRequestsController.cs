@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -51,6 +52,7 @@ namespace PurchaseManagement.Features.Api.V1.PurchaseRequests;
 /// - **DTOを使用**: Application層のDTOをそのまま返す
 /// </summary>
 [ApiController]
+[ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/purchase-requests")]
 [Authorize]  // JWT認証が必要
 public sealed class PurchaseRequestsController : ControllerBase
