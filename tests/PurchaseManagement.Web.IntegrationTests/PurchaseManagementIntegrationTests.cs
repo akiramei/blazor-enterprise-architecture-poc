@@ -97,6 +97,7 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
         var dbContext = scope.ServiceProvider.GetRequiredService<PurchaseManagementDbContext>();
 
         var purchaseRequest = await dbContext.PurchaseRequests
+            .IgnoreQueryFilters() // テスト環境ではGlobal Query Filterをバイパス
             .FirstOrDefaultAsync(pr => pr.Id == requestId);
 
         purchaseRequest.Should().NotBeNull("Purchase request should be created");
@@ -520,6 +521,7 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
 
         // Both purchase request and outbox message should exist (atomicity)
         var purchaseRequest = await dbContext.PurchaseRequests
+            .IgnoreQueryFilters() // テスト環境ではGlobal Query Filterをバイパス
             .FirstOrDefaultAsync(pr => pr.Id == requestId);
         purchaseRequest.Should().NotBeNull("Purchase request should be persisted");
 
@@ -654,11 +656,6 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
         var response = await _client.PostAsync($"/api/v1/purchase-requests/{requestId}/attachments", content);
 
         // Assert
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorContent = await response.Content.ReadAsStringAsync();
-            throw new Exception($"Request failed with status {response.StatusCode}: {errorContent}");
-        }
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var attachmentId = await response.Content.ReadFromJsonAsync<Guid>();
         attachmentId.Should().NotBeEmpty();

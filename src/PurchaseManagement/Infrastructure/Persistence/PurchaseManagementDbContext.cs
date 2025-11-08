@@ -104,13 +104,15 @@ public sealed class PurchaseManagementDbContext : DbContext
 
     /// <summary>
     /// マルチテナントフィルタを設定（ジェネリックメソッド）
+    ///
+    /// 重要: _appContext.TenantIdを直接式ツリーで参照することで、
+    /// クエリ実行時に動的にTenantIdを評価します。
+    /// ローカル変数にキャプチャすると、DbContext作成時の値で固定されてしまいます。
     /// </summary>
     private void SetMultiTenantFilter<TEntity>(ModelBuilder modelBuilder)
         where TEntity : class, IMultiTenant
     {
-        var tenantId = _appContext.TenantId;
-
         modelBuilder.Entity<TEntity>()
-            .HasQueryFilter(e => tenantId == null || e.TenantId == tenantId.Value);
+            .HasQueryFilter(e => _appContext.TenantId == null || e.TenantId == _appContext.TenantId.Value);
     }
 }
