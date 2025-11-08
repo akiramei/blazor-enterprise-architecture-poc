@@ -11,6 +11,7 @@ using RejectPurchaseRequest.Application;
 using CancelPurchaseRequest.Application;
 using GetPurchaseRequests.Application;
 using GetPurchaseRequestById.Application;
+using GetPendingApprovals.Application;
 
 namespace PurchaseManagement.Features.Api.V1.PurchaseRequests;
 
@@ -292,5 +293,47 @@ public sealed class PurchaseRequestsController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// 承認待ち申請一覧取得
+    /// </summary>
+    /// <param name="pageNumber">ページ番号（デフォルト: 1）</param>
+    /// <param name="pageSize">ページサイズ（デフォルト: 20）</param>
+    /// <param name="sortBy">ソートフィールド（デフォルト: TotalAmount）</param>
+    /// <param name="ascending">昇順ソート（デフォルト: false）</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>承認待ち申請一覧</returns>
+    [HttpGet("pending-approvals")]
+    [ProducesResponseType(typeof(List<PendingApprovalDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<List<PendingApprovalDto>>> GetPendingApprovals(
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string sortBy = "TotalAmount",
+        [FromQuery] bool ascending = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetPendingApprovalsQuery
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            SortBy = sortBy,
+            Ascending = ascending
+        };
+
+        var result = await _mediator.Send(query, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Failed to retrieve pending approvals",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        return Ok(result.Value);
     }
 }
