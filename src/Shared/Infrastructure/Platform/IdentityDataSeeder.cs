@@ -1,18 +1,34 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Shared.Domain.Identity;
+using System.Security.Claims;
 
 namespace Shared.Infrastructure.Platform;
 
 /// <summary>
 /// Identity データシーダー
 /// 初回起動時にデフォルトのロールとユーザーを作成
+///
+/// 【マルチテナント対応】
+/// - テストテナント（Tenant A, Tenant B）のマスターデータを定義
+/// - ユーザー作成時にTenantId Claimを追加
+/// - テナント間のデータ分離をテスト可能にする
 /// </summary>
 public sealed class IdentityDataSeeder
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole<Guid>> _roleManager;
     private readonly ILogger<IdentityDataSeeder> _logger;
+
+    /// <summary>
+    /// テストテナントA（デフォルトテナント）
+    /// </summary>
+    private static readonly Guid TenantAId = new Guid("11111111-1111-1111-1111-111111111111");
+
+    /// <summary>
+    /// テストテナントB（マルチテナント動作確認用）
+    /// </summary>
+    private static readonly Guid TenantBId = new Guid("22222222-2222-2222-2222-222222222222");
 
     public IdentityDataSeeder(
         UserManager<ApplicationUser> userManager,
@@ -70,7 +86,7 @@ public sealed class IdentityDataSeeder
     /// </summary>
     private async Task SeedUsersAsync()
     {
-        // 管理者ユーザーの作成
+        // 管理者ユーザーの作成（Tenant A所属）
         const string adminEmail = "admin@example.com";
         const string adminPassword = "Admin@123";
         const string adminDisplayName = "システム管理者";
@@ -79,9 +95,10 @@ public sealed class IdentityDataSeeder
             adminEmail,
             adminPassword,
             adminDisplayName,
-            Roles.Admin);
+            Roles.Admin,
+            TenantAId);
 
-        // 一般ユーザーの作成
+        // 一般ユーザーの作成（Tenant A所属）
         const string userEmail = "user@example.com";
         const string userPassword = "User@123";
         const string userDisplayName = "一般ユーザー";
@@ -90,7 +107,20 @@ public sealed class IdentityDataSeeder
             userEmail,
             userPassword,
             userDisplayName,
-            Roles.User);
+            Roles.User,
+            TenantAId);
+
+        // Tenant B所属の一般ユーザー（マルチテナントテスト用）
+        const string userBEmail = "userb@example.com";
+        const string userBPassword = "UserB@123";
+        const string userBDisplayName = "テナントBユーザー";
+
+        await CreateUserIfNotExistsAsync(
+            userBEmail,
+            userBPassword,
+            userBDisplayName,
+            Roles.User,
+            TenantBId);
     }
 
     /// <summary>
@@ -100,7 +130,8 @@ public sealed class IdentityDataSeeder
         string email,
         string password,
         string displayName,
-        string role)
+        string role,
+        Guid tenantId)
     {
         var existingUser = await _userManager.FindByEmailAsync(email);
         if (existingUser != null)
@@ -137,6 +168,20 @@ public sealed class IdentityDataSeeder
                     role,
                     email,
                     string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+            }
+
+            // TenantId Claimを追加
+            var tenantClaim = new Claim("TenantId", tenantId.ToString());
+            var claimResult = await _userManager.AddClaimAsync(user, tenantClaim);
+            if (claimResult.Succeeded)
+            {
+                _logger.LogInformation("TenantId claim '{TenantId}' assigned to user '{Email}'", tenantId, email);
+            }
+            else
+            {
+                _logger.LogError("Failed to assign TenantId claim to user '{Email}': {Errors}",
+                    email,
+                    string.Join(", ", claimResult.Errors.Select(e => e.Description)));
             }
         }
         else
