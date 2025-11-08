@@ -12,11 +12,11 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
 
     <!-- MediatR -->
-    <PackageReference Include="MediatR" Version="12.2.0" />
+    <PackageReference Include="MediatR" Version="13.1.0" />
 
     <!-- FluentValidation -->
-    <PackageReference Include="FluentValidation" Version="11.8.0" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.8.0" />
+    <PackageReference Include="FluentValidation" Version="12.1.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.0" />
 
     <!-- Entity Framework Core -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
@@ -54,7 +54,12 @@
     <ProjectReference Include="..\ProductCatalog\Shared\Infrastructure\Persistence\ProductCatalog.Shared.Infrastructure.Persistence.csproj" />
     <ProjectReference Include="..\ProductCatalog\Shared\UI\ProductCatalog.Shared.UI.csproj" />
 
-    <!-- Feature Projects - Application -->
+    <!-- PurchaseManagement Shared -->
+    <ProjectReference Include="..\PurchaseManagement\Shared\Domain\PurchaseManagement.Shared.Domain.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Shared\Application\PurchaseManagement.Shared.Application.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Infrastructure\PurchaseManagement.Infrastructure.csproj" />
+
+    <!-- Feature Projects - Application (ProductCatalog) -->
     <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\Application\CreateProduct.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\UpdateProduct\Application\UpdateProduct.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\DeleteProduct\Application\DeleteProduct.Application.csproj" />
@@ -66,7 +71,14 @@
     <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\Application\ExportProductsToCsv.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\Application\ImportProductsFromCsv.Application.csproj" />
 
-    <!-- Feature Projects - UI -->
+    <!-- Feature Projects - Application (PurchaseManagement) -->
+    <ProjectReference Include="..\PurchaseManagement\Features\SubmitPurchaseRequest\Application\SubmitPurchaseRequest.Application.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Features\ApprovePurchaseRequest\Application\ApprovePurchaseRequest.Application.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Features\RejectPurchaseRequest\Application\RejectPurchaseRequest.Application.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequests\Application\GetPurchaseRequests.Application.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequestById\Application\GetPurchaseRequestById.Application.csproj" />
+
+    <!-- Feature Projects - UI (ProductCatalog) -->
     <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\UI\CreateProduct.UI.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\UpdateProduct\UI\UpdateProduct.UI.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\DeleteProduct\UI\DeleteProduct.UI.csproj" />
@@ -77,6 +89,12 @@
     <ProjectReference Include="..\ProductCatalog\Features\BulkUpdateProductPrices\UI\BulkUpdateProductPrices.UI.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\UI\ExportProductsToCsv.UI.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\UI\ImportProductsFromCsv.UI.csproj" />
+
+    <!-- Feature Projects - UI (PurchaseManagement) -->
+    <ProjectReference Include="..\PurchaseManagement\Features\SubmitPurchaseRequest\UI\SubmitPurchaseRequest.UI.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequests\UI\GetPurchaseRequests.UI.csproj" />
+    <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequestById\UI\GetPurchaseRequestById.UI.csproj" />
+
     <ProjectReference Include="..\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
     <ProjectReference Include="..\Shared\Abstractions\Shared.Abstractions.csproj" />
   </ItemGroup>

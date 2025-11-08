@@ -24,6 +24,7 @@ using ProductCatalog.Shared.UI.Store;
 using Serilog;
 using GetProducts.Application;
 using Shared.Infrastructure.Platform.Persistence;
+using PurchaseManagement.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,7 @@ builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>(
 // MediatR - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddMediatR(cfg =>
 {
+    // ProductCatalog BC
     cfg.RegisterServicesFromAssembly(typeof(GetProductsHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(GetProductById.Application.GetProductByIdHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(CreateProduct.Application.CreateProductHandler).Assembly);
@@ -69,11 +71,19 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly);
+
+    // PurchaseManagement BC
+    cfg.RegisterServicesFromAssembly(typeof(SubmitPurchaseRequest.Application.SubmitPurchaseRequestHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(ApprovePurchaseRequest.Application.ApprovePurchaseRequestHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(RejectPurchaseRequest.Application.RejectPurchaseRequestHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly);
 });
 
 // FluentValidation - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddValidatorsFromAssemblies(new[]
 {
+    // ProductCatalog BC
     typeof(GetProductsHandler).Assembly,
     typeof(GetProductById.Application.GetProductByIdHandler).Assembly,
     typeof(CreateProduct.Application.CreateProductHandler).Assembly,
@@ -83,7 +93,14 @@ builder.Services.AddValidatorsFromAssemblies(new[]
     typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly,
     typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly,
     typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly,
-    typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly
+    typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly,
+
+    // PurchaseManagement BC
+    typeof(SubmitPurchaseRequest.Application.SubmitPurchaseRequestHandler).Assembly,
+    typeof(ApprovePurchaseRequest.Application.ApprovePurchaseRequestHandler).Assembly,
+    typeof(RejectPurchaseRequest.Application.RejectPurchaseRequestHandler).Assembly,
+    typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly,
+    typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly
 });
 
 // Pipeline Behaviors（登録順序が重要！）
@@ -134,6 +151,9 @@ if (builder.Environment.IsEnvironment("Test"))
 
     builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
         options.UseInMemoryDatabase("TestDatabase_Platform"));
+
+    builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
+        options.UseInMemoryDatabase("TestDatabase_PurchaseManagement"));
 }
 else
 {
@@ -145,7 +165,13 @@ else
 
     builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
         options.UseNpgsql(connectionString));
+
+    builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
+        options.UseNpgsql(connectionString));
 }
+
+// PurchaseManagement BC Services (Repository, Domain Services)
+builder.Services.AddPurchaseManagementServices(builder.Configuration);
 
 // ASP.NET Core Identity（本番用認証・認可）
 // Identity は技術的関心事なので PlatformDbContext を使用

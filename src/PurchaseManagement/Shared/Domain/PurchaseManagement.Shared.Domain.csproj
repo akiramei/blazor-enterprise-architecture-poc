@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Domain\Shared.Domain.csproj" />
+    <ProjectReference Include="..\..\..\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
