@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\RejectPurchaseRequest\Application\RejectPurchaseRequest.Application.csproj" />
     <ProjectReference Include="..\..\GetPurchaseRequests\Application\GetPurchaseRequests.Application.csproj" />
     <ProjectReference Include="..\..\GetPurchaseRequestById\Application\GetPurchaseRequestById.Application.csproj" />
+    <ProjectReference Include="..\..\CancelPurchaseRequest\Application\CancelPurchaseRequest.Application.csproj" />
   </ItemGroup>
 
 </Project>

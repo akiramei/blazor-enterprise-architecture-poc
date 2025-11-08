@@ -8,6 +8,7 @@ using Shared.Application;
 using SubmitPurchaseRequest.Application;
 using ApprovePurchaseRequest.Application;
 using RejectPurchaseRequest.Application;
+using CancelPurchaseRequest.Application;
 using GetPurchaseRequests.Application;
 using GetPurchaseRequestById.Application;
 
@@ -247,6 +248,44 @@ public sealed class PurchaseRequestsController : ControllerBase
             return BadRequest(new ProblemDetails
             {
                 Title = "Purchase request rejection failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// 購買申請キャンセル
+    /// </summary>
+    /// <param name="id">購買申請ID</param>
+    /// <param name="command">キャンセルコマンド</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>キャンセル結果</returns>
+    [HttpPost("{id:guid}/cancel")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelPurchaseRequest(
+        Guid id,
+        [FromBody] CancelPurchaseRequestCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        // Ensure the ID from route matches the command
+        var commandWithId = new CancelPurchaseRequestCommand
+        {
+            PurchaseRequestId = id,
+            Reason = command.Reason
+        };
+
+        var result = await _mediator.Send(commandWithId, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Purchase request cancellation failed",
                 Detail = result.Error,
                 Status = StatusCodes.Status400BadRequest
             });

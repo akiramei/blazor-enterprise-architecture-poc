@@ -76,6 +76,7 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(SubmitPurchaseRequest.Application.SubmitPurchaseRequestHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ApprovePurchaseRequest.Application.ApprovePurchaseRequestHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(RejectPurchaseRequest.Application.RejectPurchaseRequestHandler).Assembly);
+    cfg.RegisterServicesFromAssembly(typeof(CancelPurchaseRequest.Application.CancelPurchaseRequestHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly);
 });
@@ -99,6 +100,7 @@ builder.Services.AddValidatorsFromAssemblies(new[]
     typeof(SubmitPurchaseRequest.Application.SubmitPurchaseRequestHandler).Assembly,
     typeof(ApprovePurchaseRequest.Application.ApprovePurchaseRequestHandler).Assembly,
     typeof(RejectPurchaseRequest.Application.RejectPurchaseRequestHandler).Assembly,
+    typeof(CancelPurchaseRequest.Application.CancelPurchaseRequestHandler).Assembly,
     typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly,
     typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly
 });
