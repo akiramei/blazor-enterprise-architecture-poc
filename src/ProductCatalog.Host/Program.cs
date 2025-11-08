@@ -310,6 +310,9 @@ builder.Services.AddHangfireServer(options =>
 // Identity Data Seeder
 builder.Services.AddScoped<Shared.Infrastructure.Platform.IdentityDataSeeder>();
 
+// File Storage Service（ローカルファイルストレージ）
+builder.Services.AddScoped<Shared.Abstractions.IFileStorageService, Shared.Infrastructure.Platform.LocalFileStorageService>();
+
 // Controllers（REST API用）
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

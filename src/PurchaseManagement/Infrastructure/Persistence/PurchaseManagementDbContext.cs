@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PurchaseManagement.Shared.Domain;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
 using Shared.Domain.Outbox;
 
@@ -39,6 +40,7 @@ public sealed class PurchaseManagementDbContext : DbContext
 
     // ビジネスエンティティ
     public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
+    public DbSet<PurchaseRequestAttachment> PurchaseRequestAttachments => Set<PurchaseRequestAttachment>();
 
     // Outbox（物理同居、論理所有=Platform）
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
