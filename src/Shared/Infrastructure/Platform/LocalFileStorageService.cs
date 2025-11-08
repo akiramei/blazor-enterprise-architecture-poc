@@ -47,6 +47,28 @@ public sealed class LocalFileStorageService : IFileStorageService
         }
     }
 
+    public async Task<string> SaveFileAsync(
+        string storagePath,
+        byte[] fileContent,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        var fullPath = GetFullPath(storagePath);
+
+        // ディレクトリが存在しない場合は作成
+        var directory = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        // ファイルを保存
+        await File.WriteAllBytesAsync(fullPath, fileContent, cancellationToken);
+
+        _logger.LogInformation("ファイルをアップロードしました: {StoragePath} ({Size} bytes)", storagePath, fileContent.Length);
+        return fullPath;
+    }
+
     public async Task<string> UploadAsync(
         Stream stream,
         string storagePath,
@@ -72,6 +94,23 @@ public sealed class LocalFileStorageService : IFileStorageService
         return storagePath;
     }
 
+    public async Task<byte[]> GetFileAsync(
+        string storagePath,
+        CancellationToken cancellationToken = default)
+    {
+        var fullPath = GetFullPath(storagePath);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException($"ファイルが見つかりません: {storagePath}");
+        }
+
+        var content = await File.ReadAllBytesAsync(fullPath, cancellationToken);
+        _logger.LogInformation("ファイルを取得しました: {StoragePath}", storagePath);
+
+        return content;
+    }
+
     public Task<Stream> DownloadAsync(
         string storagePath,
         CancellationToken cancellationToken = default)
@@ -89,7 +128,7 @@ public sealed class LocalFileStorageService : IFileStorageService
         return Task.FromResult<Stream>(fileStream);
     }
 
-    public Task DeleteAsync(
+    public Task DeleteFileAsync(
         string storagePath,
         CancellationToken cancellationToken = default)
     {
@@ -108,13 +147,27 @@ public sealed class LocalFileStorageService : IFileStorageService
         return Task.CompletedTask;
     }
 
-    public Task<bool> ExistsAsync(
+    public Task<bool> FileExistsAsync(
         string storagePath,
         CancellationToken cancellationToken = default)
     {
         var fullPath = GetFullPath(storagePath);
         var exists = File.Exists(fullPath);
         return Task.FromResult(exists);
+    }
+
+    public Task DeleteAsync(
+        string storagePath,
+        CancellationToken cancellationToken = default)
+    {
+        return DeleteFileAsync(storagePath, cancellationToken);
+    }
+
+    public Task<bool> ExistsAsync(
+        string storagePath,
+        CancellationToken cancellationToken = default)
+    {
+        return FileExistsAsync(storagePath, cancellationToken);
     }
 
     public Task<string> GetDownloadUrlAsync(

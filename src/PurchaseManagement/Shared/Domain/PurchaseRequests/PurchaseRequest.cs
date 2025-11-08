@@ -1,4 +1,5 @@
 using ProductCatalog.Shared.Domain.Products;
+using PurchaseManagement.Shared.Domain;
 using PurchaseManagement.Shared.Domain.PurchaseRequests.Events;
 using PurchaseManagement.Shared.Domain.PurchaseRequests.StateMachine;
 using Shared.Kernel;
@@ -13,6 +14,7 @@ public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
     private readonly PurchaseRequestStateMachine _stateMachine = new();
     private readonly List<ApprovalStep> _approvalSteps = new();
     private readonly List<PurchaseRequestItem> _items = new();
+    private readonly List<PurchaseRequestAttachment> _attachments = new();
 
     // マルチテナント対応
     public Guid TenantId { get; private set; }
@@ -41,6 +43,9 @@ public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
     // 明細
     public IReadOnlyList<PurchaseRequestItem> Items => _items.AsReadOnly();
     public Money TotalAmount => new(_items.Sum(i => i.Amount.Amount));
+
+    // 添付ファイル
+    public IReadOnlyList<PurchaseRequestAttachment> Attachments => _attachments.AsReadOnly();
 
     // ビジネスルール: 金額制限
     private const decimal MaxRequestAmount = 1_000_000m; // 100万円
@@ -117,6 +122,39 @@ public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
             throw new DomainException("明細が見つかりません");
 
         _items.Remove(item);
+    }
+
+    #endregion
+
+    #region 添付ファイル操作
+
+    /// <summary>
+    /// 添付ファイルを追加
+    /// </summary>
+    public void AddAttachment(PurchaseRequestAttachment attachment)
+    {
+        if (attachment == null)
+            throw new ArgumentNullException(nameof(attachment));
+
+        if (attachment.PurchaseRequestId != Id)
+            throw new DomainException("この購買申請の添付ファイルではありません");
+
+        if (attachment.TenantId != TenantId)
+            throw new DomainException("異なるテナントの添付ファイルは追加できません");
+
+        _attachments.Add(attachment);
+    }
+
+    /// <summary>
+    /// 添付ファイルを削除（論理削除）
+    /// </summary>
+    public void RemoveAttachment(Guid attachmentId)
+    {
+        var attachment = _attachments.FirstOrDefault(a => a.Id == attachmentId);
+        if (attachment == null)
+            throw new DomainException("添付ファイルが見つかりません");
+
+        attachment.Delete();
     }
 
     #endregion
