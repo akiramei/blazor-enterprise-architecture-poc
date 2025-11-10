@@ -43,6 +43,25 @@ public sealed class ProductCatalogDbContext : DbContext
     // Outbox（物理同居、論理所有=Platform）
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        // SQLiteではrowversionが使えないため、Versionを手動でインクリメント
+        foreach (var entry in ChangeTracker.Entries<Product>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Property("Version").CurrentValue = 1L;
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                var currentVersion = (long)entry.Property("Version").OriginalValue;
+                entry.Property("Version").CurrentValue = currentVersion + 1;
+            }
+        }
+
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

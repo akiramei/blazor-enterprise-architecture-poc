@@ -2,11 +2,13 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Hosting;
+using ProductCatalog.Shared.Application.DTOs;
 using ProductCatalog.Shared.Infrastructure.Persistence;
+using Shared.Application.Common;
 using Shared.Infrastructure.Platform;
 
 namespace ProductCatalog.Web.IntegrationTests;
@@ -20,32 +22,33 @@ namespace ProductCatalog.Web.IntegrationTests;
 /// - REST API/Blazorの代表的フローの検証
 ///
 /// テスト方針:
-/// - WebApplicationFactory を使用した完全な統合テスト
-/// - InMemoryデータベースを使用（高速・独立性）
+/// - CustomWebApplicationFactory を使用した完全な統合テスト
+/// - SQLite In-Memoryデータベースを使用（高速・独立性）
 /// - Outboxメッセージの永続化確認（トランザクション保証）
 /// </summary>
-public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public ProductCatalogIntegrationTests(WebApplicationFactory<Program> factory)
+    public ProductCatalogIntegrationTests(CustomWebApplicationFactory factory)
     {
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Test");
-
-            builder.ConfigureServices(services =>
-            {
-                // テスト用にInMemoryデータベースを使用（Program.csで既に設定済み）
-                // ここでは追加設定は不要
-            });
-        });
-
+        _factory = factory;
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false // Disable auto redirect to test HTTP status codes properly
         });
+    }
+
+    public async Task InitializeAsync()
+    {
+        // データベーススキーマとシードデータを初期化
+        await _factory.InitializeDatabaseAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        return Task.CompletedTask;
     }
 
     #region Authentication Tests
@@ -69,7 +72,8 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
         result.Should().NotBeNull();
 
-        var token = result!.RootElement.GetProperty("data").GetProperty("token").GetString();
+        // 新しいLoginResponse形式: accessTokenが直接ルートにある
+        var token = result!.RootElement.GetProperty("accessToken").GetString();
         token.Should().NotBeNullOrEmpty();
     }
 
@@ -80,13 +84,18 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         var loginRequest = new
         {
             email = "invalid@example.com",
-            password = "wrong"
+            password = "WrongPass123!"
         };
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
 
-        // Assert
+        // Assert - レスポンスボディを出力して詳細確認
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Expected 401 Unauthorized but got {response.StatusCode}. Response: {errorContent}");
+        }
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -108,7 +117,7 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
             description = "Test Description",
             price = 1000,
             currency = "JPY",
-            stockQuantity = 10
+            initialStock = 10
         };
 
         // Act
@@ -117,8 +126,8 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var productId = result!.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+        // APIは直接GUIDを返す（Envelopeなし）
+        var productId = await response.Content.ReadFromJsonAsync<Guid>();
         productId.Should().NotBeEmpty();
 
         // Verify Outbox message was created (Transactional Outbox Pattern)
@@ -149,10 +158,10 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var products = result!.RootElement.GetProperty("data").EnumerateArray().ToList();
+        // APIは直接ProductDto[]を返す（Envelopeなし）
+        var products = await response.Content.ReadFromJsonAsync<List<ProductCatalog.Shared.Application.DTOs.ProductDto>>();
 
-        products.Should().NotBeEmpty();
+        products.Should().NotBeNull().And.NotBeEmpty();
     }
 
     [Fact]
@@ -168,13 +177,19 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         // Act
         var response = await _client.GetAsync($"/api/v1/products/{productId}");
 
-        // Assert
+        // Assert - まずレスポンス内容を確認
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Expected 200 OK but got {response.StatusCode}. Response: {errorContent}");
+        }
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var id = result!.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+        // APIは直接ProductDetailDtoを返す（Envelopeなし）
+        var product = await response.Content.ReadFromJsonAsync<ProductCatalog.Shared.Application.DTOs.ProductDetailDto>();
 
-        id.Should().Be(productId);
+        product.Should().NotBeNull();
+        product!.Id.Should().Be(productId);
     }
 
     [Fact]
@@ -203,27 +218,41 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
+        var existingResponse = await _client.GetAsync($"/api/v1/products/{productId}");
+        existingResponse.EnsureSuccessStatusCode();
+        var existingProduct = await existingResponse.Content.ReadFromJsonAsync<ProductCatalog.Shared.Application.DTOs.ProductDetailDto>();
+        existingProduct.Should().NotBeNull();
+
+        // DEBUG: Versionの値を確認
+        Console.WriteLine($"DEBUG: existingProduct.Version = {existingProduct!.Version}");
+
         var updateRequest = new
         {
             name = "Updated Product",
             description = "Updated Description",
             price = 2000,
             currency = "JPY",
-            stockQuantity = 20
+            stock = 20,
+            version = existingProduct!.Version
         };
 
         // Act
         var response = await _client.PutAsJsonAsync($"/api/v1/products/{productId}", updateRequest);
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        // Assert - レスポンスボディを出力して詳細確認
+        if (response.StatusCode != HttpStatusCode.NoContent)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Expected 204 NoContent but got {response.StatusCode}. Response: {errorContent}");
+        }
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify product was updated
         var getResponse = await _client.GetAsync($"/api/v1/products/{productId}");
-        var result = await getResponse.Content.ReadFromJsonAsync<JsonDocument>();
-        var name = result!.RootElement.GetProperty("data").GetProperty("name").GetString();
+        var product = await getResponse.Content.ReadFromJsonAsync<ProductCatalog.Shared.Application.DTOs.ProductDetailDto>();
 
-        name.Should().Be("Updated Product");
+        product.Should().NotBeNull();
+        product!.Name.Should().Be("Updated Product");
 
         // Verify Outbox message was created
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -240,7 +269,7 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task DeleteProduct_ExistingProduct_DeletesProductAndCreatesOutboxMessage()
     {
         // Arrange
-        var productId = await SeedTestProductAsync();
+        var productId = await SeedTestProductAsync(initialStock: 0);
         var token = await GetAuthTokenAsync();
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -287,11 +316,11 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var products = result!.RootElement.GetProperty("data").EnumerateArray().ToList();
+        var pagedResult = await response.Content.ReadFromJsonAsync<PagedResult<ProductDto>>();
 
-        products.Should().Contain(p =>
-            p.GetProperty("name").GetString()!.Contains("Laptop", StringComparison.OrdinalIgnoreCase));
+        pagedResult.Should().NotBeNull();
+        pagedResult!.Items.Should().NotBeNull().And.Contain(p =>
+            p.Name.Contains("Laptop", StringComparison.OrdinalIgnoreCase));
     }
 
     #endregion
@@ -312,7 +341,7 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
             description = "Testing transactional outbox",
             price = 5000,
             currency = "JPY",
-            stockQuantity = 5
+            initialStock = 5
         };
 
         // Act
@@ -325,8 +354,8 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         var productDbContext = scope.ServiceProvider.GetRequiredService<ProductCatalogDbContext>();
 
         // Both product and outbox message should exist (atomicity)
-        var product = await productDbContext.Products
-            .FirstOrDefaultAsync(p => p.Name == "Atomicity Test Product");
+        var products = await productDbContext.Products.ToListAsync();
+        var product = products.FirstOrDefault(p => p.Name == "Atomicity Test Product");
         product.Should().NotBeNull("Product should be persisted");
 
         var outboxMessage = await productDbContext.OutboxMessages
@@ -361,11 +390,6 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
 
     private async Task<string> GetAuthTokenAsync()
     {
-        // First, ensure admin user exists
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
-        await seeder.SeedAsync();
-
         var loginRequest = new
         {
             email = "admin@example.com",
@@ -376,10 +400,14 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        return result!.RootElement.GetProperty("data").GetProperty("token").GetString()!;
+        // 新しいLoginResponse形式: accessTokenが直接ルートにある
+        return result!.RootElement.GetProperty("accessToken").GetString()!;
     }
 
-    private async Task<Guid> SeedTestProductAsync(string name = "Test Product", string description = "Test Description")
+    private async Task<Guid> SeedTestProductAsync(
+        string name = "Test Product",
+        string description = "Test Description",
+        int initialStock = 10)
     {
         var token = await GetAuthTokenAsync();
         _client.DefaultRequestHeaders.Authorization =
@@ -391,14 +419,14 @@ public class ProductCatalogIntegrationTests : IClassFixture<WebApplicationFactor
             description,
             price = 1000,
             currency = "JPY",
-            stockQuantity = 10
+            initialStock
         };
 
         var response = await _client.PostAsJsonAsync("/api/v1/products", createRequest);
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        return result!.RootElement.GetProperty("data").GetProperty("id").GetGuid();
+        // APIは直接GUIDを返す（Envelopeなし）
+        return await response.Content.ReadFromJsonAsync<Guid>();
     }
 
     #endregion

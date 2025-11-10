@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ProductCatalog.Shared.Domain.Products;
 
 namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
@@ -32,10 +33,14 @@ namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 public sealed class EfProductRepository : IProductRepository
 {
     private readonly ProductCatalogDbContext _context;
+    private readonly ILogger<EfProductRepository> _logger;
 
-    public EfProductRepository(ProductCatalogDbContext context)
+    public EfProductRepository(
+        ProductCatalogDbContext context,
+        ILogger<EfProductRepository> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     /// <summary>
@@ -54,21 +59,51 @@ public sealed class EfProductRepository : IProductRepository
     /// </summary>
     public async Task SaveAsync(Product product, CancellationToken cancellationToken = default)
     {
-        var existing = await GetAsync(product.Id, cancellationToken);
+        _logger.LogDebug("SaveAsync called for Product: Id={ProductId}, Name={ProductName}",
+            product.Id, product.Name);
 
-        if (existing is null)
+        // EF CoreのChangeTrackerで既に追跡されているかチェック
+        // 公開プロパティのIdを使用（EF.Propertyは LINQ query内でのみ使用可能）
+        var trackedEntry = _context.ChangeTracker.Entries<Product>()
+            .FirstOrDefault(e => e.Entity.Id == product.Id);
+
+        if (trackedEntry is null)
         {
-            // 新規追加
-            // ※ 子エンティティ（ProductImage）も自動的に追加される
-            await _context.Products.AddAsync(product, cancellationToken);
+            _logger.LogDebug("Product not tracked, checking if exists in DB");
+
+            // 追跡されていない → DBに存在するかチェック
+            var existsInDb = await _context.Products
+                .AsNoTracking()
+                .AnyAsync(p => EF.Property<ProductId>(p, "_id") == product.Id, cancellationToken);
+
+            if (existsInDb)
+            {
+                // 更新
+                _logger.LogDebug("Product exists in DB, calling Update()");
+                // ※ EF CoreのChangeTrackerが自動的に変更を検出
+                // ※ 子エンティティの追加・削除・更新も自動検出
+                // ※ Versionフィールドは自動的にインクリメント（楽観的同時実行制御）
+                _context.Products.Update(product);
+            }
+            else
+            {
+                // 新規追加
+                _logger.LogDebug("Product does not exist in DB, adding new");
+                // ※ 子エンティティ（ProductImage）も自動的に追加される
+                await _context.Products.AddAsync(product, cancellationToken);
+            }
         }
         else
         {
-            // 更新
-            // ※ EF CoreのChangeTrackerが自動的に変更を検出
-            // ※ 子エンティティの追加・削除・更新も自動検出
-            // ※ Versionフィールドは自動的にインクリメント（楽観的同時実行制御）
+            // 既に追跡されている場合: Detachしてから再度Update()を呼ぶ
+            // これによりEF Coreが全てのプロパティを更新対象としてマークする
+            _logger.LogDebug("Product already tracked (State={State}), detaching and updating",
+                trackedEntry.State);
+
+            _context.Entry(product).State = EntityState.Detached;
             _context.Products.Update(product);
+
+            _logger.LogDebug("After detach and update, Entry.State={State}", _context.Entry(product).State);
         }
 
         // SaveChanges is handled by TransactionBehavior

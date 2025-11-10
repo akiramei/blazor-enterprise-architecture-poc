@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Interfaces;
@@ -36,15 +37,21 @@ public sealed class UpdateProductHandler : IRequestHandler<UpdateProductCommand,
 {
     private readonly IProductRepository _repository;
     private readonly IProductNotificationService _notificationService;
+    private readonly IMemoryCache _cache;
+    private readonly ICurrentUserService _currentUser;
     private readonly ILogger<UpdateProductHandler> _logger;
 
     public UpdateProductHandler(
         IProductRepository repository,
         IProductNotificationService notificationService,
+        IMemoryCache cache,
+        ICurrentUserService currentUser,
         ILogger<UpdateProductHandler> logger)
     {
         _repository = repository;
         _notificationService = notificationService;
+        _cache = cache;
+        _currentUser = currentUser;
         _logger = logger;
     }
 
@@ -74,6 +81,9 @@ public sealed class UpdateProductHandler : IRequestHandler<UpdateProductCommand,
         }
 
         // 3. Domainメソッド経由で変更
+        _logger.LogDebug("変更前: Name={OldName}, Price={OldPrice}, Stock={OldStock}",
+            product.Name, product.Price.Amount, product.Stock);
+
         try
         {
             // 各変更メソッドは内部でビジネスルールを検証する
@@ -89,14 +99,36 @@ public sealed class UpdateProductHandler : IRequestHandler<UpdateProductCommand,
             return Result.Fail(ex.Message);
         }
 
+        _logger.LogDebug("変更後: Name={NewName}, Price={NewPrice}, Stock={NewStock}",
+            product.Name, product.Price.Amount, product.Stock);
+
         // 4. Repository経由で保存
         await _repository.SaveAsync(product, cancellationToken);
 
         _logger.LogInformation("商品を更新しました: {ProductId}, Name: {Name}", command.ProductId, command.Name);
 
-        // 5. SignalRで全クライアントに通知（リアルタイム更新）
+        // 5. キャッシュ無効化（GetProductByIdQueryのキャッシュをクリア）
+        InvalidateProductCache(command.ProductId);
+
+        // 6. SignalRで全クライアントに通知（リアルタイム更新）
         await _notificationService.NotifyProductChangedAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// 商品のキャッシュを無効化
+    /// </summary>
+    private void InvalidateProductCache(Guid productId)
+    {
+        var userSegment = _currentUser.UserId.ToString("N");
+        var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
+        var requestSegment = $"product_{productId}";
+
+        // GetProductByIdQueryのキャッシュキーと同じ形式で生成
+        var cacheKey = $"GetProductByIdQuery:{tenantSegment}:{userSegment}:{requestSegment}";
+
+        _cache.Remove(cacheKey);
+        _logger.LogDebug("キャッシュ無効化: {CacheKey}", cacheKey);
     }
 }

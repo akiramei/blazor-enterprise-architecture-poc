@@ -105,13 +105,14 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         // トランザクション内で保存するため、確実に配信される
         foreach (var domainEvent in domainEvents)
         {
-            var eventType = domainEvent.GetType().Name;
-            var eventContent = JsonSerializer.Serialize(domainEvent, new JsonSerializerOptions
+            var eventType = domainEvent.GetType();
+            var eventTypeName = eventType.Name;
+            var eventContent = JsonSerializer.Serialize(domainEvent, eventType, new JsonSerializerOptions
             {
                 WriteIndented = false
             });
 
-            var outboxMessage = OutboxMessage.Create(eventType, eventContent);
+            var outboxMessage = OutboxMessage.Create(eventTypeName, eventContent);
             await _context.OutboxMessages.AddAsync(outboxMessage, ct);
 
             _logger.LogInformation(

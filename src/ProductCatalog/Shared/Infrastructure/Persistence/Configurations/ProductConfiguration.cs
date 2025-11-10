@@ -34,7 +34,14 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.ToTable("Products");
 
         // 公開プロパティを無視（privateフィールドを直接マッピングするため）
+        builder.Ignore(p => p.Id);
         builder.Ignore(p => p.Images);
+        builder.Ignore(p => p.IsDeleted);
+        builder.Ignore(p => p.Name);
+        builder.Ignore(p => p.Description);
+        builder.Ignore(p => p.Price);
+        builder.Ignore(p => p.Stock);
+        builder.Ignore(p => p.Status);
 
         // 主キー
         builder.HasKey("_id");
@@ -91,6 +98,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         // 楽観的同時実行制御用バージョン
         // ※ EF CoreがUpdateのたびに自動的にインクリメント
+        // SQLiteでは手動でインクリメント（ProductCatalogDbContext.SaveChangesAsyncで実装）
         builder.Property<long>("Version")
             .HasColumnName("Version")
             .IsConcurrencyToken()
