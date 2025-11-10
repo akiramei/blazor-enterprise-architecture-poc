@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Interfaces;
+using Shared.Kernel;
 using BulkUpdateProductPrices.Application;
 using ProductCatalog.Shared.Domain.Products;
 

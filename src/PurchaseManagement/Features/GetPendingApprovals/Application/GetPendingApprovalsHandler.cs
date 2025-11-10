@@ -122,7 +122,7 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
 
             _logger.LogInformation(
                 "承認待ち申請を取得しました。[UserId: {UserId}] [Count: {Count}]",
-                userId.Value,
+                userId,
                 pendingApprovals.Count);
 
             return Result.Success(pendingApprovals);

@@ -12,6 +12,7 @@ using Microsoft.OpenApi.Models;
 using Shared.Infrastructure.Behaviors;
 using Shared.Application.Interfaces;
 using Shared.Domain.Identity;
+using Shared.Kernel;
 using ProductCatalog.Shared.Domain.Products;
 using Shared.Infrastructure.Authentication;
 using Shared.Infrastructure.Platform.Stores;

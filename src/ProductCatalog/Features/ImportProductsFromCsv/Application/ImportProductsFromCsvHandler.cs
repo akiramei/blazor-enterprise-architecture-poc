@@ -6,6 +6,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Common;
+using Shared.Kernel;
 using ProductCatalog.Shared.Domain.Products;
 
 namespace ImportProductsFromCsv.Application;

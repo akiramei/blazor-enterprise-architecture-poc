@@ -35,7 +35,7 @@ public class ApprovePurchaseRequestHandler : IRequestHandler<ApprovePurchaseRequ
             }
 
             // 2. 承認処理
-            request.Approve(_currentUserService.UserId!.Value, command.Comment);
+            request.Approve(_currentUserService.UserId, command.Comment);
 
             // 3. 永続化
             await _repository.SaveAsync(request, cancellationToken);

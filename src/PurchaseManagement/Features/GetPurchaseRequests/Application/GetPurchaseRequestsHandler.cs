@@ -3,7 +3,6 @@ using MediatR;
 using Npgsql;
 using PurchaseManagement.Shared.Application;
 using Shared.Application;
-using Shared.Application.Interfaces;
 
 namespace GetPurchaseRequests.Application;
 

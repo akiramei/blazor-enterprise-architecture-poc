@@ -35,7 +35,7 @@ public class RejectPurchaseRequestHandler : IRequestHandler<RejectPurchaseReques
             }
 
             // 2. 却下処理
-            request.Reject(_currentUserService.UserId!.Value, command.Reason);
+            request.Reject(_currentUserService.UserId, command.Reason);
 
             // 3. 永続化
             await _repository.SaveAsync(request, cancellationToken);

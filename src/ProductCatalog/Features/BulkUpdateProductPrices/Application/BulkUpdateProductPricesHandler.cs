@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Interfaces;
+using Shared.Kernel;
 using ProductCatalog.Shared.Domain.Products;
 
 namespace BulkUpdateProductPrices.Application;

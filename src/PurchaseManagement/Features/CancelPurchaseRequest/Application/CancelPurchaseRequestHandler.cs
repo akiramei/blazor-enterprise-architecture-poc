@@ -55,13 +55,13 @@ public sealed class CancelPurchaseRequestHandler : IRequestHandler<CancelPurchas
 
             // 現在のユーザーIDを取得
             var userId = _currentUserService.UserId;
-            if (userId == null)
+            if (userId == Guid.Empty)
             {
                 return Result.Fail("ユーザー情報が取得できません");
             }
 
             // キャンセル実行（ドメインロジック）
-            purchaseRequest.Cancel(userId.Value);
+            purchaseRequest.Cancel(userId);
 
             // 保存（TransactionBehaviorによりOutboxにも書き込まれる）
             await _repository.SaveAsync(purchaseRequest, cancellationToken);
@@ -69,7 +69,7 @@ public sealed class CancelPurchaseRequestHandler : IRequestHandler<CancelPurchas
             _logger.LogInformation(
                 "購買申請をキャンセルしました。[Id: {PurchaseRequestId}] [User: {UserId}] [Reason: {Reason}]",
                 request.PurchaseRequestId,
-                userId.Value,
+                userId,
                 request.Reason ?? "（未指定）");
 
             return Result.Success();

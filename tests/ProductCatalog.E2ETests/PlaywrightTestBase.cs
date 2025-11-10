@@ -16,6 +16,7 @@ using Shared.Application.Common;
 using Shared.Application.Interfaces;
 using Shared.Infrastructure.Behaviors;
 using Shared.Infrastructure.Platform.Persistence;
+using Shared.Kernel;
 using ProductCatalog.Shared.Infrastructure.Persistence;
 using ProductCatalog.Shared.Infrastructure.Persistence.Behaviors;
 using ProductCatalog.Shared.Application;

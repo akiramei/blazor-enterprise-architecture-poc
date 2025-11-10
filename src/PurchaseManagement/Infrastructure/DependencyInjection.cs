@@ -67,6 +67,14 @@ public static class DependencyInjection
 ///
 /// Shared.Infrastructure.Services.CurrentUserServiceをPurchaseManagement.Shared.Application.ICurrentUserServiceに適応
 /// </summary>
+/// <summary>
+/// Shared.Application.Interfaces.ICurrentUserService から
+/// PurchaseManagement.Shared.Application.ICurrentUserService へのアダプター
+///
+/// 【アダプターパターンの理由】
+/// - PurchaseManagement BC が独自のインターフェースを持つ場合に使用
+/// - Shared層のインターフェースをラップして、BC固有の要件に適合
+/// </summary>
 internal sealed class CurrentUserServiceAdapter : PurchaseManagement.Shared.Application.ICurrentUserService
 {
     private readonly global::Shared.Application.Interfaces.ICurrentUserService _sharedCurrentUserService;
@@ -76,6 +84,7 @@ internal sealed class CurrentUserServiceAdapter : PurchaseManagement.Shared.Appl
         _sharedCurrentUserService = sharedCurrentUserService;
     }
 
-    public Guid? UserId => _sharedCurrentUserService.UserId;
+    public Guid UserId => _sharedCurrentUserService.UserId;
+    public Guid? TenantId => _sharedCurrentUserService.TenantId;
     public string? UserName => _sharedCurrentUserService.UserName;
 }
