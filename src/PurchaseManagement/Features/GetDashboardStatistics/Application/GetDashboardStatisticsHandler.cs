@@ -61,15 +61,19 @@ public sealed class GetDashboardStatisticsHandler
                 return Result.Fail<DashboardStatisticsDto>("テナント情報が取得できません");
             }
 
-            using var connection = _connectionFactory.CreateConnection();
+            // IMPORTANT: 各クエリで独立したコネクションを使用
+            // Npgsql/ADO.NET のコネクションはスレッドセーフではないため、
+            // 1本のコネクションを Task.WhenAll で使い回すと
+            // "The connection was already in use by another operation" エラーが発生
+            // 接続プールがあるため、パフォーマンスへの影響は最小限
 
-            // 5つの集計クエリを並列実行（全てTenantIdでフィルタ）
+            // 5つの集計クエリを並列実行（各クエリが独立したコネクションを使用）
             var (statusCounts, monthlyStats, topRequests, deptStats, overallSummary) = await Task.WhenAll(
-                GetStatusCountsAsync(connection, tenantId.Value),
-                GetMonthlyStatisticsAsync(connection, tenantId.Value, request.MonthsToInclude),
-                GetTopRequestsAsync(connection, tenantId.Value, request.TopRequestsCount),
-                GetDepartmentStatisticsAsync(connection, tenantId.Value, request.TopDepartmentsCount),
-                GetOverallSummaryAsync(connection, tenantId.Value)
+                GetStatusCountsAsync(tenantId.Value),
+                GetMonthlyStatisticsAsync(tenantId.Value, request.MonthsToInclude),
+                GetTopRequestsAsync(tenantId.Value, request.TopRequestsCount),
+                GetDepartmentStatisticsAsync(tenantId.Value, request.TopDepartmentsCount),
+                GetOverallSummaryAsync(tenantId.Value)
             ).ContinueWith(t => (
                 t.Result[0] as StatusCountDto ?? new StatusCountDto(),
                 t.Result[1] as List<MonthlyStatisticsDto> ?? new List<MonthlyStatisticsDto>(),
@@ -104,8 +108,10 @@ public sealed class GetDashboardStatisticsHandler
     /// <summary>
     /// ステータス別件数取得
     /// </summary>
-    private async Task<object> GetStatusCountsAsync(System.Data.IDbConnection connection, Guid tenantId)
+    private async Task<object> GetStatusCountsAsync(Guid tenantId)
     {
+        using var connection = _connectionFactory.CreateConnection();
+
         var sql = @"
             SELECT
                 SUM(CASE WHEN ""Status"" = 0 THEN 1 ELSE 0 END) AS Draft,
@@ -126,10 +132,11 @@ public sealed class GetDashboardStatisticsHandler
     /// 月次統計取得（過去N ヶ月）
     /// </summary>
     private async Task<object> GetMonthlyStatisticsAsync(
-        System.Data.IDbConnection connection,
         Guid tenantId,
         int monthsToInclude)
     {
+        using var connection = _connectionFactory.CreateConnection();
+
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
             WITH RequestTotals AS (
@@ -169,10 +176,11 @@ public sealed class GetDashboardStatisticsHandler
     /// トップ高額申請取得
     /// </summary>
     private async Task<object> GetTopRequestsAsync(
-        System.Data.IDbConnection connection,
         Guid tenantId,
         int topCount)
     {
+        using var connection = _connectionFactory.CreateConnection();
+
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
             SELECT
@@ -216,10 +224,11 @@ public sealed class GetDashboardStatisticsHandler
     /// 注: 部門情報がない場合は申請者名でグループ化
     /// </summary>
     private async Task<object> GetDepartmentStatisticsAsync(
-        System.Data.IDbConnection connection,
         Guid tenantId,
         int topCount)
     {
+        using var connection = _connectionFactory.CreateConnection();
+
         // NOTE: 現在のスキーマに部門（Department）列がないため、
         // 申請者名でグループ化。将来的に部門列を追加する場合はこのSQLを修正
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
@@ -253,8 +262,10 @@ public sealed class GetDashboardStatisticsHandler
     /// <summary>
     /// 全体サマリー取得
     /// </summary>
-    private async Task<object> GetOverallSummaryAsync(System.Data.IDbConnection connection, Guid tenantId)
+    private async Task<object> GetOverallSummaryAsync(Guid tenantId)
     {
+        using var connection = _connectionFactory.CreateConnection();
+
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
             WITH RequestTotals AS (
