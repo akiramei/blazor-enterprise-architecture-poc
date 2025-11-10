@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ProductCatalog.Shared.Domain.Products;
 using Shared.Domain.Outbox;
+using Shared.Infrastructure.Diagnostics;
 
 namespace ProductCatalog.Shared.Infrastructure.Persistence;
 
@@ -33,8 +35,13 @@ namespace ProductCatalog.Shared.Infrastructure.Persistence;
 /// </summary>
 public sealed class ProductCatalogDbContext : DbContext
 {
-    public ProductCatalogDbContext(DbContextOptions<ProductCatalogDbContext> options) : base(options)
+    private readonly ILogger<ProductCatalogDbContext> _logger;
+
+    public ProductCatalogDbContext(
+        DbContextOptions<ProductCatalogDbContext> options,
+        ILogger<ProductCatalogDbContext> logger) : base(options)
     {
+        _logger = logger;
     }
 
     // ビジネスエンティティ
@@ -45,6 +52,9 @@ public sealed class ProductCatalogDbContext : DbContext
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        // 診断ログ: EF Coreの変更追跡状態を出力
+        _logger.LogEntityState(this);
+
         // SQLiteではrowversionが使えないため、Versionを手動でインクリメント
         foreach (var entry in ChangeTracker.Entries<Product>())
         {
@@ -54,7 +64,7 @@ public sealed class ProductCatalogDbContext : DbContext
             }
             else if (entry.State == EntityState.Modified)
             {
-                var currentVersion = (long)entry.Property("Version").OriginalValue;
+                var currentVersion = entry.Property("Version").OriginalValue as long? ?? 0L;
                 entry.Property("Version").CurrentValue = currentVersion + 1;
             }
         }

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using Shared.Application.Interfaces;
 
 namespace Shared.Infrastructure.Behaviors;
@@ -14,15 +15,18 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
     private readonly IMemoryCache _cache;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
+    private readonly IHostEnvironment _environment;
 
     public CachingBehavior(
         IMemoryCache cache,
         ICurrentUserService currentUser,
-        ILogger<CachingBehavior<TRequest, TResponse>> logger)
+        ILogger<CachingBehavior<TRequest, TResponse>> logger,
+        IHostEnvironment environment)
     {
         _cache = cache;
         _currentUser = currentUser;
         _logger = logger;
+        _environment = environment;
     }
 
     public async Task<TResponse> Handle(
@@ -30,6 +34,13 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
+        // テスト環境ではキャッシュを無効化（テストの独立性を保つため）
+        if (_environment.EnvironmentName == "Test")
+        {
+            _logger.LogDebug("キャッシュ無効（Test環境）: {RequestType}", typeof(TRequest).Name);
+            return await next();
+        }
+
         // CRITICAL: キーに必ずユーザー/テナント情報を含める（キャッシュ誤配信防止）
         var userSegment = _currentUser.UserId.ToString("N");
         var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
@@ -40,7 +51,8 @@ public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRe
         // キャッシュから取得
         if (_cache.TryGetValue(cacheKey, out TResponse? cached))
         {
-            _logger.LogDebug("キャッシュヒット: {CacheKey}", cacheKey);
+            _logger.LogDebug("【キャッシュヒット】 Key={CacheKey}, Data={@CachedData}",
+                cacheKey, cached);
             return cached!;
         }
 

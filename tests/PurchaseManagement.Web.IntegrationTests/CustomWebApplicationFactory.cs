@@ -1,5 +1,7 @@
+using GetPurchaseRequestById.Application;
+using GetPurchaseRequests.Application;
+using MediatR;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -10,16 +12,21 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ProductCatalog.Shared.Infrastructure.Persistence;
 using PurchaseManagement.Infrastructure.Persistence;
 using PurchaseManagement.Shared.Application;
-using Shared.Domain.Identity;
-using Shared.Infrastructure.Platform;
+using PurchaseManagement.Web.IntegrationTests.TestDoubles;
+using Shared.Application;
 using Shared.Infrastructure.Platform.Persistence;
 
-namespace ProductCatalog.Web.IntegrationTests;
+namespace PurchaseManagement.Web.IntegrationTests;
 
 /// <summary>
-/// カスタムWebApplicationFactory（ProductCatalog統合テスト用）
+/// カスタムWebApplicationFactory（Fast テスト用）
 ///
-/// SQLite In-Memoryを使用し、テスト用のDbContextとIdentityデータをセットアップする
+/// SQLite In-Memoryを使用し、Dapperハンドラを EF Core ハンドラに置き換える
+///
+/// 特徴:
+/// - SQLite In-Memory で Relational 挙動を保証（InMemory より厳密）
+/// - Dapper 誤使用を防ぐため ThrowingConnectionFactory を登録
+/// - EF Core ハンドラで高速テストを実現
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -65,13 +72,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             context.Database.EnsureCreated();
         }
 
-        // PurchaseManagementDbContext のスキーマ作成
+        // PurchaseManagementDbContext のスキーマ作成（IWebHostEnvironment が必要）
+        // NOTE: Test環境ではGlobal Query Filterが無効化されているため、
+        //       ダミーのIWebHostEnvironmentを使用してもGlobal Query Filterは適用されない
         var purchaseManagementOptions = new DbContextOptionsBuilder<PurchaseManagementDbContext>()
             .UseSqlite(_purchaseManagementConnection)
             .Options;
-        // ダミーのIAppContextとIWebHostEnvironmentを使用
+
+        // IAppContextとIWebHostEnvironmentのダミー実装を使用
         var dummyAppContext = new DummyAppContext();
         var dummyEnvironment = new DummyWebHostEnvironment();
+
         using (var context = new PurchaseManagementDbContext(
             purchaseManagementOptions,
             dummyAppContext,
@@ -123,6 +134,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll(typeof(DbContextOptions<ProductCatalogDbContext>));
             services.RemoveAll(typeof(DbContextOptions<PlatformDbContext>));
             services.RemoveAll(typeof(DbContextOptions<PurchaseManagementDbContext>));
+
             services.RemoveAll(typeof(ProductCatalogDbContext));
             services.RemoveAll(typeof(PlatformDbContext));
             services.RemoveAll(typeof(PurchaseManagementDbContext));
@@ -150,23 +162,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDbConnectionFactory>();
             services.AddSingleton<IDbConnectionFactory, ThrowingConnectionFactory>();
 
-            // テスト用のEF Core実装のリポジトリを登録
-            services.RemoveAll<ProductCatalog.Shared.Application.IProductReadRepository>();
-            services.AddScoped<ProductCatalog.Shared.Application.IProductReadRepository, ProductCatalog.Web.IntegrationTests.TestDoubles.EfProductReadRepository>();
+            // Dapper ハンドラを EF Core ハンドラに置き換え
+            services.RemoveAll<IRequestHandler<GetPurchaseRequestByIdQuery, Result<PurchaseRequestDetailDto?>>>();
+            services.AddScoped<IRequestHandler<GetPurchaseRequestByIdQuery, Result<PurchaseRequestDetailDto?>>, EfGetPurchaseRequestByIdHandler>();
+
+            services.RemoveAll<IRequestHandler<GetPurchaseRequestsQuery, Result<List<PurchaseRequestListItemDto>>>>();
+            services.AddScoped<IRequestHandler<GetPurchaseRequestsQuery, Result<List<PurchaseRequestListItemDto>>>, EfGetPurchaseRequestsHandler>();
+
+            // ApprovalFlowService をテスト用に置き換え（固定のApproverIdを使用）
+            services.RemoveAll<PurchaseManagement.Shared.Application.IApprovalFlowService>();
+            services.AddScoped<PurchaseManagement.Shared.Application.IApprovalFlowService, TestApprovalFlowService>();
         });
-    }
-
-    /// <summary>
-    /// Identityデータをシード（スキーマは既にコンストラクタで作成済み）
-    /// </summary>
-    public async Task InitializeDatabaseAsync()
-    {
-        using var scope = Services.CreateScope();
-        var serviceProvider = scope.ServiceProvider;
-
-        // Identityデータをシード
-        var seeder = serviceProvider.GetRequiredService<IdentityDataSeeder>();
-        await seeder.SeedAsync();
     }
 
     protected override void Dispose(bool disposing)

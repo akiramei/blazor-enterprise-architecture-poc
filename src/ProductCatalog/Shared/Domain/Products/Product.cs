@@ -68,10 +68,39 @@ public sealed class Product : AggregateRoot<ProductId>
     private Product(ProductId id, string name, string description, Money price, int stock)
         : base(id)
     {
-        ChangeName(name);
-        ChangeDescription(description);
-        ChangePrice(price);
-        ChangeStock(stock);
+        // コンストラクタ内では直接フィールドに代入（イベント発行は行わない）
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new DomainException("商品名は必須です");
+        }
+        if (name.Length > 200)
+        {
+            throw new DomainException("商品名は200文字以内である必要があります");
+        }
+        _name = name;
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            throw new DomainException("説明は必須です");
+        }
+        if (description.Length > 2000)
+        {
+            throw new DomainException("説明は2000文字以内である必要があります");
+        }
+        _description = description;
+
+        if (price == null || price.Amount <= 0)
+        {
+            throw new DomainException("価格は0より大きい値である必要があります");
+        }
+        _price = price;
+
+        if (stock < 0)
+        {
+            throw new DomainException("在庫数は0以上である必要があります");
+        }
+        _stock = stock;
+
         _status = ProductStatus.Draft;  // 初期状態は下書き
         _isDeleted = false;
     }

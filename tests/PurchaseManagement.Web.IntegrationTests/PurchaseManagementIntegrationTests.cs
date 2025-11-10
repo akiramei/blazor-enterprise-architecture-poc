@@ -22,33 +22,36 @@ namespace PurchaseManagement.Web.IntegrationTests;
 /// - REST API/Blazorの代表的フローの検証
 ///
 /// テスト方針:
-/// - WebApplicationFactory を使用した完全な統合テスト
-/// - InMemoryデータベースを使用（高速・独立性）
+/// - CustomWebApplicationFactory を使用した完全な統合テスト
+/// - SQLite In-Memoryデータベースを使用（高速・独立性）
 /// - Outboxメッセージの永続化確認（トランザクション保証）
 /// - 実際のビジネスフロー（承認ワークフロー）の検証
 /// </summary>
-public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public PurchaseManagementIntegrationTests(WebApplicationFactory<Program> factory)
+    public PurchaseManagementIntegrationTests(CustomWebApplicationFactory factory)
     {
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Test");
-
-            builder.ConfigureServices(services =>
-            {
-                // テスト用にInMemoryデータベースを使用（Program.csで既に設定済み）
-                // ここでは追加設定は不要
-            });
-        });
-
+        _factory = factory;
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
         });
+    }
+
+    public async Task InitializeAsync()
+    {
+        // Identityデータをシード
+        using var scope = _factory.Services.CreateScope();
+        var seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
+        await seeder.SeedAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        return Task.CompletedTask;
     }
 
     #region Purchase Request Submission Tests
@@ -96,11 +99,15 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
         await using var scope = _factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PurchaseManagementDbContext>();
 
+        // デバッグ: 全件数を確認
+        var allCount = await dbContext.PurchaseRequests.IgnoreQueryFilters().CountAsync();
+        var allRequests = await dbContext.PurchaseRequests.IgnoreQueryFilters().ToListAsync();
+
         var purchaseRequest = await dbContext.PurchaseRequests
             .IgnoreQueryFilters() // テスト環境ではGlobal Query Filterをバイパス
             .FirstOrDefaultAsync(pr => pr.Id == requestId);
 
-        purchaseRequest.Should().NotBeNull("Purchase request should be created");
+        purchaseRequest.Should().NotBeNull($"Purchase request should be created. Total count: {allCount}, RequestId: {requestId}, All IDs: {string.Join(", ", allRequests.Select(r => r.Id))}");
         purchaseRequest!.Title.Should().Be("Test Purchase Request");
     }
 
@@ -581,11 +588,6 @@ public class PurchaseManagementIntegrationTests : IClassFixture<WebApplicationFa
 
     private async Task<string> GetAuthTokenAsync()
     {
-        // First, ensure admin user exists
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
-        await seeder.SeedAsync();
-
         var loginRequest = new
         {
             email = "admin@example.com",

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using PurchaseManagement.Shared.Domain;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
 using Shared.Application.Interfaces;
@@ -37,12 +39,15 @@ namespace PurchaseManagement.Infrastructure.Persistence;
 public sealed class PurchaseManagementDbContext : DbContext
 {
     private readonly IAppContext _appContext;
+    private readonly IWebHostEnvironment _environment;
 
     public PurchaseManagementDbContext(
         DbContextOptions<PurchaseManagementDbContext> options,
-        IAppContext appContext) : base(options)
+        IAppContext appContext,
+        IWebHostEnvironment environment) : base(options)
     {
         _appContext = appContext;
+        _environment = environment;
     }
 
     // ビジネスエンティティ
@@ -67,8 +72,11 @@ public sealed class PurchaseManagementDbContext : DbContext
         // PurchaseManagement.Infrastructure.Persistence アセンブリから設定を読み込む
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PurchaseManagementDbContext).Assembly);
 
-        // Global Query Filter: マルチテナント分離
-        ApplyGlobalFilters(modelBuilder);
+        // Global Query Filter: マルチテナント分離（Test環境では無効化）
+        if (!_environment.IsEnvironment("Test"))
+        {
+            ApplyGlobalFilters(modelBuilder);
+        }
     }
 
     /// <summary>

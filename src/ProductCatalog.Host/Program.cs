@@ -122,13 +122,18 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infras
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.IdempotencyBehavior<,>));    // 4. Idempotency (Command)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));    // 7. Transaction (Command) - BC固有
+// 7. Transaction (Command) - BC固有
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PurchaseManagement.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
 
 // Authorization
 builder.Services.AddAuthorization();
 
 // Memory Cache
 builder.Services.AddMemoryCache();
+
+// Cache Invalidation Service
+builder.Services.AddSingleton<ICacheInvalidationService, Shared.Infrastructure.Caching.CacheInvalidationService>();
 
 // Current User Service
 builder.Services.AddScoped<ICurrentUserService, Shared.Infrastructure.Services.CurrentUserService>();
@@ -158,24 +163,10 @@ builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, PurchaseM
 // Legacy Idempotency Store (Old Interface - for compatibility) - removed as it's deprecated
 
 // DbContext (Infrastructure.Platform Pattern)
-if (builder.Environment.IsEnvironment("Test"))
+// NOTE: Test環境ではCustomWebApplicationFactoryがDbContextを設定するため、
+//       ここでは登録しない。本番環境と開発環境のみPostgreSQLを使用。
+if (!builder.Environment.IsEnvironment("Test"))
 {
-    // Test environment: InMemory databases
-    builder.Services.AddDbContext<ProductCatalogDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase_ProductCatalog")
-               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
-
-    builder.Services.AddDbContext<Shared.Infrastructure.Platform.Persistence.PlatformDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase_Platform")
-               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
-
-    builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
-        options.UseInMemoryDatabase("TestDatabase_PurchaseManagement")
-               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
-}
-else
-{
-    // Production environment: PostgreSQL
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
     builder.Services.AddDbContext<ProductCatalogDbContext>(options =>
@@ -347,11 +338,14 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Rate Limiting（メモリベース）
-builder.Services.AddMemoryCache();
-builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
-builder.Services.AddInMemoryRateLimiting();
-builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+// Rate Limiting（メモリベース） - Test環境では無効化
+if (!builder.Environment.IsEnvironment("Test"))
+{
+    builder.Services.AddMemoryCache();
+    builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+    builder.Services.AddInMemoryRateLimiting();
+    builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+}
 
 // Swagger / OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -464,8 +458,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Rate Limiting（レート制限を最初に適用）
-app.UseIpRateLimiting();
+// Rate Limiting（レート制限を最初に適用） - Test環境では無効化
+if (!app.Environment.IsEnvironment("Test"))
+{
+    app.UseIpRateLimiting();
+}
 
 // CORS（クロスオリジンリクエスト許可）
 app.UseCors("ApiCorsPolicy");

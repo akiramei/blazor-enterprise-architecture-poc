@@ -11,6 +11,7 @@ public class UpdateProductHandlerTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
     private readonly Mock<IProductNotificationService> _notificationMock;
+    private readonly Mock<ICacheInvalidationService> _cacheInvalidationMock;
     private readonly Mock<ILogger<UpdateProductHandler>> _loggerMock;
     private readonly UpdateProductHandler _handler;
 
@@ -18,10 +19,12 @@ public class UpdateProductHandlerTests
     {
         _repositoryMock = new Mock<IProductRepository>();
         _notificationMock = new Mock<IProductNotificationService>();
+        _cacheInvalidationMock = new Mock<ICacheInvalidationService>();
         _loggerMock = new Mock<ILogger<UpdateProductHandler>>();
         _handler = new UpdateProductHandler(
             _repositoryMock.Object,
             _notificationMock.Object,
+            _cacheInvalidationMock.Object,
             _loggerMock.Object);
     }
 

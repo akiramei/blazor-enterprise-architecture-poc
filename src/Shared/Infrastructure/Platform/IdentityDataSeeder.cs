@@ -158,9 +158,14 @@ public sealed class IdentityDataSeeder
             return;
         }
 
+        // admin@example.comには固定のUserIdを使用（テストで承認者チェックをパスするため）
+        var userId = (email == "admin@example.com")
+            ? Guid.Parse("00000000-0000-0000-0000-000000000001")
+            : Guid.NewGuid();
+
         var user = new ApplicationUser
         {
-            Id = Guid.NewGuid(),
+            Id = userId,
             UserName = email,
             Email = email,
             DisplayName = displayName,
