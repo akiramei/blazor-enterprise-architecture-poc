@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ProductCatalog.Shared.Domain.Products;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
 
 namespace PurchaseManagement.Infrastructure.Persistence.Configurations;

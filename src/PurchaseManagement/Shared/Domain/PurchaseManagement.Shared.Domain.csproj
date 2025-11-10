@@ -3,7 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
     <ProjectReference Include="..\..\..\Shared\Domain\Shared.Domain.csproj" />
-    <ProjectReference Include="..\..\..\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <!-- Removed ProductCatalog dependency to maintain BC independence -->
+    <!-- Money value object moved to Shared.Kernel for cross-BC usage -->
   </ItemGroup>
 
   <PropertyGroup>

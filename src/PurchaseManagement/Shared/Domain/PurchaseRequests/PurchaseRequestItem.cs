@@ -1,4 +1,3 @@
-using ProductCatalog.Shared.Domain.Products;
 using Shared.Kernel;
 
 namespace PurchaseManagement.Shared.Domain.PurchaseRequests;

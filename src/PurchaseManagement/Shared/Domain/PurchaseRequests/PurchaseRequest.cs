@@ -1,4 +1,3 @@
-using ProductCatalog.Shared.Domain.Products;
 using PurchaseManagement.Shared.Domain;
 using PurchaseManagement.Shared.Domain.PurchaseRequests.Events;
 using PurchaseManagement.Shared.Domain.PurchaseRequests.StateMachine;

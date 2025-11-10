@@ -63,7 +63,7 @@ public sealed class PurchaseManagementDbContext : DbContext
 
         // Value Objectsをエンティティとして扱わないように設定
         modelBuilder.Ignore<PurchaseRequestNumber>();
-        modelBuilder.Ignore<ProductCatalog.Shared.Domain.Products.Money>();
+        modelBuilder.Ignore<Money>();
 
         // DomainEventは別テーブルで管理されるため無視
         modelBuilder.Ignore<DomainEvent>();

@@ -1,9 +1,17 @@
-using Shared.Kernel;
-
-namespace ProductCatalog.Shared.Domain.Products;
+namespace Shared.Kernel;
 
 /// <summary>
 /// 金額（Value Object）
+///
+/// 【Shared.Kernel配置理由】
+/// - Money は複数の Bounded Context で使用される共通の値オブジェクト
+/// - ProductCatalog BC と PurchaseManagement BC の両方で必要
+/// - BC間の依存を避けるため、Shared.Kernel に配置
+///
+/// 【VSA原則との整合性】
+/// - Vertical Slice Architecture では、BC間の直接依存は禁止
+/// - 共通の値オブジェクトは Shared.Kernel に配置し、両BCから参照
+/// - これにより、BC間の独立性を保ちつつ、コード重複を避ける
 /// </summary>
 public sealed class Money : ValueObject
 {
