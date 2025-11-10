@@ -69,7 +69,7 @@ public sealed class GetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRequ
             "RequestNumber" => $"pr.\"RequestNumber\" {(query.Ascending ? "ASC" : "DESC")}",
             "Title" => $"pr.\"Title\" {(query.Ascending ? "ASC" : "DESC")}",
             "Status" => $"pr.\"Status\" {(query.Ascending ? "ASC" : "DESC")}",
-            "TotalAmount" => $"total_amount {(query.Ascending ? "ASC" : "DESC")}",
+            "TotalAmount" => $"TotalAmount {(query.Ascending ? "ASC" : "DESC")}", // Fixed: Match SELECT alias
             "CreatedAt" => $"pr.\"CreatedAt\" {(query.Ascending ? "ASC" : "DESC")}",
             "SubmittedAt" => $"pr.\"SubmittedAt\" {(query.Ascending ? "ASC" : "DESC")}",
             _ => $"pr.\"CreatedAt\" {(query.Ascending ? "ASC" : "DESC")}"
