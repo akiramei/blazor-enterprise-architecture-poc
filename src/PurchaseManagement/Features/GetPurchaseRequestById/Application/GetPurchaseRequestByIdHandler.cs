@@ -1,32 +1,37 @@
-using Dapper;
 using MediatR;
 using PurchaseManagement.Shared.Application;
 using Shared.Application;
-using Shared.Application.Interfaces;
 
 namespace GetPurchaseRequestById.Application;
 
 /// <summary>
 /// 購買申請詳細取得ハンドラ
 ///
-/// 【パターン: CQRS Query Handler】
+/// 【パターン: CQRS Query Handler with EF Core Repository】
 ///
 /// 責務:
-/// - Dapperを使用してPostgreSQLから購買申請詳細を取得
+/// - EF Core Repository経由で購買申請詳細を取得
+/// - Global Query Filterによるマルチテナント分離を確保（SECURITY）
 /// - 承認ステップと品目を含む完全なデータ取得
 /// - DTOへの変換
 ///
+/// セキュリティ:
+/// - **CRITICAL**: EF Core Repositoryを使用することで、Global Query Filterが自動適用される
+/// - IDbConnectionを直接使用すると、Global Query Filterをバイパスしてしまい、
+///   他テナントのデータが閲覧可能になる（セキュリティ脆弱性）
+///
 /// AI実装時の注意:
-/// - Multiple result setsを使用して1回のクエリで全データ取得
+/// - 読み取り専用クエリでも、マルチテナントデータの場合は必ずEF Core Repositoryを使用
 /// - ステータス名の変換はアプリケーション層で実施
+/// - OwnsMany()で設定されている子エンティティは自動的にIncludeされる
 /// </summary>
 public sealed class GetPurchaseRequestByIdHandler : IRequestHandler<GetPurchaseRequestByIdQuery, Result<PurchaseRequestDetailDto?>>
 {
-    private readonly IDbConnectionFactory _connectionFactory;
+    private readonly IPurchaseRequestRepository _repository;
 
-    public GetPurchaseRequestByIdHandler(IDbConnectionFactory connectionFactory)
+    public GetPurchaseRequestByIdHandler(IPurchaseRequestRepository repository)
     {
-        _connectionFactory = connectionFactory;
+        _repository = repository;
     }
 
     public async Task<Result<PurchaseRequestDetailDto?>> Handle(
@@ -35,98 +40,55 @@ public sealed class GetPurchaseRequestByIdHandler : IRequestHandler<GetPurchaseR
     {
         try
         {
-            using var connection = _connectionFactory.CreateConnection();
+            // Global Query Filterが自動適用されるため、他テナントのデータは取得できない
+            var purchaseRequest = await _repository.GetByIdAsync(query.Id, cancellationToken);
 
-            var sql = @"
-                -- Purchase Request
-                SELECT
-                    ""Id"",
-                    ""RequestNumber"",
-                    ""RequesterId"",
-                    ""RequesterName"",
-                    ""Title"",
-                    ""Description"",
-                    ""Status"",
-                    ""CreatedAt"",
-                    ""SubmittedAt"",
-                    ""ApprovedAt"",
-                    ""RejectedAt"",
-                    ""CancelledAt""
-                FROM ""PurchaseRequests""
-                WHERE ""Id"" = @Id;
-
-                -- Approval Steps
-                SELECT
-                    ""Id"",
-                    ""StepNumber"",
-                    ""ApproverId"",
-                    ""ApproverName"",
-                    ""ApproverRole"",
-                    ""Status"",
-                    ""Comment"",
-                    ""ApprovedAt"",
-                    ""RejectedAt""
-                FROM ""ApprovalSteps""
-                WHERE ""PurchaseRequestId"" = @Id
-                ORDER BY ""StepNumber"";
-
-                -- Items
-                SELECT
-                    ""Id"",
-                    ""ProductId"",
-                    ""ProductName"",
-                    ""UnitPrice"",
-                    ""Currency"",
-                    ""Quantity"",
-                    ""Amount""
-                FROM ""PurchaseRequestItems""
-                WHERE ""PurchaseRequestId"" = @Id;";
-
-            using var multi = await connection.QueryMultipleAsync(sql, new { query.Id });
-
-            var purchaseRequest = await multi.ReadSingleOrDefaultAsync<PurchaseRequestDbModel>();
             if (purchaseRequest == null)
             {
                 return Result.Success<PurchaseRequestDetailDto?>(null);
             }
 
-            var approvalSteps = (await multi.ReadAsync<ApprovalStepDbModel>()).ToList();
-            var items = (await multi.ReadAsync<PurchaseRequestItemDetailDto>()).ToList();
-
-            var totalAmount = items.Sum(i => i.Amount);
-            var currency = items.FirstOrDefault()?.Currency ?? "JPY";
-
+            // ドメインエンティティからDTOへ変換
             var result = new PurchaseRequestDetailDto
             {
                 Id = purchaseRequest.Id,
-                RequestNumber = purchaseRequest.RequestNumber,
+                RequestNumber = purchaseRequest.RequestNumber.Value,
                 RequesterId = purchaseRequest.RequesterId,
                 RequesterName = purchaseRequest.RequesterName,
                 Title = purchaseRequest.Title,
                 Description = purchaseRequest.Description,
-                Status = purchaseRequest.Status,
-                StatusName = GetStatusName(purchaseRequest.Status),
+                Status = (int)purchaseRequest.Status,
+                StatusName = GetStatusName((int)purchaseRequest.Status),
                 CreatedAt = purchaseRequest.CreatedAt,
                 SubmittedAt = purchaseRequest.SubmittedAt,
                 ApprovedAt = purchaseRequest.ApprovedAt,
                 RejectedAt = purchaseRequest.RejectedAt,
                 CancelledAt = purchaseRequest.CancelledAt,
-                ApprovalSteps = approvalSteps.Select(s => new ApprovalStepDto
+                ApprovalSteps = purchaseRequest.ApprovalSteps.Select(s => new ApprovalStepDto
                 {
                     Id = s.Id,
                     StepNumber = s.StepNumber,
                     ApproverId = s.ApproverId,
                     ApproverName = s.ApproverName,
                     ApproverRole = s.ApproverRole,
-                    Status = s.Status,
-                    StatusName = GetApprovalStepStatusName(s.Status),
+                    Status = (int)s.Status,
+                    StatusName = GetApprovalStepStatusName((int)s.Status),
                     Comment = s.Comment,
                     ApprovedAt = s.ApprovedAt,
                     RejectedAt = s.RejectedAt
                 }).ToList(),
-                Items = items,
-                TotalAmount = totalAmount,
-                Currency = currency
+                Items = purchaseRequest.Items.Select(i => new PurchaseRequestItemDetailDto
+                {
+                    Id = i.Id,
+                    ProductId = i.ProductId,
+                    ProductName = i.ProductName,
+                    UnitPrice = i.UnitPrice.Amount,
+                    Currency = i.UnitPrice.Currency,
+                    Quantity = i.Quantity,
+                    Amount = i.Amount.Amount
+                }).ToList(),
+                TotalAmount = purchaseRequest.TotalAmount.Amount,
+                Currency = purchaseRequest.Items.FirstOrDefault()?.UnitPrice.Currency ?? "JPY"
             };
 
             return Result.Success<PurchaseRequestDetailDto?>(result);
@@ -163,34 +125,5 @@ public sealed class GetPurchaseRequestByIdHandler : IRequestHandler<GetPurchaseR
             2 => "却下",
             _ => "不明"
         };
-    }
-
-    private sealed record PurchaseRequestDbModel
-    {
-        public required Guid Id { get; init; }
-        public required string RequestNumber { get; init; }
-        public required Guid RequesterId { get; init; }
-        public required string RequesterName { get; init; }
-        public required string Title { get; init; }
-        public required string Description { get; init; }
-        public required int Status { get; init; }
-        public required DateTime CreatedAt { get; init; }
-        public DateTime? SubmittedAt { get; init; }
-        public DateTime? ApprovedAt { get; init; }
-        public DateTime? RejectedAt { get; init; }
-        public DateTime? CancelledAt { get; init; }
-    }
-
-    private sealed record ApprovalStepDbModel
-    {
-        public required Guid Id { get; init; }
-        public required int StepNumber { get; init; }
-        public required Guid ApproverId { get; init; }
-        public required string ApproverName { get; init; }
-        public required string ApproverRole { get; init; }
-        public required int Status { get; init; }
-        public string? Comment { get; init; }
-        public DateTime? ApprovedAt { get; init; }
-        public DateTime? RejectedAt { get; init; }
     }
 }

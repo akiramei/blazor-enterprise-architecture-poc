@@ -60,29 +60,35 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
             // ソート順を決定
             var orderByClause = request.SortBy switch
             {
-                "TotalAmount" => request.Ascending ? "pr.\"TotalAmount\" ASC" : "pr.\"TotalAmount\" DESC",
+                "TotalAmount" => request.Ascending ? "TotalAmount ASC" : "TotalAmount DESC",
                 "SubmittedAt" => request.Ascending ? "pr.\"SubmittedAt\" ASC" : "pr.\"SubmittedAt\" DESC",
                 "RequestNumber" => request.Ascending ? "pr.\"RequestNumber\" ASC" : "pr.\"RequestNumber\" DESC",
-                _ => "pr.\"TotalAmount\" DESC" // デフォルト: 金額降順
+                _ => "TotalAmount DESC" // デフォルト: 金額降順
             };
 
             // SQL: 承認待ち申請を取得
+            // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
+            // NOTE: IsPendingは計算プロパティ（Status = 0でPending）
             var sql = $@"
                 SELECT
                     pr.""Id"" AS PurchaseRequestId,
                     pr.""RequestNumber"",
                     pr.""Title"",
-                    pr.""TotalAmount"",
+                    COALESCE((
+                        SELECT SUM(pri.""Amount"")
+                        FROM ""PurchaseRequestItems"" pri
+                        WHERE pri.""PurchaseRequestId"" = pr.""Id""
+                    ), 0) AS TotalAmount,
                     pr.""RequesterId"",
                     pr.""RequesterName"",
                     pr.""SubmittedAt"",
                     ast.""StepNumber"" AS CurrentStepNumber,
-                    (SELECT COUNT(*) FROM pm_ApprovalSteps WHERE ""PurchaseRequestId"" = pr.""Id"") AS TotalSteps
-                FROM pm_PurchaseRequests pr
-                INNER JOIN pm_ApprovalSteps ast
+                    (SELECT COUNT(*) FROM ""ApprovalSteps"" WHERE ""PurchaseRequestId"" = pr.""Id"") AS TotalSteps
+                FROM ""PurchaseRequests"" pr
+                INNER JOIN ""ApprovalSteps"" ast
                     ON pr.""Id"" = ast.""PurchaseRequestId""
                 WHERE ast.""ApproverId"" = @UserId
-                  AND ast.""IsPending"" = true
+                  AND ast.""Status"" = 0  -- ApprovalStepStatus.Pending = 0
                   AND pr.""Status"" IN (1, 2)  -- Submitted = 1, InApproval = 2
                 ORDER BY {orderByClause}
                 LIMIT @PageSize OFFSET @Offset

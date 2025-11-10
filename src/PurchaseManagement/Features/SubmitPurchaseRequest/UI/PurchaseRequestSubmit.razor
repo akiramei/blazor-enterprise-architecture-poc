@@ -142,12 +142,30 @@
 
         try
         {
+            // INPUT VALIDATION: Validate all ProductIds before parsing
+            var invalidItems = new List<string>();
+            foreach (var item in _model.Items)
+            {
+                if (!Guid.TryParse(item.ProductId, out _))
+                {
+                    invalidItems.Add($"商品ID '{item.ProductId}' が無効です（GUID形式である必要があります）");
+                }
+            }
+
+            if (invalidItems.Any())
+            {
+                _errorMessage = string.Join("\n", invalidItems);
+                _isSubmitting = false;
+                return;
+            }
+
+            // All ProductIds are valid, safe to parse
             var command = new SubmitPurchaseRequestCommand
             {
                 Title = _model.Title,
                 Description = _model.Description,
                 Items = _model.Items.Select(item => new PurchaseRequestItemDto(
-                    Guid.Parse(item.ProductId),
+                    Guid.Parse(item.ProductId), // Now safe - validated above
                     item.ProductName,
                     item.UnitPrice,
                     item.Quantity

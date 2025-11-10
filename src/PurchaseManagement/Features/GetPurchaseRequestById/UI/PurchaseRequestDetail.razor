@@ -4,8 +4,11 @@
 @using ApprovePurchaseRequest.Application
 @using RejectPurchaseRequest.Application
 @using Shared.Application
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inject IMediator Mediator
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>購買申請詳細</PageTitle>
 
@@ -255,6 +258,22 @@ else
     private string _approvalComment = string.Empty;
     private string _rejectionReason = string.Empty;
 
+    // SECURITY: Current user ID for authorization checks
+    private Guid _currentUserId = Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get current user ID from authentication state
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            _currentUserId = Guid.TryParse(userIdClaim, out var userId) ? userId : Guid.Empty;
+        }
+    }
+
     protected override async Task OnParametersSetAsync()
     {
         await LoadPurchaseRequest();
@@ -367,20 +386,45 @@ else
         }
     }
 
+    /// <summary>
+    /// 承認可否の判定
+    ///
+    /// SECURITY: 現在のユーザーが承認者として割り当てられているかをチェック
+    /// - 単なるステータスチェックでは不十分（誰でも承認できてしまう）
+    /// - CurrentApprovalStep（Status = 0, Pending）の承認者IDと現在のユーザーIDを突き合わせる
+    /// </summary>
     private bool CanApprove()
     {
-        if (_purchaseRequest == null) return false;
+        if (_purchaseRequest == null || _currentUserId == Guid.Empty) return false;
 
-        // Status 2, 3, 4 are pending approval states
-        return _purchaseRequest.Status >= 2 && _purchaseRequest.Status <= 4;
+        // Find the current pending approval step (Status = 0)
+        var currentStep = _purchaseRequest.ApprovalSteps
+            .FirstOrDefault(s => s.Status == 0); // 0 = Pending
+
+        if (currentStep == null) return false;
+
+        // CRITICAL: Check if current user is the approver for this step
+        return currentStep.ApproverId == _currentUserId;
     }
 
+    /// <summary>
+    /// 却下可否の判定
+    ///
+    /// SECURITY: 現在のユーザーが承認者として割り当てられているかをチェック
+    /// - 承認と同じロジック（現在のステップの承認者のみが却下可能）
+    /// </summary>
     private bool CanReject()
     {
-        if (_purchaseRequest == null) return false;
+        if (_purchaseRequest == null || _currentUserId == Guid.Empty) return false;
 
-        // Can reject when in pending approval states
-        return _purchaseRequest.Status >= 2 && _purchaseRequest.Status <= 4;
+        // Find the current pending approval step (Status = 0)
+        var currentStep = _purchaseRequest.ApprovalSteps
+            .FirstOrDefault(s => s.Status == 0); // 0 = Pending
+
+        if (currentStep == null) return false;
+
+        // CRITICAL: Check if current user is the approver for this step
+        return currentStep.ApproverId == _currentUserId;
     }
 
     private static string GetStatusBadgeClass(int status)

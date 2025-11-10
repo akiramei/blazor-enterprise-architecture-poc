@@ -99,7 +99,7 @@ public sealed class GetDashboardStatisticsHandler
                 SUM(CASE WHEN ""Status"" = 5 THEN 1 ELSE 0 END) AS Approved,
                 SUM(CASE WHEN ""Status"" = 6 THEN 1 ELSE 0 END) AS Rejected,
                 SUM(CASE WHEN ""Status"" = 7 THEN 1 ELSE 0 END) AS Cancelled
-            FROM pm_PurchaseRequests
+            FROM ""PurchaseRequests""
         ";
 
         return await connection.QueryFirstOrDefaultAsync<StatusCountDto>(sql)
@@ -113,16 +113,29 @@ public sealed class GetDashboardStatisticsHandler
         System.Data.IDbConnection connection,
         int monthsToInclude)
     {
+        // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
+            WITH RequestTotals AS (
+                SELECT
+                    pr.""Id"",
+                    pr.""SubmittedAt"",
+                    pr.""Status"",
+                    COALESCE((
+                        SELECT SUM(pri.""Amount"")
+                        FROM ""PurchaseRequestItems"" pri
+                        WHERE pri.""PurchaseRequestId"" = pr.""Id""
+                    ), 0) AS TotalAmount
+                FROM ""PurchaseRequests"" pr
+                WHERE pr.""SubmittedAt"" IS NOT NULL
+                  AND pr.""SubmittedAt"" >= NOW() - INTERVAL '@Months months'
+            )
             SELECT
                 TO_CHAR(""SubmittedAt"", 'YYYY-MM') AS YearMonth,
                 COUNT(*) AS RequestCount,
-                SUM(""TotalAmount"") AS TotalAmount,
+                SUM(TotalAmount) AS TotalAmount,
                 SUM(CASE WHEN ""Status"" = 5 THEN 1 ELSE 0 END) AS ApprovedCount,
-                SUM(CASE WHEN ""Status"" = 5 THEN ""TotalAmount"" ELSE 0 END) AS ApprovedAmount
-            FROM pm_PurchaseRequests
-            WHERE ""SubmittedAt"" IS NOT NULL
-              AND ""SubmittedAt"" >= NOW() - INTERVAL '@Months months'
+                SUM(CASE WHEN ""Status"" = 5 THEN TotalAmount ELSE 0 END) AS ApprovedAmount
+            FROM RequestTotals
             GROUP BY TO_CHAR(""SubmittedAt"", 'YYYY-MM')
             ORDER BY YearMonth DESC
         ";
@@ -140,15 +153,20 @@ public sealed class GetDashboardStatisticsHandler
         System.Data.IDbConnection connection,
         int topCount)
     {
+        // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
             SELECT
-                ""Id"",
-                ""RequestNumber"",
-                ""Title"",
-                ""TotalAmount"",
-                ""RequesterName"",
-                ""SubmittedAt"",
-                CASE ""Status""
+                pr.""Id"",
+                pr.""RequestNumber"",
+                pr.""Title"",
+                COALESCE((
+                    SELECT SUM(pri.""Amount"")
+                    FROM ""PurchaseRequestItems"" pri
+                    WHERE pri.""PurchaseRequestId"" = pr.""Id""
+                ), 0) AS TotalAmount,
+                pr.""RequesterName"",
+                pr.""SubmittedAt"",
+                CASE pr.""Status""
                     WHEN 0 THEN 'Draft'
                     WHEN 1 THEN 'Submitted'
                     WHEN 2 THEN 'PendingFirstApproval'
@@ -158,9 +176,13 @@ public sealed class GetDashboardStatisticsHandler
                     WHEN 6 THEN 'Rejected'
                     WHEN 7 THEN 'Cancelled'
                 END AS Status
-            FROM pm_PurchaseRequests
-            WHERE ""SubmittedAt"" IS NOT NULL
-            ORDER BY ""TotalAmount"" DESC
+            FROM ""PurchaseRequests"" pr
+            WHERE pr.""SubmittedAt"" IS NOT NULL
+            ORDER BY COALESCE((
+                SELECT SUM(pri.""Amount"")
+                FROM ""PurchaseRequestItems"" pri
+                WHERE pri.""PurchaseRequestId"" = pr.""Id""
+            ), 0) DESC
             LIMIT @TopCount
         ";
 
@@ -178,15 +200,26 @@ public sealed class GetDashboardStatisticsHandler
     {
         // NOTE: 現在のスキーマに部門（Department）列がないため、
         // 申請者名でグループ化。将来的に部門列を追加する場合はこのSQLを修正
+        // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
+            WITH RequestTotals AS (
+                SELECT
+                    pr.""RequesterName"",
+                    COALESCE((
+                        SELECT SUM(pri.""Amount"")
+                        FROM ""PurchaseRequestItems"" pri
+                        WHERE pri.""PurchaseRequestId"" = pr.""Id""
+                    ), 0) AS TotalAmount
+                FROM ""PurchaseRequests"" pr
+                WHERE pr.""SubmittedAt"" IS NOT NULL
+            )
             SELECT
                 ""RequesterName"" AS Department,
                 COUNT(*) AS RequestCount,
-                SUM(""TotalAmount"") AS TotalAmount
-            FROM pm_PurchaseRequests
-            WHERE ""SubmittedAt"" IS NOT NULL
+                SUM(TotalAmount) AS TotalAmount
+            FROM RequestTotals
             GROUP BY ""RequesterName""
-            ORDER BY TotalAmount DESC
+            ORDER BY SUM(TotalAmount) DESC
             LIMIT @TopCount
         ";
 
@@ -199,22 +232,36 @@ public sealed class GetDashboardStatisticsHandler
     /// </summary>
     private async Task<object> GetOverallSummaryAsync(System.Data.IDbConnection connection)
     {
+        // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
+            WITH RequestTotals AS (
+                SELECT
+                    pr.""Id"",
+                    pr.""SubmittedAt"",
+                    pr.""ApprovedAt"",
+                    pr.""Status"",
+                    COALESCE((
+                        SELECT SUM(pri.""Amount"")
+                        FROM ""PurchaseRequestItems"" pri
+                        WHERE pri.""PurchaseRequestId"" = pr.""Id""
+                    ), 0) AS TotalAmount
+                FROM ""PurchaseRequests"" pr
+                WHERE pr.""SubmittedAt"" IS NOT NULL
+            )
             SELECT
                 COUNT(*) AS TotalRequests,
-                SUM(""TotalAmount"") AS TotalAmount,
+                SUM(TotalAmount) AS TotalAmount,
                 SUM(CASE WHEN DATE_TRUNC('month', ""SubmittedAt"") = DATE_TRUNC('month', NOW())
                     THEN 1 ELSE 0 END) AS CurrentMonthRequests,
                 SUM(CASE WHEN DATE_TRUNC('month', ""SubmittedAt"") = DATE_TRUNC('month', NOW())
-                    THEN ""TotalAmount"" ELSE 0 END) AS CurrentMonthAmount,
+                    THEN TotalAmount ELSE 0 END) AS CurrentMonthAmount,
                 AVG(CASE WHEN ""ApprovedAt"" IS NOT NULL AND ""SubmittedAt"" IS NOT NULL
                     THEN EXTRACT(EPOCH FROM (""ApprovedAt"" - ""SubmittedAt"")) / 86400
                     ELSE NULL END) AS AverageProcessingDays,
                 COALESCE(MAX(CASE WHEN ""Status"" IN (1, 2, 3, 4) AND ""SubmittedAt"" IS NOT NULL
                     THEN EXTRACT(DAY FROM (NOW() - ""SubmittedAt""))
                     ELSE NULL END), 0) AS OldestPendingDays
-            FROM pm_PurchaseRequests
-            WHERE ""SubmittedAt"" IS NOT NULL
+            FROM RequestTotals
         ";
 
         return await connection.QueryFirstOrDefaultAsync<OverallSummaryDto>(sql)
