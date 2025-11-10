@@ -9,34 +9,42 @@ namespace GetDashboardStatistics.Application;
 /// <summary>
 /// ダッシュボード統計情報取得ハンドラー
 ///
-/// 【パターン: CQRS Query Handler - Parallel Aggregation】
+/// 【パターン: CQRS Query Handler - Parallel Aggregation with Multi-tenant Security】
 ///
 /// 責務:
 /// - 5つの集計クエリを並列実行
+/// - マルチテナント分離（全クエリにTenantIdフィルタ）
 /// - Dapperによる高速SQL実行
 /// - 結果の統合とDTO変換
 ///
+/// セキュリティ:
+/// - **CRITICAL**: 全ての集計クエリに WHERE pr."TenantId" = @TenantId を追加
+/// - ICurrentUserService.TenantId を使用してテナント分離を保証
+///
 /// パフォーマンス最適化:
 /// - Task.WhenAll による並列実行
-/// - インデックス活用（Status, SubmittedAt列）
+/// - インデックス活用（TenantId, Status, SubmittedAt列）
 /// - 必要最小限のカラムのみSELECT
 /// - GROUP BY / ORDER BY 最適化
 ///
 /// キャッシング:
 /// - CachingBehavior適用推奨（5分TTL）
-/// - キャッシュキー: "Dashboard:Statistics"
+/// - キャッシュキー: "Dashboard:Statistics:{TenantId}"
 /// </summary>
 public sealed class GetDashboardStatisticsHandler
     : IRequestHandler<GetDashboardStatisticsQuery, Result<DashboardStatisticsDto>>
 {
     private readonly IDbConnectionFactory _connectionFactory;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<GetDashboardStatisticsHandler> _logger;
 
     public GetDashboardStatisticsHandler(
         IDbConnectionFactory connectionFactory,
+        ICurrentUserService currentUserService,
         ILogger<GetDashboardStatisticsHandler> logger)
     {
         _connectionFactory = connectionFactory;
+        _currentUserService = currentUserService;
         _logger = logger;
     }
 
@@ -46,15 +54,22 @@ public sealed class GetDashboardStatisticsHandler
     {
         try
         {
+            // SECURITY: Get current tenant ID for multi-tenant filtering
+            var tenantId = _currentUserService.TenantId;
+            if (tenantId == null)
+            {
+                return Result.Fail<DashboardStatisticsDto>("テナント情報が取得できません");
+            }
+
             using var connection = _connectionFactory.CreateConnection();
 
-            // 5つの集計クエリを並列実行
+            // 5つの集計クエリを並列実行（全てTenantIdでフィルタ）
             var (statusCounts, monthlyStats, topRequests, deptStats, overallSummary) = await Task.WhenAll(
-                GetStatusCountsAsync(connection),
-                GetMonthlyStatisticsAsync(connection, request.MonthsToInclude),
-                GetTopRequestsAsync(connection, request.TopRequestsCount),
-                GetDepartmentStatisticsAsync(connection, request.TopDepartmentsCount),
-                GetOverallSummaryAsync(connection)
+                GetStatusCountsAsync(connection, tenantId.Value),
+                GetMonthlyStatisticsAsync(connection, tenantId.Value, request.MonthsToInclude),
+                GetTopRequestsAsync(connection, tenantId.Value, request.TopRequestsCount),
+                GetDepartmentStatisticsAsync(connection, tenantId.Value, request.TopDepartmentsCount),
+                GetOverallSummaryAsync(connection, tenantId.Value)
             ).ContinueWith(t => (
                 t.Result[0] as StatusCountDto ?? new StatusCountDto(),
                 t.Result[1] as List<MonthlyStatisticsDto> ?? new List<MonthlyStatisticsDto>(),
@@ -89,7 +104,7 @@ public sealed class GetDashboardStatisticsHandler
     /// <summary>
     /// ステータス別件数取得
     /// </summary>
-    private async Task<object> GetStatusCountsAsync(System.Data.IDbConnection connection)
+    private async Task<object> GetStatusCountsAsync(System.Data.IDbConnection connection, Guid tenantId)
     {
         var sql = @"
             SELECT
@@ -100,9 +115,10 @@ public sealed class GetDashboardStatisticsHandler
                 SUM(CASE WHEN ""Status"" = 6 THEN 1 ELSE 0 END) AS Rejected,
                 SUM(CASE WHEN ""Status"" = 7 THEN 1 ELSE 0 END) AS Cancelled
             FROM ""PurchaseRequests""
+            WHERE ""TenantId"" = @TenantId
         ";
 
-        return await connection.QueryFirstOrDefaultAsync<StatusCountDto>(sql)
+        return await connection.QueryFirstOrDefaultAsync<StatusCountDto>(sql, new { TenantId = tenantId })
                ?? new StatusCountDto();
     }
 
@@ -111,6 +127,7 @@ public sealed class GetDashboardStatisticsHandler
     /// </summary>
     private async Task<object> GetMonthlyStatisticsAsync(
         System.Data.IDbConnection connection,
+        Guid tenantId,
         int monthsToInclude)
     {
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
@@ -126,7 +143,8 @@ public sealed class GetDashboardStatisticsHandler
                         WHERE pri.""PurchaseRequestId"" = pr.""Id""
                     ), 0) AS TotalAmount
                 FROM ""PurchaseRequests"" pr
-                WHERE pr.""SubmittedAt"" IS NOT NULL
+                WHERE pr.""TenantId"" = @TenantId
+                  AND pr.""SubmittedAt"" IS NOT NULL
                   AND pr.""SubmittedAt"" >= NOW() - INTERVAL '@Months months'
             )
             SELECT
@@ -141,7 +159,8 @@ public sealed class GetDashboardStatisticsHandler
         ";
 
         var results = await connection.QueryAsync<MonthlyStatisticsDto>(
-            sql.Replace("@Months", monthsToInclude.ToString()));
+            sql.Replace("@Months", monthsToInclude.ToString()),
+            new { TenantId = tenantId });
 
         return results.ToList();
     }
@@ -151,6 +170,7 @@ public sealed class GetDashboardStatisticsHandler
     /// </summary>
     private async Task<object> GetTopRequestsAsync(
         System.Data.IDbConnection connection,
+        Guid tenantId,
         int topCount)
     {
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
@@ -177,7 +197,8 @@ public sealed class GetDashboardStatisticsHandler
                     WHEN 7 THEN 'Cancelled'
                 END AS Status
             FROM ""PurchaseRequests"" pr
-            WHERE pr.""SubmittedAt"" IS NOT NULL
+            WHERE pr.""TenantId"" = @TenantId
+              AND pr.""SubmittedAt"" IS NOT NULL
             ORDER BY COALESCE((
                 SELECT SUM(pri.""Amount"")
                 FROM ""PurchaseRequestItems"" pri
@@ -186,7 +207,7 @@ public sealed class GetDashboardStatisticsHandler
             LIMIT @TopCount
         ";
 
-        var results = await connection.QueryAsync<TopRequestDto>(sql, new { TopCount = topCount });
+        var results = await connection.QueryAsync<TopRequestDto>(sql, new { TenantId = tenantId, TopCount = topCount });
         return results.ToList();
     }
 
@@ -196,6 +217,7 @@ public sealed class GetDashboardStatisticsHandler
     /// </summary>
     private async Task<object> GetDepartmentStatisticsAsync(
         System.Data.IDbConnection connection,
+        Guid tenantId,
         int topCount)
     {
         // NOTE: 現在のスキーマに部門（Department）列がないため、
@@ -211,7 +233,8 @@ public sealed class GetDashboardStatisticsHandler
                         WHERE pri.""PurchaseRequestId"" = pr.""Id""
                     ), 0) AS TotalAmount
                 FROM ""PurchaseRequests"" pr
-                WHERE pr.""SubmittedAt"" IS NOT NULL
+                WHERE pr.""TenantId"" = @TenantId
+                  AND pr.""SubmittedAt"" IS NOT NULL
             )
             SELECT
                 ""RequesterName"" AS Department,
@@ -223,14 +246,14 @@ public sealed class GetDashboardStatisticsHandler
             LIMIT @TopCount
         ";
 
-        var results = await connection.QueryAsync<DepartmentStatisticsDto>(sql, new { TopCount = topCount });
+        var results = await connection.QueryAsync<DepartmentStatisticsDto>(sql, new { TenantId = tenantId, TopCount = topCount });
         return results.ToList();
     }
 
     /// <summary>
     /// 全体サマリー取得
     /// </summary>
-    private async Task<object> GetOverallSummaryAsync(System.Data.IDbConnection connection)
+    private async Task<object> GetOverallSummaryAsync(System.Data.IDbConnection connection, Guid tenantId)
     {
         // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
         var sql = @"
@@ -246,7 +269,8 @@ public sealed class GetDashboardStatisticsHandler
                         WHERE pri.""PurchaseRequestId"" = pr.""Id""
                     ), 0) AS TotalAmount
                 FROM ""PurchaseRequests"" pr
-                WHERE pr.""SubmittedAt"" IS NOT NULL
+                WHERE pr.""TenantId"" = @TenantId
+                  AND pr.""SubmittedAt"" IS NOT NULL
             )
             SELECT
                 COUNT(*) AS TotalRequests,
@@ -264,7 +288,7 @@ public sealed class GetDashboardStatisticsHandler
             FROM RequestTotals
         ";
 
-        return await connection.QueryFirstOrDefaultAsync<OverallSummaryDto>(sql)
+        return await connection.QueryFirstOrDefaultAsync<OverallSummaryDto>(sql, new { TenantId = tenantId })
                ?? new OverallSummaryDto();
     }
 }

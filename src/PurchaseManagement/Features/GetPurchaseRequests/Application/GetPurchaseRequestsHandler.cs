@@ -10,12 +10,17 @@ namespace GetPurchaseRequests.Application;
 /// <summary>
 /// 購買申請一覧取得ハンドラ
 ///
-/// 【パターン: CQRS Query Handler】
+/// 【パターン: CQRS Query Handler with Multi-tenant Security】
 ///
 /// 責務:
 /// - Dapperを使用してPostgreSQLから購買申請一覧を効率的に取得
+/// - マルチテナント分離（TenantIdフィルタ必須）
 /// - フィルタリング・ソート・ページング処理
 /// - DTOへの変換
+///
+/// セキュリティ:
+/// - **CRITICAL**: 全てのクエリに WHERE pr."TenantId" = @TenantId を追加
+/// - ICurrentUserService.TenantId を使用してテナント分離を保証
 ///
 /// AI実装時の注意:
 /// - Dapperの動的SQLビルダーを使用してSQLインジェクション対策
@@ -25,10 +30,14 @@ namespace GetPurchaseRequests.Application;
 public sealed class GetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRequestsQuery, Result<List<PurchaseRequestListItemDto>>>
 {
     private readonly IDbConnectionFactory _connectionFactory;
+    private readonly ICurrentUserService _currentUserService;
 
-    public GetPurchaseRequestsHandler(IDbConnectionFactory connectionFactory)
+    public GetPurchaseRequestsHandler(
+        IDbConnectionFactory connectionFactory,
+        ICurrentUserService currentUserService)
     {
         _connectionFactory = connectionFactory;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<List<PurchaseRequestListItemDto>>> Handle(
@@ -37,10 +46,17 @@ public sealed class GetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRequ
     {
         try
         {
+            // SECURITY: Get current tenant ID for multi-tenant filtering
+            var tenantId = _currentUserService.TenantId;
+            if (tenantId == null)
+            {
+                return Result.Fail<List<PurchaseRequestListItemDto>>("テナント情報が取得できません");
+            }
+
             using var connection = _connectionFactory.CreateConnection();
 
             var sql = BuildQuery(query);
-            var parameters = BuildParameters(query);
+            var parameters = BuildParameters(query, tenantId.Value);
 
             var items = await connection.QueryAsync<PurchaseRequestListItemDto>(
                 sql,
@@ -94,7 +110,7 @@ public sealed class GetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRequ
             FROM ""PurchaseRequests"" pr
             LEFT JOIN ""PurchaseRequestItems"" pri ON pr.""Id"" = pri.""PurchaseRequestId""
             LEFT JOIN ""ApprovalSteps"" aps ON pr.""Id"" = aps.""PurchaseRequestId""
-            WHERE 1=1
+            WHERE pr.""TenantId"" = @TenantId
                 {(query.Status.HasValue ? "AND pr.\"Status\" = @Status" : "")}
                 {(query.RequesterId.HasValue ? "AND pr.\"RequesterId\" = @RequesterId" : "")}
             GROUP BY
@@ -112,10 +128,11 @@ public sealed class GetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRequ
             LIMIT @PageSize OFFSET @Offset";
     }
 
-    private static object BuildParameters(GetPurchaseRequestsQuery query)
+    private static object BuildParameters(GetPurchaseRequestsQuery query, Guid tenantId)
     {
         return new
         {
+            TenantId = tenantId, // SECURITY: Multi-tenant filtering
             query.Status,
             query.RequesterId,
             query.PageSize,

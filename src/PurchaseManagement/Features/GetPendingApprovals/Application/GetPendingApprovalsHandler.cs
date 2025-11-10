@@ -9,19 +9,23 @@ namespace GetPendingApprovals.Application;
 /// <summary>
 /// 承認待ち申請一覧取得ハンドラー
 ///
-/// 【パターン: CQRS Query Handler (Dapper)】
+/// 【パターン: CQRS Query Handler (Dapper) with Multi-tenant Security】
 ///
 /// 責務:
-/// - 現在のユーザーIDを取得
-/// - pm_PurchaseRequests と pm_ApprovalSteps を JOIN
-/// - 承認者 = 現在のユーザー かつ IsPending = true でフィルタ
+/// - 現在のユーザーIDとテナントIDを取得
+/// - PurchaseRequests と ApprovalSteps を JOIN
+/// - テナントID、承認者ID、承認ステータスでフィルタ
 /// - ページング・ソート適用
 /// - PendingApprovalDto にマッピング
+///
+/// セキュリティ:
+/// - **CRITICAL**: WHERE pr."TenantId" = @TenantId を必須とする
+/// - ICurrentUserService から TenantId と UserId を取得
 ///
 /// パフォーマンス:
 /// - EF Coreではなく Dapper を使用（読み取り専用クエリ最適化）
 /// - 必要なカラムのみSELECT
-/// - インデックス活用（ApproverId, IsPending）
+/// - インデックス活用（TenantId, ApproverId, Status）
 ///
 /// トランザクション:
 /// - 不要（読み取り専用）
@@ -48,11 +52,18 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
     {
         try
         {
-            // 現在のユーザーIDを取得
+            // SECURITY: Get current user ID and tenant ID
             var userId = _currentUserService.UserId;
-            if (userId == null)
+            var tenantId = _currentUserService.TenantId;
+
+            if (userId == Guid.Empty)
             {
                 return Result.Fail<List<PendingApprovalDto>>("ユーザー情報が取得できません");
+            }
+
+            if (tenantId == null)
+            {
+                return Result.Fail<List<PendingApprovalDto>>("テナント情報が取得できません");
             }
 
             using var connection = _connectionFactory.CreateConnection();
@@ -87,7 +98,8 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
                 FROM ""PurchaseRequests"" pr
                 INNER JOIN ""ApprovalSteps"" ast
                     ON pr.""Id"" = ast.""PurchaseRequestId""
-                WHERE ast.""ApproverId"" = @UserId
+                WHERE pr.""TenantId"" = @TenantId
+                  AND ast.""ApproverId"" = @UserId
                   AND ast.""Status"" = 0  -- ApprovalStepStatus.Pending = 0
                   AND pr.""Status"" IN (1, 2)  -- Submitted = 1, InApproval = 2
                 ORDER BY {orderByClause}
@@ -100,7 +112,8 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
                 sql,
                 new
                 {
-                    UserId = userId.Value,
+                    TenantId = tenantId.Value, // SECURITY: Multi-tenant filtering
+                    UserId = userId,
                     PageSize = request.PageSize,
                     Offset = offset
                 });
