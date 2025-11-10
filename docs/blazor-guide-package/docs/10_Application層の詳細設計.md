@@ -1116,3 +1116,260 @@ public class RedisIdempotencyStore : IIdempotencyStore
 
 ---
 
+## 10.X PurchaseManagement BCの実装例
+
+ProductCatalog BCの例に加えて、**PurchaseManagement BC** には複雑なビジネスプロセスの実装例が含まれています。
+
+### 承認ワークフローの実装例
+
+複数ステップの業務フローを実装する際の参考：
+
+#### SubmitPurchaseRequest - 申請作成
+
+**実装場所**: `src/PurchaseManagement/Features/SubmitPurchaseRequest/`
+
+```csharp
+// Command定義
+public sealed record SubmitPurchaseRequestCommand(
+    string Title,
+    string Description,
+    decimal Amount,
+    string Currency
+) : ICommand<Result<Guid>>
+{
+    public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+}
+
+// Handler実装（簡略版）
+public async Task<Result<Guid>> Handle(
+    SubmitPurchaseRequestCommand command,
+    CancellationToken ct)
+{
+    // ドメインファクトリで作成
+    var request = PurchaseRequest.Create(
+        command.Title,
+        command.Description,
+        new Money(command.Amount, command.Currency),
+        _appContext.UserId
+    );
+
+    // 承認フローの初期化
+    request.Submit();  // Draft → Submitted 状態遷移
+
+    await _repository.SaveAsync(request, ct);
+
+    // ドメインイベント: PurchaseRequestSubmittedDomainEvent が発行される
+    return Result.Success(request.Id.Value);
+}
+```
+
+**特徴**:
+- 状態遷移管理（Draft → Submitted）
+- ドメインイベントによる通知
+- ビジネスルール検証（金額上限など）
+
+#### ApprovePurchaseRequest - 承認処理
+
+**実装場所**: `src/PurchaseManagement/Features/ApprovePurchaseRequest/`
+
+```csharp
+public sealed record ApprovePurchaseRequestCommand(
+    Guid PurchaseRequestId,
+    string ApprovalComment
+) : ICommand<Result>;
+
+public async Task<Result> Handle(
+    ApprovePurchaseRequestCommand command,
+    CancellationToken ct)
+{
+    var request = await _repository.GetAsync(
+        new PurchaseRequestId(command.PurchaseRequestId), ct);
+
+    if (request is null)
+        return Result.Fail("申請が見つかりません");
+
+    // ビジネスルール検証
+    if (!request.CanApprove(_appContext.UserId))
+        return Result.Fail("この申請を承認する権限がありません");
+
+    // 承認処理（状態遷移）
+    request.Approve(_appContext.UserId, command.ApprovalComment);
+
+    await _repository.SaveAsync(request, ct);
+
+    // ドメインイベント: PurchaseRequestApprovedDomainEvent が発行される
+    return Result.Success();
+}
+```
+
+**特徴**:
+- ロールベース認可（CanApprove()）
+- 承認履歴の記録（ドメインイベント経由）
+- 状態遷移管理
+
+### レポート・集計の実装例
+
+#### GetDashboardStatistics - ダッシュボード用集計
+
+**実装場所**: `src/PurchaseManagement/Features/GetDashboardStatistics/`
+
+```csharp
+public sealed record GetDashboardStatisticsQuery()
+    : IQuery<Result<DashboardStatisticsDto>>, ICacheableQuery
+{
+    public string GetCacheKey() => "dashboard-statistics";
+    public int CacheDurationMinutes => 5;  // 短期キャッシュ
+}
+
+// Dapperによる高速集計
+public async Task<DashboardStatisticsDto> Handle(
+    GetDashboardStatisticsQuery query,
+    CancellationToken ct)
+{
+    var tenantId = _appContext.TenantId ?? throw new InvalidOperationException();
+
+    var sql = @"
+        SELECT
+            COUNT(*) AS TotalRequests,
+            SUM(CASE WHEN Status = 'Pending' THEN 1 ELSE 0 END) AS PendingCount,
+            SUM(CASE WHEN Status = 'Approved' THEN 1 ELSE 0 END) AS ApprovedCount,
+            SUM(CASE WHEN Status = 'Rejected' THEN 1 ELSE 0 END) AS RejectedCount,
+            SUM(Amount) AS TotalAmount
+        FROM PurchaseRequests
+        WHERE TenantId = @TenantId
+          AND IsDeleted = 0";
+
+    using var connection = _connectionFactory.CreateConnection();
+    var result = await connection.QuerySingleAsync<DashboardStatisticsDto>(
+        sql, new { TenantId = tenantId });
+
+    return result;
+}
+```
+
+**特徴**:
+- Dapperによる高速集計
+- マルチテナント対応（TenantIdフィルタリング）
+- 短期キャッシュ（5分）
+
+#### GetPendingApprovals - 承認待ち一覧
+
+**実装場所**: `src/PurchaseManagement/Features/GetPendingApprovals/`
+
+```csharp
+public sealed record GetPendingApprovalsQuery()
+    : IQuery<Result<IEnumerable<PurchaseRequestDto>>>, ICacheableQuery
+{
+    public string GetCacheKey() => $"pending-approvals-{UserId}";
+    public int CacheDurationMinutes => 3;  // 短期キャッシュ
+}
+
+public async Task<IEnumerable<PurchaseRequestDto>> Handle(
+    GetPendingApprovalsQuery query,
+    CancellationToken ct)
+{
+    var userId = _appContext.UserId;
+    var tenantId = _appContext.TenantId ?? throw new InvalidOperationException();
+
+    // ロールに応じたフィルタリング
+    var sql = _appContext.IsInRole("Manager")
+        ? @"SELECT * FROM PurchaseRequests
+            WHERE TenantId = @TenantId
+              AND Status = 'Pending'
+              AND ApprovalLevel <= @UserApprovalLevel
+              AND IsDeleted = 0"
+        : @"SELECT * FROM PurchaseRequests
+            WHERE TenantId = @TenantId
+              AND Status = 'Pending'
+              AND AssignedApproverId = @UserId
+              AND IsDeleted = 0";
+
+    using var connection = _connectionFactory.CreateConnection();
+    var results = await connection.QueryAsync<PurchaseRequestDto>(
+        sql, new { TenantId = tenantId, UserId = userId });
+
+    return results;
+}
+```
+
+**特徴**:
+- ロールベースのクエリ切り替え
+- 承認権限レベルの考慮
+- ユーザー固有のキャッシュキー
+
+### ファイルアップロードの実装例
+
+#### UploadAttachment - ファイルアップロード
+
+**実装場所**: `src/PurchaseManagement/Features/UploadAttachment/`
+
+```csharp
+public sealed record UploadAttachmentCommand(
+    Guid PurchaseRequestId,
+    string FileName,
+    string ContentType,
+    Stream FileStream
+) : ICommand<Result<Guid>>;
+
+public async Task<Result<Guid>> Handle(
+    UploadAttachmentCommand command,
+    CancellationToken ct)
+{
+    // ファイルサイズチェック
+    if (command.FileStream.Length > 10 * 1024 * 1024)
+        return Result.Fail("ファイルサイズは10MBまでです");
+
+    // 拡張子チェック
+    var allowedExtensions = new[] { ".pdf", ".jpg", ".png", ".xlsx" };
+    var extension = Path.GetExtension(command.FileName);
+    if (!allowedExtensions.Contains(extension.ToLower()))
+        return Result.Fail("許可されていないファイル形式です");
+
+    // マルチテナント対応のファイルパス
+    var tenantId = _appContext.TenantId ?? throw new InvalidOperationException();
+    var filePath = $"tenants/{tenantId}/purchases/{command.PurchaseRequestId}/{Guid.NewGuid()}{extension}";
+
+    // ファイル保存（ストレージサービス経由）
+    await _storageService.UploadAsync(filePath, command.FileStream, ct);
+
+    // ドメインエンティティに関連付け
+    var request = await _repository.GetAsync(
+        new PurchaseRequestId(command.PurchaseRequestId), ct);
+
+    if (request is null)
+        return Result.Fail("申請が見つかりません");
+
+    var attachment = Attachment.Create(
+        command.FileName,
+        filePath,
+        command.ContentType,
+        command.FileStream.Length
+    );
+
+    request.AddAttachment(attachment);
+    await _repository.SaveAsync(request, ct);
+
+    return Result.Success(attachment.Id.Value);
+}
+```
+
+**特徴**:
+- ストリーム処理（メモリ効率）
+- ファイル検証（サイズ、拡張子）
+- マルチテナント対応のパス管理
+- ドメインモデルとの関連付け
+
+### 実装例の活用方法
+
+以下のシナリオでPurchaseManagement BCの実装を参考にしてください：
+
+| シナリオ | 参考実装 | ファイルパス |
+|---------|---------|-------------|
+| 複数ステップのワークフロー | SubmitPurchaseRequest, ApprovePurchaseRequest | `src/PurchaseManagement/Features/` |
+| ロールベース認可 | GetPendingApprovals, ApprovePurchaseRequest | 同上 |
+| 集計・ダッシュボード | GetDashboardStatistics | 同上 |
+| ファイルアップロード | UploadAttachment | 同上 |
+| 状態遷移管理 | PurchaseRequest.cs (Domain) | `src/PurchaseManagement/Shared/Domain/` |
+
+---
+
