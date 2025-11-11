@@ -118,6 +118,56 @@ public static class ApprovalBoundaryExtensions
             or PurchaseRequestStatus.Rejected
             or PurchaseRequestStatus.Cancelled;
     }
+
+    /// <summary>
+    /// DTOからIntentContextを取得（Intent-Command分離パターン）
+    /// UI層が業務意図（Intent）のみを扱えるようにする
+    /// </summary>
+    public static IntentContext GetIntentContextFromDto(
+        this IApprovalBoundary boundary,
+        PurchaseRequestDetailDto dto,
+        Guid currentUserId)
+    {
+        var eligibility = boundary.CheckEligibilityFromDto(dto, currentUserId);
+        var status = (PurchaseRequestStatus)dto.Status;
+        var availableIntents = new List<AvailableIntent>();
+
+        // 承認可能な場合、現在のステータスに応じたApproval Intentを追加
+        if (eligibility.CanApprove)
+        {
+            var approvalIntent = DetermineApprovalIntent(status);
+            if (approvalIntent.HasValue)
+            {
+                availableIntents.Add(AvailableIntent.Enabled(approvalIntent.Value));
+            }
+        }
+
+        // 却下可能な場合、差し戻しと永久却下の両方を追加
+        if (eligibility.CanReject)
+        {
+            availableIntents.Add(AvailableIntent.Enabled(ApprovalIntent.SendBackForRevision));
+            availableIntents.Add(AvailableIntent.Enabled(ApprovalIntent.RejectPermanently));
+        }
+
+        // DTO版ではRequestは不要（nullでOK）
+        return new IntentContext
+        {
+            Request = null, // DTO版ではnull
+            AvailableIntents = availableIntents.ToArray(),
+            CurrentUserId = currentUserId
+        };
+    }
+
+    private static ApprovalIntent? DetermineApprovalIntent(PurchaseRequestStatus status)
+    {
+        return status switch
+        {
+            PurchaseRequestStatus.PendingFirstApproval => ApprovalIntent.PerformFirstApproval,
+            PurchaseRequestStatus.PendingSecondApproval => ApprovalIntent.PerformSecondApproval,
+            PurchaseRequestStatus.PendingFinalApproval => ApprovalIntent.PerformFinalApproval,
+            _ => null
+        };
+    }
 }
 
 /// <summary>

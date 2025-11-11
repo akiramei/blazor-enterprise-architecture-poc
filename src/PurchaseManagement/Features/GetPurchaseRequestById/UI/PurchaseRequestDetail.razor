@@ -1,8 +1,6 @@
 @page "/purchase-requests/{Id:guid}"
 @using MediatR
 @using GetPurchaseRequestById.Application
-@using ApprovePurchaseRequest.Application
-@using RejectPurchaseRequest.Application
 @using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries
 @using Shared.Application
 @using Microsoft.AspNetCore.Components.Authorization
@@ -206,41 +204,50 @@ else
         </div>
     }
 
-    @if (CanApprove() || CanReject())
+    @* Intent駆動のアクションボタン（業務意図ベース） *@
+    @if (_intentContext != null && _intentContext.HasAvailableIntents)
     {
         <div class="card mb-4">
             <div class="card-header">
-                <h5>アクション</h5>
+                <h5>実行可能なアクション</h5>
             </div>
             <div class="card-body">
-                @if (CanApprove())
-                {
-                    <div class="mb-3">
-                        <label for="approvalComment" class="form-label">承認コメント</label>
-                        <textarea id="approvalComment" class="form-control" @bind="_approvalComment" rows="3"></textarea>
-                    </div>
-                    <button class="btn btn-success" @onclick="HandleApprove" disabled="@_isProcessing">
-                        @if (_isProcessing)
+                <div class="mb-3">
+                    <label for="actionComment" class="form-label">コメント</label>
+                    <textarea id="actionComment" class="form-control" @bind="_actionComment" rows="3" placeholder="コメントを入力してください..."></textarea>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    @foreach (var intent in _intentContext.AvailableIntents.Where(i => i.IsEnabled))
+                    {
+                        var metadata = intent.Metadata;
+                        <button class="btn @metadata.ButtonClass"
+                                @onclick="() => HandleIntent(intent.Intent)"
+                                disabled="@_isProcessing"
+                                title="@metadata.Description">
+                            @if (_isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            }
+                            <i class="bi @metadata.Icon me-1"></i>
+                            @metadata.Label
+                        </button>
+                    }
+                </div>
+
+                @* 業務意図ごとの補足説明 *@
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <strong>ヒント:</strong>
+                        @foreach (var intent in _intentContext.AvailableIntents.Where(i => i.IsEnabled))
                         {
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <div class="mt-1">
+                                <span class="badge @intent.Metadata.ButtonClass me-1">@intent.Metadata.Label</span>
+                                @intent.Metadata.Description
+                            </div>
                         }
-                        承認
-                    </button>
-                }
-                @if (CanReject())
-                {
-                    <div class="mb-3">
-                        <label for="rejectionReason" class="form-label">却下理由 (必須)</label>
-                        <textarea id="rejectionReason" class="form-control" @bind="_rejectionReason" rows="3"></textarea>
-                    </div>
-                    <button class="btn btn-danger" @onclick="HandleReject" disabled="@(_isProcessing || string.IsNullOrWhiteSpace(_rejectionReason))">
-                        @if (_isProcessing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        }
-                        却下
-                    </button>
-                }
+                    </small>
+                </div>
             </div>
         </div>
     }
@@ -252,14 +259,14 @@ else
 
     private PurchaseRequestDetailDto? _purchaseRequest;
     private ApprovalEligibility? _approvalEligibility;
+    private IntentContext? _intentContext; // Intent-Command分離パターン
     private bool _isLoading = true;
     private string? _errorMessage;
     private string? _actionMessage;
     private bool _actionSuccess;
     private bool _isProcessing;
 
-    private string _approvalComment = string.Empty;
-    private string _rejectionReason = string.Empty;
+    private string _actionComment = string.Empty; // 統一されたコメント欄
 
     // SECURITY: Current user ID for authorization checks
     private Guid _currentUserId = Guid.Empty;
@@ -296,10 +303,16 @@ else
             {
                 _purchaseRequest = result.Value;
 
-                // バウンダリー経由で承認資格をチェック
+                // バウンダリー経由で承認資格とIntent一覧を取得（Intent-Command分離パターン）
                 if (_purchaseRequest != null)
                 {
                     _approvalEligibility = ApprovalBoundary.CheckEligibilityFromDto(
+                        _purchaseRequest,
+                        _currentUserId
+                    );
+
+                    // UI層は業務意図（Intent）のみを扱う
+                    _intentContext = ApprovalBoundary.GetIntentContextFromDto(
                         _purchaseRequest,
                         _currentUserId
                     );
@@ -320,70 +333,44 @@ else
         }
     }
 
-    private async Task HandleApprove()
+    /// <summary>
+    /// Intent駆動のアクション処理（Intent→Commandマッピング）
+    ///
+    /// 【Intent-Command分離パターン】
+    /// UIは業務意図（Intent）を扱い、バウンダリーがCommandに変換する
+    /// - UIは「どのコマンドか」を知らない
+    /// - UIは「何をしたいか」（業務意図）だけを伝える
+    /// - ドメイン層が技術詳細（Command）を決定する
+    /// </summary>
+    private async Task HandleIntent(ApprovalIntent intent)
     {
         _isProcessing = true;
         _actionMessage = null;
 
         try
         {
-            var command = new ApprovePurchaseRequestCommand
-            {
-                RequestId = Id,
-                Comment = _approvalComment
-            };
+            // ドメイン層（バウンダリー）がIntentをCommandに変換
+            var command = ApprovalBoundary.CreateCommandFromIntent(
+                intent,
+                Id,
+                _currentUserId,
+                _actionComment
+            );
 
-            var result = await Mediator.Send(command);
+            // MediatRコマンドを実行（型安全性のため dynamic を使用）
+            dynamic result = await Mediator.Send((dynamic)command);
 
             if (result.IsSuccess)
             {
-                _actionMessage = "購買申請を承認しました。";
+                var metadata = IntentMetadata.FromIntent(intent);
+                _actionMessage = $"{metadata.Label}を実行しました。";
                 _actionSuccess = true;
-                _approvalComment = string.Empty;
+                _actionComment = string.Empty;
                 await LoadPurchaseRequest();
             }
             else
             {
-                _actionMessage = $"承認エラー: {result.Error}";
-                _actionSuccess = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            _actionMessage = $"予期しないエラーが発生しました: {ex.Message}";
-            _actionSuccess = false;
-        }
-        finally
-        {
-            _isProcessing = false;
-        }
-    }
-
-    private async Task HandleReject()
-    {
-        _isProcessing = true;
-        _actionMessage = null;
-
-        try
-        {
-            var command = new RejectPurchaseRequestCommand
-            {
-                RequestId = Id,
-                Reason = _rejectionReason
-            };
-
-            var result = await Mediator.Send(command);
-
-            if (result.IsSuccess)
-            {
-                _actionMessage = "購買申請を却下しました。";
-                _actionSuccess = true;
-                _rejectionReason = string.Empty;
-                await LoadPurchaseRequest();
-            }
-            else
-            {
-                _actionMessage = $"却下エラー: {result.Error}";
+                _actionMessage = $"エラー: {result.Error}";
                 _actionSuccess = false;
             }
         }
