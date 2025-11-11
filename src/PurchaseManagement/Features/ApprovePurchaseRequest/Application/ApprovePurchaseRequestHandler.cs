@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using PurchaseManagement.Shared.Application;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
+using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
 using Shared.Application;
 using Shared.Kernel;
 
@@ -11,15 +12,18 @@ public class ApprovePurchaseRequestHandler : IRequestHandler<ApprovePurchaseRequ
 {
     private readonly IPurchaseRequestRepository _repository;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IApprovalBoundary _approvalBoundary;
     private readonly ILogger<ApprovePurchaseRequestHandler> _logger;
 
     public ApprovePurchaseRequestHandler(
         IPurchaseRequestRepository repository,
         ICurrentUserService currentUserService,
+        IApprovalBoundary approvalBoundary,
         ILogger<ApprovePurchaseRequestHandler> logger)
     {
         _repository = repository;
         _currentUserService = currentUserService;
+        _approvalBoundary = approvalBoundary;
         _logger = logger;
     }
 
@@ -34,10 +38,21 @@ public class ApprovePurchaseRequestHandler : IRequestHandler<ApprovePurchaseRequ
                 return Result.Fail<Unit>("購買申請が見つかりません");
             }
 
-            // 2. 承認処理
+            // 2. 承認資格チェック（バウンダリー経由）
+            var eligibility = _approvalBoundary.CheckEligibility(request, _currentUserService.UserId);
+            if (!eligibility.CanApprove)
+            {
+                var reasons = string.Join(", ", eligibility.BlockingReasons.Select(r => r.Message));
+                _logger.LogWarning(
+                    "Approval not allowed: RequestId={RequestId}, UserId={UserId}, Reasons={Reasons}",
+                    command.RequestId, _currentUserService.UserId, reasons);
+                return Result.Fail<Unit>(reasons);
+            }
+
+            // 3. 承認処理（ドメインロジック）
             request.Approve(_currentUserService.UserId, command.Comment);
 
-            // 3. 永続化
+            // 4. 永続化
             await _repository.SaveAsync(request, cancellationToken);
 
             _logger.LogInformation(

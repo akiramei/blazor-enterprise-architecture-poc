@@ -2,9 +2,11 @@
 @using MediatR
 @using Microsoft.AspNetCore.Components.Forms
 @using SubmitPurchaseRequest.Application
+@using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries
 @using Shared.Application
 @inject IMediator Mediator
 @inject NavigationManager Navigation
+@inject ISubmissionBoundary SubmissionBoundary
 
 <PageTitle>購買申請の提出</PageTitle>
 
@@ -87,7 +89,20 @@
     </button>
 
     <div class="mb-3">
-        <strong>総額: </strong>@CalculateTotalAmount().ToString("N2") JPY
+        <strong>総額: </strong>@GetTotalAmount().ToString("N2") JPY
+        @if (_submissionContext != null)
+        {
+            @if (_submissionContext.IsOverLimit)
+            {
+                <span class="badge bg-danger ms-2">上限超過</span>
+                <small class="text-danger d-block">上限: @_submissionContext.MaxAllowedAmount.ToString("N0") JPY</small>
+            }
+            else if (_submissionContext.IsNearLimit)
+            {
+                <span class="badge bg-warning ms-2">上限近接</span>
+                <small class="text-muted d-block">残り: @_submissionContext.RemainingAmount.ToString("N0") JPY</small>
+            }
+        }
     </div>
 
     <div class="mt-4">
@@ -106,6 +121,7 @@
 
 @code {
     private PurchaseRequestSubmitModel _model = new();
+    private SubmissionContext? _submissionContext;
     private bool _isSubmitting;
     private string? _errorMessage;
     private string? _successMessage;
@@ -114,11 +130,13 @@
     {
         // Initialize with one empty item
         _model.Items.Add(new PurchaseRequestItemModel());
+        UpdateSubmissionContext();
     }
 
     private void AddItem()
     {
         _model.Items.Add(new PurchaseRequestItemModel());
+        UpdateSubmissionContext();
     }
 
     private void RemoveItem(int index)
@@ -126,12 +144,44 @@
         if (_model.Items.Count > 1)
         {
             _model.Items.RemoveAt(index);
+            UpdateSubmissionContext();
         }
     }
 
-    private decimal CalculateTotalAmount()
+    /// <summary>
+    /// 合計金額を取得（バウンダリー経由）
+    /// REFACTORED: 計算ロジックをドメイン層のバウンダリーに委譲
+    /// </summary>
+    private decimal GetTotalAmount()
     {
-        return _model.Items.Sum(item => item.UnitPrice * item.Quantity);
+        var items = _model.Items.Select(i => new PurchaseRequestItemInput(
+            Guid.TryParse(i.ProductId, out var id) ? id : Guid.Empty,
+            i.ProductName,
+            i.UnitPrice,
+            i.Quantity
+        )).ToList();
+
+        return SubmissionBoundary.CalculateTotalAmount(items);
+    }
+
+    /// <summary>
+    /// 提出コンテキストを更新（バウンダリー経由）
+    /// リアルタイムで提出可否・警告を表示
+    /// </summary>
+    private void UpdateSubmissionContext()
+    {
+        var items = _model.Items.Select(i => new PurchaseRequestItemInput(
+            Guid.TryParse(i.ProductId, out var id) ? id : Guid.Empty,
+            i.ProductName,
+            i.UnitPrice,
+            i.Quantity
+        )).ToList();
+
+        _submissionContext = SubmissionBoundary.GetContext(
+            _model.Title,
+            _model.Description,
+            items
+        );
     }
 
     private async Task HandleSubmit()

@@ -1,9 +1,12 @@
 @page "/purchase-requests"
 @using MediatR
 @using GetPurchaseRequests.Application
+@using PurchaseManagement.Shared.Domain.PurchaseRequests
+@using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries
 @using Shared.Application
 @inject IMediator Mediator
 @inject NavigationManager Navigation
+@inject IFilteringBoundary FilteringBoundary
 
 <PageTitle>購買申請一覧</PageTitle>
 
@@ -18,15 +21,16 @@
     <div class="col-md-6">
         <div class="input-group">
             <select class="form-select" @bind="_statusFilter">
-                <option value="">すべてのステータス</option>
-                <option value="0">下書き</option>
-                <option value="1">提出済み</option>
-                <option value="2">1次承認待ち</option>
-                <option value="3">2次承認待ち</option>
-                <option value="4">3次承認待ち</option>
-                <option value="5">承認済み</option>
-                <option value="6">却下</option>
-                <option value="7">キャンセル</option>
+                @if (_filterOptions != null)
+                {
+                    @foreach (var option in _filterOptions.StatusOptions)
+                    {
+                        <option value="@(option.Value.HasValue ? ((int)option.Value.Value).ToString() : "")"
+                                title="@option.Description">
+                            @option.Label
+                        </option>
+                    }
+                }
             </select>
             <button class="btn btn-secondary" @onclick="LoadPurchaseRequests">
                 フィルター適用
@@ -157,6 +161,7 @@ else
 
 @code {
     private List<PurchaseRequestListItemDto>? _purchaseRequests;
+    private FilterOptions? _filterOptions;
     private bool _isLoading = true;
     private string? _errorMessage;
 
@@ -168,6 +173,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // バウンダリー経由でフィルターオプションを取得
+        _filterOptions = FilteringBoundary.GetFilterOptions();
         await LoadPurchaseRequests();
     }
 
@@ -234,17 +241,14 @@ else
         Navigation.NavigateTo($"/purchase-requests/{id}");
     }
 
-    private static string GetStatusBadgeClass(int status)
+    /// <summary>
+    /// ステータスバッジクラス取得（バウンダリー経由）
+    /// REFACTORED: ステータス表示ロジックをドメイン層のバウンダリーに委譲
+    /// </summary>
+    private string GetStatusBadgeClass(int status)
     {
-        return status switch
-        {
-            0 => "bg-secondary", // 下書き
-            1 => "bg-info", // 提出済み
-            2 or 3 or 4 => "bg-warning", // 承認待ち
-            5 => "bg-success", // 承認済み
-            6 => "bg-danger", // 却下
-            7 => "bg-dark", // キャンセル
-            _ => "bg-light"
-        };
+        var statusEnum = (PurchaseRequestStatus)status;
+        var displayInfo = FilteringBoundary.GetStatusDisplay(statusEnum);
+        return displayInfo.BadgeColorClass;
     }
 }

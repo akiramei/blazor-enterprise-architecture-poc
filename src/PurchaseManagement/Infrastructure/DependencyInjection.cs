@@ -5,6 +5,7 @@ using PurchaseManagement.Infrastructure.Persistence;
 using PurchaseManagement.Infrastructure.Persistence.Repositories;
 using PurchaseManagement.Infrastructure.Services;
 using PurchaseManagement.Shared.Application;
+using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
 
 namespace PurchaseManagement.Infrastructure;
 
@@ -48,6 +49,11 @@ public static class DependencyInjection
 
         // Domain Services
         services.AddScoped<IApprovalFlowService, ApprovalFlowService>();
+
+        // Boundary Services（バウンダリーパターン: ドメインロジックとUI間の契約）
+        services.AddScoped<IApprovalBoundary, ApprovalBoundaryService>();
+        services.AddScoped<ISubmissionBoundary, SubmissionBoundaryService>();
+        services.AddScoped<IFilteringBoundary, FilteringBoundaryService>();
 
         // Current User Service
         // NOTE: 実際にはShared.Infrastructure.Services.CurrentUserServiceが使用されるが、

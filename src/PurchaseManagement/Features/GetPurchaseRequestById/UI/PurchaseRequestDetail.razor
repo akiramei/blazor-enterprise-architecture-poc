@@ -3,12 +3,14 @@
 @using GetPurchaseRequestById.Application
 @using ApprovePurchaseRequest.Application
 @using RejectPurchaseRequest.Application
+@using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries
 @using Shared.Application
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Security.Claims
 @inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IApprovalBoundary ApprovalBoundary
 
 <PageTitle>購買申請詳細</PageTitle>
 
@@ -249,6 +251,7 @@ else
     public Guid Id { get; set; }
 
     private PurchaseRequestDetailDto? _purchaseRequest;
+    private ApprovalEligibility? _approvalEligibility;
     private bool _isLoading = true;
     private string? _errorMessage;
     private string? _actionMessage;
@@ -292,6 +295,15 @@ else
             if (result.IsSuccess)
             {
                 _purchaseRequest = result.Value;
+
+                // バウンダリー経由で承認資格をチェック
+                if (_purchaseRequest != null)
+                {
+                    _approvalEligibility = ApprovalBoundary.CheckEligibilityFromDto(
+                        _purchaseRequest,
+                        _currentUserId
+                    );
+                }
             }
             else
             {
@@ -387,58 +399,41 @@ else
     }
 
     /// <summary>
-    /// 承認可否の判定
+    /// 承認可否の判定（バウンダリー経由）
     ///
-    /// SECURITY: 現在のユーザーが承認者として割り当てられているかをチェック
-    /// - 単なるステータスチェックでは不十分（誰でも承認できてしまう）
-    /// - CurrentApprovalStep（Status = 0, Pending）の承認者IDと現在のユーザーIDを突き合わせる
+    /// REFACTORED: UI層のロジックをドメイン層のバウンダリーに委譲
+    /// - ドメインロジックをUI層に置かない（バウンダリーパターン）
+    /// - セキュリティクリティカルな判定はドメイン層で一元管理
     /// </summary>
     private bool CanApprove()
     {
-        if (_purchaseRequest == null || _currentUserId == Guid.Empty) return false;
-
-        // Find the current pending approval step (Status = 0)
-        var currentStep = _purchaseRequest.ApprovalSteps
-            .FirstOrDefault(s => s.Status == 0); // 0 = Pending
-
-        if (currentStep == null) return false;
-
-        // CRITICAL: Check if current user is the approver for this step
-        return currentStep.ApproverId == _currentUserId;
+        return _approvalEligibility?.CanApprove ?? false;
     }
 
     /// <summary>
-    /// 却下可否の判定
+    /// 却下可否の判定（バウンダリー経由）
     ///
-    /// SECURITY: 現在のユーザーが承認者として割り当てられているかをチェック
-    /// - 承認と同じロジック（現在のステップの承認者のみが却下可能）
+    /// REFACTORED: UI層のロジックをドメイン層のバウンダリーに委譲
+    /// - ドメインロジックをUI層に置かない（バウンダリーパターン）
+    /// - セキュリティクリティカルな判定はドメイン層で一元管理
     /// </summary>
     private bool CanReject()
     {
-        if (_purchaseRequest == null || _currentUserId == Guid.Empty) return false;
-
-        // Find the current pending approval step (Status = 0)
-        var currentStep = _purchaseRequest.ApprovalSteps
-            .FirstOrDefault(s => s.Status == 0); // 0 = Pending
-
-        if (currentStep == null) return false;
-
-        // CRITICAL: Check if current user is the approver for this step
-        return currentStep.ApproverId == _currentUserId;
+        return _approvalEligibility?.CanReject ?? false;
     }
 
+    /// <summary>
+    /// ステータスバッジクラス取得（バウンダリー経由）
+    ///
+    /// REFACTORED: ステータス表示ロジックをドメイン層のバウンダリーに委譲
+    /// - ステータスの意味論（色、重要度）はドメイン知識
+    /// - UI層はバウンダリーが返す情報を表示するだけ
+    /// </summary>
     private static string GetStatusBadgeClass(int status)
     {
-        return status switch
-        {
-            0 => "bg-secondary", // 下書き
-            1 => "bg-info", // 提出済み
-            2 or 3 or 4 => "bg-warning", // 承認待ち
-            5 => "bg-success", // 承認済み
-            6 => "bg-danger", // 却下
-            7 => "bg-dark", // キャンセル
-            _ => "bg-light"
-        };
+        var statusEnum = (PurchaseManagement.Shared.Domain.PurchaseRequests.PurchaseRequestStatus)status;
+        var displayInfo = StatusDisplayInfo.FromStatus(statusEnum);
+        return displayInfo.BadgeColorClass;
     }
 
     private static string GetApprovalStepStatusBadgeClass(int status)

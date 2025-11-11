@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using PurchaseManagement.Shared.Application;
 using PurchaseManagement.Shared.Domain.PurchaseRequests;
+using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
 using Shared.Application;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
@@ -12,17 +13,20 @@ public class SubmitPurchaseRequestHandler : IRequestHandler<SubmitPurchaseReques
 {
     private readonly IPurchaseRequestRepository _repository;
     private readonly IApprovalFlowService _approvalFlowService;
+    private readonly ISubmissionBoundary _submissionBoundary;
     private readonly IAppContext _appContext;
     private readonly ILogger<SubmitPurchaseRequestHandler> _logger;
 
     public SubmitPurchaseRequestHandler(
         IPurchaseRequestRepository repository,
         IApprovalFlowService approvalFlowService,
+        ISubmissionBoundary submissionBoundary,
         IAppContext appContext,
         ILogger<SubmitPurchaseRequestHandler> logger)
     {
         _repository = repository;
         _approvalFlowService = approvalFlowService;
+        _submissionBoundary = submissionBoundary;
         _appContext = appContext;
         _logger = logger;
     }
@@ -31,7 +35,30 @@ public class SubmitPurchaseRequestHandler : IRequestHandler<SubmitPurchaseReques
     {
         try
         {
-            // 1. 購買申請を作成
+            // 1. 提出資格チェック（バウンダリー経由）
+            var items = command.Items.Select(i => new PurchaseRequestItemInput(
+                i.ProductId,
+                i.ProductName,
+                i.UnitPrice,
+                i.Quantity
+            )).ToList();
+
+            var eligibility = _submissionBoundary.CheckEligibility(
+                command.Title,
+                command.Description,
+                items
+            );
+
+            if (!eligibility.CanSubmit)
+            {
+                var reasons = string.Join(", ", eligibility.BlockingReasons.Select(r => r.Message));
+                _logger.LogWarning(
+                    "Submission not allowed: Title={Title}, Reasons={Reasons}",
+                    command.Title, reasons);
+                return Result.Fail<Guid>(reasons);
+            }
+
+            // 2. 購買申請を作成
             var tenantId = _appContext.TenantId ?? throw new InvalidOperationException("TenantIdが設定されていません");
 
             var request = PurchaseRequest.Create(
@@ -42,22 +69,22 @@ public class SubmitPurchaseRequestHandler : IRequestHandler<SubmitPurchaseReques
                 tenantId
             );
 
-            // 2. 明細を追加
+            // 3. 明細を追加
             foreach (var item in command.Items)
             {
                 request.AddItem(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity);
             }
 
-            // 3. 承認フローを決定（金額に応じて自動判定）
+            // 4. 承認フローを決定（金額に応じて自動判定）
             var approvalFlow = await _approvalFlowService.DetermineFlowAsync(
                 request.TotalAmount.Amount,
                 cancellationToken
             );
 
-            // 4. 申請提出
+            // 5. 申請提出
             request.Submit(approvalFlow);
 
-            // 5. 永続化
+            // 6. 永続化
             await _repository.SaveAsync(request, cancellationToken);
 
             _logger.LogInformation(
