@@ -62,6 +62,9 @@ public static class ApprovalBoundaryExtensions
 
     /// <summary>
     /// DTOから承認コンテキストを取得
+    ///
+    /// 【リファクタリング: Type-Safe Boundary Decision】
+    /// string[] AllowedActions → BoundaryDecision with ApprovalAction[]
     /// </summary>
     public static ApprovalContextDto GetContextFromDto(
         this IApprovalBoundary boundary,
@@ -75,7 +78,11 @@ public static class ApprovalBoundaryExtensions
         var remainingSteps = dto.ApprovalSteps.Where(s => s.Status == 0 && s != currentStep).ToArray();
 
         var status = (PurchaseRequestStatus)dto.Status;
-        var allowedActions = DetermineAllowedActions(status, eligibility, dto.RequesterId, currentUserId);
+        var decision = DetermineBoundaryDecision(status, eligibility, dto.RequesterId, currentUserId, dto.Id);
+
+        // 【UIポリシープッシュ】UIメタデータを生成
+        var uiMetadata = UIMetadata.ForRequestStatus(status);
+        var stepUIMetadata = GenerateStepUIMetadataFromDto(dto.ApprovalSteps);
 
         return new ApprovalContextDto
         {
@@ -84,32 +91,93 @@ public static class ApprovalBoundaryExtensions
             CompletedSteps = completedSteps,
             RemainingSteps = remainingSteps,
             IsTerminalState = IsTerminalState(status),
-            AllowedActions = allowedActions,
-            StatusDisplay = StatusDisplayInfo.FromStatus(status)
+            Decision = decision,
+            StatusDisplay = StatusDisplayInfo.FromStatus(status),
+            UIMetadata = uiMetadata,
+            StepUIMetadata = stepUIMetadata
         };
     }
 
-    private static string[] DetermineAllowedActions(
+    /// <summary>
+    /// 承認ステップごとのUIメタデータを生成（DTO版）
+    /// </summary>
+    private static Dictionary<int, UIMetadata> GenerateStepUIMetadataFromDto(IEnumerable<ApprovalStepDto> steps)
+    {
+        return steps.ToDictionary(
+            step => step.StepNumber,
+            step => UIMetadata.ForApprovalStep((ApprovalStepStatus)step.Status)
+        );
+    }
+
+    /// <summary>
+    /// バウンダリー判定を実行（型安全な許可/拒否判定）
+    ///
+    /// 【リファクタリング: Type-Safe Boundary Decision】
+    /// string[] → ApprovalAction[] (UIメタデータを含む型安全な値オブジェクト)
+    /// </summary>
+    private static BoundaryDecision DetermineBoundaryDecision(
         PurchaseRequestStatus status,
         ApprovalEligibility eligibility,
         Guid requesterId,
-        Guid currentUserId)
+        Guid currentUserId,
+        Guid requestId)
     {
-        var actions = new List<string>();
+        var context = new DecisionContext
+        {
+            UserId = currentUserId,
+            RequestId = requestId,
+            RequestStatus = status,
+            CurrentStepNumber = null, // DTOからは取得不可
+            DecisionTimestamp = DateTime.UtcNow,
+            IsRequester = requesterId == currentUserId,
+            IsCurrentApprover = eligibility.CanApprove
+        };
+
+        // 拒否されている場合
+        if (!eligibility.CanApprove && !eligibility.CanReject)
+        {
+            // キャンセル可能か判定
+            bool canCancel = !IsTerminalState(status)
+                && status != PurchaseRequestStatus.Draft
+                && requesterId == currentUserId;
+
+            if (!canCancel)
+            {
+                // 何もできない場合は拒否
+                return BoundaryDecision.Denied(
+                    reasons: eligibility.BlockingReasons.ToList(),
+                    context: context
+                );
+            }
+
+            // キャンセルのみ可能
+            return BoundaryDecision.Allowed(
+                actions: new[] { ApprovalAction.Cancel() },
+                context: context
+            );
+        }
+
+        // 許可されたアクションを構築
+        var actions = new List<ApprovalAction>();
 
         if (eligibility.CanApprove)
-            actions.Add("Approve");
+            actions.Add(ApprovalAction.Approve());
 
         if (eligibility.CanReject)
-            actions.Add("Reject");
+            actions.Add(ApprovalAction.Reject());
 
-        // キャンセルは申請者のみ（承認済み・却下・キャンセル済みを除く）
+        // SECURITY: キャンセルは申請者のみ（承認済み・却下・キャンセル済みを除く）
         if (!IsTerminalState(status)
             && status != PurchaseRequestStatus.Draft
             && requesterId == currentUserId)
-            actions.Add("Cancel");
+        {
+            actions.Add(ApprovalAction.Cancel());
+        }
 
-        return actions.ToArray();
+        return BoundaryDecision.Allowed(
+            actions: actions,
+            context: context
+        );
     }
 
     private static bool IsTerminalState(PurchaseRequestStatus status)
@@ -172,6 +240,12 @@ public static class ApprovalBoundaryExtensions
 
 /// <summary>
 /// 承認コンテキスト（DTO版）
+///
+/// 【リファクタリング: Type-Safe Boundary Decision】
+/// string[] AllowedActions → BoundaryDecision（型安全な判定結果）
+///
+/// 【UIポリシープッシュ】
+/// UIメタデータをドメイン層からプッシュ
 /// </summary>
 public record ApprovalContextDto
 {
@@ -180,6 +254,33 @@ public record ApprovalContextDto
     public ApprovalStepDto[] CompletedSteps { get; init; } = Array.Empty<ApprovalStepDto>();
     public ApprovalStepDto[] RemainingSteps { get; init; } = Array.Empty<ApprovalStepDto>();
     public bool IsTerminalState { get; init; }
-    public string[] AllowedActions { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// バウンダリー判定結果（型安全な許可/拒否情報）
+    /// </summary>
+    public required BoundaryDecision Decision { get; init; }
+
     public StatusDisplayInfo StatusDisplay { get; init; } = null!;
+
+    /// <summary>
+    /// UIメタデータ（UIポリシープッシュ）
+    /// ドメイン層がUIの表示方法を指示
+    /// </summary>
+    public UIMetadata? UIMetadata { get; init; }
+
+    /// <summary>
+    /// 承認ステップごとのUIメタデータ（UIポリシープッシュ）
+    /// Key: StepNumber, Value: UIメタデータ
+    /// </summary>
+    public IReadOnlyDictionary<int, UIMetadata>? StepUIMetadata { get; init; }
+
+    /// <summary>
+    /// 後方互換性: 許可されたアクション文字列配列
+    /// 【Deprecated】Decision.AllowedActions を使用してください
+    /// </summary>
+    [Obsolete("Use Decision.AllowedActions instead. This property will be removed in future versions.")]
+    public string[] AllowedActions => Decision.AllowedActions
+        .Where(a => a.IsEnabled)
+        .Select(a => a.Type.ToString())
+        .ToArray();
 }

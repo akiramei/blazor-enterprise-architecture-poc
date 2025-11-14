@@ -50,6 +50,16 @@ public static class DependencyInjection
         // Domain Services
         services.AddScoped<IApprovalFlowService, ApprovalFlowService>();
 
+        // Command Factories（Abstract Factoryパターン: Intent→Command変換）
+        // 各Feature層のファクトリーを登録
+        services.AddScoped<IApprovalCommandFactory>(sp =>
+        {
+            // Composite Factoryを使用して、承認と却下の両方のコマンドを生成可能にする
+            var approveFactory = new ApprovePurchaseRequest.Application.ApprovalCommandFactory();
+            var rejectFactory = new RejectPurchaseRequest.Application.RejectCommandFactory();
+            return new CompositeApprovalCommandFactory(approveFactory, rejectFactory);
+        });
+
         // Boundary Services（バウンダリーパターン: ドメインロジックとUI間の契約）
         services.AddScoped<IApprovalBoundary, ApprovalBoundaryService>();
         services.AddScoped<ISubmissionBoundary, SubmissionBoundaryService>();

@@ -53,6 +53,7 @@ public interface IApprovalBoundary
     /// <param name="requestId">申請ID</param>
     /// <param name="userId">実行ユーザーID</param>
     /// <param name="comment">コメント</param>
+    /// <param name="idempotencyKey">冪等性キー（UI層が生成・管理）</param>
     /// <returns>MediatRコマンド（IRequest）</returns>
-    object CreateCommandFromIntent(ApprovalIntent intent, Guid requestId, Guid userId, string? comment);
+    object CreateCommandFromIntent(ApprovalIntent intent, Guid requestId, Guid userId, string? comment, string idempotencyKey);
 }

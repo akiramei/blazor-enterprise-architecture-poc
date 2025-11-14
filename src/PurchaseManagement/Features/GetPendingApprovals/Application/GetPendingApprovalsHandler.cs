@@ -80,6 +80,20 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
             // SQL: 承認待ち申請を取得
             // NOTE: TotalAmountは計算プロパティ（PurchaseRequestItemsから集計）
             // NOTE: IsPendingは計算プロパティ（Status = 0でPending）
+            //
+            // 【SECURITY FIX】
+            // 修正前: pr."Status" IN (1, 2) → 2次承認・最終承認が表示されない
+            // 修正後: pr."Status" IN (1, 2, 3, 4) → 全ての承認待ちステータスを含む
+            //   1 = Submitted
+            //   2 = PendingFirstApproval
+            //   3 = PendingSecondApproval
+            //   4 = PendingFinalApproval
+            //
+            // 【回帰テストの制限】
+            // このハンドラは PostgreSQL 固有のSQL構文を使用しているため、
+            // SQLite In-Memory では実行できず、自動回帰テストができません。
+            // SQL を修正した場合は、手動で PostgreSQL 環境でテストしてください。
+            // 詳細: tests/PurchaseManagement.Web.IntegrationTests/README.md
             var sql = $@"
                 SELECT
                     pr.""Id"" AS PurchaseRequestId,
@@ -101,7 +115,7 @@ public sealed class GetPendingApprovalsHandler : IRequestHandler<GetPendingAppro
                 WHERE pr.""TenantId"" = @TenantId
                   AND ast.""ApproverId"" = @UserId
                   AND ast.""Status"" = 0  -- ApprovalStepStatus.Pending = 0
-                  AND pr.""Status"" IN (1, 2)  -- Submitted = 1, InApproval = 2
+                  AND pr.""Status"" IN (1, 2, 3, 4)  -- FIXED: 全承認待ちステータスを含む
                 ORDER BY {orderByClause}
                 LIMIT @PageSize OFFSET @Offset
             ";

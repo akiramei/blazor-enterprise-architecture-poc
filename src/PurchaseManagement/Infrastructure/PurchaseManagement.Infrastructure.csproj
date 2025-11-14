@@ -4,6 +4,8 @@
     <ProjectReference Include="..\Shared\Domain\PurchaseManagement.Shared.Domain.csproj" />
     <ProjectReference Include="..\Shared\Application\PurchaseManagement.Shared.Application.csproj" />
     <ProjectReference Include="..\..\Shared\Infrastructure\Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\Features\ApprovePurchaseRequest\Application\ApprovePurchaseRequest.Application.csproj" />
+    <ProjectReference Include="..\Features\RejectPurchaseRequest\Application\RejectPurchaseRequest.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

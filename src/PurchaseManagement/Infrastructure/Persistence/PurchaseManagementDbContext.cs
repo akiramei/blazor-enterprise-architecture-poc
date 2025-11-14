@@ -116,11 +116,25 @@ public sealed class PurchaseManagementDbContext : DbContext
     /// 重要: _appContext.TenantIdを直接式ツリーで参照することで、
     /// クエリ実行時に動的にTenantIdを評価します。
     /// ローカル変数にキャプチャすると、DbContext作成時の値で固定されてしまいます。
+    ///
+    /// 【SECURITY FIX】
+    /// _appContext.TenantId == null の場合、全データを返すのではなく、
+    /// 全データをブロックするように変更（false を返す条件に変更）。
+    /// 未認証ユーザーや設定ミスのコンテキストでデータ漏洩を防止。
+    ///
+    /// 修正前: _appContext.TenantId == null || e.TenantId == _appContext.TenantId.Value
+    ///   → null の場合に true となり、全テナントのデータが見える（脆弱性）
+    ///
+    /// 修正後: _appContext.TenantId != null && e.TenantId == _appContext.TenantId.Value
+    ///   → null の場合に false となり、全データをブロック（安全）
     /// </summary>
     private void SetMultiTenantFilter<TEntity>(ModelBuilder modelBuilder)
         where TEntity : class, IMultiTenant
     {
+        // SECURITY: TenantId が null の場合は全データをブロック
+        // NOTE: Nullable<Guid> を直接比較することで EF Core がSQL に正しく変換できる
+        //       .Value を使うと null チェックがあってもランタイムエラーになる場合がある
         modelBuilder.Entity<TEntity>()
-            .HasQueryFilter(e => _appContext.TenantId == null || e.TenantId == _appContext.TenantId.Value);
+            .HasQueryFilter(e => _appContext.TenantId.HasValue && e.TenantId == _appContext.TenantId);
     }
 }

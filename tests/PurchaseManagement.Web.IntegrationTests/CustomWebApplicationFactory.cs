@@ -175,6 +175,67 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         });
     }
 
+    /// <summary>
+    /// TenantId を null に設定したファクトリーを返す（セキュリティテスト用）
+    /// </summary>
+    public CustomWebApplicationFactory WithNullTenant()
+    {
+        return (CustomWebApplicationFactory)WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // IAppContext を null TenantId に置き換え
+                services.RemoveAll<global::Shared.Application.Interfaces.IAppContext>();
+                services.AddScoped<global::Shared.Application.Interfaces.IAppContext>(_ => new TestAppContext(null));
+            });
+        });
+    }
+
+    /// <summary>
+    /// 指定された TenantId を設定したファクトリーを返す
+    /// </summary>
+    public CustomWebApplicationFactory WithTenant(Guid tenantId)
+    {
+        return (CustomWebApplicationFactory)WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // IAppContext を指定 TenantId に置き換え
+                services.RemoveAll<global::Shared.Application.Interfaces.IAppContext>();
+                services.AddScoped<global::Shared.Application.Interfaces.IAppContext>(_ => new TestAppContext(tenantId));
+            });
+        });
+    }
+
+    /// <summary>
+    /// テスト用 IAppContext 実装
+    /// </summary>
+    private class TestAppContext : global::Shared.Application.Interfaces.IAppContext
+    {
+        public TestAppContext(Guid? tenantId)
+        {
+            TenantId = tenantId;
+        }
+
+        public Guid UserId => Guid.Empty;
+        public string UserName => "Test";
+        public Guid? TenantId { get; }
+        public bool IsAuthenticated => TenantId.HasValue;
+        public System.Security.Claims.ClaimsPrincipal User => new();
+        public string CorrelationId => "test";
+        public Guid RequestId => Guid.NewGuid();
+        public DateTime RequestStartTimeUtc => DateTime.UtcNow;
+        public string RequestPath => "/test";
+        public string HttpMethod => "GET";
+        public string? ClientIpAddress => null;
+        public string? UserAgent => null;
+        public string EnvironmentName => "Test";
+        public string HostName => "test";
+        public string ApplicationName => "test";
+        public bool IsInRole(string role) => false;
+        public bool IsInAnyRole(params string[] roles) => false;
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)

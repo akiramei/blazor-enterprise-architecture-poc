@@ -3,6 +3,9 @@ namespace PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
 /// <summary>
 /// 承認コンテキスト：UIが"何を見せるべきか"の根拠
 /// 承認画面に表示する情報の完全なスナップショット
+///
+/// 【リファクタリング: Type-Safe Boundary】
+/// string[] AllowedActions → BoundaryDecision（型安全な判定結果）
 /// </summary>
 public record ApprovalContext
 {
@@ -32,14 +35,36 @@ public record ApprovalContext
     public bool IsTerminalState { get; init; }
 
     /// <summary>
-    /// 許可されたアクション（UI側でボタン表示制御に使用）
+    /// バウンダリー判定結果（型安全な許可/拒否情報）
     /// </summary>
-    public string[] AllowedActions { get; init; } = Array.Empty<string>();
+    public required BoundaryDecision Decision { get; init; }
 
     /// <summary>
     /// 現在のステータス表示情報
     /// </summary>
     public StatusDisplayInfo StatusDisplay { get; init; } = null!;
+
+    /// <summary>
+    /// UIメタデータ（UIポリシープッシュ）
+    /// ドメイン層がUIの表示方法を指示
+    /// </summary>
+    public UIMetadata? UIMetadata { get; init; }
+
+    /// <summary>
+    /// 承認ステップごとのUIメタデータ（UIポリシープッシュ）
+    /// Key: StepNumber, Value: UIメタデータ
+    /// </summary>
+    public IReadOnlyDictionary<int, UIMetadata>? StepUIMetadata { get; init; }
+
+    /// <summary>
+    /// 後方互換性: 許可されたアクション文字列配列
+    /// 【Deprecated】Decision.AllowedActions を使用してください
+    /// </summary>
+    [Obsolete("Use Decision.AllowedActions instead. This property will be removed in future versions.")]
+    public string[] AllowedActions => Decision.AllowedActions
+        .Where(a => a.IsEnabled)
+        .Select(a => a.Type.ToString())
+        .ToArray();
 }
 
 /// <summary>

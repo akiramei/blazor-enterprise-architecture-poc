@@ -16,7 +16,26 @@ public class IntentContextTests
 
     public IntentContextTests()
     {
-        _sut = new ApprovalBoundaryService();
+        // Mock IApprovalCommandFactory（テスト用）
+        var mockFactory = new MockApprovalCommandFactory();
+        var mockLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<ApprovalBoundaryService>.Instance;
+        _sut = new ApprovalBoundaryService(mockFactory, mockLogger);
+    }
+
+    /// <summary>
+    /// テスト用のモックファクトリー
+    /// </summary>
+    private class MockApprovalCommandFactory : IApprovalCommandFactory
+    {
+        public object CreateApproveCommand(Guid requestId, string comment, string idempotencyKey)
+        {
+            return new { RequestId = requestId, Comment = comment, IdempotencyKey = idempotencyKey, Type = "Approve" };
+        }
+
+        public object CreateRejectCommand(Guid requestId, string reason, string idempotencyKey)
+        {
+            return new { RequestId = requestId, Reason = reason, IdempotencyKey = idempotencyKey, Type = "Reject" };
+        }
     }
 
     #region GetIntentContext Tests

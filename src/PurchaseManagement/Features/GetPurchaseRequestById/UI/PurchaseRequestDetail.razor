@@ -5,10 +5,12 @@
 @using Shared.Application
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Security.Claims
+@using Microsoft.JSInterop
 @inject IMediator Mediator
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IApprovalBoundary ApprovalBoundary
+@inject IJSRuntime JSRuntime
 
 <PageTitle>購買申請詳細</PageTitle>
 
@@ -65,9 +67,22 @@ else
                 </div>
                 <div class="col-md-6 mb-3">
                     <strong>ステータス:</strong>
-                    <span class="badge @GetStatusBadgeClass(_purchaseRequest.Status)">
-                        @_purchaseRequest.StatusName
-                    </span>
+                    @if (_approvalContext?.UIMetadata != null)
+                    {
+                        var uiMeta = _approvalContext.UIMetadata;
+                        <span class="badge @uiMeta.Rendering.BadgeColorClass"
+                              role="@uiMeta.Accessibility.Role"
+                              aria-label="@uiMeta.Accessibility.AriaLabel">
+                            <i class="@uiMeta.Rendering.IconClass me-1"></i>
+                            @_purchaseRequest.StatusName
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">
+                            @_purchaseRequest.StatusName
+                        </span>
+                    }
                 </div>
             </div>
             <div class="row">
@@ -160,7 +175,10 @@ else
             <div class="card-body">
                 @foreach (var step in _purchaseRequest.ApprovalSteps.OrderBy(s => s.StepNumber))
                 {
-                    <div class="card mb-3 @(step.Status == 0 ? "border-warning" : step.Status == 1 ? "border-success" : "border-danger")">
+                    var stepUI = _approvalContext?.StepUIMetadata?.GetValueOrDefault(step.StepNumber);
+                    var borderClass = stepUI?.Rendering.BorderColorClass ?? "border-secondary";
+
+                    <div class="card mb-3 @borderClass">
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
@@ -168,9 +186,21 @@ else
                                 </div>
                                 <div class="col-md-6">
                                     <strong>ステータス:</strong>
-                                    <span class="badge @GetApprovalStepStatusBadgeClass(step.Status)">
-                                        @step.StatusName
-                                    </span>
+                                    @if (stepUI != null)
+                                    {
+                                        <span class="badge @stepUI.Rendering.BadgeColorClass"
+                                              role="@stepUI.Accessibility.Role"
+                                              aria-label="@stepUI.Accessibility.AriaLabel">
+                                            <i class="@stepUI.Rendering.IconClass me-1"></i>
+                                            @step.StatusName
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">
+                                            @step.StatusName
+                                        </span>
+                                    }
                                 </div>
                             </div>
                             @if (!string.IsNullOrEmpty(step.Comment))
@@ -222,7 +252,7 @@ else
                     {
                         var metadata = intent.Metadata;
                         <button class="btn @metadata.ButtonClass"
-                                @onclick="() => HandleIntent(intent.Intent)"
+                                @onclick="async () => await HandleIntentWithConfirmation(intent)"
                                 disabled="@_isProcessing"
                                 title="@metadata.Description">
                             @if (_isProcessing)
@@ -260,6 +290,7 @@ else
     private PurchaseRequestDetailDto? _purchaseRequest;
     private ApprovalEligibility? _approvalEligibility;
     private IntentContext? _intentContext; // Intent-Command分離パターン
+    private ApprovalContextDto? _approvalContext; // UIポリシープッシュ用
     private bool _isLoading = true;
     private string? _errorMessage;
     private string? _actionMessage;
@@ -316,6 +347,12 @@ else
                         _purchaseRequest,
                         _currentUserId
                     );
+
+                    // 【UIポリシープッシュ】ApprovalContextを取得（UIメタデータ含む）
+                    _approvalContext = ApprovalBoundary.GetContextFromDto(
+                        _purchaseRequest,
+                        _currentUserId
+                    );
                 }
             }
             else
@@ -334,6 +371,35 @@ else
     }
 
     /// <summary>
+    /// 確認ダイアログ付きでIntentを実行
+    ///
+    /// 【パターン: 確認ダイアログ統合】
+    /// IntentMetadataの RequiresConfirmation を使用して、
+    /// 重要な操作（最終承認、却下）で確認を求める
+    /// </summary>
+    private async Task HandleIntentWithConfirmation(AvailableIntent availableIntent)
+    {
+        var metadata = availableIntent.Metadata;
+
+        // 確認が必要な場合、JavaScript confirm() を使用
+        if (metadata.RequiresConfirmation)
+        {
+            var confirmed = await JSRuntime.InvokeAsync<bool>(
+                "confirm",
+                metadata.ConfirmationMessage ?? "この操作を実行してもよろしいですか？"
+            );
+
+            if (!confirmed)
+            {
+                return; // ユーザーがキャンセル
+            }
+        }
+
+        // Intentを実行
+        await HandleIntent(availableIntent.Intent);
+    }
+
+    /// <summary>
     /// Intent駆動のアクション処理（Intent→Commandマッピング）
     ///
     /// 【Intent-Command分離パターン】
@@ -341,6 +407,9 @@ else
     /// - UIは「どのコマンドか」を知らない
     /// - UIは「何をしたいか」（業務意図）だけを伝える
     /// - ドメイン層が技術詳細（Command）を決定する
+    ///
+    /// 【リファクタリング: IdempotencyKey制御】
+    /// UI層がIdempotencyKeyを生成・管理することで、重複送信を防止
     /// </summary>
     private async Task HandleIntent(ApprovalIntent intent)
     {
@@ -349,12 +418,16 @@ else
 
         try
         {
+            // UI層でIdempotencyKeyを生成（重複送信防止）
+            var idempotencyKey = Guid.NewGuid().ToString();
+
             // ドメイン層（バウンダリー）がIntentをCommandに変換
             var command = ApprovalBoundary.CreateCommandFromIntent(
                 intent,
                 Id,
                 _currentUserId,
-                _actionComment
+                _actionComment,
+                idempotencyKey  // UI層が制御
             );
 
             // MediatRコマンドを実行（型安全性のため dynamic を使用）
@@ -407,30 +480,5 @@ else
     private bool CanReject()
     {
         return _approvalEligibility?.CanReject ?? false;
-    }
-
-    /// <summary>
-    /// ステータスバッジクラス取得（バウンダリー経由）
-    ///
-    /// REFACTORED: ステータス表示ロジックをドメイン層のバウンダリーに委譲
-    /// - ステータスの意味論（色、重要度）はドメイン知識
-    /// - UI層はバウンダリーが返す情報を表示するだけ
-    /// </summary>
-    private static string GetStatusBadgeClass(int status)
-    {
-        var statusEnum = (PurchaseManagement.Shared.Domain.PurchaseRequests.PurchaseRequestStatus)status;
-        var displayInfo = StatusDisplayInfo.FromStatus(statusEnum);
-        return displayInfo.BadgeColorClass;
-    }
-
-    private static string GetApprovalStepStatusBadgeClass(int status)
-    {
-        return status switch
-        {
-            0 => "bg-warning", // 保留中
-            1 => "bg-success", // 承認済み
-            2 => "bg-danger", // 却下
-            _ => "bg-light"
-        };
     }
 }

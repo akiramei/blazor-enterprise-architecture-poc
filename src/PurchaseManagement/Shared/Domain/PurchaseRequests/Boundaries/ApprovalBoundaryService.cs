@@ -1,50 +1,94 @@
+using Microsoft.Extensions.Logging;
 using Shared.Kernel;
 
 namespace PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
 
 /// <summary>
 /// 承認バウンダリーサービス：ドメインサービスとして承認ロジックを提供
+///
+/// 【可観測性】
+/// CheckEligibility, GetContext の呼び出しを構造化ログで記録
+/// ビジネス指標（拒否率、よく使われるアクション）を可視化可能
 /// </summary>
 public class ApprovalBoundaryService : IApprovalBoundary
 {
+    private readonly IApprovalCommandFactory _commandFactory;
+    private readonly ILogger<ApprovalBoundaryService> _logger;
+
+    public ApprovalBoundaryService(
+        IApprovalCommandFactory commandFactory,
+        ILogger<ApprovalBoundaryService> logger)
+    {
+        _commandFactory = commandFactory;
+        _logger = logger;
+    }
     /// <summary>
     /// 承認資格をチェック
+    ///
+    /// 【可観測性】構造化ログでチェック結果を記録
     /// </summary>
     public ApprovalEligibility CheckEligibility(PurchaseRequest request, Guid currentUserId)
     {
         if (request == null)
+        {
+            _logger.LogWarning("CheckEligibility failed: REQUEST_NOT_FOUND for userId={UserId}",
+                currentUserId);
             return ApprovalEligibility.NotEligible(
                 new DomainError("REQUEST_NOT_FOUND", "購買申請が見つかりません")
             );
+        }
 
         if (currentUserId == Guid.Empty)
+        {
+            _logger.LogWarning("CheckEligibility failed: USER_NOT_AUTHENTICATED for requestId={RequestId}",
+                request.Id);
             return ApprovalEligibility.NotEligible(
                 new DomainError("USER_NOT_AUTHENTICATED", "ユーザーが認証されていません")
             );
+        }
 
         // 終端状態チェック
         if (IsTerminalState(request.Status))
+        {
+            _logger.LogInformation(
+                "CheckEligibility denied: TERMINAL_STATE. RequestId={RequestId}, Status={Status}, UserId={UserId}",
+                request.Id, request.Status, currentUserId);
             return ApprovalEligibility.NotEligible(
                 new DomainError("TERMINAL_STATE", $"この申請は既に処理済みです（{request.Status}）")
             );
+        }
 
         // 現在の承認ステップを取得
         var currentStep = request.CurrentApprovalStep;
         if (currentStep == null)
+        {
+            _logger.LogWarning(
+                "CheckEligibility denied: NO_PENDING_STEP. RequestId={RequestId}, Status={Status}, UserId={UserId}",
+                request.Id, request.Status, currentUserId);
             return ApprovalEligibility.NotEligible(
                 new DomainError("NO_PENDING_STEP", "承認待ちのステップがありません")
             );
+        }
 
         // 承認者チェック（SECURITY: 重要）
         if (currentStep.ApproverId != currentUserId)
+        {
+            _logger.LogWarning(
+                "CheckEligibility denied: NOT_ASSIGNED_APPROVER. RequestId={RequestId}, ExpectedApproverId={ExpectedApproverId}, ActualUserId={ActualUserId}, StepNumber={StepNumber}",
+                request.Id, currentStep.ApproverId, currentUserId, currentStep.StepNumber);
             return ApprovalEligibility.NotEligible(
                 new DomainError(
                     "NOT_ASSIGNED_APPROVER",
                     $"あなたはこのステップの承認者ではありません（承認者: {currentStep.ApproverName}）"
                 )
             );
+        }
 
         // すべてのチェックをパス
+        _logger.LogInformation(
+            "CheckEligibility approved. RequestId={RequestId}, UserId={UserId}, StepNumber={StepNumber}",
+            request.Id, currentUserId, currentStep.StepNumber);
+
         return ApprovalEligibility.Eligible(
             currentStep.ApproverId,
             currentStep.StepNumber
@@ -53,6 +97,11 @@ public class ApprovalBoundaryService : IApprovalBoundary
 
     /// <summary>
     /// 承認コンテキストを取得
+    ///
+    /// 【リファクタリング: Type-Safe Boundary Decision】
+    /// string[] AllowedActions → BoundaryDecision with ApprovalAction[]
+    ///
+    /// 【可観測性】構造化ログでコンテキスト取得と判定結果を記録
     /// </summary>
     public ApprovalContext GetContext(PurchaseRequest request, Guid currentUserId)
     {
@@ -68,7 +117,25 @@ public class ApprovalBoundaryService : IApprovalBoundary
             .OrderBy(s => s.StepNumber)
             .ToArray();
 
-        var allowedActions = DetermineAllowedActions(request, eligibility);
+        var decision = DetermineBoundaryDecision(request, eligibility, currentUserId);
+
+        // 【可観測性】判定結果をログに記録
+        _logger.LogInformation(
+            "GetContext completed. RequestId={RequestId}, UserId={UserId}, Status={Status}, " +
+            "IsAllowed={IsAllowed}, AllowedActionsCount={AllowedActionsCount}, BlockingReasonsCount={BlockingReasonsCount}, " +
+            "AllowedActions={AllowedActions}",
+            request.Id,
+            currentUserId,
+            request.Status,
+            decision.IsAllowed,
+            decision.AllowedActions.Count,
+            decision.BlockingReasons.Count,
+            string.Join(",", decision.AllowedActions.Select(a => a.Type.ToString()))
+        );
+
+        // 【UIポリシープッシュ】UIメタデータを生成
+        var uiMetadata = UIMetadata.ForRequestStatus(request.Status);
+        var stepUIMetadata = GenerateStepUIMetadata(request.ApprovalSteps);
 
         return new ApprovalContext
         {
@@ -77,29 +144,91 @@ public class ApprovalBoundaryService : IApprovalBoundary
             CompletedSteps = completedSteps,
             RemainingSteps = remainingSteps,
             IsTerminalState = IsTerminalState(request.Status),
-            AllowedActions = allowedActions,
-            StatusDisplay = StatusDisplayInfo.FromStatus(request.Status)
+            Decision = decision,
+            StatusDisplay = StatusDisplayInfo.FromStatus(request.Status),
+            UIMetadata = uiMetadata,
+            StepUIMetadata = stepUIMetadata
         };
     }
 
     /// <summary>
-    /// 許可されたアクションを判定
+    /// 承認ステップごとのUIメタデータを生成
     /// </summary>
-    private string[] DetermineAllowedActions(PurchaseRequest request, ApprovalEligibility eligibility)
+    private Dictionary<int, UIMetadata> GenerateStepUIMetadata(IEnumerable<ApprovalStep> steps)
     {
-        var actions = new List<string>();
+        return steps.ToDictionary(
+            step => step.StepNumber,
+            step => UIMetadata.ForApprovalStep(step.Status)
+        );
+    }
+
+    /// <summary>
+    /// バウンダリー判定を実行（型安全な許可/拒否判定）
+    ///
+    /// 【SECURITY FIX】
+    /// Cancel アクションは申請者（RequesterId）のみに許可する。
+    /// 修正前は currentUserId をチェックせず、全ユーザーに Cancel を表示していた。
+    ///
+    /// 【リファクタリング: Type-Safe Boundary Decision】
+    /// string[] → ApprovalAction[] (UIメタデータを含む型安全な値オブジェクト)
+    /// </summary>
+    private BoundaryDecision DetermineBoundaryDecision(
+        PurchaseRequest request,
+        ApprovalEligibility eligibility,
+        Guid currentUserId)
+    {
+        var context = DecisionContext.Create(
+            userId: currentUserId,
+            request: request,
+            isRequester: request.RequesterId == currentUserId,
+            isCurrentApprover: request.CurrentApprovalStep?.ApproverId == currentUserId
+        );
+
+        // 拒否されている場合
+        if (!eligibility.CanApprove && !eligibility.CanReject)
+        {
+            // キャンセル可能か判定
+            bool canCancel = !IsTerminalState(request.Status)
+                && request.Status != PurchaseRequestStatus.Draft
+                && request.RequesterId == currentUserId;
+
+            if (!canCancel)
+            {
+                // 何もできない場合は拒否
+                return BoundaryDecision.Denied(
+                    reasons: eligibility.BlockingReasons.ToList(),
+                    context: context
+                );
+            }
+
+            // キャンセルのみ可能
+            return BoundaryDecision.Allowed(
+                actions: new[] { ApprovalAction.Cancel() },
+                context: context
+            );
+        }
+
+        // 許可されたアクションを構築
+        var actions = new List<ApprovalAction>();
 
         if (eligibility.CanApprove)
-            actions.Add("Approve");
+            actions.Add(ApprovalAction.Approve());
 
         if (eligibility.CanReject)
-            actions.Add("Reject");
+            actions.Add(ApprovalAction.Reject());
 
-        // キャンセルは申請者のみ（承認済み・却下・キャンセル済みを除く）
-        if (!IsTerminalState(request.Status) && request.Status != PurchaseRequestStatus.Draft)
-            actions.Add("Cancel");
+        // SECURITY: キャンセルは申請者のみ（承認済み・却下・キャンセル済みを除く）
+        if (!IsTerminalState(request.Status)
+            && request.Status != PurchaseRequestStatus.Draft
+            && request.RequesterId == currentUserId) // SECURITY FIX: 申請者チェック追加
+        {
+            actions.Add(ApprovalAction.Cancel());
+        }
 
-        return actions.ToArray();
+        return BoundaryDecision.Allowed(
+            actions: actions,
+            context: context
+        );
     }
 
     /// <summary>
@@ -157,16 +286,24 @@ public class ApprovalBoundaryService : IApprovalBoundary
     /// <summary>
     /// IntentをMediatRコマンドに変換（Intent→Command マッピング）
     /// ドメイン層が業務意図を技術実装に変換する責務を持つ
+    ///
+    /// 【リファクタリング: リフレクション削除】
+    /// Abstract Factoryパターンを使い、型安全にコマンドを生成
     /// </summary>
-    public object CreateCommandFromIntent(ApprovalIntent intent, Guid requestId, Guid userId, string? comment)
+    public object CreateCommandFromIntent(ApprovalIntent intent, Guid requestId, Guid userId, string? comment, string idempotencyKey)
     {
         return intent switch
         {
-            ApprovalIntent.PerformFirstApproval => CreateApproveCommand(requestId, comment ?? "1次承認"),
-            ApprovalIntent.PerformSecondApproval => CreateApproveCommand(requestId, comment ?? "2次承認"),
-            ApprovalIntent.PerformFinalApproval => CreateApproveCommand(requestId, comment ?? "最終承認"),
-            ApprovalIntent.SendBackForRevision => CreateRejectCommand(requestId, comment ?? "修正のため差し戻し"),
-            ApprovalIntent.RejectPermanently => CreateRejectCommand(requestId, comment ?? "申請を却下"),
+            ApprovalIntent.PerformFirstApproval =>
+                _commandFactory.CreateApproveCommand(requestId, comment ?? "1次承認", idempotencyKey),
+            ApprovalIntent.PerformSecondApproval =>
+                _commandFactory.CreateApproveCommand(requestId, comment ?? "2次承認", idempotencyKey),
+            ApprovalIntent.PerformFinalApproval =>
+                _commandFactory.CreateApproveCommand(requestId, comment ?? "最終承認", idempotencyKey),
+            ApprovalIntent.SendBackForRevision =>
+                _commandFactory.CreateRejectCommand(requestId, comment ?? "修正のため差し戻し", idempotencyKey),
+            ApprovalIntent.RejectPermanently =>
+                _commandFactory.CreateRejectCommand(requestId, comment ?? "申請を却下", idempotencyKey),
             _ => throw new ArgumentOutOfRangeException(nameof(intent), intent, "未知のIntent")
         };
     }
@@ -183,33 +320,5 @@ public class ApprovalBoundaryService : IApprovalBoundary
             PurchaseRequestStatus.PendingFinalApproval => ApprovalIntent.PerformFinalApproval,
             _ => null
         };
-    }
-
-    /// <summary>
-    /// 承認コマンドを生成（リフレクション回避のため動的生成）
-    /// </summary>
-    private object CreateApproveCommand(Guid requestId, string comment)
-    {
-        // NOTE: コマンドはFeature層に定義されているため、ここでは動的生成
-        // 将来的にはコマンドのファクトリーパターンを検討
-        var commandType = Type.GetType("ApprovePurchaseRequest.Application.ApprovePurchaseRequestCommand, ApprovePurchaseRequest.Application");
-        if (commandType == null)
-            throw new InvalidOperationException("ApprovePurchaseRequestCommand型が見つかりません");
-
-        return Activator.CreateInstance(commandType, new object[] { requestId, comment, Guid.NewGuid().ToString() })
-            ?? throw new InvalidOperationException("コマンドの生成に失敗しました");
-    }
-
-    /// <summary>
-    /// 却下コマンドを生成（リフレクション回避のため動的生成）
-    /// </summary>
-    private object CreateRejectCommand(Guid requestId, string reason)
-    {
-        var commandType = Type.GetType("RejectPurchaseRequest.Application.RejectPurchaseRequestCommand, RejectPurchaseRequest.Application");
-        if (commandType == null)
-            throw new InvalidOperationException("RejectPurchaseRequestCommand型が見つかりません");
-
-        return Activator.CreateInstance(commandType, new object[] { requestId, reason, Guid.NewGuid().ToString() })
-            ?? throw new InvalidOperationException("コマンドの生成に失敗しました");
     }
 }
