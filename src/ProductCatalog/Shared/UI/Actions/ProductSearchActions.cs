@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using MediatR;
 using ExportProductsToCsv.Application;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 using ProductCatalog.Shared.UI.Store;
 
 namespace ProductCatalog.Shared.UI.Actions;

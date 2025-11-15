@@ -1,8 +1,8 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.Extensions.Logging;
 using PurchaseManagement.Shared.Application;
-using PurchaseManagement.Shared.Domain.PurchaseRequests;
-using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.PurchaseRequests;
+using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
 using Shared.Application;
 using Shared.Kernel;
 

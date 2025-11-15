@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using CsvHelper;
 using CsvHelper.Configuration;
@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Common;
 using Shared.Kernel;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace ImportProductsFromCsv.Application;
 

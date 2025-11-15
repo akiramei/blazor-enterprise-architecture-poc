@@ -1,5 +1,5 @@
 using ProductCatalog.Shared.Application.DTOs;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 using Shared.Application.Common;
 
 namespace ProductCatalog.Shared.Application;

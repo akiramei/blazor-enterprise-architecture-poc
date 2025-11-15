@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 using Shared.Domain.Outbox;
 using Shared.Infrastructure.Diagnostics;
 

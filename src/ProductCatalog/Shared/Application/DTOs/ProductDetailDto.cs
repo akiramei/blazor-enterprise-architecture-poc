@@ -1,4 +1,4 @@
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Shared.Application.DTOs;
 

@@ -1,5 +1,5 @@
-using PurchaseManagement.Shared.Application;
-using PurchaseManagement.Shared.Domain.PurchaseRequests;
+﻿using PurchaseManagement.Shared.Application;
+using Domain.PurchaseManagement.PurchaseRequests;
 
 namespace PurchaseManagement.Infrastructure.Services;
 

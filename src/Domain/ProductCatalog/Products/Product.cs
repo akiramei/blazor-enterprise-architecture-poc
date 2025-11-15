@@ -1,5 +1,5 @@
 using Shared.Kernel;
-using ProductCatalog.Shared.Domain.Products.Events;
+using Domain.ProductCatalog.Products.Events;
 
 namespace Domain.ProductCatalog.Products;
 

@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using PurchaseManagement.Shared.Application;
 
 namespace PurchaseManagement.Web.IntegrationTests.TestDoubles;

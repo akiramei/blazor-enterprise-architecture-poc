@@ -1,6 +1,6 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Shared.Kernel;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Domain.UnitTests;
 

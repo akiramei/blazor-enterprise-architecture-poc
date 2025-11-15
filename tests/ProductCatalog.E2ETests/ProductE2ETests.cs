@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.Playwright;
 
 namespace ProductCatalog.E2ETests;

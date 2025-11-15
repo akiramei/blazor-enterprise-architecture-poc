@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using PurchaseManagement.Shared.Domain;
+using Domain.PurchaseManagement;
 
 namespace PurchaseManagement.Infrastructure.Persistence.EntityConfigurations;
 

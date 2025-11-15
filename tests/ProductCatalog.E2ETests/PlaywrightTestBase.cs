@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -23,7 +23,7 @@ using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using Shared.Domain.Identity;
 using Shared.Domain.AuditLogs;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 using Shared.Infrastructure.Services;
 using ProductCatalog.Host.Components;

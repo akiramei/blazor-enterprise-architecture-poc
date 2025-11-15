@@ -1,4 +1,4 @@
-using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
+﻿using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
 
 namespace RejectPurchaseRequest.Application;
 

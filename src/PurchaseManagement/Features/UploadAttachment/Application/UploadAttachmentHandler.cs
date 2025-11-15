@@ -1,7 +1,7 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.Extensions.Logging;
 using PurchaseManagement.Shared.Application;
-using PurchaseManagement.Shared.Domain;
+using Domain.PurchaseManagement;
 using Shared.Abstractions;
 using Shared.Application;
 using Shared.Application.Interfaces;

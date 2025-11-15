@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Common;
@@ -6,7 +6,7 @@ using Shared.Application.Interfaces;
 using ExportProductsToCsv.Application;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
 

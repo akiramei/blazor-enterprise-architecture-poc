@@ -1,8 +1,8 @@
-using Shared.Application;
+﻿using Shared.Application;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
 using ProductCatalog.Shared.Application.DTOs;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace SearchProducts.Application;
 

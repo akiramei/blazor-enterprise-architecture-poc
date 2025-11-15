@@ -1,4 +1,4 @@
-using PurchaseManagement.Shared.Application;
+﻿using PurchaseManagement.Shared.Application;
 using System.Data;
 
 namespace ProductCatalog.Web.IntegrationTests;

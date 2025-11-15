@@ -1,8 +1,8 @@
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
-using PurchaseManagement.Shared.Domain;
-using PurchaseManagement.Shared.Domain.PurchaseRequests;
+using Domain.PurchaseManagement;
+using Domain.PurchaseManagement.PurchaseRequests;
 using Shared.Application.Interfaces;
 using Shared.Domain.Outbox;
 using Shared.Kernel;

@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using GetProductById.Application;
 
 namespace ProductCatalog.Application.UnitTests;

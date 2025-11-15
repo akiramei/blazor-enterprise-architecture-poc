@@ -1,7 +1,7 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Shared.Kernel;
-using ProductCatalog.Shared.Domain.Products;
-using ProductCatalog.Shared.Domain.Products.Events;
+using Domain.ProductCatalog.Products;
+using Domain.ProductCatalog.Products.Events;
 
 namespace ProductCatalog.Domain.UnitTests;
 

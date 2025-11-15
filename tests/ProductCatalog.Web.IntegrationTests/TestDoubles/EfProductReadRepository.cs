@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 using ProductCatalog.Shared.Infrastructure.Persistence;
 using Shared.Application.Common;
 

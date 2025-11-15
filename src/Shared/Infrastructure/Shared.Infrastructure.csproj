@@ -30,6 +30,6 @@
     <ProjectReference Include="..\Application\Shared.Application.csproj" />
     <ProjectReference Include="..\Domain\Shared.Domain.csproj" />
     <ProjectReference Include="..\Abstractions\Shared.Abstractions.csproj" />
-    <ProjectReference Include="..\..\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
+    <ProjectReference Include="..\..\Domain\ProductCatalog\Domain.ProductCatalog.csproj" />
   </ItemGroup>
 </Project>

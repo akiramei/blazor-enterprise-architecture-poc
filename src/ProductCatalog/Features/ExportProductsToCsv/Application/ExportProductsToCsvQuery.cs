@@ -1,6 +1,6 @@
-using MediatR;
+﻿using MediatR;
 using Shared.Application;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace ExportProductsToCsv.Application;
 

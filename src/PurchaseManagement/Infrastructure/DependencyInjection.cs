@@ -1,11 +1,11 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PurchaseManagement.Infrastructure.Persistence;
 using PurchaseManagement.Infrastructure.Persistence.Repositories;
 using PurchaseManagement.Infrastructure.Services;
 using PurchaseManagement.Shared.Application;
-using PurchaseManagement.Shared.Domain.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
 
 namespace PurchaseManagement.Infrastructure;
 

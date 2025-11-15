@@ -1,10 +1,10 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PurchaseManagement.Infrastructure.Persistence;
-using PurchaseManagement.Shared.Domain.PurchaseRequests;
+using Domain.PurchaseManagement.PurchaseRequests;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
 

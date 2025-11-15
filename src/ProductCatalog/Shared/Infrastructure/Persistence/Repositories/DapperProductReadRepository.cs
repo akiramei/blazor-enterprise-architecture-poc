@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -7,7 +7,7 @@ using Shared.Application.Common;
 using Shared.Application.Interfaces;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
-using ProductCatalog.Shared.Domain.Products;
+using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 

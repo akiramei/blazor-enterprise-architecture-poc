@@ -12,4 +12,11 @@
     <ProjectReference Include="..\..\Shared\Kernel\Shared.Kernel.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 古いプロジェクトファイルと bin/obj を除外 -->
+    <Compile Remove="Products\**\*.csproj" />
+    <None Remove="Products\bin\**" />
+    <None Remove="Products\obj\**" />
+  </ItemGroup>
+
 </Project>
