@@ -11,8 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Shared\Kernel\Shared.Kernel.csproj" />
-    <ProjectReference Include="..\Application\GetProductById.Application.csproj" />
-    <ProjectReference Include="..\..\..\..\..\Domain\ProductCatalog\Domain.ProductCatalog.csproj" />
     <ProjectReference Include="..\..\..\Shared\UI\ProductCatalog.Shared.UI.csproj" />
   </ItemGroup>
 </Project>
