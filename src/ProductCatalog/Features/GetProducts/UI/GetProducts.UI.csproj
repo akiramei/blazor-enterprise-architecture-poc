@@ -21,5 +21,6 @@
     <ProjectReference Include="..\..\GetProductById\Application\GetProductById.Application.csproj" />
     <ProjectReference Include="..\..\SearchProducts\Application\SearchProducts.Application.csproj" />
     <ProjectReference Include="..\..\CreateProduct\UI\CreateProduct.UI.csproj" />
+    <ProjectReference Include="..\..\..\..\Application.Features.ProductCatalog\Application.Features.ProductCatalog.csproj" />
   </ItemGroup>
 </Project>

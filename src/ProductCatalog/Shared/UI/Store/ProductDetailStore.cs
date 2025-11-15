@@ -48,7 +48,7 @@ public sealed class ProductDetailStore : IDisposable
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var query = new GetProductByIdQuery(productId);
+            var query = new GetProductByIdQuery { ProductId = productId };
             _logger.LogInformation("[Store] Sending GetProductByIdQuery to MediatR");
             var result = await mediator.Send(query, _cts.Token);
 

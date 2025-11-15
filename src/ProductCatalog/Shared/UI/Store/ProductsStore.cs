@@ -136,7 +136,7 @@ public sealed class ProductsStore : IDisposable
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var command = new DeleteProductCommand(productId);
+            var command = new DeleteProductCommand { ProductId = productId };
             var result = await mediator.Send(command, ct);
 
             if (result.IsSuccess)

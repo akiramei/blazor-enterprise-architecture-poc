@@ -46,7 +46,7 @@ public sealed class ProductEditStore : IDisposable
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var query = new GetProductByIdQuery(productId);
+            var query = new GetProductByIdQuery { ProductId = productId };
             var result = await mediator.Send(query, _cts.Token);
 
             if (result.IsSuccess)
@@ -106,7 +106,15 @@ public sealed class ProductEditStore : IDisposable
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var command = new UpdateProductCommand(productId, name, description, price, stock, version);
+            var command = new UpdateProductCommand
+            {
+                ProductId = productId,
+                Name = name,
+                Description = description,
+                Price = price,
+                Stock = stock,
+                Version = version
+            };
             var result = await mediator.Send(command, _cts.Token);
 
             if (result.IsSuccess)
