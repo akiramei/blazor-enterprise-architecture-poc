@@ -63,13 +63,7 @@ builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>(
 // MediatR - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddMediatR(cfg =>
 {
-    // ProductCatalog BC (未移行の4機能のみ旧版)
-    cfg.RegisterServicesFromAssembly(typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly);
-
-    // ProductCatalog BC (工業製品化版 - 6機能)
+    // ProductCatalog BC (工業製品化版 - 10機能すべて完了)
     cfg.RegisterServicesFromAssembly(typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly);
 
     // PurchaseManagement BC (工業製品化版 - 9機能)
@@ -79,13 +73,7 @@ builder.Services.AddMediatR(cfg =>
 // FluentValidation - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddValidatorsFromAssemblies(new[]
 {
-    // ProductCatalog BC (未移行の4機能のみ旧版)
-    typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly,
-    typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly,
-    typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly,
-    typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly,
-
-    // ProductCatalog BC (工業製品化版 - 6機能)
+    // ProductCatalog BC (工業製品化版 - 10機能すべて完了)
     typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly,
 
     // PurchaseManagement BC (工業製品化版 - 9機能)

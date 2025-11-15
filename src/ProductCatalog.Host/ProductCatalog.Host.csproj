@@ -62,13 +62,7 @@
     <ProjectReference Include="..\PurchaseManagement\Shared\Application\PurchaseManagement.Shared.Application.csproj" />
     <ProjectReference Include="..\PurchaseManagement\Infrastructure\PurchaseManagement.Infrastructure.csproj" />
 
-    <!-- Feature Projects - Application (ProductCatalog) ※未移行の4機能のみ -->
-    <ProjectReference Include="..\ProductCatalog\Features\BulkDeleteProducts\Application\BulkDeleteProducts.Application.csproj" />
-    <ProjectReference Include="..\ProductCatalog\Features\BulkUpdateProductPrices\Application\BulkUpdateProductPrices.Application.csproj" />
-    <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\Application\ExportProductsToCsv.Application.csproj" />
-    <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\Application\ImportProductsFromCsv.Application.csproj" />
-
-    <!-- Feature Projects - Application (PurchaseManagement) ※全て工業製品化版に移行済み -->
+    <!-- Feature Projects - Application ※全て工業製品化版に移行済み -->
 
     <!-- Feature Projects - UI (ProductCatalog) -->
     <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\UI\CreateProduct.UI.csproj" />

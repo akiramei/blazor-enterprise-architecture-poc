@@ -2,7 +2,7 @@ using Shared.Application;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
 
-namespace BulkDeleteProducts.Application;
+namespace Application.Features.ProductCatalog.BulkDeleteProducts;
 
 /// <summary>
 /// 商品一括削除Command
@@ -31,10 +31,10 @@ namespace BulkDeleteProducts.Application;
 /// 関連パターン:
 /// - DeleteProduct: 単一削除の場合
 /// </summary>
-public sealed record BulkDeleteProductsCommand(
-    IEnumerable<Guid> ProductIds
-) : ICommand<Result<BulkOperationResult>>
+public sealed record BulkDeleteProductsCommand : ICommand<Result<BulkOperationResult>>
 {
+    public IEnumerable<Guid> ProductIds { get; init; } = Enumerable.Empty<Guid>();
+
     /// <summary>
     /// 冪等性キー（重複実行防止）
     /// </summary>

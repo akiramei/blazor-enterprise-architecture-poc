@@ -7,7 +7,7 @@ using Shared.Application;
 using Shared.Application.Common;
 using Application.Features.ProductCatalog.GetProducts;
 using Application.Features.ProductCatalog.DeleteProduct;
-using BulkDeleteProducts.Application;
+using Application.Features.ProductCatalog.BulkDeleteProducts;
 using ProductCatalog.Shared.Application.DTOs;
 
 namespace ProductCatalog.Shared.UI.Store;
@@ -163,7 +163,10 @@ public sealed class ProductsStore : IDisposable
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-            var command = new BulkDeleteProductsCommand(productIds);
+            var command = new BulkDeleteProductsCommand
+            {
+                ProductIds = productIds
+            };
             var result = await mediator.Send(command, ct);
 
             if (result.IsSuccess)

@@ -22,7 +22,8 @@
       "Bash(fi)",
       "Bash(done)",
       "Bash(powershell -Command:*)",
-      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\Users\\akira\\source\\repos\\VSASample\\scripts\\update-test-namespaces.ps1\")"
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\Users\\akira\\source\\repos\\VSASample\\scripts\\update-test-namespaces.ps1\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

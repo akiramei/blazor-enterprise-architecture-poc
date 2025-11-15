@@ -1,17 +1,16 @@
-﻿using MediatR;
-using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
+using Application.Core.Commands;
 using Shared.Kernel;
 using Domain.ProductCatalog.Products;
 
-namespace BulkDeleteProducts.Application;
+namespace Application.Features.ProductCatalog.BulkDeleteProducts;
 
 /// <summary>
 /// 商品一括削除Handler
 ///
-/// 【パターン: 一括処理Handler】
+/// 【パターン: 一括処理Handler + CommandPipeline】
 ///
 /// 処理フロー:
 /// 1. ProductIdsをループ
@@ -41,33 +40,29 @@ namespace BulkDeleteProducts.Application;
 /// - 1件でも失敗したらロールバックするか、部分的に成功を許すかは要件次第
 /// - 現在の実装: 全件処理して結果を返す（部分成功を許容）
 /// </summary>
-public sealed class BulkDeleteProductsHandler
-    : IRequestHandler<BulkDeleteProductsCommand, Result<BulkOperationResult>>
+public sealed class BulkDeleteProductsCommandHandler
+    : CommandPipeline<BulkDeleteProductsCommand, BulkOperationResult>
 {
     private readonly IProductRepository _repository;
     private readonly IProductNotificationService _notificationService;
-    private readonly ILogger<BulkDeleteProductsHandler> _logger;
 
-    public BulkDeleteProductsHandler(
+    public BulkDeleteProductsCommandHandler(
         IProductRepository repository,
-        IProductNotificationService notificationService,
-        ILogger<BulkDeleteProductsHandler> logger)
+        IProductNotificationService notificationService)
     {
         _repository = repository;
         _notificationService = notificationService;
-        _logger = logger;
     }
 
-    public async Task<Result<BulkOperationResult>> Handle(
+    protected override async Task<Result<BulkOperationResult>> ExecuteAsync(
         BulkDeleteProductsCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
         var productIds = command.ProductIds.ToList();
 
         // バッチサイズ制限（パフォーマンス考慮）
         if (productIds.Count > 100)
         {
-            _logger.LogWarning("一括削除の件数が多すぎます: {Count}件", productIds.Count);
             return Result.Fail<BulkOperationResult>("一括削除は100件までです");
         }
 
@@ -80,20 +75,17 @@ public sealed class BulkDeleteProductsHandler
         var failedCount = 0;
         var errors = new List<string>();
 
-        _logger.LogInformation("一括削除を開始します: {Count}件", productIds.Count);
-
         // 各商品を個別に処理
         foreach (var productId in productIds)
         {
             try
             {
-                var product = await _repository.GetAsync(new ProductId(productId), cancellationToken);
+                var product = await _repository.GetAsync(new ProductId(productId), ct);
 
                 if (product is null)
                 {
                     failedCount++;
                     errors.Add($"商品 {productId}: 見つかりません");
-                    _logger.LogWarning("商品が見つかりません: {ProductId}", productId);
                     continue;
                 }
 
@@ -102,17 +94,15 @@ public sealed class BulkDeleteProductsHandler
                     // ビジネスルール検証（在庫チェックなど）
                     product.Delete();
 
-                    await _repository.SaveAsync(product, cancellationToken);
+                    await _repository.SaveAsync(product, ct);
 
                     succeededCount++;
-                    _logger.LogInformation("商品を削除しました: {ProductId}", productId);
                 }
                 catch (DomainException ex)
                 {
                     // ビジネスルール違反
                     failedCount++;
                     errors.Add($"商品 {productId}: {ex.Message}");
-                    _logger.LogWarning(ex, "商品削除がドメインルールにより拒否されました: {ProductId}", productId);
                 }
             }
             catch (Exception ex)
@@ -120,19 +110,13 @@ public sealed class BulkDeleteProductsHandler
                 // 予期しないエラー
                 failedCount++;
                 errors.Add($"商品 {productId}: システムエラーが発生しました");
-                _logger.LogError(ex, "商品削除中にエラーが発生しました: {ProductId}", productId);
             }
         }
-
-        _logger.LogInformation(
-            "一括削除が完了しました。成功: {Succeeded}件, 失敗: {Failed}件",
-            succeededCount,
-            failedCount);
 
         // SignalRで全クライアントに通知（成功した件数が1件以上の場合）
         if (succeededCount > 0)
         {
-            await _notificationService.NotifyProductChangedAsync(cancellationToken);
+            await _notificationService.NotifyProductChangedAsync(ct);
         }
 
         var result = BulkOperationResult.PartiallySucceeded(succeededCount, failedCount, errors);

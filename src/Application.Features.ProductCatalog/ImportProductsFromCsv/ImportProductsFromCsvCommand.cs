@@ -1,8 +1,8 @@
-using MediatR;
 using Shared.Application;
 using Shared.Application.Common;
+using Shared.Application.Interfaces;
 
-namespace ImportProductsFromCsv.Application;
+namespace Application.Features.ProductCatalog.ImportProductsFromCsv;
 
 /// <summary>
 /// 商品CSV インポートコマンド
@@ -27,6 +27,19 @@ namespace ImportProductsFromCsv.Application;
 /// - メモリ効率のためストリーム処理を使用
 /// - 最大インポート件数制限（例: 1,000件）
 /// </summary>
-public record ImportProductsFromCsvCommand(
-    Stream CsvStream
-) : IRequest<Result<BulkOperationResult>>;
+public record ImportProductsFromCsvCommand : ICommand<Result<BulkOperationResult>>
+{
+    public Stream CsvStream { get; init; } = Stream.Null;
+}
+
+/// <summary>
+/// CSVインポート用DTO
+/// </summary>
+public class ProductCsvImportDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public decimal Price { get; set; }
+    public string? Currency { get; set; }
+    public int Stock { get; set; }
+}

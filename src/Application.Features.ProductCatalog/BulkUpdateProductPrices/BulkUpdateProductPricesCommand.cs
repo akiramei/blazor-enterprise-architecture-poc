@@ -1,8 +1,8 @@
-using Shared.Application.Common;
-using MediatR;
 using Shared.Application;
+using Shared.Application.Common;
+using Shared.Application.Interfaces;
 
-namespace BulkUpdateProductPrices.Application;
+namespace Application.Features.ProductCatalog.BulkUpdateProductPrices;
 
 /// <summary>
 /// 商品価格一括更新コマンド
@@ -25,9 +25,10 @@ namespace BulkUpdateProductPrices.Application;
 /// - エラーが発生した商品は記録するが、他の商品は処理継続
 /// - 最大更新件数制限（例: 100件）
 /// </summary>
-public record BulkUpdateProductPricesCommand(
-    IReadOnlyList<ProductPriceUpdate> Updates
-) : IRequest<Result<BulkOperationResult>>;
+public record BulkUpdateProductPricesCommand : ICommand<Result<BulkOperationResult>>
+{
+    public IReadOnlyList<ProductPriceUpdate> Updates { get; init; } = Array.Empty<ProductPriceUpdate>();
+}
 
 /// <summary>
 /// 商品価格更新情報

@@ -1,8 +1,8 @@
-﻿using MediatR;
 using Shared.Application;
+using Shared.Application.Interfaces;
 using Domain.ProductCatalog.Products;
 
-namespace ExportProductsToCsv.Application;
+namespace Application.Features.ProductCatalog.ExportProductsToCsv;
 
 /// <summary>
 /// 商品一覧CSV エクスポートクエリ
@@ -26,9 +26,10 @@ namespace ExportProductsToCsv.Application;
 /// - ヘッダー行は日本語で出力
 /// - エクスポート上限（例: 10,000件）を設定してメモリ枯渇を防ぐ
 /// </summary>
-public record ExportProductsToCsvQuery(
-    string? NameFilter,
-    decimal? MinPrice,
-    decimal? MaxPrice,
-    ProductStatus? Status
-) : IRequest<Result<byte[]>>;
+public record ExportProductsToCsvQuery : IQuery<Result<byte[]>>
+{
+    public string? NameFilter { get; init; }
+    public decimal? MinPrice { get; init; }
+    public decimal? MaxPrice { get; init; }
+    public ProductStatus? Status { get; init; }
+}

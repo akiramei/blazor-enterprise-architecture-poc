@@ -1,17 +1,16 @@
-﻿using Shared.Application.Common;
-using MediatR;
-using Microsoft.Extensions.Logging;
 using Shared.Application;
+using Shared.Application.Common;
 using Shared.Application.Interfaces;
+using Application.Core.Commands;
 using Shared.Kernel;
 using Domain.ProductCatalog.Products;
 
-namespace BulkUpdateProductPrices.Application;
+namespace Application.Features.ProductCatalog.BulkUpdateProductPrices;
 
 /// <summary>
 /// 商品価格一括更新ハンドラ
 ///
-/// 【パターン: バルク更新 - Handler】
+/// 【パターン: バルク更新 - Handler + CommandPipeline】
 ///
 /// 使用シナリオ:
 /// - 複数商品の価格を一括で更新
@@ -30,32 +29,32 @@ namespace BulkUpdateProductPrices.Application;
 /// - 最大更新件数（100件）チェック
 /// - 成功後に通知サービスを呼ぶ
 /// </summary>
-public class BulkUpdateProductPricesHandler : IRequestHandler<BulkUpdateProductPricesCommand, Result<BulkOperationResult>>
+public class BulkUpdateProductPricesCommandHandler
+    : CommandPipeline<BulkUpdateProductPricesCommand, BulkOperationResult>
 {
     private readonly IProductRepository _repository;
     private readonly IProductNotificationService _notificationService;
-    private readonly ILogger<BulkUpdateProductPricesHandler> _logger;
     private const int MaxUpdateCount = 100;
 
-    public BulkUpdateProductPricesHandler(
+    public BulkUpdateProductPricesCommandHandler(
         IProductRepository repository,
-        IProductNotificationService notificationService,
-        ILogger<BulkUpdateProductPricesHandler> logger)
+        IProductNotificationService notificationService)
     {
         _repository = repository;
         _notificationService = notificationService;
-        _logger = logger;
     }
 
-    public async Task<Result<BulkOperationResult>> Handle(BulkUpdateProductPricesCommand request, CancellationToken cancellationToken)
+    protected override async Task<Result<BulkOperationResult>> ExecuteAsync(
+        BulkUpdateProductPricesCommand command,
+        CancellationToken ct)
     {
         // バリデーション
-        if (!request.Updates.Any())
+        if (!command.Updates.Any())
         {
             return Result.Fail<BulkOperationResult>("更新対象の商品が指定されていません");
         }
 
-        if (request.Updates.Count > MaxUpdateCount)
+        if (command.Updates.Count > MaxUpdateCount)
         {
             return Result.Fail<BulkOperationResult>($"一括更新は{MaxUpdateCount}件までです");
         }
@@ -64,11 +63,11 @@ public class BulkUpdateProductPricesHandler : IRequestHandler<BulkUpdateProductP
         var errors = new List<string>();
 
         // 各商品を更新
-        foreach (var update in request.Updates)
+        foreach (var update in command.Updates)
         {
             try
             {
-                var product = await _repository.GetAsync(new ProductId(update.ProductId), cancellationToken);
+                var product = await _repository.GetAsync(new ProductId(update.ProductId), ct);
 
                 if (product == null)
                 {
@@ -88,15 +87,11 @@ public class BulkUpdateProductPricesHandler : IRequestHandler<BulkUpdateProductP
                 product.ChangePrice(money);
 
                 // 保存
-                await _repository.SaveAsync(product, cancellationToken);
+                await _repository.SaveAsync(product, ct);
                 succeededCount++;
-
-                _logger.LogInformation("商品価格を更新しました: ProductId={ProductId}, NewPrice={NewPrice}",
-                    update.ProductId, update.NewPrice);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "商品ID {ProductId} の価格更新中にエラーが発生しました", update.ProductId);
                 errors.Add($"商品ID {update.ProductId}: {ex.Message}");
             }
         }
@@ -104,11 +99,8 @@ public class BulkUpdateProductPricesHandler : IRequestHandler<BulkUpdateProductP
         // 成功した商品がある場合は通知
         if (succeededCount > 0)
         {
-            await _notificationService.NotifyProductChangedAsync(cancellationToken);
+            await _notificationService.NotifyProductChangedAsync(ct);
         }
-
-        _logger.LogInformation("一括価格更新完了: 成功={SucceededCount}, 失敗={FailedCount}",
-            succeededCount, errors.Count);
 
         return Result.Success(BulkOperationResult.PartiallySucceeded(
             succeededCount,

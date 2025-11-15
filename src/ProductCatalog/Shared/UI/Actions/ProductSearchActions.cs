@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using MediatR;
-using ExportProductsToCsv.Application;
+using Application.Features.ProductCatalog.ExportProductsToCsv;
 using Domain.ProductCatalog.Products;
 using ProductCatalog.Shared.UI.Store;
 
@@ -80,11 +80,13 @@ public sealed class ProductSearchActions
         {
             var productStatus = status.HasValue ? (ProductStatus)status.Value : (ProductStatus?)null;
 
-            var query = new ExportProductsToCsvQuery(
-                nameFilter,
-                minPrice,
-                maxPrice,
-                productStatus);
+            var query = new ExportProductsToCsvQuery
+            {
+                NameFilter = nameFilter,
+                MinPrice = minPrice,
+                MaxPrice = maxPrice,
+                Status = productStatus
+            };
 
             var result = await _mediator.Send(query, ct);
 

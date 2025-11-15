@@ -2,8 +2,8 @@ using Microsoft.Extensions.Logging;
 using MediatR;
 using Shared.Application;
 using Shared.Application.Common;
-using BulkDeleteProducts.Application;
-using ImportProductsFromCsv.Application;
+using Application.Features.ProductCatalog.BulkDeleteProducts;
+using Application.Features.ProductCatalog.ImportProductsFromCsv;
 using ProductCatalog.Shared.UI.Store;
 
 namespace ProductCatalog.Shared.UI.Actions;
@@ -95,7 +95,10 @@ public sealed class ProductListActions
     {
         try
         {
-            var command = new ImportProductsFromCsvCommand(csvStream);
+            var command = new ImportProductsFromCsvCommand
+            {
+                CsvStream = csvStream
+            };
             var result = await _mediator.Send(command, ct);
 
             if (!result.IsSuccess)
