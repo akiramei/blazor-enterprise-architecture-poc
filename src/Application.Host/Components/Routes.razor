@@ -1,0 +1,23 @@
+@using Application.Host.Components.ErrorBoundary
+@using Application.Host.Infrastructure.Providers
+
+<SessionProvider>
+    <ThemeProvider>
+        <Router AppAssembly="typeof(Program).Assembly"
+                AdditionalAssemblies="Program.FeatureUIAssemblies">
+            <Found Context="routeData">
+                <CustomErrorBoundary ShowDetails="@IsDevelopment">
+                    <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
+                </CustomErrorBoundary>
+            </Found>
+        </Router>
+    </ThemeProvider>
+</SessionProvider>
+
+@code {
+    [Inject]
+    private IWebHostEnvironment Environment { get; set; } = default!;
+
+    private bool IsDevelopment => Environment.IsDevelopment();
+}
