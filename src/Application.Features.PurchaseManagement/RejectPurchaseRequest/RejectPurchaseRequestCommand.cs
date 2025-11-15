@@ -11,4 +11,5 @@ public class RejectPurchaseRequestCommand : ICommand<Result<Unit>>
 {
     public Guid RequestId { get; init; }
     public string Reason { get; init; } = string.Empty;
+    public string IdempotencyKey { get; init; } = string.Empty;
 }

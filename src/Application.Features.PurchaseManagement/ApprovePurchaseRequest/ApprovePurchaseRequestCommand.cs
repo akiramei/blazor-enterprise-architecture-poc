@@ -11,4 +11,5 @@ public class ApprovePurchaseRequestCommand : ICommand<Result<Unit>>
 {
     public Guid RequestId { get; init; }
     public string Comment { get; init; } = string.Empty;
+    public string IdempotencyKey { get; init; } = string.Empty;
 }

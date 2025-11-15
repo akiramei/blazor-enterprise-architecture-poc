@@ -1,5 +1,4 @@
 using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
-using Domain.PurchaseManagement.PurchaseRequests.Boundaries.Approval;
 
 namespace Application.Features.PurchaseManagement.ApprovePurchaseRequest;
 
@@ -8,12 +7,19 @@ namespace Application.Features.PurchaseManagement.ApprovePurchaseRequest;
 /// </summary>
 public class ApprovalCommandFactory : IApprovalCommandFactory
 {
-    public IApprovalCommand CreateCommand(ApprovalIntent intent)
+    public object CreateApproveCommand(Guid requestId, string comment, string idempotencyKey)
     {
         return new ApprovePurchaseRequestCommand
         {
-            PurchaseRequestId = intent.PurchaseRequestId,
-            Comments = intent.Comments
+            RequestId = requestId,
+            Comment = comment,
+            IdempotencyKey = idempotencyKey
         };
+    }
+
+    public object CreateRejectCommand(Guid requestId, string reason, string idempotencyKey)
+    {
+        // This factory only handles approve commands
+        throw new NotSupportedException("Use RejectCommandFactory for reject commands");
     }
 }

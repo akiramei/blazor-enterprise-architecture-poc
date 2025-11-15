@@ -145,7 +145,7 @@ public sealed class ProductsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var query = new GetProductByIdQuery(id);
+        var query = new GetProductByIdQuery { ProductId = id };
         var result = await _mediator.Send(query, cancellationToken);
 
         if (!result.IsSuccess || result.Value is null)
@@ -234,13 +234,15 @@ public sealed class ProductsController : ControllerBase
         [FromBody] UpdateProductCommand command,
         CancellationToken cancellationToken = default)
     {
-        var commandWithId = new UpdateProductCommand(
-            id,
-            command.Name,
-            command.Description,
-            command.Price,
-            command.Stock,
-            command.Version);
+        var commandWithId = new UpdateProductCommand
+        {
+            ProductId = id,
+            Name = command.Name,
+            Description = command.Description,
+            Price = command.Price,
+            Stock = command.Stock,
+            Version = command.Version
+        };
 
         var result = await _mediator.Send(commandWithId, cancellationToken);
 
@@ -270,7 +272,7 @@ public sealed class ProductsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var command = new DeleteProductCommand(id);
+        var command = new DeleteProductCommand { ProductId = id };
         var result = await _mediator.Send(command, cancellationToken);
 
         if (!result.IsSuccess)

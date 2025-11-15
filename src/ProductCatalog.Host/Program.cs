@@ -23,7 +23,6 @@ using ProductCatalog.Host.Components;
 using ProductCatalog.Shared.UI.Actions;
 using ProductCatalog.Shared.UI.Store;
 using Serilog;
-using GetProducts.Application;
 using Shared.Infrastructure.Platform.Persistence;
 using PurchaseManagement.Infrastructure;
 using Hangfire;

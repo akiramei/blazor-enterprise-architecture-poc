@@ -41,14 +41,18 @@ public class PurchaseRequestItemDto
     public decimal UnitPrice { get; init; }
     public int Quantity { get; init; }
     public decimal Amount { get; init; }
+    public string Currency { get; init; } = "JPY";
 }
 
 public class ApprovalStepDto
 {
     public int StepNumber { get; init; }
+    public Guid ApproverId { get; init; }
     public string ApproverName { get; init; } = string.Empty;
     public string ApproverRole { get; init; } = string.Empty;
     public int Status { get; init; }
+    public string StatusName { get; init; } = string.Empty;
     public string? Comment { get; init; }
     public DateTime? ApprovedAt { get; init; }
+    public DateTime? RejectedAt { get; init; }
 }

@@ -99,7 +99,6 @@ public sealed class PurchaseRequestsController : ControllerBase
         var query = new GetPurchaseRequestsQuery
         {
             Status = status,
-            RequesterId = requesterId,
             PageNumber = pageNumber,
             PageSize = pageSize,
             SortBy = sortBy,
@@ -284,7 +283,7 @@ public sealed class PurchaseRequestsController : ControllerBase
         // Ensure the ID from route matches the command
         var commandWithId = new CancelPurchaseRequestCommand
         {
-            PurchaseRequestId = id,
+            RequestId = id,
             Reason = command.Reason
         };
 
