@@ -64,44 +64,32 @@ builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>(
 // MediatR - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddMediatR(cfg =>
 {
-    // ProductCatalog BC (既存) ※CreateProduct, GetProducts, Update, Delete, GetByIdは新版に移行済み
-    // cfg.RegisterServicesFromAssembly(typeof(GetProductsHandler).Assembly); // 新版に移行
-    // cfg.RegisterServicesFromAssembly(typeof(GetProductById.Application.GetProductByIdHandler).Assembly); // 新版に移行
-    // cfg.RegisterServicesFromAssembly(typeof(CreateProduct.Application.CreateProductHandler).Assembly); // 新版に移行
-    // cfg.RegisterServicesFromAssembly(typeof(UpdateProduct.Application.UpdateProductHandler).Assembly); // 新版に移行
-    // cfg.RegisterServicesFromAssembly(typeof(DeleteProduct.Application.DeleteProductHandler).Assembly); // 新版に移行
-    cfg.RegisterServicesFromAssembly(typeof(SearchProducts.Application.SearchProductsHandler).Assembly);
+    // ProductCatalog BC (未移行の4機能のみ旧版)
     cfg.RegisterServicesFromAssembly(typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly);
 
-    // ProductCatalog BC (工業製品化版 - 新規)
+    // ProductCatalog BC (工業製品化版 - 6機能)
     cfg.RegisterServicesFromAssembly(typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly);
 
-    // PurchaseManagement BC (工業製品化版 - 新規) ※既存は削除
+    // PurchaseManagement BC (工業製品化版 - 9機能)
     cfg.RegisterServicesFromAssembly(typeof(Application.Features.PurchaseManagement.SubmitPurchaseRequest.SubmitPurchaseRequestCommandHandler).Assembly);
 });
 
 // FluentValidation - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddValidatorsFromAssemblies(new[]
 {
-    // ProductCatalog BC (既存) ※新版に移行済み
-    // typeof(GetProductsHandler).Assembly, // 新版に移行
-    // typeof(GetProductById.Application.GetProductByIdHandler).Assembly, // 新版に移行
-    // typeof(CreateProduct.Application.CreateProductHandler).Assembly, // 新版に移行
-    // typeof(UpdateProduct.Application.UpdateProductHandler).Assembly, // 新版に移行
-    // typeof(DeleteProduct.Application.DeleteProductHandler).Assembly, // 新版に移行
-    typeof(SearchProducts.Application.SearchProductsHandler).Assembly,
+    // ProductCatalog BC (未移行の4機能のみ旧版)
     typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly,
     typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly,
     typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly,
     typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly,
 
-    // ProductCatalog BC (工業製品化版)
+    // ProductCatalog BC (工業製品化版 - 6機能)
     typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly,
 
-    // PurchaseManagement BC (工業製品化版) ※既存は削除
+    // PurchaseManagement BC (工業製品化版 - 9機能)
     typeof(Application.Features.PurchaseManagement.SubmitPurchaseRequest.SubmitPurchaseRequestCommandHandler).Assembly
 });
 

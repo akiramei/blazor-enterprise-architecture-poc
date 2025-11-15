@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Common;
-using GetProducts.Application;
-using DeleteProduct.Application;
+using Application.Features.ProductCatalog.GetProducts;
+using Application.Features.ProductCatalog.DeleteProduct;
 using BulkDeleteProducts.Application;
 using ProductCatalog.Shared.Application.DTOs;
 

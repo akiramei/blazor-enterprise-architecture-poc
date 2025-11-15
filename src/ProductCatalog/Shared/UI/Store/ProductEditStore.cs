@@ -3,8 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
-using UpdateProduct.Application;
-using GetProductById.Application;
+using Application.Features.ProductCatalog.UpdateProduct;
+using Application.Features.ProductCatalog.GetProductById;
 
 namespace ProductCatalog.Shared.UI.Store;
 

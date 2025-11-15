@@ -9,20 +9,18 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
     <PackageReference Include="MediatR" Version="13.1.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Shared\Application\Shared.Application.csproj" />
     <ProjectReference Include="..\Application\ProductCatalog.Shared.Application.csproj" />
     <ProjectReference Include="..\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
-    <ProjectReference Include="..\..\Features\GetProducts\Application\GetProducts.Application.csproj" />
-    <ProjectReference Include="..\..\Features\DeleteProduct\Application\DeleteProduct.Application.csproj" />
+    <!-- 工業製品化版への参照 -->
+    <ProjectReference Include="..\..\..\Application.Features.ProductCatalog\Application.Features.ProductCatalog.csproj" />
+    <!-- 未移行機能は旧版のまま -->
     <ProjectReference Include="..\..\Features\BulkDeleteProducts\Application\BulkDeleteProducts.Application.csproj" />
-    <ProjectReference Include="..\..\Features\GetProductById\Application\GetProductById.Application.csproj" />
-    <ProjectReference Include="..\..\Features\UpdateProduct\Application\UpdateProduct.Application.csproj" />
-    <ProjectReference Include="..\..\Features\SearchProducts\Application\SearchProducts.Application.csproj" />
     <ProjectReference Include="..\..\Features\ImportProductsFromCsv\Application\ImportProductsFromCsv.Application.csproj" />
     <ProjectReference Include="..\..\Features\ExportProductsToCsv\Application\ExportProductsToCsv.Application.csproj" />
   </ItemGroup>

@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\GetPendingApprovals\Application\GetPendingApprovals.Application.csproj" />
     <ProjectReference Include="..\..\GetDashboardStatistics\Application\GetDashboardStatistics.Application.csproj" />
     <ProjectReference Include="..\..\UploadAttachment\Application\UploadAttachment.Application.csproj" />
+    <ProjectReference Include="..\..\..\..\Application.Features.PurchaseManagement\Application.Features.PurchaseManagement.csproj" />
   </ItemGroup>
 
 </Project>

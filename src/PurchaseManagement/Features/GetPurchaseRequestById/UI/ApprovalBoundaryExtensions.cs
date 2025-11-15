@@ -1,4 +1,4 @@
-﻿using GetPurchaseRequestById.Application;
+﻿using Application.Features.PurchaseManagement.GetPurchaseRequestById;
 using Domain.PurchaseManagement.PurchaseRequests;
 using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
 using Shared.Kernel;

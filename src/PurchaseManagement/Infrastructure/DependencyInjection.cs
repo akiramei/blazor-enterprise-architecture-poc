@@ -55,8 +55,8 @@ public static class DependencyInjection
         services.AddScoped<IApprovalCommandFactory>(sp =>
         {
             // Composite Factoryを使用して、承認と却下の両方のコマンドを生成可能にする
-            var approveFactory = new ApprovePurchaseRequest.Application.ApprovalCommandFactory();
-            var rejectFactory = new RejectPurchaseRequest.Application.RejectCommandFactory();
+            var approveFactory = new Application.Features.PurchaseManagement.ApprovePurchaseRequest.ApprovalCommandFactory();
+            var rejectFactory = new Application.Features.PurchaseManagement.RejectPurchaseRequest.RejectCommandFactory();
             return new CompositeApprovalCommandFactory(approveFactory, rejectFactory);
         });
 

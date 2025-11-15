@@ -6,15 +6,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Domain.Identity;
-using SubmitPurchaseRequest.Application;
-using ApprovePurchaseRequest.Application;
-using RejectPurchaseRequest.Application;
-using CancelPurchaseRequest.Application;
-using GetPurchaseRequests.Application;
-using GetPurchaseRequestById.Application;
-using GetPendingApprovals.Application;
-using GetDashboardStatistics.Application;
-using UploadAttachment.Application;
+using Application.Features.PurchaseManagement.SubmitPurchaseRequest;
+using Application.Features.PurchaseManagement.ApprovePurchaseRequest;
+using Application.Features.PurchaseManagement.RejectPurchaseRequest;
+using Application.Features.PurchaseManagement.CancelPurchaseRequest;
+using Application.Features.PurchaseManagement.GetPurchaseRequests;
+using Application.Features.PurchaseManagement.GetPurchaseRequestById;
+using Application.Features.PurchaseManagement.GetPendingApprovals;
+using Application.Features.PurchaseManagement.GetDashboardStatistics;
+using Application.Features.PurchaseManagement.UploadAttachment;
 
 namespace PurchaseManagement.Features.Api.V1.PurchaseRequests;
 
