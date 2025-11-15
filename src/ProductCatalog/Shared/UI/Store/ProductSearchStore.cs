@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
-using Application.Features.ProductCatalog.SearchProducts;
+using Application.Features.SearchProducts;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Shared.UI.Store;

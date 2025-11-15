@@ -83,7 +83,7 @@
 
     <ProjectReference Include="..\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
     <ProjectReference Include="..\Shared\Abstractions\Shared.Abstractions.csproj" />
-    <ProjectReference Include="..\Application.Features.PurchaseManagement\Application.Features.PurchaseManagement.csproj" />
-    <ProjectReference Include="..\Application.Features.ProductCatalog\Application.Features.ProductCatalog.csproj" />
+    <!-- フラット構造のApplication.Features (全19機能) -->
+    <ProjectReference Include="..\Application.Features\Application.Features.csproj" />
   </ItemGroup>
 </Project>

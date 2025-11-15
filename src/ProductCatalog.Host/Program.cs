@@ -63,21 +63,15 @@ builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>(
 // MediatR - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddMediatR(cfg =>
 {
-    // ProductCatalog BC (工業製品化版 - 10機能すべて完了)
-    cfg.RegisterServicesFromAssembly(typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly);
-
-    // PurchaseManagement BC (工業製品化版 - 9機能)
-    cfg.RegisterServicesFromAssembly(typeof(Application.Features.PurchaseManagement.SubmitPurchaseRequest.SubmitPurchaseRequestCommandHandler).Assembly);
+    // All Features (フラット構造 - 19機能)
+    cfg.RegisterServicesFromAssembly(typeof(Application.Features.CreateProduct.CreateProductCommandHandler).Assembly);
 });
 
 // FluentValidation - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddValidatorsFromAssemblies(new[]
 {
-    // ProductCatalog BC (工業製品化版 - 10機能すべて完了)
-    typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly,
-
-    // PurchaseManagement BC (工業製品化版 - 9機能)
-    typeof(Application.Features.PurchaseManagement.SubmitPurchaseRequest.SubmitPurchaseRequestCommandHandler).Assembly
+    // All Features (フラット構造 - 19機能)
+    typeof(Application.Features.CreateProduct.CreateProductCommandHandler).Assembly
 });
 
 // Pipeline Behaviors（登録順序が重要！）

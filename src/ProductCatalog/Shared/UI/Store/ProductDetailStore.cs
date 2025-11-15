@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
-using Application.Features.ProductCatalog.GetProductById;
+using Application.Features.GetProductById;
 
 namespace ProductCatalog.Shared.UI.Store;
 

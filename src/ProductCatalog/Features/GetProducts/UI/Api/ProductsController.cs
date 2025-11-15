@@ -5,12 +5,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Common;
-using Application.Features.ProductCatalog.CreateProduct;
-using Application.Features.ProductCatalog.DeleteProduct;
-using Application.Features.ProductCatalog.GetProductById;
-using Application.Features.ProductCatalog.GetProducts;
-using Application.Features.ProductCatalog.SearchProducts;
-using Application.Features.ProductCatalog.UpdateProduct;
+using Application.Features.CreateProduct;
+using Application.Features.DeleteProduct;
+using Application.Features.GetProductById;
+using Application.Features.GetProducts;
+using Application.Features.SearchProducts;
+using Application.Features.UpdateProduct;
 using ProductCatalog.Shared.Application.DTOs;
 
 namespace ProductCatalog.Features.Api.V1.Products;

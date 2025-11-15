@@ -5,9 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shared.Application;
 using Shared.Application.Common;
-using Application.Features.ProductCatalog.GetProducts;
-using Application.Features.ProductCatalog.DeleteProduct;
-using Application.Features.ProductCatalog.BulkDeleteProducts;
+using Application.Features.GetProducts;
+using Application.Features.DeleteProduct;
+using Application.Features.BulkDeleteProducts;
 using ProductCatalog.Shared.Application.DTOs;
 
 namespace ProductCatalog.Shared.UI.Store;

@@ -4,9 +4,9 @@
 @using Shared.Domain.Identity
 @using ProductCatalog.Shared.UI.Store
 @using ProductCatalog.Shared.UI.Actions
-@using Application.Features.ProductCatalog.GetProducts
+@using Application.Features.GetProducts
 @using GetProducts.UI.Components
-@using Application.Features.ProductCatalog.BulkDeleteProducts
+@using Application.Features.BulkDeleteProducts
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = Shared.Domain.Identity.Roles.Admin)]
 @inject ProductsStore Store
 @inject ProductListActions Actions

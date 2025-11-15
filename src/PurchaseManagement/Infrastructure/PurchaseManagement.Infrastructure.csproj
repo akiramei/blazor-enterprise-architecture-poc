@@ -4,7 +4,8 @@
     <ProjectReference Include="..\Shared\Domain\PurchaseManagement.Shared.Domain.csproj" />
     <ProjectReference Include="..\Shared\Application\PurchaseManagement.Shared.Application.csproj" />
     <ProjectReference Include="..\..\Shared\Infrastructure\Shared.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\Application.Features.PurchaseManagement\Application.Features.PurchaseManagement.csproj" />
+    <!-- フラット構造のApplication.Features -->
+    <ProjectReference Include="..\..\Application.Features\Application.Features.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,8 +2,8 @@ using Microsoft.Extensions.Logging;
 using MediatR;
 using Shared.Application;
 using Shared.Application.Common;
-using Application.Features.ProductCatalog.BulkDeleteProducts;
-using Application.Features.ProductCatalog.ImportProductsFromCsv;
+using Application.Features.BulkDeleteProducts;
+using Application.Features.ImportProductsFromCsv;
 using ProductCatalog.Shared.UI.Store;
 
 namespace ProductCatalog.Shared.UI.Actions;
