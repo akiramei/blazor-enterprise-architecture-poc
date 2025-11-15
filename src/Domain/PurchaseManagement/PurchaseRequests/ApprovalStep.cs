@@ -21,7 +21,11 @@ public class ApprovalStep : Entity
     public bool IsApproved => Status == ApprovalStepStatus.Approved;
     public bool IsRejected => Status == ApprovalStepStatus.Rejected;
 
-    private ApprovalStep() { } // For EF Core
+    /// <summary>
+    /// パラメータレスコンストラクタ
+    /// オブジェクト再構成時に使用
+    /// </summary>
+    private ApprovalStep() { }
 
     public ApprovalStep(int stepNumber, Guid approverId, string approverName, string approverRole)
     {

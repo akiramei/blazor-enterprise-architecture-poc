@@ -14,7 +14,11 @@ public class PurchaseRequestItem : Entity
     public int Quantity { get; init; }
     public Money Amount { get; init; } = null!;
 
-    private PurchaseRequestItem() { } // For EF Core
+    /// <summary>
+    /// パラメータレスコンストラクタ
+    /// オブジェクト再構成時に使用
+    /// </summary>
+    private PurchaseRequestItem() { }
 
     public static PurchaseRequestItem Create(Guid productId, string productName, decimal unitPrice, int quantity)
     {

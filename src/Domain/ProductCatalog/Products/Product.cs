@@ -56,7 +56,10 @@ public sealed class Product : AggregateRoot<ProductId>
     public bool IsDeleted => _isDeleted;
 
     /// <summary>
-    /// EF Core用のパラメータレスコンストラクタ
+    /// <summary>
+    /// パラメータレスコンストラクタ
+    /// オブジェクト再構成時に使用
+    /// </summary>
     /// </summary>
     private Product()
     {

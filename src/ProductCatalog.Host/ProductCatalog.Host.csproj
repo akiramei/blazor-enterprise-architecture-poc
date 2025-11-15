@@ -22,14 +22,14 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.0" />
 
     <!-- Entity Framework Core -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
 
     <!-- Dapper -->
-    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Dapper" Version="2.1.66" />
 
     <!-- ASP.NET Core Identity -->
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
@@ -63,10 +63,10 @@
     <ProjectReference Include="..\PurchaseManagement\Infrastructure\PurchaseManagement.Infrastructure.csproj" />
 
     <!-- Feature Projects - Application (ProductCatalog) -->
-    <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\Application\CreateProduct.Application.csproj" />
+    <!-- <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\Application\CreateProduct.Application.csproj" /> --> <!-- 工業製品化版に移行 -->
     <ProjectReference Include="..\ProductCatalog\Features\UpdateProduct\Application\UpdateProduct.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\DeleteProduct\Application\DeleteProduct.Application.csproj" />
-    <ProjectReference Include="..\ProductCatalog\Features\GetProducts\Application\GetProducts.Application.csproj" />
+    <!-- <ProjectReference Include="..\ProductCatalog\Features\GetProducts\Application\GetProducts.Application.csproj" /> --> <!-- 工業製品化版に移行 -->
     <ProjectReference Include="..\ProductCatalog\Features\GetProductById\Application\GetProductById.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\SearchProducts\Application\SearchProducts.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\BulkDeleteProducts\Application\BulkDeleteProducts.Application.csproj" />
@@ -74,12 +74,12 @@
     <ProjectReference Include="..\ProductCatalog\Features\ExportProductsToCsv\Application\ExportProductsToCsv.Application.csproj" />
     <ProjectReference Include="..\ProductCatalog\Features\ImportProductsFromCsv\Application\ImportProductsFromCsv.Application.csproj" />
 
-    <!-- Feature Projects - Application (PurchaseManagement) -->
-    <ProjectReference Include="..\PurchaseManagement\Features\SubmitPurchaseRequest\Application\SubmitPurchaseRequest.Application.csproj" />
-    <ProjectReference Include="..\PurchaseManagement\Features\ApprovePurchaseRequest\Application\ApprovePurchaseRequest.Application.csproj" />
-    <ProjectReference Include="..\PurchaseManagement\Features\RejectPurchaseRequest\Application\RejectPurchaseRequest.Application.csproj" />
-    <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequests\Application\GetPurchaseRequests.Application.csproj" />
-    <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequestById\Application\GetPurchaseRequestById.Application.csproj" />
+    <!-- Feature Projects - Application (PurchaseManagement) ※工業製品化版に移行済み -->
+    <!-- <ProjectReference Include="..\PurchaseManagement\Features\SubmitPurchaseRequest\Application\SubmitPurchaseRequest.Application.csproj" /> -->
+    <!-- <ProjectReference Include="..\PurchaseManagement\Features\ApprovePurchaseRequest\Application\ApprovePurchaseRequest.Application.csproj" /> -->
+    <!-- <ProjectReference Include="..\PurchaseManagement\Features\RejectPurchaseRequest\Application\RejectPurchaseRequest.Application.csproj" /> -->
+    <!-- <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequests\Application\GetPurchaseRequests.Application.csproj" /> -->
+    <!-- <ProjectReference Include="..\PurchaseManagement\Features\GetPurchaseRequestById\Application\GetPurchaseRequestById.Application.csproj" /> -->
 
     <!-- Feature Projects - UI (ProductCatalog) -->
     <ProjectReference Include="..\ProductCatalog\Features\CreateProduct\UI\CreateProduct.UI.csproj" />
@@ -100,5 +100,7 @@
 
     <ProjectReference Include="..\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
     <ProjectReference Include="..\Shared\Abstractions\Shared.Abstractions.csproj" />
+    <ProjectReference Include="..\Application.Features.PurchaseManagement\Application.Features.PurchaseManagement.csproj" />
+    <ProjectReference Include="..\Application.Features.ProductCatalog\Application.Features.ProductCatalog.csproj" />
   </ItemGroup>
 </Project>

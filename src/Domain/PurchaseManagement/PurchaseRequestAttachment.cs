@@ -127,7 +127,10 @@ public sealed class PurchaseRequestAttachment : Entity, IMultiTenant
     /// </summary>
     public DateTime? DeletedAt { get; private set; }
 
-    // EF Core用のプライベートコンストラクタ
+    /// <summary>
+    /// パラメータレスコンストラクタ
+    /// オブジェクト再構成時に使用
+    /// </summary>
     private PurchaseRequestAttachment() { }
 
     /// <summary>

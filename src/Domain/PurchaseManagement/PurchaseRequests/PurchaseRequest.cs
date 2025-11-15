@@ -49,7 +49,17 @@ public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
     // ビジネスルール: 金額制限
     private const decimal MaxRequestAmount = 1_000_000m; // 100万円
 
-    private PurchaseRequest() { } // For EF Core
+    /// <summary>
+    /// パラメータレスコンストラクタ
+    /// オブジェクトの再構成時に使用（デシリアライズ、マッピング等）
+    /// </summary>
+    private PurchaseRequest()
+    {
+        // コレクションの初期化（ドメインルール）
+        _approvalSteps = new List<ApprovalStep>();
+        _items = new List<PurchaseRequestItem>();
+        _attachments = new List<PurchaseRequestAttachment>();
+    }
 
     #region ファクトリメソッド
 

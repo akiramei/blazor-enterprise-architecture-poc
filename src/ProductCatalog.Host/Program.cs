@@ -64,55 +64,45 @@ builder.Services.AddSingleton<Shared.Infrastructure.Metrics.ApplicationMetrics>(
 // MediatR - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddMediatR(cfg =>
 {
-    // ProductCatalog BC
-    cfg.RegisterServicesFromAssembly(typeof(GetProductsHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(GetProductById.Application.GetProductByIdHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(CreateProduct.Application.CreateProductHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(UpdateProduct.Application.UpdateProductHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(DeleteProduct.Application.DeleteProductHandler).Assembly);
+    // ProductCatalog BC (既存) ※CreateProduct, GetProducts, Update, Delete, GetByIdは新版に移行済み
+    // cfg.RegisterServicesFromAssembly(typeof(GetProductsHandler).Assembly); // 新版に移行
+    // cfg.RegisterServicesFromAssembly(typeof(GetProductById.Application.GetProductByIdHandler).Assembly); // 新版に移行
+    // cfg.RegisterServicesFromAssembly(typeof(CreateProduct.Application.CreateProductHandler).Assembly); // 新版に移行
+    // cfg.RegisterServicesFromAssembly(typeof(UpdateProduct.Application.UpdateProductHandler).Assembly); // 新版に移行
+    // cfg.RegisterServicesFromAssembly(typeof(DeleteProduct.Application.DeleteProductHandler).Assembly); // 新版に移行
     cfg.RegisterServicesFromAssembly(typeof(SearchProducts.Application.SearchProductsHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly);
     cfg.RegisterServicesFromAssembly(typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly);
 
-    // PurchaseManagement BC
-    cfg.RegisterServicesFromAssembly(typeof(SubmitPurchaseRequest.Application.SubmitPurchaseRequestHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(ApprovePurchaseRequest.Application.ApprovePurchaseRequestHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(RejectPurchaseRequest.Application.RejectPurchaseRequestHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(CancelPurchaseRequest.Application.CancelPurchaseRequestHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(GetPendingApprovals.Application.GetPendingApprovalsHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(GetDashboardStatistics.Application.GetDashboardStatisticsHandler).Assembly);
-    cfg.RegisterServicesFromAssembly(typeof(UploadAttachment.Application.UploadAttachmentHandler).Assembly);
+    // ProductCatalog BC (工業製品化版 - 新規)
+    cfg.RegisterServicesFromAssembly(typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly);
+
+    // PurchaseManagement BC (工業製品化版 - 新規) ※既存は削除
+    cfg.RegisterServicesFromAssembly(typeof(Application.Features.PurchaseManagement.SubmitPurchaseRequest.SubmitPurchaseRequestCommandHandler).Assembly);
 });
 
 // FluentValidation - すべてのFeature Applicationアセンブリを登録
 builder.Services.AddValidatorsFromAssemblies(new[]
 {
-    // ProductCatalog BC
-    typeof(GetProductsHandler).Assembly,
-    typeof(GetProductById.Application.GetProductByIdHandler).Assembly,
-    typeof(CreateProduct.Application.CreateProductHandler).Assembly,
-    typeof(UpdateProduct.Application.UpdateProductHandler).Assembly,
-    typeof(DeleteProduct.Application.DeleteProductHandler).Assembly,
+    // ProductCatalog BC (既存) ※新版に移行済み
+    // typeof(GetProductsHandler).Assembly, // 新版に移行
+    // typeof(GetProductById.Application.GetProductByIdHandler).Assembly, // 新版に移行
+    // typeof(CreateProduct.Application.CreateProductHandler).Assembly, // 新版に移行
+    // typeof(UpdateProduct.Application.UpdateProductHandler).Assembly, // 新版に移行
+    // typeof(DeleteProduct.Application.DeleteProductHandler).Assembly, // 新版に移行
     typeof(SearchProducts.Application.SearchProductsHandler).Assembly,
     typeof(BulkDeleteProducts.Application.BulkDeleteProductsHandler).Assembly,
     typeof(BulkUpdateProductPrices.Application.BulkUpdateProductPricesHandler).Assembly,
     typeof(ExportProductsToCsv.Application.ExportProductsToCsvHandler).Assembly,
     typeof(ImportProductsFromCsv.Application.ImportProductsFromCsvHandler).Assembly,
 
-    // PurchaseManagement BC
-    typeof(SubmitPurchaseRequest.Application.SubmitPurchaseRequestHandler).Assembly,
-    typeof(ApprovePurchaseRequest.Application.ApprovePurchaseRequestHandler).Assembly,
-    typeof(RejectPurchaseRequest.Application.RejectPurchaseRequestHandler).Assembly,
-    typeof(CancelPurchaseRequest.Application.CancelPurchaseRequestHandler).Assembly,
-    typeof(GetPurchaseRequests.Application.GetPurchaseRequestsHandler).Assembly,
-    typeof(GetPurchaseRequestById.Application.GetPurchaseRequestByIdHandler).Assembly,
-    typeof(GetPendingApprovals.Application.GetPendingApprovalsHandler).Assembly,
-    typeof(GetDashboardStatistics.Application.GetDashboardStatisticsHandler).Assembly,
-    typeof(UploadAttachment.Application.UploadAttachmentHandler).Assembly
+    // ProductCatalog BC (工業製品化版)
+    typeof(Application.Features.ProductCatalog.CreateProduct.CreateProductCommandHandler).Assembly,
+
+    // PurchaseManagement BC (工業製品化版) ※既存は削除
+    typeof(Application.Features.PurchaseManagement.SubmitPurchaseRequest.SubmitPurchaseRequestCommandHandler).Assembly
 });
 
 // Pipeline Behaviors（登録順序が重要！）

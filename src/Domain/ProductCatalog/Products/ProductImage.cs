@@ -46,7 +46,10 @@ public sealed class ProductImage : Entity
     public int DisplayOrder => _displayOrder;
 
     /// <summary>
-    /// EF Core用のパラメータレスコンストラクタ
+    /// <summary>
+    /// パラメータレスコンストラクタ
+    /// オブジェクト再構成時に使用
+    /// </summary>
     /// </summary>
     private ProductImage()
     {
