@@ -68,6 +68,7 @@ public sealed class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly ITotpService _totpService;
     private readonly PlatformDbContext _dbContext;
     private readonly ILogger<AuthController> _logger;
 
@@ -75,12 +76,14 @@ public sealed class AuthController : ControllerBase
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IJwtTokenGenerator jwtTokenGenerator,
+        ITotpService totpService,
         PlatformDbContext dbContext,
         ILogger<AuthController> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _totpService = totpService;
         _dbContext = dbContext;
         _logger = logger;
     }
@@ -88,9 +91,15 @@ public sealed class AuthController : ControllerBase
     /// <summary>
     /// ログイン
     /// </summary>
+    /// <remarks>
+    /// 2FA対応のログインフロー:
+    /// 1. パスワード検証成功 + 2FA無効 → トークン発行
+    /// 2. パスワード検証成功 + 2FA有効 + 2FAコード未提供 → Requires2FA=trueを返す
+    /// 3. パスワード検証成功 + 2FA有効 + 2FAコード提供 → コード検証後トークン発行
+    /// </remarks>
     /// <param name="request">ログインリクエスト</param>
     /// <param name="cancellationToken">キャンセルトークン</param>
-    /// <returns>Access TokenとRefresh Token</returns>
+    /// <returns>Access TokenとRefresh Token、または2FA要求</returns>
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -126,6 +135,72 @@ public sealed class AuthController : ControllerBase
             });
         }
 
+        // ============================================
+        // 二要素認証（2FA）検証
+        // ============================================
+
+        if (user.IsTwoFactorEnabled)
+        {
+            // 2FAコード未提供 → 2FA要求レスポンス
+            if (string.IsNullOrEmpty(request.TwoFactorCode))
+            {
+                _logger.LogInformation("2FA required. UserId={UserId}", user.Id);
+                return Ok(new LoginResponse
+                {
+                    Requires2FA = true
+                });
+            }
+
+            // リカバリーコード検証
+            if (request.IsRecoveryCode)
+            {
+                var recoveryCode = await _dbContext.TwoFactorRecoveryCodes
+                    .FirstOrDefaultAsync(c =>
+                        c.UserId == user.Id && !c.IsUsed,
+                        cancellationToken);
+
+                if (recoveryCode is null || !recoveryCode.Verify(request.TwoFactorCode))
+                {
+                    _logger.LogWarning("Login failed: Invalid recovery code. UserId={UserId}", user.Id);
+                    return Unauthorized(new ProblemDetails
+                    {
+                        Title = "Authentication failed",
+                        Detail = "Invalid recovery code",
+                        Status = StatusCodes.Status401Unauthorized
+                    });
+                }
+
+                // リカバリーコードを使用済みとしてマーク
+                recoveryCode.MarkAsUsed();
+                user.TwoFactorRecoveryCodesRemaining = Math.Max(0, user.TwoFactorRecoveryCodesRemaining - 1);
+                await _userManager.UpdateAsync(user);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation("Login with recovery code successful. UserId={UserId}", user.Id);
+            }
+            // TOTPコード検証
+            else
+            {
+                if (string.IsNullOrEmpty(user.TwoFactorSecretKey) ||
+                    !_totpService.ValidateCode(user.TwoFactorSecretKey, request.TwoFactorCode))
+                {
+                    _logger.LogWarning("Login failed: Invalid 2FA code. UserId={UserId}", user.Id);
+                    return Unauthorized(new ProblemDetails
+                    {
+                        Title = "Authentication failed",
+                        Detail = "Invalid two-factor authentication code",
+                        Status = StatusCodes.Status401Unauthorized
+                    });
+                }
+
+                _logger.LogInformation("Login with 2FA code successful. UserId={UserId}", user.Id);
+            }
+        }
+
+        // ============================================
+        // トークン生成（パスワード検証成功 + 2FA検証成功またはスキップ）
+        // ============================================
+
         // JWT Access Token生成
         var accessToken = await _jwtTokenGenerator.GenerateAccessTokenAsync(user);
         var refreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
@@ -151,7 +226,8 @@ public sealed class AuthController : ControllerBase
             ExpiresAt = DateTime.UtcNow.AddMinutes(15), // appsettings.jsonから取得すべきだが簡易実装
             UserId = user.Id,
             Email = user.Email!,
-            Roles = roles.ToList()
+            Roles = roles.ToList(),
+            Requires2FA = false
         });
     }
 
@@ -245,5 +321,208 @@ public sealed class AuthController : ControllerBase
             RefreshToken = newRefreshTokenValue,
             ExpiresAt = DateTime.UtcNow.AddMinutes(15)
         });
+    }
+
+    // ============================================
+    // 二要素認証（2FA）エンドポイント
+    // ============================================
+
+    /// <summary>
+    /// 2FA有効化の準備（QRコード取得）
+    /// </summary>
+    /// <remarks>
+    /// 認証済みユーザーが2FA設定を開始します。
+    /// - TOTP秘密鍵を生成
+    /// - QRコードURIを返す（認証アプリでスキャン）
+    /// - リカバリーコードを生成（緊急時用）
+    ///
+    /// 次のステップ: `/api/v1/auth/2fa/verify` で6桁コードを検証し、2FA有効化を確定
+    /// </remarks>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>QRコードURIとリカバリーコード</returns>
+    [HttpPost("2fa/enable")]
+    [Authorize] // 認証済みユーザーのみアクセス可能
+    [ProducesResponseType(typeof(Enable2FAResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<Enable2FAResponse>> Enable2FA(
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            _logger.LogWarning("2FA enable failed: User not found");
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "User not found",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        // 既に2FA有効の場合はエラー
+        if (user.IsTwoFactorEnabled)
+        {
+            _logger.LogWarning("2FA enable failed: Already enabled. UserId={UserId}", user.Id);
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA setup failed",
+                Detail = "Two-factor authentication is already enabled",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        // TOTP秘密鍵生成
+        var secretKey = _totpService.GenerateSecretKey();
+        user.TwoFactorSecretKey = secretKey; // TODO: セキュリティ強化版では暗号化して保存
+        await _userManager.UpdateAsync(user);
+
+        // QRコードURI生成
+        var qrCodeUri = _totpService.GenerateQrCodeUri(user.Email!, secretKey);
+
+        // リカバリーコード生成
+        var recoveryCodes = _totpService.GenerateRecoveryCodes(count: 10);
+        foreach (var code in recoveryCodes)
+        {
+            var recoveryCode = TwoFactorRecoveryCode.Create(user.Id, code);
+            _dbContext.TwoFactorRecoveryCodes.Add(recoveryCode);
+        }
+
+        user.TwoFactorRecoveryCodesRemaining = recoveryCodes.Count;
+        await _userManager.UpdateAsync(user);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("2FA setup initiated. UserId={UserId}", user.Id);
+
+        return Ok(new Enable2FAResponse(secretKey, qrCodeUri, recoveryCodes));
+    }
+
+    /// <summary>
+    /// 2FA有効化の確定（TOTPコード検証）
+    /// </summary>
+    /// <remarks>
+    /// 認証アプリで生成された6桁のコードを検証し、2FA有効化を確定します。
+    /// - コードが正しい場合、2FAが有効化されます
+    /// - 次回ログインから2FAが必須になります
+    /// </remarks>
+    /// <param name="request">6桁のTOTPコード</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>成功メッセージ</returns>
+    [HttpPost("2fa/verify")]
+    [Authorize] // 認証済みユーザーのみアクセス可能
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> Verify2FA(
+        [FromBody] Verify2FARequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            _logger.LogWarning("2FA verify failed: User not found");
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "User not found",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        // 秘密鍵が設定されているか確認
+        if (string.IsNullOrEmpty(user.TwoFactorSecretKey))
+        {
+            _logger.LogWarning("2FA verify failed: Secret key not set. UserId={UserId}", user.Id);
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA verification failed",
+                Detail = "2FA setup not initiated. Please call /api/v1/auth/2fa/enable first",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        // TOTPコード検証
+        if (!_totpService.ValidateCode(user.TwoFactorSecretKey, request.Code))
+        {
+            _logger.LogWarning("2FA verify failed: Invalid code. UserId={UserId}", user.Id);
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA verification failed",
+                Detail = "Invalid verification code",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        // 2FA有効化
+        user.IsTwoFactorEnabled = true;
+        user.TwoFactorEnabledAt = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
+
+        _logger.LogInformation("2FA enabled successfully. UserId={UserId}", user.Id);
+
+        return Ok(new { message = "Two-factor authentication enabled successfully" });
+    }
+
+    /// <summary>
+    /// 2FA無効化
+    /// </summary>
+    /// <remarks>
+    /// セキュリティのため、パスワード再確認が必要です。
+    /// - 2FAを無効化
+    /// - すべてのリカバリーコードを削除
+    /// </remarks>
+    /// <param name="request">パスワード</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>成功メッセージ</returns>
+    [HttpPost("2fa/disable")]
+    [Authorize] // 認証済みユーザーのみアクセス可能
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> Disable2FA(
+        [FromBody] Disable2FARequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            _logger.LogWarning("2FA disable failed: User not found");
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "User not found",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        // パスワード再確認（セキュリティ強化）
+        if (!await _userManager.CheckPasswordAsync(user, request.Password))
+        {
+            _logger.LogWarning("2FA disable failed: Invalid password. UserId={UserId}", user.Id);
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA disable failed",
+                Detail = "Invalid password",
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        // 2FA無効化
+        user.IsTwoFactorEnabled = false;
+        user.TwoFactorSecretKey = null;
+        user.TwoFactorEnabledAt = null;
+        user.TwoFactorRecoveryCodesRemaining = 0;
+        await _userManager.UpdateAsync(user);
+
+        // リカバリーコード削除
+        var recoveryCodes = await _dbContext.TwoFactorRecoveryCodes
+            .Where(c => c.UserId == user.Id)
+            .ToListAsync(cancellationToken);
+        _dbContext.TwoFactorRecoveryCodes.RemoveRange(recoveryCodes);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("2FA disabled successfully. UserId={UserId}", user.Id);
+
+        return Ok(new { message = "Two-factor authentication disabled successfully" });
     }
 }
