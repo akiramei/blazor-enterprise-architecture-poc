@@ -180,6 +180,9 @@ builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSett
 // JWT Token Generator
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
+// TOTP Service (Two-Factor Authentication)
+builder.Services.AddScoped<ITotpService, TotpService>();
+
 // JWT Bearer認証設定（REST API用）
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings are not configured.");

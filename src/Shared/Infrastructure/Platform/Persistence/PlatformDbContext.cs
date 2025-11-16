@@ -36,6 +36,7 @@ public sealed class PlatformDbContext : IdentityDbContext<ApplicationUser, Ident
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<TwoFactorRecoveryCode> TwoFactorRecoveryCodes => Set<TwoFactorRecoveryCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
