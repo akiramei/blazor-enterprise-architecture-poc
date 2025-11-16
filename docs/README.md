@@ -18,17 +18,19 @@ docs/
 │       └── CHANGELOG.md           # ドキュメント変更履歴
 │
 ├── architecture/                  # 📐 アーキテクチャ設計文書
-│   ├── VSA-STRICT-RULES.md        # VSA構造の厳格ルール
 │   ├── cross-cutting-concerns.md  # 横断的関心事の詳細設計
-│   └── STATE-MANAGEMENT-LAYERS.md # 状態管理の2層モデル
+│   ├── STATE-MANAGEMENT-LAYERS.md # 状態管理の2層モデル
+│   ├── OUTBOX_PATTERN.md          # Outboxパターンの実装
+│   ├── SHARED-VS-KERNEL-DISTINCTION.md  # SharedとKernelの使い分け
+│   └── UI-POLICY-PUSH-DESIGNER-BENEFITS.md  # UI設計ポリシー
 │
-├── ai-instructions/               # 🤖 AI実装ガイド
-│   ├── README.md                  # AI向け実装指示の概要
-│   └── NO-CLEAN-ARCHITECTURE.md   # Clean Architectureバイアス克服
-│
-└── patterns/                      # 📋 設計パターン集（将来拡張用）
+└── patterns/                      # 📋 設計パターン集
     ├── REST-API-DESIGN-GUIDE.md   # REST API設計ガイド
-    └── API-CLIENT-CONTRACT.md     # APIクライアント契約
+    ├── API-CLIENT-CONTRACT.md     # APIクライアント契約
+    ├── 01_APPROVAL_WORKFLOW_PATTERN.md  # 承認ワークフローパターン
+    ├── 02_AGGREGATION_REPORTING_PATTERN.md  # 集計レポートパターン
+    ├── BUSINESS_PATTERNS_ROADMAP.md  # ビジネスパターンロードマップ
+    └── README.md                  # パターン集の概要
 ```
 
 ---
@@ -43,13 +45,9 @@ docs/
 1. **[18_3層アーキテクチャからの移行ガイド](blazor-guide-package/docs/18_3層アーキテクチャからの移行ガイド.md)** ← 最短パス
 2. 既知の概念から新しいパターンへ段階的に学習
 
-### AI実装を始める方
-1. **[ai-instructions/README.md](ai-instructions/README.md)** - AI向け実装指示
-2. **[19_AIへの実装ガイド](blazor-guide-package/docs/19_AIへの実装ガイド.md)** - パターン選択とチェックリスト
-
 ### アーキテクチャ設計者
-1. **[architecture/VSA-STRICT-RULES.md](architecture/VSA-STRICT-RULES.md)** - VSA構造の原則
-2. **[architecture/cross-cutting-concerns.md](architecture/cross-cutting-concerns.md)** - 横断的関心事
+1. **[architecture/cross-cutting-concerns.md](architecture/cross-cutting-concerns.md)** - 横断的関心事
+2. **[architecture/STATE-MANAGEMENT-LAYERS.md](architecture/STATE-MANAGEMENT-LAYERS.md)** - 状態管理
 3. **[03_アーキテクチャ概要](blazor-guide-package/docs/03_アーキテクチャ概要.md)** - 設計原則
 
 ---
@@ -65,7 +63,7 @@ docs/
 - Blazor初心者
 
 **内容**:
-- アーキテクチャ設計原則（VSA）
+- アーキテクチャ設計原則（モノリシックVSA）
 - 各層の詳細設計（UI/Application/Domain/Infrastructure）
 - 実装パターンカタログ
 - テスト戦略
@@ -87,9 +85,11 @@ docs/
 - コードレビュアー
 
 **内容**:
-- VSAの厳格ルール（絶対禁止事項）
 - 横断的関心事の実装詳細
 - 状態管理の設計パターン
+- Outboxパターンの実装
+- SharedとKernelの使い分け
+- UI設計ポリシー
 
 **更新ポリシー**:
 - ✅ アーキテクチャの基本方針変更時に更新
@@ -102,43 +102,24 @@ docs/
 
 ---
 
-### 3. ai-instructions/
-**役割**: AI（Claude/ChatGPT等）が正しく実装を生成するためのガイド
-
-**対象読者**:
-- AIツールを使用する開発者
-- AI自身（プロンプトとして使用）
-
-**内容**:
-- AI学習データのバイアス対策
-- VSA構造の強制ルール
-- 禁止パターンの明示
-- 実装テンプレート
-
-**更新ポリシー**:
-- ✅ AIが誤った実装を繰り返す場合に追加
-- ✅ 新しい禁止パターンを発見した場合に追加
-- ❌ Blazorガイドと内容が重複する場合は参照のみ
-
----
-
-### 4. patterns/
-**役割**: プロジェクト横断の設計パターン集（将来拡張用）
+### 3. patterns/
+**役割**: プロジェクト横断の設計パターン集
 
 **対象読者**:
 - APIを公開する場合の開発者
 - フロントエンド/バックエンド連携担当者
+- ビジネスロジック設計者
 
 **内容**:
 - REST API設計ガイドライン
 - APIクライアント契約パターン
-
-**現在の状態**:
-- ⚠️ 現在のプロジェクトではREST APIを公開していない
-- 📦 将来の拡張のために準備されたドキュメント
+- 承認ワークフローパターン
+- 集計レポートパターン
+- ビジネスパターンロードマップ
 
 **更新ポリシー**:
 - ✅ REST API公開時に参照・更新
+- ✅ 新しいビジネスパターン実装時に追加
 - ❌ 使用しない場合は更新不要
 
 ---
@@ -202,10 +183,6 @@ docs/
 - 基本方針変更時は必須
 - 実装詳細の変更では不要
 
-**AI指示書（ai-instructions/）:**
-- AIの誤実装パターン発見時に追加
-- 頻繁な更新は不要
-
 **パターン集（patterns/）:**
 - 該当機能の実装時に更新
 - 未使用の場合は更新不要
@@ -265,10 +242,46 @@ docs/
 
 - **プロジェクトメインREADME**: [/README.md](../README.md)
 - **Blazorガイド目次**: [blazor-guide-package/docs/00_README.md](blazor-guide-package/docs/00_README.md)
-- **VSA厳格ルール**: [architecture/VSA-STRICT-RULES.md](architecture/VSA-STRICT-RULES.md)
-- **AI実装ガイド**: [ai-instructions/README.md](ai-instructions/README.md)
+- **横断的関心事**: [architecture/cross-cutting-concerns.md](architecture/cross-cutting-concerns.md)
+- **状態管理**: [architecture/STATE-MANAGEMENT-LAYERS.md](architecture/STATE-MANAGEMENT-LAYERS.md)
 
 ---
 
-**最終更新**: 2025-11-05
-**バージョン**: 1.0.0
+## 🏗️ 現在のアーキテクチャ概要
+
+このプロジェクトは **モノリシックVSA (Vertical Slice Architecture)** を採用しています。
+
+### プロジェクト構造
+
+```
+src/
+├── Application/              # 単一Blazorプロジェクト
+│   ├── Application.csproj    # すべての機能を含む
+│   ├── Program.cs
+│   ├── Core/                 # Commands, Queries, Behaviors
+│   ├── Features/             # 19機能 (UIを含む垂直スライス)
+│   ├── Infrastructure/
+│   ├── Shared/
+│   └── ...
+├── Domain/                   # 分離されたドメインプロジェクト
+│   ├── ProductCatalog/
+│   └── PurchaseManagement/
+└── Shared/                   # 共通ライブラリ
+    ├── Kernel/
+    ├── Domain/
+    ├── Application/
+    ├── Infrastructure/
+    └── ...
+```
+
+### 設計原則
+
+- **YAGNI (You Aren't Gonna Need It)**: シンプルから始め、必要に応じて複雑化
+- **単一プロジェクト**: Domainのみ分離、それ以外は単一Applicationプロジェクト
+- **垂直スライス**: 機能ごとにUI + Application + Infrastructure を含む
+- **モノリシック**: 将来的にマイクロサービス化が必要になった場合のみ分割
+
+---
+
+**最終更新**: 2025-11-16
+**バージョン**: 2.0.0 (モノリシック統合完了)
