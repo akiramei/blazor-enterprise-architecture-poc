@@ -27,7 +27,7 @@
 **パス・リンクの統一:**
 - 全ドキュメントのサンプルコードパスをVSA構造に修正
   - 誤: `/Features/Products/GetProducts/`
-  - 正: `src/ProductCatalog/Features/GetProducts/`
+  - 正: `src/Application/Features/GetProducts/`
 - リンク切れ修正（13箇所）
   - ファイルリンク: `BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md`
   - アンカーリンク: 09_UI層（#7x → #9x）、10_Application層（#8x → #10x）
@@ -134,9 +134,9 @@
   - BulkOperationResult
 
 **既存パターンの再構成:**
-- `CreateProduct` → `src/ProductCatalog/Features/CreateProduct/` (現在のVSA構造)
-- `DeleteProduct` → `src/ProductCatalog/Features/DeleteProduct/` (現在のVSA構造)
-- `GetProducts` → `src/ProductCatalog/Features/GetProducts/` (現在のVSA構造)
+- `CreateProduct` → `src/Application/Features/CreateProduct/` (現在のVSA構造)
+- `DeleteProduct` → `src/Application/Features/DeleteProduct/` (現在のVSA構造)
+- `GetProducts` → `src/Application/Features/GetProducts/` (現在のVSA構造)
 - すべてにIdempotencyKey追加
 - AI向け詳細コメント追加
 
@@ -190,9 +190,9 @@
     /Products/Handlers/CreateProductHandler.cs
     /Products/Validators/CreateProductCommandValidator.cs
 
-現在(VSA): src/ProductCatalog/Features/CreateProduct/Application/CreateProductCommand.cs
-          src/ProductCatalog/Features/CreateProduct/Application/CreateProductHandler.cs
-          src/ProductCatalog/Features/CreateProduct/Application/CreateProductValidator.cs
+現在(VSA): src/Application/Features/CreateProduct/Application/CreateProductCommand.cs
+          src/Application/Features/CreateProduct/Application/CreateProductHandler.cs
+          src/Application/Features/CreateProduct/Application/CreateProductValidator.cs
 ```
 
 **パターンの組織化:**

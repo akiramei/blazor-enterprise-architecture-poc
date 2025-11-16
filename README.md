@@ -8,98 +8,138 @@
 
 ## 🏗️ アーキテクチャ構成
 
-### VSA (Vertical Slice Architecture) 構造
+### モノリシックVSA (Vertical Slice Architecture) 構造
 
 ```
 src/
-├── ProductCatalog/                    # Bounded Context（商品カタログドメイン）
-│   ├── Features/                      # 機能スライス（Feature Slices）
+├── Application/                       # 単一Blazor Server プロジェクト
+│   ├── Application.csproj
+│   ├── Program.cs                     # DI登録、パイプライン設定
+│   │
+│   ├── Features/                      # 機能スライス（19機能）
 │   │   ├── CreateProduct/             # 機能1: 商品作成
-│   │   │   ├── Application/           # Command/Handler/Validator
-│   │   │   │   ├── CreateProductCommand.cs
-│   │   │   │   ├── CreateProductHandler.cs
-│   │   │   │   └── CreateProductValidator.cs
-│   │   │   └── UI/                    # API Endpoints/DTOs（この機能固有）
+│   │   │   ├── CreateProductCommand.cs
+│   │   │   ├── CreateProductCommandHandler.cs
+│   │   │   └── UI/
 │   │   │       └── Api/
-│   │   │           ├── CreateProductEndpoint.cs
 │   │   │           └── Dtos/
 │   │   ├── GetProducts/               # 機能2: 商品一覧取得
-│   │   │   ├── Application/           # Query/Handler
-│   │   │   └── UI/                    # API Endpoints/DTOs/Components
+│   │   │   ├── GetProductsQuery.cs
+│   │   │   ├── GetProductsQueryHandler.cs
+│   │   │   └── UI/
 │   │   │       ├── Api/
-│   │   │       └── Components/
+│   │   │       ├── Components/
+│   │   │       └── ProductList.razor
 │   │   ├── DeleteProduct/             # 機能3: 商品削除
-│   │   │   ├── Application/
-│   │   │   └── UI/
 │   │   ├── UpdateProduct/             # 機能4: 商品更新
-│   │   │   ├── Application/
-│   │   │   └── UI/
 │   │   ├── BulkDeleteProducts/        # 機能5: 一括削除
 │   │   ├── BulkUpdateProductPrices/   # 機能6: 一括価格更新
 │   │   ├── ExportProductsToCsv/       # 機能7: CSV出力
 │   │   ├── ImportProductsFromCsv/     # 機能8: CSV取り込み
 │   │   ├── GetProductById/            # 機能9: 商品詳細取得
-│   │   └── SearchProducts/            # 機能10: 商品検索
+│   │   ├── SearchProducts/            # 機能10: 商品検索
+│   │   ├── SubmitPurchaseRequest/     # 機能11: 購買申請
+│   │   ├── ApprovePurchaseRequest/    # 機能12: 購買承認
+│   │   └── ... (全19機能)
 │   │
-│   └── Shared/                        # ProductCatalog共通コード
-│       ├── Application/               # 共通DTO等
-│       │   └── DTOs/
-│       ├── Domain/                    # 共通ドメインモデル
-│       │   └── Products/              # Product集約
-│       │       ├── Product.cs
-│       │       ├── Money.cs
-│       │       └── Events/
-│       ├── Infrastructure/            # 共通インフラ
-│       │   └── Persistence/
-│       │       ├── Behaviors/         # 横断的Behaviors（この機能固有）
-│       │       ├── Configurations/    # EF Core設定
-│       │       └── Repositories/      # Repository実装
-│       └── UI/                        # 共通UI
-│           ├── Actions/               # PageActions Pattern
-│           └── Store/                 # Store Pattern（状態管理）
-│
-├── ProductCatalog.Host/               # Blazor Server ホストプロジェクト
-│   ├── Program.cs                     # DI登録、パイプライン設定
-│   ├── Components/                    # Layout/Pages
+│   ├── Shared/                        # BC別の共通コード
+│   │   ├── ProductCatalog/            # 商品カタログBC共通
+│   │   │   ├── Application/
+│   │   │   │   └── DTOs/              # ProductDto等
+│   │   │   ├── Infrastructure/
+│   │   │   │   └── Persistence/
+│   │   │   │       ├── ProductCatalogDbContext.cs
+│   │   │   │       ├── Configurations/
+│   │   │   │       └── Repositories/
+│   │   │   └── UI/
+│   │   │       ├── Actions/           # ProductListActions等
+│   │   │       └── Store/             # ProductsStore等
+│   │   └── PurchaseManagement/        # 購買管理BC共通
+│   │       ├── Application/
+│   │       ├── Domain/
+│   │       └── Infrastructure/
+│   │
+│   ├── Core/                          # アプリケーション基盤
+│   │   ├── Commands/                  # CommandPipeline
+│   │   ├── Queries/                   # QueryPipeline
+│   │   └── Behaviors/                 # GenericTransactionBehavior
+│   │
+│   ├── Components/                    # Blazor共通コンポーネント
+│   │   ├── Layout/
+│   │   ├── Pages/
+│   │   └── ErrorBoundary/
+│   │
+│   ├── Infrastructure/                # インフラ層
+│   │   ├── Models/                    # アプリケーション状態
+│   │   ├── Services/                  # LocalStorage等
+│   │   └── Stores/                    # Fluxパターン状態管理
+│   │
 │   ├── Hubs/                          # SignalR Hubs
-│   ├── Infrastructure/                # UI Infrastructure
-│   ├── Middleware/                    # ASP.NET Core Middleware
-│   └── Services/                      # ホストレベルサービス
+│   ├── Jobs/                          # Hangfire バックグラウンドジョブ
+│   ├── Middleware/                    # ASP.NET Core ミドルウェア
+│   └── Services/                      # アプリケーションサービス
 │
-├── Shared/                            # グローバル共通コード（全BC共有）
-│   ├── Abstractions/                  # プラットフォーム抽象化
-│   │   └── Platform/                  # IOutboxReader, IIdempotencyStore, IAuditLogStore等
-│   ├── Application/                   # ICommand, IQuery, Result
-│   │   ├── Attributes/                # AuthorizeAttribute等
-│   │   ├── Common/                    # PagedResult, BulkOperationResult
-│   │   └── Interfaces/                # ICacheableQuery, IAuditableCommand
-│   ├── Domain/                        # 認証・監査ログ等
-│   │   ├── Identity/                  # ApplicationUser, Roles
-│   │   ├── AuditLogs/                 # AuditLog
-│   │   ├── Idempotency/               # IdempotencyRecord
-│   │   └── Outbox/                    # OutboxMessage (ドメインモデル)
-│   ├── Infrastructure/                # グローバル横断的関心事
-│   │   ├── Platform/                  # プラットフォーム実装
-│   │   │   ├── Api/                   # 認証API（AuthController）
-│   │   │   ├── Persistence/           # PlatformDbContext
-│   │   │   ├── Repositories/          # AuditLogRepository等
-│   │   │   └── Stores/                # AuditLogStore, IdempotencyStore等
-│   │   ├── Authentication/            # JWT生成/検証
-│   │   ├── Behaviors/                 # MediatR Pipeline Behaviors
-│   │   ├── Metrics/                   # ApplicationMetrics
-│   │   └── Services/                  # CurrentUserService等
-│   └── Kernel/                        # ドメイン基底クラス
-│       ├── Entity.cs
-│       ├── AggregateRoot.cs
-│       ├── ValueObject.cs
-│       ├── DomainEvent.cs
-│       └── DomainException.cs
+├── Domain/                            # ドメインプロジェクト（分離）
+│   ├── ProductCatalog/
+│   │   ├── Domain.ProductCatalog.csproj
+│   │   ├── Products/
+│   │   │   ├── Product.cs             # Product集約
+│   │   │   ├── IProductRepository.cs
+│   │   │   └── ProductSpecifications.cs
+│   │   ├── Services/
+│   │   └── Events/
+│   │
+│   └── PurchaseManagement/
+│       ├── Domain.PurchaseManagement.csproj
+│       ├── PurchaseRequests/
+│       ├── Services/
+│       └── Events/
+│
+└── Shared/                            # グローバル共通コード（全BC共有）
+    ├── Kernel/                        # ドメイン基底クラス
+    │   ├── Shared.Kernel.csproj
+    │   ├── Entity.cs
+    │   ├── AggregateRoot.cs
+    │   ├── ValueObject.cs
+    │   └── DomainEvent.cs
+    │
+    ├── Domain/                        # ドメイン共通
+    │   ├── Shared.Domain.csproj
+    │   ├── Identity/                  # ApplicationUser, Roles
+    │   ├── AuditLogs/
+    │   ├── Idempotency/
+    │   └── Outbox/
+    │
+    ├── Application/                   # アプリケーション共通
+    │   ├── Shared.Application.csproj
+    │   ├── Interfaces/                # ICommand, IQuery
+    │   ├── Common/                    # Result, PagedResult
+    │   └── Attributes/
+    │
+    ├── Infrastructure/                # インフラ共通
+    │   ├── Shared.Infrastructure.csproj
+    │   ├── Authentication/            # JWT生成/検証
+    │   ├── Behaviors/                 # MediatR Pipeline Behaviors
+    │   ├── Caching/
+    │   └── Services/                  # CurrentUserService等
+    │
+    ├── Infrastructure.Platform/       # プラットフォーム共通
+    │   ├── Shared.Infrastructure.Platform.csproj
+    │   ├── Outbox/
+    │   ├── Persistence/
+    │   └── Stores/
+    │
+    └── Abstractions/                  # 抽象化共通
+        ├── Shared.Abstractions.csproj
+        └── Interfaces/
 ```
 
-**VSAの特徴:**
+**モノリシックVSAの特徴:**
+- **単一プロジェクト**: Application/配下に全機能を集約（YAGNI原則）
 - **機能ファースト**: 機能（Feature）が最上位の構造単位
-- **垂直統合（実用的パターン）**: 各機能は Application + UI を持ち、共通のDomain/Infrastructureを利用
-- **共通ドメイン集約**: すべての機能が同じProduct集約を扱うため、`ProductCatalog/Shared/Domain`に集約して重複を排除
+- **垂直統合**: 各機能は Command/Query/Handler + UI を持つ完結した垂直スライス
+- **BC別共通化**: Application/Shared/{BC}/に各BCの共通コード（Store, Actions, DbContext等）
+- **ドメイン分離**: Domain/はプロジェクトとして分離（純粋なビジネスロジック）
 - **疎結合**: 機能間の依存を最小化（Shared経由でのみ共有）
 - **変更容易性**: 機能追加・変更時の影響範囲が明確（1つのFeatureフォルダ内で完結）
 
@@ -153,10 +193,10 @@ podman exec -it postgres-productcatalog psql -U postgres -d productcatalog
 
 ```bash
 # ソリューション全体をビルド
-dotnet build ProductCatalog.sln
+dotnet build
 
 # Webアプリを起動（初回起動時に自動でマイグレーション実行）
-cd src/ProductCatalog.Host
+cd src/Application
 dotnet run
 ```
 
@@ -203,48 +243,52 @@ dotnet run
 
 ## 🧪 アーキテクチャの特徴
 
-### VSAにおける依存関係
+### モノリシックVSAにおける依存関係
 
 **機能スライス内の依存方向:**
 ```
-Feature/UI → Feature/Application → ProductCatalog/Shared/Domain
-                                          ↑
-                                   ProductCatalog/Shared/Infrastructure
+Application/Features/{Feature}/UI
+  ↓
+Application/Features/{Feature}/CommandHandler
+  ↓
+Domain/{BC}/ (例: Domain/ProductCatalog/Products/)
+  ↑
+Application/Shared/{BC}/Infrastructure/Repositories/
 ```
 
-- **Feature/UI層**: Feature/Application層のCommand/Queryを呼び出し
-- **Feature/Application層**: Shared/Domain層に依存（ビジネスルール適用）、Shared/Infrastructure層のRepositoryを利用
-- **Shared/Domain層**: 他の層に依存しない（ピュアなビジネスロジック）
-- **Shared/Infrastructure層**: Shared/Domain層に依存（依存性逆転の原則）
+- **Feature/UI層**: MediatR経由でCommand/Queryを送信
+- **Feature/CommandHandler**: Domain層のAggregateを操作、Repositoryで永続化
+- **Domain層**: 他の層に依存しない（純粋なビジネスロジック）
+- **Application/Shared/Infrastructure**: Domain層に依存（依存性逆転の原則）
 
 **機能スライス間の依存:**
 ```
-各Feature/CreateProduct → ProductCatalog/Shared（共通Domain/Infrastructure）
-各Feature/GetProducts   → ProductCatalog/Shared（共通Domain/Infrastructure）
-各Feature/UpdateProduct → ProductCatalog/Shared（共通Domain/Infrastructure）
+Application/Features/CreateProduct → Application/Shared/ProductCatalog/
+Application/Features/GetProducts   → Application/Shared/ProductCatalog/
+Application/Features/UpdateProduct → Application/Shared/ProductCatalog/
 
 Feature間の直接依存は禁止（例: CreateProduct → GetProducts ❌）
 ```
 
-**レイヤー間の依存（グローバル）:**
+**プロジェクト間の依存:**
 ```
-ProductCatalog/Shared → Shared（グローバル共通）
-  - Shared/Kernel（Entity, AggregateRoot等の基底クラス）
-  - Shared/Application（ICommand, IQuery, Result）
-  - Shared/Infrastructure（MediatR Behaviors, AppDbContext）
+Application/
+  ↓ 依存
+Domain/{BC}/ (ProductCatalog, PurchaseManagement)
+  ↓ 依存
+Shared/ (Kernel, Domain, Application, Infrastructure, Platform, Abstractions)
 ```
 
 ### 主要な設計判断
 
-1. **VSA採用（実用的パターン）**: 機能単位の垂直スライス（Application + UI）+ 共通ドメインモデル
-2. **共通ドメイン集約**: Product集約を`ProductCatalog/Shared/Domain`に集約し、全機能で共有
-3. **グローバル共通とBC共通の分離**:
-   - `Shared/`（全BC共有）と`ProductCatalog/Shared`（BC内共有）を明確に分離
-   - `Shared/Abstractions/`でプラットフォーム抽象化、`Shared/Infrastructure/Platform/`で実装
-4. **都度スコープ作成**: `IServiceScopeFactory`を使用してDbContextリークを防止
-5. **不変State**: `record`による不変状態オブジェクト
-6. **ビジネスルール保護**: Product集約によるルール集約
-7. **I/O分離**: PageActionsはI/Oを持たず、Storeに完全委譲
+1. **モノリシックVSA採用**: 単一Applicationプロジェクト + 機能単位の垂直スライス（YAGNI原則）
+2. **ドメイン分離**: `Domain/`プロジェクトのみ分離し、純粋なビジネスロジックを保護
+3. **BC別共通化**: `Application/Shared/{BC}/`で各BCの共通コード（Store, DbContext等）を管理
+4. **グローバル共通**: `Shared/`プロジェクトで全BC共有のKernel/Application/Infrastructure
+5. **都度スコープ作成**: `IServiceScopeFactory`を使用してDbContextリークを防止
+6. **不変State**: `record`による不変状態オブジェクト
+7. **ビジネスルール保護**: Aggregate RootによるDomain層でのルール集約
+8. **I/O分離**: PageActionsはI/Oを持たず、Storeに完全委譲
 
 ## 📖 アーキテクチャドキュメント
 

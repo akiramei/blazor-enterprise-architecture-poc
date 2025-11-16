@@ -78,7 +78,7 @@
 
 ### 1. 書き込み側: TransactionBehavior
 
-**場所**: `src/ProductCatalog/Shared/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs`
+**場所**: `src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs`
 
 **責務**:
 - ビジネスエンティティ (Product) の更新
@@ -97,7 +97,7 @@ await _context.OutboxMessages.AddAsync(outboxMessage, ct); // ProductCatalogDbCo
 
 ### 2. 読み取り側: ProductCatalogOutboxReader
 
-**場所**: `src/ProductCatalog/Shared/Infrastructure/Persistence/ProductCatalogOutboxReader.cs`
+**場所**: `src/Application/Shared/ProductCatalog/Infrastructure/Persistence/ProductCatalogOutboxReader.cs`
 
 **責務**:
 - 未処理メッセージの取得
@@ -239,7 +239,7 @@ builder.Services.AddScoped<IOutboxReader, OrderOutboxReader>();
 
 - ~~`src/Shared/Abstractions/Platform/IOutboxStore.cs`~~ (削除済み)
 - ~~`src/Shared/Infrastructure/Platform/Stores/OutboxStore.cs`~~ (削除済み)
-- ~~`src/ProductCatalog.Host/Program.cs` の DI登録~~ (削除済み)
+- ~~`src/Application/Program.cs` の DI登録~~ (削除済み)
 
 ### 代わりに使用するパターン
 

@@ -458,7 +458,7 @@ public class ApprovePurchaseRequestHandler : ICommandHandler<ApprovePurchaseRequ
 **理由:** 商品カタログに関連する集計・レポート機能なので、既存BCに追加
 
 ```
-src/ProductCatalog/Features/
+src/Application/Features/
 ├── GetProductSalesReport/              # 商品売上レポート
 ├── GetInventoryTurnoverReport/         # 在庫回転率レポート
 ├── GetTopSellingProducts/              # 売れ筋商品ランキング
@@ -774,7 +774,7 @@ public record JobStatus(string State, DateTime? StartedAt, DateTime? CompletedAt
 #### BC: `ProductCatalog`（既存BCに追加）
 
 ```
-src/ProductCatalog/Features/
+src/Application/Features/
 ├── GenerateNightlyProductReport/      # 夜間商品レポート生成
 ├── ArchiveInactiveProducts/           # 非アクティブ商品アーカイブ
 ├── SyncProductCatalogToExternal/      # 外部システムへの商品同期
@@ -938,7 +938,7 @@ public record FileMetadata(
 #### BC: `ProductCatalog`（既存BCに追加）
 
 ```
-src/ProductCatalog/Features/
+src/Application/Features/
 ├── UploadProductImage/                 # 商品画像アップロード
 ├── DeleteProductImage/                 # 商品画像削除
 ├── DownloadProductAttachment/          # 商品添付ファイルダウンロード
