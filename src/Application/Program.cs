@@ -82,9 +82,8 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infras
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.IdempotencyBehavior<,>));    // 4. Idempotency (Command)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
-// 7. Transaction (Command) - BC固有
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PurchaseManagement.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+// 7. Transaction (Command) - BC非依存の汎用トランザクション管理
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Application.Core.Behaviors.GenericTransactionBehavior<,>));
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -137,6 +136,37 @@ if (!builder.Environment.IsEnvironment("Test"))
 
     builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
         options.UseNpgsql(connectionString));
+
+    // IBoundedContextResolver (BC名/機能名 → DbContext型のマッピング)
+    // GenericTransactionBehavior が使用
+    builder.Services.AddSingleton<Application.Core.Behaviors.IBoundedContextResolver>(sp =>
+        new Application.Core.Behaviors.BoundedContextResolver(new Dictionary<string, Type>
+        {
+            // ProductCatalog BC
+            ["ProductCatalog"] = typeof(ProductCatalogDbContext),
+            ["CreateProduct"] = typeof(ProductCatalogDbContext),
+            ["UpdateProduct"] = typeof(ProductCatalogDbContext),
+            ["DeleteProduct"] = typeof(ProductCatalogDbContext),
+            ["GetProducts"] = typeof(ProductCatalogDbContext),
+            ["GetProductById"] = typeof(ProductCatalogDbContext),
+            ["SearchProducts"] = typeof(ProductCatalogDbContext),
+            ["BulkDeleteProducts"] = typeof(ProductCatalogDbContext),
+            ["BulkUpdateProductPrices"] = typeof(ProductCatalogDbContext),
+            ["ExportProductsToCsv"] = typeof(ProductCatalogDbContext),
+            ["ImportProductsFromCsv"] = typeof(ProductCatalogDbContext),
+
+            // PurchaseManagement BC
+            ["PurchaseManagement"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["SubmitPurchaseRequest"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["ApprovePurchaseRequest"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["RejectPurchaseRequest"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["CancelPurchaseRequest"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["GetPurchaseRequests"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["GetPurchaseRequestById"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["GetPendingApprovals"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["GetDashboardStatistics"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext),
+            ["UploadAttachment"] = typeof(PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext)
+        }));
 }
 
 // PurchaseManagement BC Services (Repository, Domain Services)
