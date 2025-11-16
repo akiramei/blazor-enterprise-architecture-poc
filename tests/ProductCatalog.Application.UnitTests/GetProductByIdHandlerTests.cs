@@ -1,7 +1,7 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using GetProductById.Application;
+using Application.Features.GetProductById;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 

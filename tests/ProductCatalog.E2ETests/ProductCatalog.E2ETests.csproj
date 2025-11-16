@@ -23,28 +23,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProductCatalog.Host\ProductCatalog.Host.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Shared\Infrastructure\Persistence\ProductCatalog.Shared.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Application\Application.csproj" />
     <ProjectReference Include="..\..\src\Shared\Abstractions\Shared.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
-
-    <!-- Feature UI projects - Required for Blazor Router to discover @page routes -->
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\GetProducts\UI\GetProducts.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\GetProductById\UI\GetProductById.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\UpdateProduct\UI\UpdateProduct.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\CreateProduct\UI\CreateProduct.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\DeleteProduct\UI\DeleteProduct.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\SearchProducts\UI\SearchProducts.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\BulkDeleteProducts\UI\BulkDeleteProducts.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\BulkUpdateProductPrices\UI\BulkUpdateProductPrices.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\ExportProductsToCsv\UI\ExportProductsToCsv.UI.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\ImportProductsFromCsv\UI\ImportProductsFromCsv.UI.csproj" />
   </ItemGroup>
 
   <Target Name="CopyDepsFiles" AfterTargets="Build" Condition="'$(TargetFramework)'!=''">
     <ItemGroup>
-      <DepsFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','ProductCatalog.Host','bin','$(Configuration)','$(TargetFramework)','ProductCatalog.Host.deps.json'))" />
-      <RuntimeConfigFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','ProductCatalog.Host','bin','$(Configuration)','$(TargetFramework)','ProductCatalog.Host.runtimeconfig.json'))" />
+      <DepsFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','Application','bin','$(Configuration)','$(TargetFramework)','Application.deps.json'))" />
+      <RuntimeConfigFilePaths Include="$([System.IO.Path]::Combine('$(MSBuildThisFileDirectory)','..','..','src','Application','bin','$(Configuration)','$(TargetFramework)','Application.runtimeconfig.json'))" />
     </ItemGroup>
     <Copy SourceFiles="@(DepsFilePaths)" DestinationFolder="$(OutDir)" Condition="Exists('%(DepsFilePaths.Identity)')" />
     <Copy SourceFiles="@(RuntimeConfigFilePaths)" DestinationFolder="$(OutDir)" Condition="Exists('%(RuntimeConfigFilePaths.Identity)')" />

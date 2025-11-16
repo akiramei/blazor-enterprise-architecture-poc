@@ -22,8 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProductCatalog.Host\ProductCatalog.Host.csproj" />
-    <ProjectReference Include="..\..\src\PurchaseManagement\Infrastructure\PurchaseManagement.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Application\Application.csproj" />
     <ProjectReference Include="..\..\src\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
     <ProjectReference Include="..\..\src\Shared\Application\Shared.Application.csproj" />
   </ItemGroup>

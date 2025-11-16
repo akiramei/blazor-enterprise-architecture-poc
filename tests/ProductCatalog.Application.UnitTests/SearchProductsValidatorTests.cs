@@ -1,5 +1,5 @@
 ﻿using FluentAssertions;
-using SearchProducts.Application;
+using Application.Features.SearchProducts;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;

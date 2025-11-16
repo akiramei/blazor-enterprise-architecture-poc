@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
-using SearchProducts.Application;
+using Application.Features.SearchProducts;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using Domain.ProductCatalog.Products;

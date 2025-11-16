@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
-using DeleteProduct.Application;
+using Application.Features.DeleteProduct;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
