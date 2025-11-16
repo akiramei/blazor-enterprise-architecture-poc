@@ -24,7 +24,8 @@
       "Bash(powershell -Command:*)",
       "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\Users\\akira\\source\\repos\\VSASample\\scripts\\update-test-namespaces.ps1\")",
       "Bash(git commit:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
