@@ -1,0 +1,65 @@
+@using Domain.PurchaseManagement.PurchaseRequests
+@using Domain.PurchaseManagement.PurchaseRequests.Boundaries
+
+<div class="card mb-2 @GetBorderClass()">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <h6 class="card-subtitle mb-2">
+                    ステップ @Step.StepNumber: @Step.ApproverRole
+                </h6>
+                <p class="card-text mb-1">
+                    <strong>承認者:</strong> @Step.ApproverName
+                </p>
+                @if (Step.ApprovedAt.HasValue)
+                {
+                    <p class="card-text text-muted mb-1">
+                        <small>承認日時: @Step.ApprovedAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small>
+                    </p>
+                }
+                @if (Step.RejectedAt.HasValue)
+                {
+                    <p class="card-text text-muted mb-1">
+                        <small>却下日時: @Step.RejectedAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small>
+                    </p>
+                }
+                @if (!string.IsNullOrEmpty(Step.Comment))
+                {
+                    <p class="card-text">
+                        <small><strong>コメント:</strong> @Step.Comment</small>
+                    </p>
+                }
+            </div>
+            <div>
+                @if (UIMetadata != null)
+                {
+                    <StatusBadge Label="@GetStatusLabel()" Metadata="@UIMetadata" />
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ApprovalStep Step { get; set; } = null!;
+
+    [Parameter]
+    public UIMetadata? UIMetadata { get; set; }
+
+    private string GetBorderClass()
+    {
+        return UIMetadata?.Rendering.BorderColorClass ?? "border-secondary";
+    }
+
+    private string GetStatusLabel()
+    {
+        return Step.Status switch
+        {
+            ApprovalStepStatus.Pending => "承認待ち",
+            ApprovalStepStatus.Approved => "承認済み",
+            ApprovalStepStatus.Rejected => "却下",
+            _ => "不明"
+        };
+    }
+}

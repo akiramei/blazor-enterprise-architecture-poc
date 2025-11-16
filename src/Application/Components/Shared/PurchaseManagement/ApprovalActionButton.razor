@@ -1,0 +1,33 @@
+@using Domain.PurchaseManagement.PurchaseRequests.Boundaries
+
+<button type="button"
+        class="btn btn-@Action.ColorTheme"
+        disabled="@(!Action.IsEnabled)"
+        @onclick="HandleClick"
+        aria-label="@Action.AriaLabel"
+        title="@(Action.DisabledReason ?? Action.Label)">
+    <i class="bi bi-@Action.Icon"></i>
+    @Action.Label
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public ApprovalAction Action { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback<ApprovalAction> OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (!Action.IsEnabled)
+            return;
+
+        if (Action.RequiresConfirmation && !string.IsNullOrEmpty(Action.ConfirmationMessage))
+        {
+            // TODO: 確認ダイアログを表示（JavaScript Interop）
+            // 現在は簡易実装として即座に実行
+        }
+
+        await OnClick.InvokeAsync(Action);
+    }
+}

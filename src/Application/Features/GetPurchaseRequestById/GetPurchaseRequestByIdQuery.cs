@@ -1,3 +1,4 @@
+using Domain.PurchaseManagement.PurchaseRequests;
 using Shared.Application;
 using Shared.Application.Interfaces;
 
@@ -5,11 +6,11 @@ namespace Application.Features.GetPurchaseRequestById;
 
 /// <summary>
 /// 購買申請詳細取得クエリ
+///
+/// 【パターン: Entity直接返却（Boundary活用のため）】
+/// UI層でバウンダリーを活用するため、DTOではなくエンティティを返す
 /// </summary>
-public class GetPurchaseRequestByIdQuery : IQuery<Result<PurchaseRequestDetailDto>>
-{
-    public Guid Id { get; init; }
-}
+public record GetPurchaseRequestByIdQuery(Guid Id) : IQuery<Result<PurchaseRequest>>;
 
 /// <summary>
 /// 購買申請詳細DTO

@@ -1,0 +1,339 @@
+@page "/purchase-requests/{Id:guid}"
+@using Domain.PurchaseManagement.PurchaseRequests
+@using Domain.PurchaseManagement.PurchaseRequests.Boundaries
+@using Application.Components.Shared.PurchaseManagement
+@using Shared.Application
+@using Shared.Application.Interfaces
+@using MediatR
+@inject IApprovalBoundary ApprovalBoundary
+@inject IMediator Mediator
+@inject ICurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>購買申請詳細</PageTitle>
+
+<div class="container my-4">
+    @if (_isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">読み込み中...</span>
+            </div>
+        </div>
+    }
+    else if (_request == null)
+    {
+        <div class="alert alert-danger" role="alert">
+            購買申請が見つかりません
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>購買申請詳細</h1>
+            <button class="btn btn-secondary" @onclick="GoBack">
+                <i class="bi bi-arrow-left"></i> 戻る
+            </button>
+        </div>
+
+        @* ステータスバッジ（UIメタデータ活用） *@
+        <div class="mb-3">
+            @if (_context?.UIMetadata != null)
+            {
+                <StatusBadge Label="@_context.StatusDisplay.Label" Metadata="@_context.UIMetadata" />
+            }
+        </div>
+
+        @* 基本情報 *@
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">基本情報</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>申請番号:</strong> @_request.RequestNumber.Value</p>
+                        <p><strong>申請者:</strong> @_request.RequesterName</p>
+                        <p><strong>タイトル:</strong> @_request.Title</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>合計金額:</strong> ¥@_request.TotalAmount.Amount.ToString("N0")</p>
+                        <p><strong>作成日:</strong> @_request.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</p>
+                        @if (_request.SubmittedAt.HasValue)
+                        {
+                            <p><strong>提出日:</strong> @_request.SubmittedAt.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</p>
+                        }
+                    </div>
+                </div>
+                @if (!string.IsNullOrEmpty(_request.Description))
+                {
+                    <div class="mt-3">
+                        <strong>説明:</strong>
+                        <p>@_request.Description</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* 承認アクション（バウンダリー活用） *@
+        @if (_context != null && _context.Decision.IsAllowed && _context.Decision.AllowedActions.Any())
+        {
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">承認アクション</h5>
+                </div>
+                <div class="card-body">
+                    <ActionButtonGroup Actions="@_context.Decision.AllowedActions" OnActionClick="@HandleActionClick" />
+
+                    @* コメント入力欄 *@
+                    <div class="mt-3">
+                        <label for="comment" class="form-label">コメント</label>
+                        <textarea class="form-control" id="comment" rows="3" @bind="_comment"></textarea>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (_context != null && !_context.Decision.IsAllowed)
+        {
+            <div class="alert alert-info" role="alert">
+                <i class="bi bi-info-circle"></i>
+                @foreach (var reason in _context.Decision.BlockingReasons)
+                {
+                    <div>@reason.Message</div>
+                }
+            </div>
+        }
+
+        @* エラーメッセージ *@
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @_errorMessage
+                <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+            </div>
+        }
+
+        @* 成功メッセージ *@
+        @if (!string.IsNullOrEmpty(_successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @_successMessage
+                <button type="button" class="btn-close" @onclick="() => _successMessage = null"></button>
+            </div>
+        }
+
+        @* 承認フロー（UIメタデータ活用） *@
+        @if (_context != null)
+        {
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">承認フロー</h5>
+                </div>
+                <div class="card-body">
+                    @* 完了済みステップ *@
+                    @if (_context.CompletedSteps.Any())
+                    {
+                        <h6>完了済み</h6>
+                        @foreach (var step in _context.CompletedSteps)
+                        {
+                            var stepMetadata = _context.StepUIMetadata?.GetValueOrDefault(step.StepNumber);
+                            <ApprovalStepCard Step="@step" UIMetadata="@stepMetadata" />
+                        }
+                    }
+
+                    @* 現在のステップ *@
+                    @if (_context.CurrentStep != null)
+                    {
+                        <h6 class="mt-3">現在の承認ステップ</h6>
+                        var currentMetadata = _context.StepUIMetadata?.GetValueOrDefault(_context.CurrentStep.StepNumber);
+                        <ApprovalStepCard Step="@_context.CurrentStep" UIMetadata="@currentMetadata" />
+                    }
+
+                    @* 残りのステップ *@
+                    @if (_context.RemainingSteps.Any())
+                    {
+                        <h6 class="mt-3">残りのステップ</h6>
+                        @foreach (var step in _context.RemainingSteps)
+                        {
+                            var stepMetadata = _context.StepUIMetadata?.GetValueOrDefault(step.StepNumber);
+                            <ApprovalStepCard Step="@step" UIMetadata="@stepMetadata" />
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+        @* 明細 *@
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">購入品目</h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>商品名</th>
+                            <th class="text-end">単価</th>
+                            <th class="text-end">数量</th>
+                            <th class="text-end">金額</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _request.Items)
+                        {
+                            <tr>
+                                <td>@item.ProductName</td>
+                                <td class="text-end">¥@item.UnitPrice.Amount.ToString("N0")</td>
+                                <td class="text-end">@item.Quantity</td>
+                                <td class="text-end">¥@item.Amount.Amount.ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="3" class="text-end">合計</th>
+                            <th class="text-end">¥@_request.TotalAmount.Amount.ToString("N0")</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private PurchaseRequest? _request;
+    private ApprovalContext? _context;
+    private bool _isLoading = true;
+    private string? _comment;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRequestAsync();
+    }
+
+    private async Task LoadRequestAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            // 購買申請を取得
+            var query = new GetPurchaseRequestByIdQuery(Id);
+            var result = await Mediator.Send(query);
+
+            if (result.IsSuccess && result.Value != null)
+            {
+                _request = result.Value;
+
+                // バウンダリーから承認コンテキストを取得
+                _context = ApprovalBoundary.GetContext(_request, CurrentUser.UserId);
+            }
+            else
+            {
+                _errorMessage = result.Error ?? "購買申請の取得に失敗しました";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"エラーが発生しました: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleActionClick(ApprovalAction action)
+    {
+        if (_request == null)
+            return;
+
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var idempotencyKey = Guid.NewGuid().ToString();
+
+            // アクションタイプに応じてコマンドを作成して実行
+            var success = action.Type switch
+            {
+                ApprovalActionType.Approve => await ApproveAsync(idempotencyKey),
+                ApprovalActionType.Reject => await RejectAsync(idempotencyKey),
+                ApprovalActionType.Cancel => await CancelAsync(idempotencyKey),
+                _ => false
+            };
+
+            if (success)
+            {
+                _successMessage = $"{action.Label}が完了しました";
+                await LoadRequestAsync(); // 再読み込み
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"エラーが発生しました: {ex.Message}";
+        }
+    }
+
+    private async Task<bool> ApproveAsync(string idempotencyKey)
+    {
+        var command = new Application.Features.ApprovePurchaseRequest.ApprovePurchaseRequestCommand
+        {
+            RequestId = Id,
+            Comment = _comment ?? "",
+            IdempotencyKey = idempotencyKey
+        };
+
+        var result = await Mediator.Send(command);
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.Error;
+        }
+        return result.IsSuccess;
+    }
+
+    private async Task<bool> RejectAsync(string idempotencyKey)
+    {
+        var command = new Application.Features.RejectPurchaseRequest.RejectPurchaseRequestCommand
+        {
+            RequestId = Id,
+            Reason = _comment ?? "却下",
+            IdempotencyKey = idempotencyKey
+        };
+
+        var result = await Mediator.Send(command);
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.Error;
+        }
+        return result.IsSuccess;
+    }
+
+    private async Task<bool> CancelAsync(string idempotencyKey)
+    {
+        var command = new Application.Features.CancelPurchaseRequest.CancelPurchaseRequestCommand
+        {
+            RequestId = Id,
+            Reason = _comment ?? "キャンセル"
+        };
+
+        var result = await Mediator.Send(command);
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.Error;
+        }
+        return result.IsSuccess;
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/purchase-requests");
+    }
+}

@@ -1,0 +1,29 @@
+@using Domain.PurchaseManagement.PurchaseRequests.Boundaries
+
+<div class="btn-group" role="group" aria-label="承認アクション">
+    @foreach (var action in Actions.Where(a => a.IsEnabled))
+    {
+        <ApprovalActionButton Action="@action" OnClick="@OnActionClick" />
+    }
+</div>
+
+@if (Actions.Any(a => !a.IsEnabled))
+{
+    <div class="mt-2">
+        @foreach (var disabledAction in Actions.Where(a => !a.IsEnabled))
+        {
+            <small class="text-muted d-block">
+                <i class="bi bi-info-circle"></i>
+                @disabledAction.Label: @disabledAction.DisabledReason
+            </small>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ApprovalAction> Actions { get; set; } = Array.Empty<ApprovalAction>();
+
+    [Parameter]
+    public EventCallback<ApprovalAction> OnActionClick { get; set; }
+}

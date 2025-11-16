@@ -1,0 +1,17 @@
+@using Domain.PurchaseManagement.PurchaseRequests.Boundaries
+
+<span class="badge @Metadata.Rendering.BadgeColorClass"
+      role="@Metadata.Accessibility.Role"
+      aria-label="@Metadata.Accessibility.AriaLabel"
+      aria-live="@Metadata.Accessibility.LiveRegion">
+    <i class="bi @Metadata.Rendering.IconClass"></i>
+    @Label
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public UIMetadata Metadata { get; set; } = null!;
+}
