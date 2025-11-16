@@ -1,34 +1,34 @@
 using System.Collections.Immutable;
 
-namespace Application.Host.Infrastructure.Models;
+namespace Application.Infrastructure.Models;
 
 /// <summary>
-/// 通知状態 - トースト通知・モーダル等の表示状態を保持
+/// 騾夂衍迥ｶ諷・- 繝医・繧ｹ繝磯夂衍繝ｻ繝｢繝ｼ繝繝ｫ遲峨・陦ｨ遉ｺ迥ｶ諷九ｒ菫晄戟
 ///
-/// 設計方針:
-/// - トースト通知のキュー管理
-/// - モーダルダイアログの状態管理
-/// - 自動消去機能（トースト）
+/// 險ｭ險域婿驥・
+/// - 繝医・繧ｹ繝磯夂衍縺ｮ繧ｭ繝･繝ｼ邂｡逅・
+/// - 繝｢繝ｼ繝繝ｫ繝繧､繧｢繝ｭ繧ｰ縺ｮ迥ｶ諷狗ｮ｡逅・
+/// - 閾ｪ蜍墓ｶ亥悉讖溯・・医ヨ繝ｼ繧ｹ繝茨ｼ・
 /// </summary>
 public sealed record NotificationState
 {
     /// <summary>
-    /// 表示中のトースト通知リスト
+    /// 陦ｨ遉ｺ荳ｭ縺ｮ繝医・繧ｹ繝磯夂衍繝ｪ繧ｹ繝・
     /// </summary>
     public ImmutableList<ToastNotification> Toasts { get; init; } = ImmutableList<ToastNotification>.Empty;
 
     /// <summary>
-    /// 現在表示中のモーダル
+    /// 迴ｾ蝨ｨ陦ｨ遉ｺ荳ｭ縺ｮ繝｢繝ｼ繝繝ｫ
     /// </summary>
     public ModalNotification? CurrentModal { get; init; }
 
     /// <summary>
-    /// 初期化中フラグ
+    /// 蛻晄悄蛹紋ｸｭ繝輔Λ繧ｰ
     /// </summary>
     public bool IsLoading { get; init; }
 
     /// <summary>
-    /// 空の状態
+    /// 遨ｺ縺ｮ迥ｶ諷・
     /// </summary>
     public static NotificationState Empty => new()
     {
@@ -39,140 +39,140 @@ public sealed record NotificationState
 }
 
 /// <summary>
-/// トースト通知
+/// 繝医・繧ｹ繝磯夂衍
 /// </summary>
 public sealed record ToastNotification
 {
     /// <summary>
-    /// 通知ID
+    /// 騾夂衍ID
     /// </summary>
     public Guid Id { get; init; } = Guid.NewGuid();
 
     /// <summary>
-    /// タイトル
+    /// 繧ｿ繧､繝医Ν
     /// </summary>
     public string Title { get; init; } = string.Empty;
 
     /// <summary>
-    /// メッセージ
+    /// 繝｡繝・そ繝ｼ繧ｸ
     /// </summary>
     public string Message { get; init; } = string.Empty;
 
     /// <summary>
-    /// 通知種別
+    /// 騾夂衍遞ｮ蛻･
     /// </summary>
     public NotificationType Type { get; init; } = NotificationType.Info;
 
     /// <summary>
-    /// 表示継続時間（ミリ秒）
+    /// 陦ｨ遉ｺ邯咏ｶ壽凾髢難ｼ医Α繝ｪ遘抵ｼ・
     /// </summary>
     public int DurationMs { get; init; } = 5000;
 
     /// <summary>
-    /// 作成日時
+    /// 菴懈・譌･譎・
     /// </summary>
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     /// <summary>
-    /// 自動消去するか
+    /// 閾ｪ蜍墓ｶ亥悉縺吶ｋ縺・
     /// </summary>
     public bool AutoDismiss { get; init; } = true;
 }
 
 /// <summary>
-/// モーダル通知
+/// 繝｢繝ｼ繝繝ｫ騾夂衍
 /// </summary>
 public sealed record ModalNotification
 {
     /// <summary>
-    /// モーダルID
+    /// 繝｢繝ｼ繝繝ｫID
     /// </summary>
     public Guid Id { get; init; } = Guid.NewGuid();
 
     /// <summary>
-    /// タイトル
+    /// 繧ｿ繧､繝医Ν
     /// </summary>
     public string Title { get; init; } = string.Empty;
 
     /// <summary>
-    /// メッセージ
+    /// 繝｡繝・そ繝ｼ繧ｸ
     /// </summary>
     public string Message { get; init; } = string.Empty;
 
     /// <summary>
-    /// 通知種別
+    /// 騾夂衍遞ｮ蛻･
     /// </summary>
     public NotificationType Type { get; init; } = NotificationType.Info;
 
     /// <summary>
-    /// モーダル種別
+    /// 繝｢繝ｼ繝繝ｫ遞ｮ蛻･
     /// </summary>
     public ModalType ModalType { get; init; } = ModalType.Alert;
 
     /// <summary>
-    /// 確認ボタンテキスト
+    /// 遒ｺ隱阪・繧ｿ繝ｳ繝・く繧ｹ繝・
     /// </summary>
     public string ConfirmButtonText { get; init; } = "OK";
 
     /// <summary>
-    /// キャンセルボタンテキスト
+    /// 繧ｭ繝｣繝ｳ繧ｻ繝ｫ繝懊ち繝ｳ繝・く繧ｹ繝・
     /// </summary>
     public string? CancelButtonText { get; init; }
 
     /// <summary>
-    /// 確認時のコールバック
+    /// 遒ｺ隱肴凾縺ｮ繧ｳ繝ｼ繝ｫ繝舌ャ繧ｯ
     /// </summary>
     public Func<Task>? OnConfirm { get; init; }
 
     /// <summary>
-    /// キャンセル時のコールバック
+    /// 繧ｭ繝｣繝ｳ繧ｻ繝ｫ譎ゅ・繧ｳ繝ｼ繝ｫ繝舌ャ繧ｯ
     /// </summary>
     public Func<Task>? OnCancel { get; init; }
 }
 
 /// <summary>
-/// 通知種別
+/// 騾夂衍遞ｮ蛻･
 /// </summary>
 public enum NotificationType
 {
     /// <summary>
-    /// 情報
+    /// 諠・ｱ
     /// </summary>
     Info,
 
     /// <summary>
-    /// 成功
+    /// 謌仙粥
     /// </summary>
     Success,
 
     /// <summary>
-    /// 警告
+    /// 隴ｦ蜻・
     /// </summary>
     Warning,
 
     /// <summary>
-    /// エラー
+    /// 繧ｨ繝ｩ繝ｼ
     /// </summary>
     Error
 }
 
 /// <summary>
-/// モーダル種別
+/// 繝｢繝ｼ繝繝ｫ遞ｮ蛻･
 /// </summary>
 public enum ModalType
 {
     /// <summary>
-    /// アラート（OKのみ）
+    /// 繧｢繝ｩ繝ｼ繝茨ｼ・K縺ｮ縺ｿ・・
     /// </summary>
     Alert,
 
     /// <summary>
-    /// 確認ダイアログ（OK/キャンセル）
+    /// 遒ｺ隱阪ム繧､繧｢繝ｭ繧ｰ・・K/繧ｭ繝｣繝ｳ繧ｻ繝ｫ・・
     /// </summary>
     Confirm,
 
     /// <summary>
-    /// カスタムコンテンツ
+    /// 繧ｫ繧ｹ繧ｿ繝繧ｳ繝ｳ繝・Φ繝・
     /// </summary>
     Custom
 }

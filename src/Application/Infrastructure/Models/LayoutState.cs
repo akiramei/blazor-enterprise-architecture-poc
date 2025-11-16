@@ -1,47 +1,47 @@
-namespace Application.Host.Infrastructure.Models;
+namespace Application.Infrastructure.Models;
 
 /// <summary>
-/// レイアウト状態 - UI要素の表示/非表示状態を保持
+/// 繝ｬ繧､繧｢繧ｦ繝育憾諷・- UI隕∫ｴ縺ｮ陦ｨ遉ｺ/髱櫁｡ｨ遉ｺ迥ｶ諷九ｒ菫晄戟
 ///
-/// 設計方針:
-/// - サイドバー、ナビゲーションメニュー等の状態管理
-/// - LocalStorageに永続化
-/// - レスポンシブ対応（画面サイズに応じた自動調整）
+/// 險ｭ險域婿驥・
+/// - 繧ｵ繧､繝峨ヰ繝ｼ縲√リ繝薙ご繝ｼ繧ｷ繝ｧ繝ｳ繝｡繝九Η繝ｼ遲峨・迥ｶ諷狗ｮ｡逅・
+/// - LocalStorage縺ｫ豌ｸ邯壼喧
+/// - 繝ｬ繧ｹ繝昴Φ繧ｷ繝門ｯｾ蠢懶ｼ育判髱｢繧ｵ繧､繧ｺ縺ｫ蠢懊§縺溯・蜍戊ｪｿ謨ｴ・・
 /// </summary>
 public sealed record LayoutState
 {
     /// <summary>
-    /// サイドバーの表示状態
+    /// 繧ｵ繧､繝峨ヰ繝ｼ縺ｮ陦ｨ遉ｺ迥ｶ諷・
     /// </summary>
     public bool IsSidebarOpen { get; init; }
 
     /// <summary>
-    /// サイドバーの固定状態（ピン留め）
+    /// 繧ｵ繧､繝峨ヰ繝ｼ縺ｮ蝗ｺ螳夂憾諷具ｼ医ヴ繝ｳ逡吶ａ・・
     /// </summary>
     public bool IsSidebarPinned { get; init; }
 
     /// <summary>
-    /// ナビゲーションメニューの折りたたみ状態
+    /// 繝翫ン繧ｲ繝ｼ繧ｷ繝ｧ繝ｳ繝｡繝九Η繝ｼ縺ｮ謚倥ｊ縺溘◆縺ｿ迥ｶ諷・
     /// </summary>
     public bool IsNavMenuCollapsed { get; init; }
 
     /// <summary>
-    /// フルスクリーンモード
+    /// 繝輔Ν繧ｹ繧ｯ繝ｪ繝ｼ繝ｳ繝｢繝ｼ繝・
     /// </summary>
     public bool IsFullScreen { get; init; }
 
     /// <summary>
-    /// 現在の画面サイズ
+    /// 迴ｾ蝨ｨ縺ｮ逕ｻ髱｢繧ｵ繧､繧ｺ
     /// </summary>
     public ScreenSize ScreenSize { get; init; }
 
     /// <summary>
-    /// 初期化中フラグ
+    /// 蛻晄悄蛹紋ｸｭ繝輔Λ繧ｰ
     /// </summary>
     public bool IsLoading { get; init; }
 
     /// <summary>
-    /// デフォルト状態
+    /// 繝・ヵ繧ｩ繝ｫ繝育憾諷・
     /// </summary>
     public static LayoutState Default => new()
     {
@@ -54,7 +54,7 @@ public sealed record LayoutState
     };
 
     /// <summary>
-    /// モバイル用デフォルト状態
+    /// 繝｢繝舌う繝ｫ逕ｨ繝・ヵ繧ｩ繝ｫ繝育憾諷・
     /// </summary>
     public static LayoutState MobileDefault => new()
     {
@@ -68,22 +68,22 @@ public sealed record LayoutState
 }
 
 /// <summary>
-/// 画面サイズ
+/// 逕ｻ髱｢繧ｵ繧､繧ｺ
 /// </summary>
 public enum ScreenSize
 {
     /// <summary>
-    /// モバイル（< 768px）
+    /// 繝｢繝舌う繝ｫ・・ 768px・・
     /// </summary>
     Mobile,
 
     /// <summary>
-    /// タブレット（768px - 1024px）
+    /// 繧ｿ繝悶Ξ繝・ヨ・・68px - 1024px・・
     /// </summary>
     Tablet,
 
     /// <summary>
-    /// デスクトップ（> 1024px）
+    /// 繝・せ繧ｯ繝医ャ繝暦ｼ・ 1024px・・
     /// </summary>
     Desktop
 }

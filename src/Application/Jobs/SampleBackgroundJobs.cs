@@ -1,7 +1,7 @@
 using Hangfire;
 using Microsoft.Extensions.Logging;
 
-namespace Application.Host.Jobs;
+namespace Application.Jobs;
 
 /// <summary>
 /// サンプル バックグラウンドジョブ

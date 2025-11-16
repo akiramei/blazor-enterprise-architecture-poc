@@ -116,7 +116,7 @@
                                    checked="@selectedProductIds.Contains(product.Id)"
                                    @onchange="@((ChangeEventArgs e) => ToggleSelection(product.Id, e))">
                         </div>
-                        <ProductCard Product="@product" OnDelete="@(id => Actions.DeleteAsync(id))" />
+                        <ProductCard Product="@product" OnDelete="@(async (Guid id) => await Actions.DeleteAsync(id))" />
                     </div>
                 </div>
             }

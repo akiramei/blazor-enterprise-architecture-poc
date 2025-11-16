@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.SignalR;
 using Shared.Application.Interfaces;
-using Application.Host.Hubs;
+using Application.Hubs;
 
-namespace Application.Host.Services;
+namespace Application.Services;
 
 /// <summary>
-/// SignalRを使用した商品変更通知サービス
+/// SignalR繧剃ｽｿ逕ｨ縺励◆蝠・刀螟画峩騾夂衍繧ｵ繝ｼ繝薙せ
 /// </summary>
 public sealed class ProductNotificationService : IProductNotificationService
 {
@@ -22,7 +22,7 @@ public sealed class ProductNotificationService : IProductNotificationService
 
     public async Task NotifyProductChangedAsync(CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("商品変更を全クライアントに通知");
+        _logger.LogInformation("蝠・刀螟画峩繧貞・繧ｯ繝ｩ繧､繧｢繝ｳ繝医↓騾夂衍");
         await _hubContext.Clients.All.ProductChanged();
     }
 }

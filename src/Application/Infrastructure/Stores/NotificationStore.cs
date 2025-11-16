@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
-using Application.Host.Infrastructure.Models;
+using Application.Infrastructure.Models;
 
-namespace Application.Host.Infrastructure.Stores;
+namespace Application.Infrastructure.Stores;
 
 /// <summary>
 /// 通知管理

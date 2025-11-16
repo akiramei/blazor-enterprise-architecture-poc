@@ -1,7 +1,7 @@
-namespace Application.Host.Middleware;
+namespace Application.Middleware;
 
 /// <summary>
-/// リクエストごとに CorrelationID を生成・管理するミドルウェア
+/// 繝ｪ繧ｯ繧ｨ繧ｹ繝医＃縺ｨ縺ｫ CorrelationID 繧堤函謌舌・邂｡逅・☆繧九Α繝峨Ν繧ｦ繧ｧ繧｢
 /// </summary>
 public sealed class CorrelationIdMiddleware
 {
@@ -17,14 +17,14 @@ public sealed class CorrelationIdMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // リクエストヘッダーから CorrelationID を取得、なければ生成
+        // 繝ｪ繧ｯ繧ｨ繧ｹ繝医・繝・ム繝ｼ縺九ｉ CorrelationID 繧貞叙蠕励√↑縺代ｌ縺ｰ逕滓・
         var correlationId = context.Request.Headers[CorrelationIdHeader].FirstOrDefault()
             ?? Guid.NewGuid().ToString("N");
 
-        // HttpContext.Items に保存
+        // HttpContext.Items 縺ｫ菫晏ｭ・
         context.Items[CorrelationIdKey] = correlationId;
 
-        // レスポンスヘッダーに追加
+        // 繝ｬ繧ｹ繝昴Φ繧ｹ繝倥ャ繝繝ｼ縺ｫ霑ｽ蜉
         context.Response.OnStarting(() =>
         {
             if (!context.Response.Headers.ContainsKey(CorrelationIdHeader))

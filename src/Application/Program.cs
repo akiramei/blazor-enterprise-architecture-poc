@@ -18,8 +18,8 @@ using Shared.Infrastructure.Authentication;
 using Shared.Infrastructure.Platform.Stores;
 using ProductCatalog.Shared.Infrastructure.Persistence;
 using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
-using Application.Host.Services;
-using Application.Host.Components;
+using Application.Services;
+using Application.Components;
 using ProductCatalog.Shared.UI.Actions;
 using ProductCatalog.Shared.UI.Store;
 using Serilog;
@@ -27,7 +27,7 @@ using Shared.Infrastructure.Platform.Persistence;
 using PurchaseManagement.Infrastructure;
 using Hangfire;
 using Hangfire.PostgreSql;
-using Application.Host.Middleware;
+using Application.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,7 +102,7 @@ builder.Services.AddScoped<ICurrentUserService, Shared.Infrastructure.Services.C
 builder.Services.AddScoped<IAppContext, Shared.Infrastructure.Services.AppContext>();
 
 // Product Notification Service (SignalR)
-builder.Services.AddScoped<IProductNotificationService, Application.Host.Services.ProductNotificationService>();
+builder.Services.AddScoped<IProductNotificationService, Application.Services.ProductNotificationService>();
 
 // Correlation ID Accessor (Distributed Tracing)
 builder.Services.AddScoped<ICorrelationIdAccessor, Shared.Infrastructure.Services.CorrelationIdAccessor>();
@@ -222,12 +222,12 @@ else
 builder.Services.AddScoped<IAuditLogRepository, Shared.Infrastructure.Platform.Repositories.AuditLogRepository>();
 
 // Infrastructure Services (Scoped for Blazor Server circuits)
-builder.Services.AddScoped<Application.Host.Infrastructure.Services.LocalStorageService>();
+builder.Services.AddScoped<Application.Infrastructure.Services.LocalStorageService>();
 
 // Infrastructure Stores (Scoped for Blazor Server circuits - システムレベル状態管理)
-builder.Services.AddScoped<Application.Host.Infrastructure.Stores.PreferencesStore>();
-builder.Services.AddScoped<Application.Host.Infrastructure.Stores.LayoutStore>();
-builder.Services.AddScoped<Application.Host.Infrastructure.Stores.NotificationStore>();
+builder.Services.AddScoped<Application.Infrastructure.Stores.PreferencesStore>();
+builder.Services.AddScoped<Application.Infrastructure.Stores.LayoutStore>();
+builder.Services.AddScoped<Application.Infrastructure.Stores.NotificationStore>();
 
 // Feature Stores (Scoped for Blazor Server circuits - ドメイン固有状態管理)
 builder.Services.AddScoped<ProductsStore>();
@@ -428,10 +428,10 @@ if (!app.Environment.IsEnvironment("Test"))
 app.UseCors("ApiCorsPolicy");
 
 // Correlation ID Middleware (最初に実行)
-app.UseMiddleware<Application.Host.Middleware.CorrelationIdMiddleware>();
+app.UseMiddleware<Application.Middleware.CorrelationIdMiddleware>();
 
 // Global Exception Handler (グローバルエラーハンドリング)
-app.UseMiddleware<Application.Host.Middleware.GlobalExceptionHandlerMiddleware>();
+app.UseMiddleware<Application.Middleware.GlobalExceptionHandlerMiddleware>();
 
 // Serilog Request Logging (HTTPリクエスト/レスポンスのログ記録)
 app.UseSerilogRequestLogging();
@@ -455,7 +455,7 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(Program.FeatureUIAssemblies);
 
 // SignalR Hub エンドポイント
-app.MapHub<Application.Host.Hubs.ProductHub>("/hubs/products");
+app.MapHub<Application.Hubs.ProductHub>("/hubs/products");
 
 // REST API Controllers エンドポイント
 app.MapControllers();
@@ -476,7 +476,7 @@ foreach (var ds in app.Services.GetServices<Microsoft.AspNetCore.Routing.Endpoin
 if (!app.Environment.IsEnvironment("Test"))
 {
     // 毎日午前3時に古いデータをクリーンアップ
-    RecurringJob.AddOrUpdate<Application.Host.Jobs.SampleBackgroundJobs>(
+    RecurringJob.AddOrUpdate<Application.Jobs.SampleBackgroundJobs>(
         "daily-cleanup",
         job => job.CleanupOldData(default),
         Cron.Daily(3), // 午前3時
@@ -486,7 +486,7 @@ if (!app.Environment.IsEnvironment("Test"))
         });
 
     // 毎月1日の午前2時に月次レポート生成
-    RecurringJob.AddOrUpdate<Application.Host.Jobs.SampleBackgroundJobs>(
+    RecurringJob.AddOrUpdate<Application.Jobs.SampleBackgroundJobs>(
         "monthly-report",
         job => job.GenerateMonthlyReport(default),
         Cron.Monthly(1, 2), // 毎月1日の午前2時

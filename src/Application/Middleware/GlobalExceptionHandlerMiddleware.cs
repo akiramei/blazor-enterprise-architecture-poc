@@ -3,7 +3,7 @@ using System.Text.Json;
 using FluentValidation;
 using Shared.Application.Interfaces;
 
-namespace Application.Host.Middleware;
+namespace Application.Middleware;
 
 /// <summary>
 /// グローバル例外ハンドリングミドルウェア

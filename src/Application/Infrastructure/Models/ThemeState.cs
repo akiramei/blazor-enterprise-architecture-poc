@@ -1,32 +1,32 @@
-namespace Application.Host.Infrastructure.Models;
+namespace Application.Infrastructure.Models;
 
 /// <summary>
-/// テーマ状態 - アプリケーションのテーマ設定を保持
+/// 繝・・繝樒憾諷・- 繧｢繝励Μ繧ｱ繝ｼ繧ｷ繝ｧ繝ｳ縺ｮ繝・・繝櫁ｨｭ螳壹ｒ菫晄戟
 ///
-/// 設計方針:
-/// - ダークモード/ライトモードの切り替えをサポート
-/// - LocalStorageに永続化
-/// - システム設定に従うオプションを提供
+/// 險ｭ險域婿驥・
+/// - 繝繝ｼ繧ｯ繝｢繝ｼ繝・繝ｩ繧､繝医Δ繝ｼ繝峨・蛻・ｊ譖ｿ縺医ｒ繧ｵ繝昴・繝・
+/// - LocalStorage縺ｫ豌ｸ邯壼喧
+/// - 繧ｷ繧ｹ繝・Β險ｭ螳壹↓蠕薙≧繧ｪ繝励す繝ｧ繝ｳ繧呈署萓・
 /// </summary>
 public sealed record ThemeState
 {
     /// <summary>
-    /// テーマモード
+    /// 繝・・繝槭Δ繝ｼ繝・
     /// </summary>
     public ThemeMode Mode { get; init; }
 
     /// <summary>
-    /// システムのテーマ設定に従うか
+    /// 繧ｷ繧ｹ繝・Β縺ｮ繝・・繝櫁ｨｭ螳壹↓蠕薙≧縺・
     /// </summary>
     public bool UseSystemTheme { get; init; }
 
     /// <summary>
-    /// 初期化中フラグ
+    /// 蛻晄悄蛹紋ｸｭ繝輔Λ繧ｰ
     /// </summary>
     public bool IsLoading { get; init; }
 
     /// <summary>
-    /// デフォルト状態（ライトモード）
+    /// 繝・ヵ繧ｩ繝ｫ繝育憾諷具ｼ医Λ繧､繝医Δ繝ｼ繝会ｼ・
     /// </summary>
     public static ThemeState Default => new()
     {
@@ -36,7 +36,7 @@ public sealed record ThemeState
     };
 
     /// <summary>
-    /// 実際に適用されるテーマモード（システム設定考慮）
+    /// 螳滄圀縺ｫ驕ｩ逕ｨ縺輔ｌ繧九ユ繝ｼ繝槭Δ繝ｼ繝会ｼ医す繧ｹ繝・Β險ｭ螳夊・・・・
     /// </summary>
     public ThemeMode EffectiveMode(bool systemPrefersDark) =>
         UseSystemTheme
@@ -45,17 +45,17 @@ public sealed record ThemeState
 }
 
 /// <summary>
-/// テーマモード
+/// 繝・・繝槭Δ繝ｼ繝・
 /// </summary>
 public enum ThemeMode
 {
     /// <summary>
-    /// ライトモード
+    /// 繝ｩ繧､繝医Δ繝ｼ繝・
     /// </summary>
     Light,
 
     /// <summary>
-    /// ダークモード
+    /// 繝繝ｼ繧ｯ繝｢繝ｼ繝・
     /// </summary>
     Dark
 }

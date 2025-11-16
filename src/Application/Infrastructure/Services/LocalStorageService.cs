@@ -1,15 +1,15 @@
 using Microsoft.JSInterop;
 using System.Text.Json;
 
-namespace Application.Host.Infrastructure.Services;
+namespace Application.Infrastructure.Services;
 
 /// <summary>
-/// LocalStorage アクセス用サービス
+/// LocalStorage 繧｢繧ｯ繧ｻ繧ｹ逕ｨ繧ｵ繝ｼ繝薙せ
 ///
-/// 設計方針:
-/// - JSInterop経由でブラウザのLocalStorageにアクセス
-/// - JSON形式でシリアライズ/デシリアライズ
-/// - 非同期操作をサポート
+/// 險ｭ險域婿驥・
+/// - JSInterop邨檎罰縺ｧ繝悶Λ繧ｦ繧ｶ縺ｮLocalStorage縺ｫ繧｢繧ｯ繧ｻ繧ｹ
+/// - JSON蠖｢蠑上〒繧ｷ繝ｪ繧｢繝ｩ繧､繧ｺ/繝・す繝ｪ繧｢繝ｩ繧､繧ｺ
+/// - 髱槫酔譛滓桃菴懊ｒ繧ｵ繝昴・繝・
 /// </summary>
 public sealed class LocalStorageService
 {
@@ -31,7 +31,7 @@ public sealed class LocalStorageService
     }
 
     /// <summary>
-    /// 値を保存
+    /// 蛟､繧剃ｿ晏ｭ・
     /// </summary>
     public async Task SetItemAsync<T>(string key, T value, CancellationToken ct = default)
     {
@@ -42,13 +42,13 @@ public sealed class LocalStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "LocalStorageへの保存に失敗しました: Key={Key}", key);
+            _logger.LogError(ex, "LocalStorage縺ｸ縺ｮ菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆: Key={Key}", key);
             throw;
         }
     }
 
     /// <summary>
-    /// 値を取得
+    /// 蛟､繧貞叙蠕・
     /// </summary>
     public async Task<T?> GetItemAsync<T>(string key, CancellationToken ct = default)
     {
@@ -63,13 +63,13 @@ public sealed class LocalStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "LocalStorageからの取得に失敗しました: Key={Key}", key);
+            _logger.LogError(ex, "LocalStorage縺九ｉ縺ｮ蜿門ｾ励↓螟ｱ謨励＠縺ｾ縺励◆: Key={Key}", key);
             return default;
         }
     }
 
     /// <summary>
-    /// 値を削除
+    /// 蛟､繧貞炎髯､
     /// </summary>
     public async Task RemoveItemAsync(string key, CancellationToken ct = default)
     {
@@ -79,13 +79,13 @@ public sealed class LocalStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "LocalStorageからの削除に失敗しました: Key={Key}", key);
+            _logger.LogError(ex, "LocalStorage縺九ｉ縺ｮ蜑企勁縺ｫ螟ｱ謨励＠縺ｾ縺励◆: Key={Key}", key);
             throw;
         }
     }
 
     /// <summary>
-    /// すべてクリア
+    /// 縺吶∋縺ｦ繧ｯ繝ｪ繧｢
     /// </summary>
     public async Task ClearAsync(CancellationToken ct = default)
     {
@@ -95,13 +95,13 @@ public sealed class LocalStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "LocalStorageのクリアに失敗しました");
+            _logger.LogError(ex, "LocalStorage縺ｮ繧ｯ繝ｪ繧｢縺ｫ螟ｱ謨励＠縺ｾ縺励◆");
             throw;
         }
     }
 
     /// <summary>
-    /// キーの存在確認
+    /// 繧ｭ繝ｼ縺ｮ蟄伜惠遒ｺ隱・
     /// </summary>
     public async Task<bool> ContainsKeyAsync(string key, CancellationToken ct = default)
     {
@@ -112,7 +112,7 @@ public sealed class LocalStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "LocalStorageの確認に失敗しました: Key={Key}", key);
+            _logger.LogError(ex, "LocalStorage縺ｮ遒ｺ隱阪↓螟ｱ謨励＠縺ｾ縺励◆: Key={Key}", key);
             return false;
         }
     }
