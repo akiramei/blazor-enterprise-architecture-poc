@@ -60,13 +60,13 @@ src/
 **重要なポイント:**
 - `src/Shared/` = **BC横断**の共有（全BC共通）
 - `src/PurchaseManagement/Shared/` = **PurchaseManagement BC内**の共有（このBC内のみ）
-- `src/ProductCatalog/Shared/` = **ProductCatalog BC内**の共有（このBC内のみ）
+- `src/Application/Shared/ProductCatalog/` = **ProductCatalog BC内**の共有（このBC内のみ）
 - 同じ `Shared` という名前だが、**スコープが全く異なる**
 
 **3つの「Shared/Domain」:**
 1. `src/Shared/Domain/` → 全BC共通（ApplicationUser、OutboxMessage）
 2. `src/PurchaseManagement/Shared/Domain/` → PurchaseManagement BC固有（PurchaseRequest）
-3. `src/ProductCatalog/Shared/Domain/` → ProductCatalog BC固有（Product）
+3. `src/Application/Shared/ProductCatalog/Domain/` → ProductCatalog BC固有（Product）
 
 ---
 

@@ -105,7 +105,7 @@ GROUP BY product_id, DATE_TRUNC('day', order_date);
 ### BC構造
 
 ```
-src/ProductCatalog/Features/              # 既存BCに追加
+src/Application/Features/              # 既存BCに追加
 ├── GetProductSalesReport/                 # 商品売上レポート
 │   ├── Application/
 │   │   ├── GetProductSalesReportQuery.cs

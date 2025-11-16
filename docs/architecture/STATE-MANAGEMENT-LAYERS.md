@@ -466,7 +466,7 @@
 ### 1. 共通プラットフォームSDK（将来的にNuGetパッケージ化も可能）
 
 ```
-src/ProductCatalog/Shared/UI/Providers/
+src/Application/Shared/ProductCatalog/UI/Providers/
 ├── Session/
 │   ├── SessionProvider.razor
 │   ├── SessionState.cs
@@ -494,7 +494,7 @@ src/ProductCatalog/Shared/UI/Providers/
 ### 2. サーバーサイド共通基盤（プロジェクトテンプレート）
 
 ```
-src/ProductCatalog/Shared/Infrastructure/
+src/Application/Shared/ProductCatalog/Infrastructure/
 ├── Authentication/
 │   ├── JwtSettings.cs
 │   ├── JwtTokenGenerator.cs

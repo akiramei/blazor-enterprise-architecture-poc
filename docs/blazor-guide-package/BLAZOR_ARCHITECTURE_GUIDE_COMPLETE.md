@@ -373,7 +373,7 @@ graph TD
 **Vertical Slice Architecture: 機能ごとに全層を包含**
 
 ```
-src/ProductCatalog/
+src/Application/
   └── Features/
       ├── CreateProduct/              ← 【作成パターン】
       │   ├── Application/
@@ -426,7 +426,7 @@ VSAでは各機能スライス内に層が配置されています。機能を�
 
 1. **Domain層から** - ビジネスロジックの中核を理解
    - [11_Domain層の詳細設計](11_Domain層の詳細設計.md)
-   - `src/ProductCatalog/Features/CreateProduct/Domain/Product.cs` を読む
+   - `src/Application/Features/CreateProduct/Domain/Product.cs` を読む
 
 2. **Application層** - ユースケース実装パターンを理解
    - [10_Application層の詳細設計](10_Application層の詳細設計.md) (CQRS、Command/Query実装)
@@ -445,28 +445,28 @@ VSAでは各機能スライス内に層が配置されています。機能を�
 **参照系:**
 ```
 1. GetProducts (基本的な一覧取得)
-   → src/ProductCatalog/Features/GetProducts/
+   → src/Application/Features/GetProducts/
 
 2. GetProductById (単一取得)
-   → src/ProductCatalog/Features/GetProductById/
+   → src/Application/Features/GetProductById/
 
 3. SearchProducts (複雑な検索)
-   → src/ProductCatalog/Features/SearchProducts/
+   → src/Application/Features/SearchProducts/
 ```
 
 **更新系:**
 ```
 1. CreateProduct (作成)
-   → src/ProductCatalog/Features/CreateProduct/
+   → src/Application/Features/CreateProduct/
 
 2. UpdateProduct (更新)
-   → src/ProductCatalog/Features/UpdateProduct/
+   → src/Application/Features/UpdateProduct/
 
 3. DeleteProduct (削除)
-   → src/ProductCatalog/Features/DeleteProduct/
+   → src/Application/Features/DeleteProduct/
 
 4. BulkDeleteProducts (一括削除)
-   → src/ProductCatalog/Features/BulkDeleteProducts/
+   → src/Application/Features/BulkDeleteProducts/
 ```
 
 ### ステップ4: 実践（6-7日目）
@@ -1517,10 +1517,10 @@ public class OrderProcessSaga
 
 | パターン名 | 使用シナリオ | 複雑度 | 実装場所 |
 |-----------|------------|-------|---------|
-| **GetProducts** | 全商品の一覧取得 | ⭐ 簡単 | `src/ProductCatalog/Features/GetProducts/` |
-| **GetProductById** | IDで単一商品を取得 | ⭐ 簡単 | `src/ProductCatalog/Features/GetProductById/` |
-| **SearchProducts** | 複雑な検索、フィルタリング、ページング | ⭐⭐⭐ 複雑 | `src/ProductCatalog/Features/SearchProducts/` |
-| **ExportProductsToCsv** | 検索結果のCSVエクスポート | ⭐⭐ 普通 | `src/ProductCatalog/Features/ExportProductsToCsv/` |
+| **GetProducts** | 全商品の一覧取得 | ⭐ 簡単 | `src/Application/Features/GetProducts/` |
+| **GetProductById** | IDで単一商品を取得 | ⭐ 簡単 | `src/Application/Features/GetProductById/` |
+| **SearchProducts** | 複雑な検索、フィルタリング、ページング | ⭐⭐⭐ 複雑 | `src/Application/Features/SearchProducts/` |
+| **ExportProductsToCsv** | 検索結果のCSVエクスポート | ⭐⭐ 普通 | `src/Application/Features/ExportProductsToCsv/` |
 
 #### GetProducts - 一覧取得パターン
 
@@ -1724,12 +1724,12 @@ public async Task ExportToCsvAsync(CancellationToken ct = default)
 
 | パターン名 | 使用シナリオ | 複雑度 | 実装場所 |
 |-----------|------------|-------|---------|
-| **CreateProduct** | 新規商品の作成 | ⭐⭐ 普通 | `src/ProductCatalog/Features/CreateProduct/` |
-| **UpdateProduct** | 既存商品の更新 | ⭐⭐⭐ 複雑 | `src/ProductCatalog/Features/UpdateProduct/` |
-| **DeleteProduct** | 単一商品の削除 | ⭐⭐ 普通 | `src/ProductCatalog/Features/DeleteProduct/` |
-| **BulkDeleteProducts** | 複数商品の一括削除 | ⭐⭐⭐ 複雑 | `src/ProductCatalog/Features/BulkDeleteProducts/` |
-| **BulkUpdateProductPrices** | 複数商品の価格一括更新 | ⭐⭐⭐ 複雑 | `src/ProductCatalog/Features/BulkUpdateProductPrices/` |
-| **ImportProductsFromCsv** | CSVファイルから一括インポート | ⭐⭐⭐⭐ 高度 | `src/ProductCatalog/Features/ImportProductsFromCsv/` |
+| **CreateProduct** | 新規商品の作成 | ⭐⭐ 普通 | `src/Application/Features/CreateProduct/` |
+| **UpdateProduct** | 既存商品の更新 | ⭐⭐⭐ 複雑 | `src/Application/Features/UpdateProduct/` |
+| **DeleteProduct** | 単一商品の削除 | ⭐⭐ 普通 | `src/Application/Features/DeleteProduct/` |
+| **BulkDeleteProducts** | 複数商品の一括削除 | ⭐⭐⭐ 複雑 | `src/Application/Features/BulkDeleteProducts/` |
+| **BulkUpdateProductPrices** | 複数商品の価格一括更新 | ⭐⭐⭐ 複雑 | `src/Application/Features/BulkUpdateProductPrices/` |
+| **ImportProductsFromCsv** | CSVファイルから一括インポート | ⭐⭐⭐⭐ 高度 | `src/Application/Features/ImportProductsFromCsv/` |
 
 #### CreateProduct - 作成パターン
 
@@ -2206,11 +2206,11 @@ await NotificationStore.ShowSuccessAsync("保存完了", "データを保存し�
 
 | パターン名 | 役割 | 実装場所 | 詳細 |
 |-----------|-----|---------|------|
-| **ProductsStore** | 商品一覧の状態管理+I/O | `src/ProductCatalog/Shared/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
-| **ProductDetailStore** | 商品詳細の状態管理+I/O | `src/ProductCatalog/Shared/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
-| **ProductEditStore** | 商品編集の状態管理+I/O | `src/ProductCatalog/Shared/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
-| **ProductSearchStore** | 商品検索の状態管理+I/O | `src/ProductCatalog/Shared/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
-| **ProductListActions** | 商品一覧画面のUI手順 | `src/ProductCatalog/Shared/UI/Actions/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#93-pageactionsui手順オーケストレーション) |
+| **ProductsStore** | 商品一覧の状態管理+I/O | `src/Application/Shared/ProductCatalog/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
+| **ProductDetailStore** | 商品詳細の状態管理+I/O | `src/Application/Shared/ProductCatalog/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
+| **ProductEditStore** | 商品編集の状態管理+I/O | `src/Application/Shared/ProductCatalog/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
+| **ProductSearchStore** | 商品検索の状態管理+I/O | `src/Application/Shared/ProductCatalog/UI/Store/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#94-store状態管理とio) |
+| **ProductListActions** | 商品一覧画面のUI手順 | `src/Application/Shared/ProductCatalog/UI/Actions/` | [09_UI層の詳細設計](09_UI層の詳細設計.md#93-pageactionsui手順オーケストレーション) |
 
 **いつ使うか:**
 - ✅ ビジネスロジック固有の機能
@@ -3130,7 +3130,7 @@ public class ProductListActions
 
 #### **📦 システムレベル状態管理（Infrastructure）の実装**
 
-以下の5つのコンポーネントが `src/ProductCatalog.Host/Infrastructure/` に実装されています。
+以下の5つのコンポーネントが `src/Application/Infrastructure/` に実装されています。
 
 ##### **1. SessionProvider（認証状態管理）の使い方**
 
@@ -12162,7 +12162,7 @@ AI判断: データ変更 → 更新系パターン → UpdateProductパター�
 **パターンが決まったら、対応する機能スライスの全ファイルを参照:**
 
 ```
-src/ProductCatalog/Features/UpdateProduct/
+src/Application/Features/UpdateProduct/
 ├── Application/
 │   ├── UpdateProductCommand.cs      ← Commandの定義を学ぶ
 │   ├── UpdateProductHandler.cs      ← ビジネスロジックの流れを学ぶ
