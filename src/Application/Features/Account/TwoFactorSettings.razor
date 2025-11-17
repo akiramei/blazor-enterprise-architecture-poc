@@ -1,0 +1,324 @@
+@page "/account/2fa"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using global::Shared.Domain.Identity
+@using Application.Shared.Account.UI.Store
+@using Application.Shared.Account.UI.Actions
+@attribute [Authorize]
+@inject UserManager<ApplicationUser> UserManager
+@inject SecuritySettingsStore Store
+@inject SecuritySettingsActions Actions
+@inject NavigationManager Navigation
+@inject ILogger<TwoFactorSettings> Logger
+@implements IDisposable
+
+<PageTitle>二要素認証設定</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h2>二要素認証（2FA）設定</h2>
+
+            @if (loading)
+            {
+                <div class="text-center my-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">読み込み中...</span>
+                    </div>
+                </div>
+            }
+            else if (state.ErrorMessage != null)
+            {
+                <div class="alert alert-danger" role="alert">
+                    @state.ErrorMessage
+                </div>
+            }
+            else
+            {
+                @if (!state.IsEnabled)
+                {
+                    <!-- 2FA無効状態 -->
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">二要素認証を有効化</h5>
+                            <p class="card-text">
+                                二要素認証（2FA）を有効にすると、ログイン時にパスワードに加えて
+                                認証アプリから生成される6桁のコードが必要になります。
+                            </p>
+                            <p class="card-text">
+                                <strong>セキュリティが大幅に向上します。</strong>
+                            </p>
+
+                            @if (state.SetupStep == SetupStep.NotStarted)
+                            {
+                                <button class="btn btn-primary" @onclick="StartEnable2FA" disabled="@state.IsProcessing">
+                                    @if (state.IsProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    2FAを有効化
+                                </button>
+                            }
+                            else if (state.SetupStep == SetupStep.ShowingQRCode)
+                            {
+                                <!-- QRコード表示 -->
+                                <div class="alert alert-info">
+                                    <h6>ステップ 1: 認証アプリでQRコードをスキャン</h6>
+                                    <p class="mb-2">以下のいずれかの認証アプリを使用してください：</p>
+                                    <ul class="mb-2">
+                                        <li>Google Authenticator</li>
+                                        <li>Microsoft Authenticator</li>
+                                        <li>Authy</li>
+                                    </ul>
+                                </div>
+
+                                <div class="text-center my-4">
+                                    @if (!string.IsNullOrEmpty(state.QrCodeDataUri))
+                                    {
+                                        <img src="@state.QrCodeDataUri" alt="QR Code" class="img-fluid" style="max-width: 300px;" />
+                                    }
+                                </div>
+
+                                <div class="alert alert-secondary">
+                                    <p class="mb-1"><strong>手動入力する場合:</strong></p>
+                                    <code>@state.SecretKey</code>
+                                    <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="CopySecretKey">
+                                        コピー
+                                    </button>
+                                </div>
+
+                                <div class="alert alert-warning">
+                                    <h6>ステップ 2: リカバリーコードを保存</h6>
+                                    <p class="mb-2">
+                                        認証アプリにアクセスできなくなった場合に使用できるリカバリーコードです。
+                                        <strong>必ず安全な場所に保存してください。</strong>
+                                    </p>
+                                    <div class="recovery-codes bg-light p-3 rounded">
+                                        @foreach (var recoveryCode in state.RecoveryCodes)
+                                        {
+                                            <div class="font-monospace">@recoveryCode</div>
+                                        }
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="CopyRecoveryCodes">
+                                        すべてコピー
+                                    </button>
+                                </div>
+
+                                <div class="alert alert-info">
+                                    <h6>ステップ 3: 確認コードを入力</h6>
+                                    <p class="mb-2">認証アプリに表示される6桁のコードを入力してください。</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="verificationCode" class="form-label">確認コード</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="verificationCode"
+                                           value="@state.VerificationCode"
+                                           @oninput="async (e) => await Store.SetVerificationCodeAsync(e.Value?.ToString() ?? string.Empty)"
+                                           maxlength="6"
+                                           placeholder="000000"
+                                           disabled="@state.IsProcessing" />
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(state.VerificationError))
+                                {
+                                    <div class="alert alert-danger">
+                                        @state.VerificationError
+                                    </div>
+                                }
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-success" @onclick="Verify2FA" disabled="@(state.IsProcessing || string.IsNullOrWhiteSpace(state.VerificationCode) || state.VerificationCode.Length != 6)">
+                                        @if (state.IsProcessing)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        確認して有効化
+                                    </button>
+                                    <button class="btn btn-outline-secondary" @onclick="CancelSetup" disabled="@state.IsProcessing">
+                                        キャンセル
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- 2FA有効状態 -->
+                    <div class="card border-success">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">
+                                <i class="bi bi-shield-check"></i> 二要素認証が有効です
+                            </h5>
+                            <p class="card-text">
+                                アカウントは二要素認証で保護されています。
+                            </p>
+                            <p class="card-text text-muted">
+                                有効化日時: @user?.TwoFactorEnabledAt?.ToLocalTime().ToString("yyyy/MM/dd HH:mm")
+                            </p>
+
+                            <hr />
+
+                            <h6>無効化</h6>
+                            <p class="text-muted">
+                                二要素認証を無効にすると、セキュリティレベルが低下します。
+                            </p>
+
+                            @if (!state.ShowDisableConfirmation)
+                            {
+                                <button class="btn btn-outline-danger" @onclick="ShowDisableConfirmation">
+                                    2FAを無効化
+                                </button>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    <p class="mb-2">本当に二要素認証を無効化しますか？</p>
+                                    <div class="mb-3">
+                                        <label for="passwordConfirm" class="form-label">パスワードを入力して確認</label>
+                                        <input type="password"
+                                               class="form-control"
+                                               id="passwordConfirm"
+                                               value="@state.PasswordConfirmation"
+                                               @oninput="async (e) => await Store.SetPasswordConfirmationAsync(e.Value?.ToString() ?? string.Empty)"
+                                               placeholder="パスワード"
+                                               disabled="@state.IsProcessing" />
+                                    </div>
+
+                                    @if (!string.IsNullOrEmpty(state.DisableError))
+                                    {
+                                        <div class="alert alert-danger">
+                                            @state.DisableError
+                                        </div>
+                                    }
+
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-danger" @onclick="Disable2FA" disabled="@(state.IsProcessing || string.IsNullOrWhiteSpace(state.PasswordConfirmation))">
+                                            @if (state.IsProcessing)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            }
+                                            無効化する
+                                        </button>
+                                        <button class="btn btn-outline-secondary" @onclick="CancelDisable" disabled="@state.IsProcessing">
+                                            キャンセル
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private ApplicationUser? user;
+    private bool loading = true;
+    private SecuritySettingsState state => Store.GetState();
+
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Store変更通知の購読
+        Store.OnChangeAsync += HandleStateChanged;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userName = authState.User.Identity?.Name;
+
+            if (string.IsNullOrEmpty(userName))
+            {
+                Navigation.NavigateTo("/Account/Login");
+                return;
+            }
+
+            user = await UserManager.FindByNameAsync(userName);
+            if (user == null)
+            {
+                await Store.SetErrorAsync("ユーザーが見つかりません");
+                return;
+            }
+
+            // 初期状態設定
+            await Store.SetEnabledAsync(user.IsTwoFactorEnabled);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "2FA設定画面の初期化エラー");
+            await Store.SetErrorAsync("エラーが発生しました。もう一度お試しください。");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task HandleStateChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Actions呼び出しに委譲（Phase 2改善）
+    private async Task StartEnable2FA()
+    {
+        await Actions.Enable2FAAsync(user!.Id);
+        // ユーザー状態を再取得
+        user = await UserManager.FindByIdAsync(user.Id.ToString());
+    }
+
+    private async Task Verify2FA()
+    {
+        await Actions.Verify2FAAsync(user!.Id, state.VerificationCode);
+        // ユーザー状態を再取得
+        user = await UserManager.FindByIdAsync(user.Id.ToString());
+    }
+
+    private async Task CancelSetup()
+    {
+        await Actions.CancelSetupAsync();
+    }
+
+    private async Task ShowDisableConfirmation()
+    {
+        await Actions.ToggleDisableConfirmationAsync(true);
+    }
+
+    private async Task CancelDisable()
+    {
+        await Actions.ToggleDisableConfirmationAsync(false);
+    }
+
+    private async Task Disable2FA()
+    {
+        await Actions.Disable2FAAsync(user!.Id, state.PasswordConfirmation);
+        // ユーザー状態を再取得
+        user = await UserManager.FindByIdAsync(user.Id.ToString());
+    }
+
+    // クリップボードコピー（UI層のヘルパーメソッド）
+    private async Task CopySecretKey()
+    {
+        // TODO: クリップボードコピー機能を実装
+        await Task.CompletedTask;
+    }
+
+    private async Task CopyRecoveryCodes()
+    {
+        // TODO: クリップボードコピー機能を実装
+        await Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= HandleStateChanged;
+    }
+}

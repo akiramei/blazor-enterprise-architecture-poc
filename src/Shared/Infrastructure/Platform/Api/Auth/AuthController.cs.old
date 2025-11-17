@@ -1,0 +1,366 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using MediatR;
+using Shared.Domain.Identity;
+using Shared.Infrastructure.Authentication;
+using Shared.Infrastructure.Platform.Persistence;
+using Shared.Infrastructure.Platform.Api.Auth.Dtos;
+using Application.Features.Login;
+using Application.Features.RefreshToken;
+using Application.Features.Enable2FA;
+using Application.Features.Verify2FA;
+using Application.Features.Disable2FA;
+
+namespace Shared.Infrastructure.Platform.Api.Auth;
+
+/// <summary>
+/// 認証API（Login, RefreshToken）
+///
+/// 【パターン: JWT Bearer認証 + Refresh Token】
+///
+/// このControllerは、REST APIクライアント（外部システム、モバイルアプリ、SPA等）向けの
+/// JWT Bearer認証エンドポイントを提供します。
+///
+/// ## 設計判断
+///
+/// ### なぜJWT Bearer + Refresh Tokenなのか？
+/// - **ステートレス**: サーバー側でセッション管理が不要
+/// - **スケーラブル**: 水平スケールが容易
+/// - **モバイル・SPA対応**: Cookie非依存の認証方式
+/// - **セキュリティ**: Access Token短命(15分) + Refresh Token長命(7日)のバランス
+///
+/// ### Blazor Server (Cookie認証) との併用
+/// このアプリケーションでは、以下2つの認証方式を並行稼働させています:
+/// - **Blazor Server UI**: Cookie認証（セッション管理、SignalR利用）
+/// - **REST API**: JWT Bearer認証（ステートレス、外部連携）
+///
+/// ## APIクライアントへの契約
+///
+/// 1. **ログインフロー**:
+///    - `/api/v1/auth/login` でAccess Token + Refresh Tokenを取得
+///    - Access TokenをすべてのAPIリクエストの `Authorization: Bearer {token}` ヘッダーに含める
+///
+/// 2. **トークン更新フロー**:
+///    - Access Token期限切れ（15分）時は `/api/v1/auth/refresh` で更新
+///    - Refresh Tokenも期限切れ（7日）の場合は再ログイン
+///
+/// 3. **セキュリティ要件**:
+///    - トークンは安全に保存（メモリ、暗号化ストレージ）
+///    - LocalStorage/SessionStorageに保存しない（XSS脆弱性）
+///    - 機密情報をログに出力しない
+///
+/// ## AI実装時の注意
+///
+/// - **Refresh Token Rotation**: 使用済みRefresh Tokenは無効化（セキュリティ強化）
+/// - **レート制限**: 認証系エンドポイントは 5 req/min（ブルートフォース攻撃対策）
+/// - **ロックアウト**: 5回失敗で5分間ロック（ASP.NET Core Identity設定）
+/// - **エラーレスポンス**: RFC 7807 Problem Details形式で統一
+/// - **ログ出力**: パスワードやトークンをログに記録しない
+///
+/// ## 関連ドキュメント
+/// - docs/patterns/REST-API-DESIGN-GUIDE.md - 認証フロー詳細
+/// - docs/patterns/API-CLIENT-CONTRACT.md - クライアント契約
+/// </summary>
+[ApiController]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/auth")]
+[AllowAnonymous]  // ❗ 認証不要（ログイン前のユーザーがアクセス）
+public sealed class AuthController : ControllerBase
+{
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
+    private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly ITotpService _totpService;
+    private readonly PlatformDbContext _dbContext;
+    private readonly ILogger<AuthController> _logger;
+    private readonly ISender _mediator;
+
+    public AuthController(
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
+        IJwtTokenGenerator jwtTokenGenerator,
+        ITotpService totpService,
+        PlatformDbContext dbContext,
+        ILogger<AuthController> logger,
+        ISender mediator)
+    {
+        _userManager = userManager;
+        _signInManager = signInManager;
+        _jwtTokenGenerator = jwtTokenGenerator;
+        _totpService = totpService;
+        _dbContext = dbContext;
+        _logger = logger;
+        _mediator = mediator;
+    }
+
+    /// <summary>
+    /// ログイン
+    /// </summary>
+    /// <remarks>
+    /// 【Phase 3改善】
+    /// - ビジネスロジックをLoginCommandHandlerに移譲
+    /// - Controllerは薄いレイヤーに（DTO変換のみ）
+    ///
+    /// 2FA対応のログインフロー:
+    /// 1. パスワード検証成功 + 2FA無効 → トークン発行
+    /// 2. パスワード検証成功 + 2FA有効 + 2FAコード未提供 → Requires2FA=trueを返す
+    /// 3. パスワード検証成功 + 2FA有効 + 2FAコード提供 → コード検証後トークン発行
+    /// </remarks>
+    /// <param name="request">ログインリクエスト</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>Access TokenとRefresh Token、または2FA要求</returns>
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<LoginResponse>> Login(
+        [FromBody] LoginRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new LoginCommand
+        {
+            Email = request.Email,
+            Password = request.Password,
+            TwoFactorCode = request.TwoFactorCode,
+            IsRecoveryCode = request.IsRecoveryCode
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        var value = result.Value;
+        return Ok(new LoginResponse
+        {
+            AccessToken = value.AccessToken,
+            RefreshToken = value.RefreshToken,
+            ExpiresAt = value.ExpiresAt,
+            UserId = value.UserId,
+            Email = value.Email,
+            Roles = value.Roles,
+            Requires2FA = value.Requires2FA
+        });
+    }
+
+    /// <summary>
+    /// Refresh Token（Access Token更新）
+    /// </summary>
+    /// <remarks>
+    /// 【Phase 3改善】
+    /// - ビジネスロジックをRefreshTokenCommandHandlerに移譲
+    /// - Refresh Token Rotation実装（セキュリティ強化）
+    /// </remarks>
+    /// <param name="request">Refresh Tokenリクエスト</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>新しいAccess TokenとRefresh Token</returns>
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<RefreshTokenResponse>> RefreshToken(
+        [FromBody] RefreshTokenRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var command = new RefreshTokenCommand
+        {
+            AccessToken = request.AccessToken,
+            RefreshToken = request.RefreshToken
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Token refresh failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        var value = result.Value;
+        return Ok(new RefreshTokenResponse
+        {
+            AccessToken = value.AccessToken,
+            RefreshToken = value.RefreshToken,
+            ExpiresAt = value.ExpiresAt
+        });
+    }
+
+    // ============================================
+    // 二要素認証（2FA）エンドポイント
+    // ============================================
+
+    /// <summary>
+    /// 2FA有効化の準備（QRコード取得）
+    /// </summary>
+    /// <remarks>
+    /// 【Phase 3改善】
+    /// - ビジネスロジックをEnable2FACommandHandlerに移譲（Phase 1で実装済み）
+    ///
+    /// 認証済みユーザーが2FA設定を開始します。
+    /// - TOTP秘密鍵を生成
+    /// - QRコードURIを返す（認証アプリでスキャン）
+    /// - リカバリーコードを生成（緊急時用）
+    ///
+    /// 次のステップ: `/api/v1/auth/2fa/verify` で6桁コードを検証し、2FA有効化を確定
+    /// </remarks>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>QRコードURIとリカバリーコード</returns>
+    [HttpPost("2fa/enable")]
+    [Authorize] // 認証済みユーザーのみアクセス可能
+    [ProducesResponseType(typeof(Enable2FAResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<Enable2FAResponse>> Enable2FA(
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "User not found",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        var command = new Enable2FACommand { UserId = user.Id };
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA setup failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        var value = result.Value;
+        return Ok(new Enable2FAResponse(value.SecretKey, value.QrCodeUri, value.RecoveryCodes));
+    }
+
+    /// <summary>
+    /// 2FA有効化の確定（TOTPコード検証）
+    /// </summary>
+    /// <remarks>
+    /// 【Phase 3改善】
+    /// - ビジネスロジックをVerify2FACommandHandlerに移譲（Phase 1で実装済み）
+    ///
+    /// 認証アプリで生成された6桁のコードを検証し、2FA有効化を確定します。
+    /// - コードが正しい場合、2FAが有効化されます
+    /// - 次回ログインから2FAが必須になります
+    /// </remarks>
+    /// <param name="request">6桁のTOTPコード</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>成功メッセージ</returns>
+    [HttpPost("2fa/verify")]
+    [Authorize] // 認証済みユーザーのみアクセス可能
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> Verify2FA(
+        [FromBody] Verify2FARequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "User not found",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        var command = new Verify2FACommand
+        {
+            UserId = user.Id,
+            VerificationCode = request.Code
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA verification failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        return Ok(new { message = "Two-factor authentication enabled successfully" });
+    }
+
+    /// <summary>
+    /// 2FA無効化
+    /// </summary>
+    /// <remarks>
+    /// 【Phase 3改善】
+    /// - ビジネスロジックをDisable2FACommandHandlerに移譲（Phase 1で実装済み）
+    ///
+    /// セキュリティのため、パスワード再確認が必要です。
+    /// - 2FAを無効化
+    /// - すべてのリカバリーコードを削除
+    /// </remarks>
+    /// <param name="request">パスワード</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>成功メッセージ</returns>
+    [HttpPost("2fa/disable")]
+    [Authorize] // 認証済みユーザーのみアクセス可能
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> Disable2FA(
+        [FromBody] Disable2FARequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "User not found",
+                Status = StatusCodes.Status401Unauthorized
+            });
+        }
+
+        var command = new Disable2FACommand
+        {
+            UserId = user.Id,
+            Password = request.Password
+        };
+
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "2FA disable failed",
+                Detail = result.Error,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+
+        return Ok(new { message = "Two-factor authentication disabled successfully" });
+    }
+}

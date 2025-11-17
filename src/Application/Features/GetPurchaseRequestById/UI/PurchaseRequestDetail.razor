@@ -2,12 +2,12 @@
 @using Domain.PurchaseManagement.PurchaseRequests
 @using Domain.PurchaseManagement.PurchaseRequests.Boundaries
 @using Application.Components.Shared.PurchaseManagement
-@using Shared.Application
-@using Shared.Application.Interfaces
+@using global::Shared.Application
+@using global::Shared.Application.Interfaces
 @using MediatR
 @inject IApprovalBoundary ApprovalBoundary
 @inject IMediator Mediator
-@inject ICurrentUserService CurrentUser
+@inject global::Shared.Application.Interfaces.ICurrentUserService CurrentUser
 @inject NavigationManager Navigation
 
 <PageTitle>購買申請詳細</PageTitle>

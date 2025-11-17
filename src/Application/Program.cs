@@ -16,6 +16,7 @@ using Shared.Kernel;
 using Domain.ProductCatalog.Products;
 using Shared.Infrastructure.Authentication;
 using Shared.Infrastructure.Platform.Stores;
+using Shared.Infrastructure.Services;
 using ProductCatalog.Shared.Infrastructure.Persistence;
 using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 using Application.Services;
@@ -183,6 +184,9 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 // TOTP Service (Two-Factor Authentication)
 builder.Services.AddScoped<ITotpService, TotpService>();
 
+// QR Code Service (Two-Factor Authentication)
+builder.Services.AddScoped<IQrCodeService, QrCodeService>();
+
 // JWT Bearer認証設定（REST API用）
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings are not configured.");
@@ -237,12 +241,14 @@ builder.Services.AddScoped<ProductsStore>();
 builder.Services.AddScoped<ProductDetailStore>();
 builder.Services.AddScoped<ProductEditStore>();
 builder.Services.AddScoped<ProductSearchStore>();
+builder.Services.AddScoped<Application.Shared.Account.UI.Store.SecuritySettingsStore>();
 
 // Actions (Scoped for Blazor Server circuits)
 builder.Services.AddScoped<ProductListActions>();
 builder.Services.AddScoped<ProductDetailActions>();
 builder.Services.AddScoped<ProductEditActions>();
 builder.Services.AddScoped<ProductSearchActions>();
+builder.Services.AddScoped<Application.Shared.Account.UI.Actions.SecuritySettingsActions>();
 
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
 builder.Services.AddHostedService<Shared.Infrastructure.Platform.OutboxBackgroundService>();

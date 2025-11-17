@@ -1,5 +1,6 @@
 @page "/Account/Login"
-@inject SignInManager<global::Shared.Domain.Identity.ApplicationUser> SignInManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager NavigationManager
 
 <PageTitle>ログイン</PageTitle>
@@ -12,38 +13,117 @@
                     <h3>ログイン</h3>
                 </div>
                 <div class="card-body">
-                    <EditForm Model="@Input" OnValidSubmit="OnValidSubmitAsync" FormName="login">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary class="text-danger" />
+                    @if (!requires2FA)
+                    {
+                        <!-- 通常のログインフォーム -->
+                        <EditForm Model="@Input" OnValidSubmit="OnValidSubmitAsync" FormName="login">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
 
-                        @if (!string.IsNullOrEmpty(ErrorMessage))
-                        {
-                            <div class="alert alert-danger" role="alert">
-                                @ErrorMessage
+                            @if (!string.IsNullOrEmpty(ErrorMessage))
+                            {
+                                <div class="alert alert-danger" role="alert">
+                                    @ErrorMessage
+                                </div>
+                            }
+
+                            <div class="mb-3">
+                                <label for="email" class="form-label">メールアドレス</label>
+                                <InputText id="email" @bind-Value="Input.Email" class="form-control" autocomplete="username" />
+                                <ValidationMessage For="() => Input.Email" />
                             </div>
-                        }
 
-                        <div class="mb-3">
-                            <label for="email" class="form-label">メールアドレス</label>
-                            <InputText id="email" @bind-Value="Input.Email" class="form-control" autocomplete="username" />
-                            <ValidationMessage For="() => Input.Email" />
+                            <div class="mb-3">
+                                <label for="password" class="form-label">パスワード</label>
+                                <InputText id="password" type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" />
+                                <ValidationMessage For="() => Input.Password" />
+                            </div>
+
+                            <div class="mb-3 form-check">
+                                <InputCheckbox id="rememberMe" @bind-Value="Input.RememberMe" class="form-check-input" />
+                                <label class="form-check-label" for="rememberMe">
+                                    ログイン状態を保持する
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100" disabled="@processing">
+                                @if (processing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                }
+                                ログイン
+                            </button>
+                        </EditForm>
+                    }
+                    else
+                    {
+                        <!-- 2FA認証フォーム -->
+                        <div class="alert alert-info">
+                            <i class="bi bi-shield-check"></i> 二要素認証が有効です
                         </div>
 
-                        <div class="mb-3">
-                            <label for="password" class="form-label">パスワード</label>
-                            <InputText id="password" type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" />
-                            <ValidationMessage For="() => Input.Password" />
-                        </div>
+                        <EditForm Model="@TwoFactorInput" OnValidSubmit="OnTwoFactorSubmitAsync" FormName="twoFactor">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
 
-                        <div class="mb-3 form-check">
-                            <InputCheckbox id="rememberMe" @bind-Value="Input.RememberMe" class="form-check-input" />
-                            <label class="form-check-label" for="rememberMe">
-                                ログイン状態を保持する
-                            </label>
-                        </div>
+                            @if (!string.IsNullOrEmpty(ErrorMessage))
+                            {
+                                <div class="alert alert-danger" role="alert">
+                                    @ErrorMessage
+                                </div>
+                            }
 
-                        <button type="submit" class="btn btn-primary w-100">ログイン</button>
-                    </EditForm>
+                            @if (!useRecoveryCode)
+                            {
+                                <div class="mb-3">
+                                    <label for="twoFactorCode" class="form-label">認証コード</label>
+                                    <InputText id="twoFactorCode"
+                                               @bind-Value="TwoFactorInput.Code"
+                                               class="form-control"
+                                               maxlength="6"
+                                               placeholder="000000"
+                                               autocomplete="one-time-code" />
+                                    <div class="form-text">認証アプリに表示されている6桁のコードを入力してください</div>
+                                    <ValidationMessage For="() => TwoFactorInput.Code" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="mb-3">
+                                    <label for="recoveryCode" class="form-label">リカバリーコード</label>
+                                    <InputText id="recoveryCode"
+                                               @bind-Value="TwoFactorInput.RecoveryCode"
+                                               class="form-control"
+                                               placeholder="リカバリーコードを入力"
+                                               autocomplete="off" />
+                                    <div class="form-text">保存したリカバリーコードを入力してください</div>
+                                    <ValidationMessage For="() => TwoFactorInput.RecoveryCode" />
+                                </div>
+                            }
+
+                            <div class="mb-3 form-check">
+                                <InputCheckbox id="rememberMachine" @bind-Value="TwoFactorInput.RememberMachine" class="form-check-input" />
+                                <label class="form-check-label" for="rememberMachine">
+                                    このデバイスを記憶する
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 mb-2" disabled="@processing">
+                                @if (processing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                }
+                                確認
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-outline-secondary w-100"
+                                    @onclick="ToggleRecoveryCode"
+                                    disabled="@processing">
+                                @(useRecoveryCode ? "認証コードを使用" : "リカバリーコードを使用")
+                            </button>
+                        </EditForm>
+                    }
 
                     <hr />
                     <p class="text-center">
@@ -59,31 +139,114 @@
     [SupplyParameterFromForm]
     private LoginInputModel Input { get; set; } = new();
 
+    [SupplyParameterFromForm]
+    private TwoFactorInputModel TwoFactorInput { get; set; } = new();
+
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
     private string? ErrorMessage { get; set; }
+    private bool processing = false;
+    private bool requires2FA = false;
+    private bool useRecoveryCode = false;
+    private ApplicationUser? currentUser;
 
     private async Task OnValidSubmitAsync()
     {
-        var result = await SignInManager.PasswordSignInAsync(
-            Input.Email,
-            Input.Password,
-            Input.RememberMe,
-            lockoutOnFailure: true);
+        processing = true;
+        ErrorMessage = null;
 
-        if (result.Succeeded)
+        try
         {
-            NavigationManager.NavigateTo(ReturnUrl ?? "/");
+            var result = await SignInManager.PasswordSignInAsync(
+                Input.Email,
+                Input.Password,
+                Input.RememberMe,
+                lockoutOnFailure: true);
+
+            if (result.Succeeded)
+            {
+                NavigationManager.NavigateTo(ReturnUrl ?? "/");
+            }
+            else if (result.RequiresTwoFactor)
+            {
+                // 2FAが必要な場合
+                currentUser = await UserManager.FindByEmailAsync(Input.Email);
+                requires2FA = true;
+                ErrorMessage = null;
+            }
+            else if (result.IsLockedOut)
+            {
+                ErrorMessage = "アカウントがロックされています。しばらくしてから再度お試しください。";
+            }
+            else
+            {
+                ErrorMessage = "メールアドレスまたはパスワードが正しくありません。";
+            }
         }
-        else if (result.IsLockedOut)
+        finally
         {
-            ErrorMessage = "アカウントがロックされています。しばらくしてから再度お試しください。";
+            processing = false;
         }
-        else
+    }
+
+    private async Task OnTwoFactorSubmitAsync()
+    {
+        processing = true;
+        ErrorMessage = null;
+
+        try
         {
-            ErrorMessage = "メールアドレスまたはパスワードが正しくありません。";
+            if (currentUser == null)
+            {
+                ErrorMessage = "セッションが無効です。もう一度ログインしてください。";
+                requires2FA = false;
+                return;
+            }
+
+            Microsoft.AspNetCore.Identity.SignInResult result;
+
+            if (useRecoveryCode)
+            {
+                // リカバリーコードを使用
+                result = await SignInManager.TwoFactorRecoveryCodeSignInAsync(TwoFactorInput.RecoveryCode);
+            }
+            else
+            {
+                // TOTPコードを使用
+                result = await SignInManager.TwoFactorAuthenticatorSignInAsync(
+                    TwoFactorInput.Code,
+                    Input.RememberMe,
+                    TwoFactorInput.RememberMachine);
+            }
+
+            if (result.Succeeded)
+            {
+                NavigationManager.NavigateTo(ReturnUrl ?? "/");
+            }
+            else if (result.IsLockedOut)
+            {
+                ErrorMessage = "アカウントがロックされています。しばらくしてから再度お試しください。";
+            }
+            else
+            {
+                ErrorMessage = useRecoveryCode
+                    ? "リカバリーコードが正しくありません。"
+                    : "認証コードが正しくありません。もう一度お試しください。";
+            }
         }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private void ToggleRecoveryCode()
+    {
+        useRecoveryCode = !useRecoveryCode;
+        ErrorMessage = null;
+        TwoFactorInput.Code = string.Empty;
+        TwoFactorInput.RecoveryCode = string.Empty;
     }
 
     private sealed class LoginInputModel
@@ -97,5 +260,16 @@
         public string Password { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; }
+    }
+
+    private sealed class TwoFactorInputModel
+    {
+        [Required(ErrorMessage = "認証コードは必須です")]
+        [StringLength(6, MinimumLength = 6, ErrorMessage = "認証コードは6桁です")]
+        public string Code { get; set; } = string.Empty;
+
+        public string RecoveryCode { get; set; } = string.Empty;
+
+        public bool RememberMachine { get; set; }
     }
 }
