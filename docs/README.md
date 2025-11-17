@@ -25,6 +25,7 @@ docs/
 │   └── UI-POLICY-PUSH-DESIGNER-BENEFITS.md  # UI設計ポリシー
 │
 └── patterns/                      # 📋 設計パターン集
+    ├── TWO_FACTOR_AUTHENTICATION.md  # 二要素認証（2FA）実装ガイド
     ├── REST-API-DESIGN-GUIDE.md   # REST API設計ガイド
     ├── API-CLIENT-CONTRACT.md     # APIクライアント契約
     ├── 01_APPROVAL_WORKFLOW_PATTERN.md  # 承認ワークフローパターン
@@ -109,8 +110,10 @@ docs/
 - APIを公開する場合の開発者
 - フロントエンド/バックエンド連携担当者
 - ビジネスロジック設計者
+- セキュリティエンジニア
 
 **内容**:
+- 二要素認証（2FA）実装ガイド
 - REST API設計ガイドライン
 - APIクライアント契約パターン
 - 承認ワークフローパターン
@@ -118,6 +121,7 @@ docs/
 - ビジネスパターンロードマップ
 
 **更新ポリシー**:
+- ✅ セキュリティ機能追加時に参照・更新
 - ✅ REST API公開時に参照・更新
 - ✅ 新しいビジネスパターン実装時に追加
 - ❌ 使用しない場合は更新不要
