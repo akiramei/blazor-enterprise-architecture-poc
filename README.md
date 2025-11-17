@@ -221,7 +221,12 @@ dotnet run
 ### 認証・認可機能
 - **ASP.NET Core Identity**: 本番用認証基盤
 - **ロールベース認可**: Admin/Userロールによるアクセス制御
-- **ログイン/ログアウト**: Cookie認証
+- **ログイン/ログアウト**: Cookie認証（Blazor Server）、JWT Bearer認証（REST API）
+- **二要素認証（2FA）**: TOTP（Time-based One-Time Password）対応
+  - QRコードによる認証アプリ登録（Google Authenticator/Microsoft Authenticator等）
+  - リカバリーコード（10個、BCryptハッシュ化）
+  - 2FA有効化/無効化機能
+  - ログイン時の2FA検証（TOTP/リカバリーコード対応）
 - **自動ユーザーシード**: 初回起動時にテストアカウント自動作成
 
 ### 商品管理機能
@@ -346,6 +351,17 @@ Shared/ (Kernel, Domain, Application, Infrastructure, Platform, Abstractions)
 - **Versioning Pattern**: 連打対策のバージョン管理
 - **CancellationToken管理**: 古い処理の自動キャンセル
 
+### セキュリティ機能
+- **二要素認証（2FA）**: TOTP + リカバリーコード
+  - TOTP秘密鍵生成とQRコード表示
+  - リカバリーコード生成（BCryptハッシュ化でDB保存）
+  - ログイン時の2FA検証フロー
+  - REST API対応（JWT Bearer認証）
+- **JWT Bearer認証**: REST APIクライアント向け
+  - Access Token（15分）+ Refresh Token（7日）
+  - Refresh Token Rotation（セキュリティ強化）
+- **アカウントロックアウト**: 5回失敗で5分間ロック
+
 ### その他の実装
 - **ICurrentUserService**: 現在のユーザー情報管理
 - **Result型**: エラーハンドリングパターン
@@ -374,6 +390,8 @@ Shared/ (Kernel, Domain, Application, Infrastructure, Platform, Abstractions)
 - [x] CorrelationIdトラッキング（分散トレーシング）
 - [x] 構造化ログ（Serilog）
 - [x] 本番用認証・認可（ASP.NET Core Identity）
+- [x] 二要素認証（2FA）- TOTP + リカバリーコード
+- [x] JWT Bearer認証（REST API向け）
 - [x] 本番用データベース（PostgreSQL）
 - [x] エラーハンドリングの強化（グローバルエラーハンドラ）
 - [x] 自動マイグレーション（起動時にDatabase.MigrateAsync実行）

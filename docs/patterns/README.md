@@ -11,6 +11,31 @@
 
 ## 📚 ドキュメント一覧
 
+### 🔐 [TWO_FACTOR_AUTHENTICATION.md](./TWO_FACTOR_AUTHENTICATION.md)
+
+**パターン名:** 二要素認証（2FA）
+
+**対象読者:** 開発者全員、セキュリティエンジニア
+
+**内容:**
+- TOTP（Time-based One-Time Password）実装
+- QRコード表示とリカバリーコード管理
+- ログイン時の2FA検証フロー
+- REST API統合
+- セキュリティベストプラクティス
+
+**主要技術:**
+- ASP.NET Core Identity
+- TOTP（RFC 6238準拠）
+- QRCoder（QRコード生成）
+- BCrypt（リカバリーコードハッシュ化）
+
+**実装状態:** ✅ 実装済み
+
+**読むべきタイミング:** セキュリティ要件の実装時、認証機能の拡張時
+
+---
+
 ### 🗺️ [BUSINESS_PATTERNS_ROADMAP.md](./BUSINESS_PATTERNS_ROADMAP.md)
 
 **対象読者:** プロジェクトマネージャー、アーキテクト、開発リード
@@ -382,6 +407,7 @@ graph TD
 
 | 日付 | 変更内容 |
 |-----|---------|
+| 2025-11-17 | 二要素認証（2FA）実装ガイドを追加 |
 | 2025-11-07 | 初版作成（ロードマップ + パターン1・2） |
 
 ---
