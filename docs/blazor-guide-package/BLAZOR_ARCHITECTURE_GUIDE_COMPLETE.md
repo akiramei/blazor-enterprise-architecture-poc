@@ -1318,13 +1318,26 @@ public record ProductDeletedEvent(ProductId ProductId) : DomainEvent;
 public abstract class AggregateRoot
 {
     private readonly List<DomainEvent> _domainEvents = new();
-    
+
+    /// <summary>
+    /// ドメインイベント一覧（読み取り専用）
+    /// </summary>
+    public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    /// <summary>
+    /// ドメインイベントを取得
+    /// </summary>
+    public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents.AsReadOnly();
+
     protected void RaiseDomainEvent(DomainEvent @event)
     {
         _domainEvents.Add(@event);
     }
-    
-    public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents;
+
+    public void ClearDomainEvents()
+    {
+        _domainEvents.Clear();
+    }
 }
 ```
 
@@ -7073,29 +7086,36 @@ public sealed record StockReservedEvent(
 ) : DomainEvent;
 ```
 
-### 9.5 Aggregate Root基底クラス
+### 9.5 Entity & Aggregate Root基底クラス
 
 ```csharp
 /// <summary>
-/// 集約ルート基底クラス
+/// エンティティの基底クラス
+/// 識別子による同一性を持つ
 /// </summary>
-public abstract class AggregateRoot<TId> : Entity<TId>
+public abstract class Entity
 {
     private readonly List<DomainEvent> _domainEvents = new();
-    
+
     /// <summary>
-    /// ドメインイベント一覧を取得
+    /// ドメインイベント一覧（読み取り専用）
+    /// EF Coreで永続化する場合は Ignore(p => p.DomainEvents) で無視する
+    /// </summary>
+    public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    /// <summary>
+    /// ドメインイベントを取得
     /// </summary>
     public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents.AsReadOnly();
-    
+
     /// <summary>
-    /// ドメインイベントを発行
+    /// ドメインイベントを追加
     /// </summary>
     protected void RaiseDomainEvent(DomainEvent domainEvent)
     {
         _domainEvents.Add(domainEvent);
     }
-    
+
     /// <summary>
     /// ドメインイベントをクリア
     /// </summary>
@@ -7106,45 +7126,93 @@ public abstract class AggregateRoot<TId> : Entity<TId>
 }
 
 /// <summary>
-/// エンティティ基底クラス
+/// 集約ルート基底クラス
+/// Entity を継承し、型付きID、バージョン管理、等価性比較を提供
 /// </summary>
-public abstract class Entity<TId>
+/// <typeparam name="TId">集約ルートの識別子の型（ProductId, OrderIdなど）</typeparam>
+public abstract class AggregateRoot<TId> : Entity
 {
-    public TId Id { get; protected set; } = default!;
-    
+    private TId _id = default!;
+
+    /// <summary>
+    /// 集約ルートの識別子
+    /// </summary>
+    public TId Id
+    {
+        get => _id;
+        protected set => _id = value;
+    }
+
+    /// <summary>
+    /// 楽観的排他制御用のバージョン番号
+    /// EF Coreの RowVersion と連携して使用
+    /// </summary>
+    public long Version { get; protected set; }
+
+    /// <summary>
+    /// EF Core用のパラメータレスコンストラクタ
+    /// </summary>
+    protected AggregateRoot()
+    {
+    }
+
+    /// <summary>
+    /// 識別子を指定してインスタンスを生成
+    /// </summary>
+    /// <param name="id">集約ルートの識別子</param>
+    protected AggregateRoot(TId id)
+    {
+        _id = id ?? throw new ArgumentNullException(nameof(id));
+    }
+
+    /// <summary>
+    /// 等価性比較（IDベース）
+    /// </summary>
     public override bool Equals(object? obj)
     {
-        if (obj is not Entity<TId> other)
+        if (obj is not AggregateRoot<TId> other)
             return false;
-        
+
         if (ReferenceEquals(this, other))
             return true;
-        
+
         if (GetType() != other.GetType())
             return false;
-        
-        return Id?.Equals(other.Id) ?? false;
+
+        if (_id == null || other._id == null)
+            return false;
+
+        return _id.Equals(other._id);
     }
-    
+
+    /// <summary>
+    /// ハッシュコード生成
+    /// </summary>
     public override int GetHashCode()
     {
-        return (GetType().ToString() + Id).GetHashCode();
+        return (_id?.GetHashCode() ?? 0) ^ GetType().GetHashCode();
     }
-    
-    public static bool operator ==(Entity<TId>? a, Entity<TId>? b)
+
+    /// <summary>
+    /// 等価演算子
+    /// </summary>
+    public static bool operator ==(AggregateRoot<TId>? left, AggregateRoot<TId>? right)
     {
-        if (a is null && b is null)
+        if (left is null && right is null)
             return true;
-        
-        if (a is null || b is null)
+
+        if (left is null || right is null)
             return false;
-        
-        return a.Equals(b);
+
+        return left.Equals(right);
     }
-    
-    public static bool operator !=(Entity<TId>? a, Entity<TId>? b)
+
+    /// <summary>
+    /// 不等価演算子
+    /// </summary>
+    public static bool operator !=(AggregateRoot<TId>? left, AggregateRoot<TId>? right)
     {
-        return !(a == b);
+        return !(left == right);
     }
 }
 ```
