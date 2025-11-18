@@ -1,4 +1,5 @@
 @using Domain.PurchaseManagement.PurchaseRequests.Boundaries
+@inject IJSRuntime JSRuntime
 
 <button type="button"
         class="btn btn-@Action.ColorTheme"
@@ -22,10 +23,25 @@
         if (!Action.IsEnabled)
             return;
 
-        if (Action.RequiresConfirmation && !string.IsNullOrEmpty(Action.ConfirmationMessage))
+        if (Action.RequiresConfirmation)
         {
-            // TODO: 確認ダイアログを表示（JavaScript Interop）
-            // 現在は簡易実装として即座に実行
+            try
+            {
+                var confirmationMessage = !string.IsNullOrEmpty(Action.ConfirmationMessage)
+                    ? Action.ConfirmationMessage
+                    : $"Are you sure you want to {Action.Label.ToLower()}?";
+
+                var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", confirmationMessage);
+
+                if (!confirmed)
+                    return;
+            }
+            catch (Exception ex)
+            {
+                // JS interop failed - treat as cancelled for safety
+                Console.WriteLine($"Confirmation dialog failed: {ex.Message}");
+                return;
+            }
         }
 
         await OnClick.InvokeAsync(Action);
