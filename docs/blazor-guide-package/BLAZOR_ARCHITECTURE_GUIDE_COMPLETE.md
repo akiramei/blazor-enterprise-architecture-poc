@@ -1400,8 +1400,25 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
 
 ##### **11. Outbox パターン**
 
+> **⚠️ DEPRECATED - Learning Example Only**
+> **This simplified implementation is provided for educational purposes to understand the basic concept.**
+> **For production use, see the [recommended v2.0 implementation](#1111-outbox-dispatcher-の信頼性向上-v20改善) which includes:**
+> - **Exponential backoff** for retry logic
+> - **State machine** with proper state transitions (Pending → Publishing → Published/Failed)
+> - **Dead-letter handling** for messages that exceed retry limits
+> - **Batch processing** and optimized polling
+> - **Comprehensive error handling** and logging
+>
+> **Migration Note:** If you're using this simple implementation, migrate to v2.0 by:
+> 1. Update database schema to include Status, AttemptCount, NextAttemptAt, LastError columns
+> 2. Create DeadLetterMessages table for failed messages
+> 3. Replace OutboxDispatcher with the v2.0 implementation
+> 4. Update OutboxMessage entity to match v2.0 schema
+
+**Simplified Concept (For Learning Only):**
+
 ```csharp
-// トランザクション内で統合イベントを記録
+// トランザクション内で統合イベントを記録 - 簡略版（学習用）
 public class OutboxMessage
 {
     public Guid Id { get; set; }
@@ -1409,9 +1426,15 @@ public class OutboxMessage
     public string PayloadJson { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? PublishedAt { get; set; }
+    // ⚠️ 本番環境では v2.0 の完全な実装を使用してください
 }
 
-// バックグラウンドジョブで配信
+// バックグラウンドジョブで配信 - 簡略版（学習用）
+// ⚠️ この実装には以下が欠けています：
+// - リトライロジック（指数バックオフ）
+// - エラーハンドリング
+// - Dead Letter 処理
+// - 状態管理
 public class OutboxDispatcher : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -1419,13 +1442,13 @@ public class OutboxDispatcher : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             var messages = await _repository.GetUnpublishedAsync();
-            
+
             foreach (var message in messages)
             {
                 await _eventBus.PublishAsync(message);
                 await _repository.MarkAsPublishedAsync(message.Id);
             }
-            
+
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
     }
@@ -11429,6 +11452,26 @@ Success
 
 ## 11.1.1 Outbox Dispatcher の信頼性向上 (v2.0改善)
 
+> **✅ RECOMMENDED PRODUCTION IMPLEMENTATION**
+>
+> This is the **recommended approach** for implementing the Outbox pattern in production environments.
+> The simple version shown earlier in this guide is for educational purposes only.
+>
+> **Key Features of v2.0:**
+> - **Exponential Backoff**: Automatic retry with increasing delays (2^attemptCount minutes)
+> - **State Transitions**: Proper state machine (Pending → Publishing → Published/Failed)
+> - **Dead-Letter Queue**: Failed messages moved to separate table after max retry attempts
+> - **Batch Processing**: Processes messages in configurable batches (default: 100)
+> - **Resilient Error Handling**: Comprehensive logging and error recovery
+> - **Optimized Queries**: Indexed queries for efficient message retrieval
+>
+> **Why v2.0 over Simple Implementation:**
+> - Prevents message loss during transient failures
+> - Automatically handles temporary service outages
+> - Provides visibility into failed messages for manual intervention
+> - Scales to handle high message volumes
+> - Production-ready with proper monitoring and observability
+
 ### Outbox テーブル DDL
 
 ```sql
@@ -11539,29 +11582,31 @@ public class OutboxDispatcher : BackgroundService
     }
     
     private async Task ProcessMessageAsync(
-        OutboxMessage message, 
+        OutboxMessage message,
         AppDbContext dbContext,
         IEventBus eventBus,
         CancellationToken ct)
     {
         try
         {
-            // 状態を Publishing に変更
+            // ⭐ State Transition: Pending → Publishing
+            // 配信中であることを明示的にマーク（重複処理防止）
             message.Status = OutboxStatus.Publishing;
             await dbContext.SaveChangesAsync(ct);
-            
-            _logger.LogDebug("メッセージ配信開始: {EventType}, Id: {MessageId}", 
+
+            _logger.LogDebug("メッセージ配信開始: {EventType}, Id: {MessageId}",
                 message.EventType, message.Id);
-            
+
             // イベント配信
             await eventBus.PublishAsync(message.EventType, message.PayloadJson, ct);
-            
-            // 成功: Published 状態に変更
+
+            // ⭐ State Transition: Publishing → Published
+            // 配信成功を記録
             message.Status = OutboxStatus.Published;
             message.PublishedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(ct);
-            
-            _logger.LogInformation("メッセージ配信完了: {EventType}, Id: {MessageId}", 
+
+            _logger.LogInformation("メッセージ配信完了: {EventType}, Id: {MessageId}",
                 message.EventType, message.Id);
         }
         catch (Exception ex)
@@ -11575,21 +11620,25 @@ public class OutboxDispatcher : BackgroundService
             
             if (message.AttemptCount >= MaxAttempts)
             {
-                // 最大試行回数超過: Dead Letter へ移動
+                // ⭐ Dead-Letter Handling: 最大試行回数超過
+                // 配信不可能なメッセージを Dead Letter キューへ移動
+                // これにより、問題のあるメッセージが処理をブロックすることを防ぎます
                 await MoveToDeadLetterAsync(message, dbContext, ct);
-                
-                _logger.LogWarning("メッセージを Dead Letter へ移動: {EventType}, Id: {MessageId}", 
+
+                _logger.LogWarning("メッセージを Dead Letter へ移動: {EventType}, Id: {MessageId}",
                     message.EventType, message.Id);
             }
             else
             {
                 // リトライ: 指数バックオフで次回実行時刻を設定
+                // ⭐ Exponential Backoff: 2^attemptCount 分後にリトライ
+                // 例: 1回目失敗 → 2分後, 2回目失敗 → 4分後, 3回目失敗 → 8分後
                 message.Status = OutboxStatus.Pending;
                 message.NextAttemptAt = DateTime.UtcNow.AddMinutes(Math.Pow(2, message.AttemptCount));
-                
+
                 await dbContext.SaveChangesAsync(ct);
-                
-                _logger.LogInformation("メッセージをリトライ予約: {EventType}, Id: {MessageId}, NextAttempt: {NextAttemptAt}", 
+
+                _logger.LogInformation("メッセージをリトライ予約: {EventType}, Id: {MessageId}, NextAttempt: {NextAttemptAt}",
                     message.EventType, message.Id, message.NextAttemptAt);
             }
         }
