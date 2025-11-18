@@ -66,6 +66,8 @@
                             <DataAnnotationsValidator />
                             <ValidationSummary class="text-danger" />
 
+                            <input type="hidden" name="TwoFactorInput.UseRecoveryCode" value="@TwoFactorInput.UseRecoveryCode" />
+
                             @if (!string.IsNullOrEmpty(ErrorMessage))
                             {
                                 <div class="alert alert-danger" role="alert">
@@ -244,6 +246,7 @@
     private void ToggleRecoveryCode()
     {
         useRecoveryCode = !useRecoveryCode;
+        TwoFactorInput.UseRecoveryCode = useRecoveryCode;
         ErrorMessage = null;
         TwoFactorInput.Code = string.Empty;
         TwoFactorInput.RecoveryCode = string.Empty;
@@ -262,14 +265,43 @@
         public bool RememberMe { get; set; }
     }
 
-    private sealed class TwoFactorInputModel
+    private sealed class TwoFactorInputModel : IValidatableObject
     {
-        [Required(ErrorMessage = "認証コードは必須です")]
         [StringLength(6, MinimumLength = 6, ErrorMessage = "認証コードは6桁です")]
         public string Code { get; set; } = string.Empty;
 
         public string RecoveryCode { get; set; } = string.Empty;
 
         public bool RememberMachine { get; set; }
+
+        public bool UseRecoveryCode { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            var results = new List<ValidationResult>();
+
+            if (UseRecoveryCode)
+            {
+                // リカバリーコードモードの場合、RecoveryCodeが必須
+                if (string.IsNullOrWhiteSpace(RecoveryCode))
+                {
+                    results.Add(new ValidationResult(
+                        "リカバリーコードは必須です",
+                        new[] { nameof(RecoveryCode) }));
+                }
+            }
+            else
+            {
+                // 認証コードモードの場合、Codeが必須
+                if (string.IsNullOrWhiteSpace(Code))
+                {
+                    results.Add(new ValidationResult(
+                        "認証コードは必須です",
+                        new[] { nameof(Code) }));
+                }
+            }
+
+            return results;
+        }
     }
 }

@@ -37,7 +37,49 @@ public sealed class GlobalExceptionHandlerMiddleware
                 correlationId,
                 context.Request.Path);
 
-            await HandleExceptionAsync(context, ex, correlationId, _logger);
+            try
+            {
+                await HandleExceptionAsync(context, ex, correlationId, _logger);
+            }
+            catch (Exception handlerEx)
+            {
+                // エラーハンドリング自体が失敗した場合の最終防衛策
+                _logger.LogError(handlerEx,
+                    "エラーハンドリング中に例外が発生しました。 [CorrelationId: {CorrelationId}] [Path: {Path}]",
+                    correlationId,
+                    context.Request.Path);
+
+                // レスポンスがまだ開始されていない場合のみ、安全なフォールバックレスポンスを返す
+                if (!context.Response.HasStarted)
+                {
+                    try
+                    {
+                        context.Response.Clear();
+                        context.Response.StatusCode = 500;
+                        context.Response.ContentType = "application/json";
+
+                        // 最小限のフォールバックエラーレスポンス
+                        var fallbackResponse = JsonSerializer.Serialize(new
+                        {
+                            statusCode = 500,
+                            message = "サーバー内部でエラーが発生しました。",
+                            correlationId = correlationId,
+                            timestamp = DateTime.UtcNow
+                        }, new JsonSerializerOptions
+                        {
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                        });
+
+                        await context.Response.WriteAsync(fallbackResponse);
+                    }
+                    catch
+                    {
+                        // 最終フォールバックも失敗した場合は何もしない（ログは既に記録済み）
+                        // レスポンスの送信を試みて失敗しても、パイプラインをクラッシュさせない
+                    }
+                }
+                // レスポンスが既に開始されている場合は何もできない（ログのみ記録）
+            }
         }
     }
 
@@ -68,7 +110,7 @@ public sealed class GlobalExceptionHandlerMiddleware
 
             InvalidOperationException => (
                 HttpStatusCode.BadRequest,
-                exception.Message),
+                "Invalid request"),
 
             UnauthorizedAccessException => (
                 HttpStatusCode.Unauthorized,

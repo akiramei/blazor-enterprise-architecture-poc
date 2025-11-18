@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using Domain.ProductCatalog.Products;

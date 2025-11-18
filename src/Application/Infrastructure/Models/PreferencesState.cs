@@ -3,42 +3,42 @@ using System.Globalization;
 namespace Application.Infrastructure.Models;
 
 /// <summary>
-/// 繝ｦ繝ｼ繧ｶ繝ｼ險ｭ螳夂憾諷・- 險隱槭・繧ｿ繧､繝繧ｾ繝ｼ繝ｳ遲峨・繝ｦ繝ｼ繧ｶ繝ｼ險ｭ螳壹ｒ菫晄戟
+/// ユーザー設定状態 - 言語・タイムゾーン等のユーザー設定を保持
 ///
-/// 險ｭ險域婿驥・
-/// - 繝ｦ繝ｼ繧ｶ繝ｼ縺斐→縺ｮ險ｭ螳壹ｒ邂｡逅・
-/// - LocalStorage縺ｫ豌ｸ邯壼喧
-/// - 繝・ヵ繧ｩ繝ｫ繝亥､縺ｯ繧ｷ繧ｹ繝・Β險ｭ螳壹°繧牙叙蠕・
+/// 設定方針:
+/// - ユーザーごとの設定を管理
+/// - LocalStorageに永続化
+/// - デフォルト値はシステム設定から取得
 /// </summary>
 public sealed record PreferencesState
 {
     /// <summary>
-    /// 險隱・繧ｫ繝ｫ繝√Ε險ｭ螳夲ｼ井ｾ・ "ja-JP", "en-US"・・
+    /// 言語・カルチャ設定（例: "ja-JP", "en-US"）
     /// </summary>
     public string Culture { get; init; }
 
     /// <summary>
-    /// 繧ｿ繧､繝繧ｾ繝ｼ繝ｳID・井ｾ・ "Tokyo Standard Time", "UTC"・・
+    /// タイムゾーンID（例: "Tokyo Standard Time", "UTC"）
     /// </summary>
     public string TimeZoneId { get; init; }
 
     /// <summary>
-    /// 譌･莉倥ヵ繧ｩ繝ｼ繝槭ャ繝郁ｨｭ螳・
+    /// 日付フォーマット設定
     /// </summary>
     public string DateFormat { get; init; }
 
     /// <summary>
-    /// 譎ょ綾繝輔か繝ｼ繝槭ャ繝郁ｨｭ螳・
+    /// 時刻フォーマット設定
     /// </summary>
     public string TimeFormat { get; init; }
 
     /// <summary>
-    /// 1繝壹・繧ｸ縺ゅ◆繧翫・陦ｨ遉ｺ莉ｶ謨ｰ・医ョ繝輔か繝ｫ繝茨ｼ・
+    /// 1ページあたりの表示件数（デフォルト）
     /// </summary>
     public int DefaultPageSize { get; init; }
 
     /// <summary>
-    /// 蛻晄悄蛹紋ｸｭ繝輔Λ繧ｰ
+    /// 初期化中フラグ
     /// </summary>
     public bool IsLoading { get; init; }
 
@@ -52,7 +52,7 @@ public sealed record PreferencesState
     }
 
     /// <summary>
-    /// 繝・ヵ繧ｩ繝ｫ繝育憾諷具ｼ医す繧ｹ繝・Β縺ｮ繧ｫ繝ｫ繝√Ε繧剃ｽｿ逕ｨ・・
+    /// デフォルト状態（システムのカルチャを使用）
     /// </summary>
     public static PreferencesState Default => new()
     {
@@ -65,7 +65,7 @@ public sealed record PreferencesState
     };
 
     /// <summary>
-    /// CultureInfo繧貞叙蠕・
+    /// CultureInfoを取得
     /// </summary>
     public CultureInfo GetCultureInfo()
     {
@@ -80,7 +80,7 @@ public sealed record PreferencesState
     }
 
     /// <summary>
-    /// TimeZoneInfo繧貞叙蠕・
+    /// TimeZoneInfoを取得
     /// </summary>
     public TimeZoneInfo GetTimeZoneInfo()
     {

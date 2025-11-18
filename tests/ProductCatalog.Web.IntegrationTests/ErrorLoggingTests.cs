@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using ProductCatalog.Shared.Application.DTOs;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -16,6 +17,7 @@ public class ErrorLoggingTests : IClassFixture<CustomWebApplicationFactory>, IAs
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly ITestOutputHelper _output;
+    private readonly TestConfiguration.TestCredentials _testCredentials;
 
     public ErrorLoggingTests(CustomWebApplicationFactory factory, ITestOutputHelper output)
     {
@@ -25,6 +27,9 @@ public class ErrorLoggingTests : IClassFixture<CustomWebApplicationFactory>, IAs
         {
             AllowAutoRedirect = false
         });
+
+        // テスト認証情報を取得（環境変数または設定ファイルから）
+        _testCredentials = TestConfiguration.GetTestCredentials();
     }
 
     public async Task InitializeAsync()
@@ -76,24 +81,60 @@ public class ErrorLoggingTests : IClassFixture<CustomWebApplicationFactory>, IAs
         // Act
         var response = await _client.GetAsync($"/api/v1/products/{productId}");
 
-        // Log response details
+        // Log response details for debugging
         _output.WriteLine($"Status Code: {response.StatusCode}");
         _output.WriteLine($"Headers: {response.Headers}");
 
         var content = await response.Content.ReadAsStringAsync();
         _output.WriteLine($"Response Body: {content}");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "the product should be retrieved successfully");
+
+        content.Should().NotBeNullOrEmpty(
+            "the response body should contain product data");
+
+        var product = JsonSerializer.Deserialize<ProductDto>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        product.Should().NotBeNull(
+            "the response should deserialize to a ProductDto");
+        product!.Id.Should().Be(productId,
+            "the returned product ID should match the seeded product ID");
+        product.Name.Should().Be("Test Product",
+            "the product name should match the seeded value");
+        product.Description.Should().Be("Test Description",
+            "the product description should match the seeded value");
+        product.Price.Should().Be(1000,
+            "the product price should match the seeded value");
+        product.Currency.Should().Be("JPY",
+            "the product currency should match the seeded value");
     }
 
+    /// <summary>
+    /// 認証トークンを取得（設定ファイルまたは環境変数から認証情報を読み込む）
+    /// </summary>
     private async Task<string> GetAuthTokenAsync()
     {
         var loginRequest = new
         {
-            email = "admin@example.com",
-            password = "Admin@123"
+            email = _testCredentials.AdminEmail,
+            password = _testCredentials.AdminPassword
         };
 
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _output.WriteLine($"Login failed for email: {_testCredentials.AdminEmail}");
+            _output.WriteLine($"Status: {response.StatusCode}");
+            _output.WriteLine($"Error: {errorContent}");
+            response.EnsureSuccessStatusCode();
+        }
 
         var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
         return result!.RootElement.GetProperty("accessToken").GetString()!;

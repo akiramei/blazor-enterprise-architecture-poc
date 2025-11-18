@@ -231,8 +231,9 @@ public sealed class DapperProductReadRepository : IProductReadRepository
         var validOrderByColumns = new[] { "Name", "Price", "Stock", "Status" };
         if (!validOrderByColumns.Contains(orderBy))
         {
+            var originalOrderBy = orderBy;  // Capture the original invalid value
             orderBy = "Name";  // デフォルト
-            _logger.LogWarning("無効なOrderBy指定: {OrderBy} -> デフォルト（Name）に変更", orderBy);
+            _logger.LogWarning("無効なOrderBy指定: {OrderBy} -> デフォルト（Name）に変更", originalOrderBy);
         }
 
         var orderDirection = isDescending ? "DESC" : "ASC";
