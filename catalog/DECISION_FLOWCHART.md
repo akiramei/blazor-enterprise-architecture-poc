@@ -127,6 +127,7 @@ class Pattern:
         self.name = pattern_data["name"]
         self.category = pattern_data["category"]
         self.intent = pattern_data["intent"]
+        self.file = pattern_data["file"]
 
 def select_pattern(
     request_type: RequestType,
