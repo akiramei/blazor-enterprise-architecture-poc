@@ -3249,6 +3249,7 @@ builder.Services.AddScoped<PreferencesStore>();
 
 ```razor
 @inject PreferencesStore PreferencesStore
+@implements IDisposable
 
 @code {
     protected override async Task OnInitializedAsync()
@@ -3257,7 +3258,7 @@ builder.Services.AddScoped<PreferencesStore>();
         await PreferencesStore.InitializeAsync();
 
         // 状態変更を購読
-        PreferencesStore.OnChangeAsync += StateHasChanged;
+        PreferencesStore.OnChangeAsync += HandleStateChangeAsync;
     }
 
     private async Task ChangeCulture(string culture)
@@ -3271,6 +3272,17 @@ builder.Services.AddScoped<PreferencesStore>();
     }
 
     private PreferencesState Prefs => PreferencesStore.GetState();
+
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        PreferencesStore.OnChangeAsync -= HandleStateChangeAsync;
+    }
 }
 ```
 
@@ -3286,12 +3298,13 @@ builder.Services.AddScoped<LayoutStore>();
 
 ```razor
 @inject LayoutStore LayoutStore
+@implements IDisposable
 
 @code {
     protected override async Task OnInitializedAsync()
     {
         await LayoutStore.InitializeAsync();
-        LayoutStore.OnChangeAsync += StateHasChanged;
+        LayoutStore.OnChangeAsync += HandleStateChangeAsync;
     }
 
     private async Task ToggleSidebar()
@@ -3305,6 +3318,17 @@ builder.Services.AddScoped<LayoutStore>();
     }
 
     private LayoutState Layout => LayoutStore.GetState();
+
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        LayoutStore.OnChangeAsync -= HandleStateChangeAsync;
+    }
 }
 ```
 
@@ -3523,10 +3547,10 @@ public sealed class ProductListActions
     protected override async Task OnInitializedAsync()
     {
         // ドメイン固有Store購読
-        Store.OnChangeAsync += StateHasChanged;
+        Store.OnChangeAsync += HandleStateChangeAsync;
 
         // システムレベルStore購読
-        NotificationStore.OnChangeAsync += StateHasChanged;
+        NotificationStore.OnChangeAsync += HandleStateChangeAsync;
 
         // データロード
         await Actions.LoadAsync();
@@ -3534,10 +3558,16 @@ public sealed class ProductListActions
 
     private bool CanDelete => SessionProvider.State.IsInRole("Admin");
 
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
-        Store.OnChangeAsync -= StateHasChanged;
-        NotificationStore.OnChangeAsync -= StateHasChanged;
+        Store.OnChangeAsync -= HandleStateChangeAsync;
+        NotificationStore.OnChangeAsync -= HandleStateChangeAsync;
     }
 }
 ```
@@ -3617,18 +3647,25 @@ public sealed class ProductListActions
 // ✅ GOOD
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += StateHasChanged;
+    Store.OnChangeAsync += HandleStateChangeAsync;
+}
+
+// OnChangeAsync (Func<Task>) との互換性のためのラッパー
+private Task HandleStateChangeAsync()
+{
+    return InvokeAsync(StateHasChanged);
 }
 
 public void Dispose()
 {
-    Store.OnChangeAsync -= StateHasChanged;  // 必ず解除
+    Store.OnChangeAsync -= HandleStateChangeAsync;  // 必ず解除
 }
 
 // ❌ BAD: Disposeしない（メモリリーク）
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += StateHasChanged;
+    Store.OnChangeAsync += HandleStateChangeAsync;
+    // Disposeで解除し忘れ → メモリリーク
 }
 ```
 
@@ -4107,7 +4144,7 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始
-            SetState(_state with { IsLoading = true, ErrorMessage = null });
+            await SetState(_state with { IsLoading = true, ErrorMessage = null });
             
             // 2. 新しいスコープでMediatorを取得(DbContextリーク防止)
             using var scope = _scopeFactory.CreateScope();
@@ -4121,7 +4158,7 @@ public sealed class ProductsStore : IDisposable
             // 4. 結果を状態に反映
             if (result.IsSuccess)
             {
-                SetState(_state with
+                await SetState(_state with
                 {
                     IsLoading = false,
                     Products = result.Value.Items.ToImmutableList(),
@@ -4131,7 +4168,7 @@ public sealed class ProductsStore : IDisposable
             }
             else
             {
-                SetState(_state with
+                await SetState(_state with
                 {
                     IsLoading = false,
                     ErrorMessage = result.Error
@@ -4141,12 +4178,12 @@ public sealed class ProductsStore : IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogDebug("LoadAsyncがキャンセルされました");
-            SetState(_state with { IsLoading = false });
+            await SetState(_state with { IsLoading = false });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品一覧の読み込みに失敗しました");
-            SetState(_state with
+            await SetState(_state with
             {
                 IsLoading = false,
                 ErrorMessage = "データの読み込みに失敗しました"
@@ -4165,8 +4202,8 @@ public sealed class ProductsStore : IDisposable
     {
         if (pageNumber < 1 || pageNumber > _state.TotalPages)
             return;
-        
-        SetState(_state with { CurrentPage = pageNumber });
+
+        await SetState(_state with { CurrentPage = pageNumber });
         await LoadAsync(ct);
     }
     
@@ -4178,7 +4215,7 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始(部分的)
-            SetState(_state with { ErrorMessage = null });
+            await SetState(_state with { ErrorMessage = null });
             
             // 2. 新しいスコープでCommandを実行
             using var scope = _scopeFactory.CreateScope();
@@ -4186,10 +4223,10 @@ public sealed class ProductsStore : IDisposable
             
             var command = new DeleteProductCommand(productId);
             var result = await mediator.Send(command, ct);
-            
+
             if (!result.IsSuccess)
             {
-                SetState(_state with { ErrorMessage = result.Error });
+                await SetState(_state with { ErrorMessage = result.Error });
                 return false;
             }
             
@@ -4200,7 +4237,7 @@ public sealed class ProductsStore : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品削除に失敗しました: {ProductId}", productId);
-            SetState(_state with { ErrorMessage = "削除処理に失敗しました" });
+            await SetState(_state with { ErrorMessage = "削除処理に失敗しました" });
             return false;
         }
     }
@@ -4215,8 +4252,8 @@ public sealed class ProductsStore : IDisposable
         var ids = productIds.ToList();
         var successCount = 0;
         var failureCount = 0;
-        
-        SetState(_state with { IsLoading = true, ErrorMessage = null });
+
+        await SetState(_state with { IsLoading = true, ErrorMessage = null });
         
         foreach (var id in ids)
         {
@@ -4243,7 +4280,7 @@ public sealed class ProductsStore : IDisposable
     /// <summary>
     /// 状態を更新し、購読者に通知
     /// </summary>
-    private async void SetState(ProductsState newState)
+    private async Task SetState(ProductsState newState)
     {
         _state = newState;
         
@@ -4750,7 +4787,7 @@ public class ProductList : ComponentBase
 
 ```csharp
 // ✅ GOOD: Storeから直接読む
-public class ProductList : ComponentBase
+public class ProductList : ComponentBase, IDisposable
 {
     [Inject] private ProductsStore Store { get; set; }
 
@@ -4759,7 +4796,18 @@ public class ProductList : ComponentBase
 
     protected override void OnInitialized()
     {
-        Store.OnChangeAsync += StateHasChanged;  // 変更通知を購読
+        Store.OnChangeAsync += HandleStateChangeAsync;  // 変更通知を購読
+    }
+
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= HandleStateChangeAsync;
     }
 }
 ```
@@ -4879,8 +4927,13 @@ public sealed record ProductEditState
 // ❌ BAD: 購読解除忘れでメモリリーク
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += StateHasChanged;
+    Store.OnChangeAsync += HandleStateChangeAsync;
     // Disposeで解除し忘れ → メモリリーク
+}
+
+private Task HandleStateChangeAsync()
+{
+    return InvokeAsync(StateHasChanged);
 }
 
 // Disposeが実装されていない or 解除忘れ
@@ -6406,7 +6459,7 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Authorization
 /// キャッシュ誤配信を防ぐ改善版CachingBehavior
 /// </summary>
 public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IQuery<TResponse>, ICacheable
+    where TRequest : IQuery<TResponse>, ICacheableQuery
 {
     private readonly IMemoryCache _cache;
     private readonly ICurrentUserService _currentUser;  // ✅ 必須依存
@@ -6430,7 +6483,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         // ✅ CRITICAL: キーに必ずユーザー/テナント情報を含める
         var userSegment = _currentUser.UserId.ToString("N");
         var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
-        var requestSegment = request.GetCacheKey();
+        var requestSegment = request.CacheKey;
         
         var cacheKey = $"{typeof(TRequest).Name}:{tenantSegment}:{userSegment}:{requestSegment}";
         //                                        ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^
@@ -6446,21 +6499,21 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         var response = await next();
         
         _cache.Set(
-            cacheKey, 
-            response, 
-            TimeSpan.FromMinutes(request.CacheDuration));
+            cacheKey,
+            response,
+            request.CacheDuration);
         
         return response;
     }
 }
 
 // ✅ 使用例(正しいキー設計)
-public record GetProductQuery(Guid Id) : IQuery<ProductDto>, ICacheable
+public record GetProductQuery(Guid Id) : IQuery<ProductDto>, ICacheableQuery
 {
     // ❌ 悪い例: "Product:123" → 全ユーザーで共有される
     // ✅ 良い例: Behaviorが自動的に "GetProductQuery:tenant456:user789:Product:123" に拡張
-    public string GetCacheKey() => $"Product:{Id}";
-    public int CacheDuration => 5;  // 分
+    public string CacheKey => $"Product:{Id}";
+    public TimeSpan CacheDuration => TimeSpan.FromMinutes(5);
 }
 ```
 

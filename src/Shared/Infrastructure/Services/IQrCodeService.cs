@@ -19,5 +19,8 @@ public interface IQrCodeService
     /// </summary>
     /// <param name="content">QRコードに埋め込むコンテンツ（通常はotpauth://形式のURI）</param>
     /// <returns>data:image/png;base64,... 形式の画像データURI</returns>
+    /// <exception cref="ArgumentNullException">contentがnullの場合</exception>
+    /// <exception cref="ArgumentException">contentが空文字列、空白文字のみ、または最大長(2048文字)を超える場合</exception>
+    /// <exception cref="InvalidOperationException">QRコード生成に失敗した場合</exception>
     string GenerateQrCodeImage(string content);
 }

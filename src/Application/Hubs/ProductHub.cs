@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace Application.Hubs;
 
 /// <summary>
-/// 蝠・刀邂｡逅・畑 SignalR Hub
+/// 製品通知用 SignalR Hub
 /// </summary>
 public sealed class ProductHub : Hub<IProductHubClient>
 {
@@ -16,24 +16,24 @@ public sealed class ProductHub : Hub<IProductHubClient>
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation("繧ｯ繝ｩ繧､繧｢繝ｳ繝域磁邯・ {ConnectionId}", Context.ConnectionId);
+        _logger.LogInformation("クライアントが接続しました: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        _logger.LogInformation("クライアント切断: {ConnectionId}, 切断理由: {Exception}",
+        _logger.LogInformation("クライアントが切断: {ConnectionId}, 理由: {Exception}",
             Context.ConnectionId,
-            exception?.Message ?? "なし");
+            exception?.Message ?? "正常切断");
         await base.OnDisconnectedAsync(exception);
     }
 
     /// <summary>
-    /// 縺吶∋縺ｦ縺ｮ繧ｯ繝ｩ繧､繧｢繝ｳ繝医↓蝠・刀螟画峩繧帝夂衍
+    /// すべてのクライアントに製品変更を通知
     /// </summary>
     public async Task NotifyProductChanged()
     {
-        _logger.LogInformation("蝠・刀螟画峩繧貞・繧ｯ繝ｩ繧､繧｢繝ｳ繝医↓騾夂衍: {ConnectionId}", Context.ConnectionId);
+        _logger.LogInformation("製品変更を全クライアントに送信: {ConnectionId}", Context.ConnectionId);
         await Clients.All.ProductChanged();
     }
 }

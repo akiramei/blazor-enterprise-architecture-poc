@@ -70,14 +70,76 @@ public sealed class NotificationStore : IDisposable
                 {
                     try
                     {
-                        await Task.Delay(durationMs, cts.Token);
-                        await DismissToastAsync(toast.Id);
+                        // タイマー待機
+                        try
+                        {
+                            await Task.Delay(durationMs, cts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // タイマーがキャンセルされた（手動で消去された）
+                            return;
+                        }
+
+                        // タイマー完了後、トーストを自動消去
+                        try
+                        {
+                            await DismissToastAsync(toast.Id);
+                        }
+                        catch (Exception dismissEx)
+                        {
+                            _logger.LogError(dismissEx, "トースト自動消去処理中にエラーが発生しました。ToastId: {ToastId}", toast.Id);
+
+                            // DismissToastAsyncが失敗した場合、タイマーエントリを手動でクリーンアップ
+                            try
+                            {
+                                await _gate.WaitAsync();
+                                try
+                                {
+                                    if (_toastTimers.TryGetValue(toast.Id, out var timerCts))
+                                    {
+                                        timerCts.Dispose();
+                                        _toastTimers.Remove(toast.Id);
+                                    }
+                                }
+                                finally
+                                {
+                                    _gate.Release();
+                                }
+                            }
+                            catch (Exception cleanupEx)
+                            {
+                                _logger.LogError(cleanupEx, "タイマークリーンアップ中にエラーが発生しました。ToastId: {ToastId}", toast.Id);
+                            }
+                        }
                     }
-                    catch (OperationCanceledException)
+                    catch (Exception ex)
                     {
-                        // タイマーがキャンセルされた（手動で消去された）
+                        _logger.LogError(ex, "トースト自動消去タイマーで予期しないエラーが発生しました。ToastId: {ToastId}", toast.Id);
+
+                        // 予期しないエラーの場合もタイマーエントリをクリーンアップして、リソースリークを防ぐ
+                        try
+                        {
+                            await _gate.WaitAsync();
+                            try
+                            {
+                                if (_toastTimers.TryGetValue(toast.Id, out var timerCts))
+                                {
+                                    timerCts.Dispose();
+                                    _toastTimers.Remove(toast.Id);
+                                }
+                            }
+                            finally
+                            {
+                                _gate.Release();
+                            }
+                        }
+                        catch (Exception cleanupEx)
+                        {
+                            _logger.LogError(cleanupEx, "予期しないエラー後のタイマークリーンアップ中にエラーが発生しました。ToastId: {ToastId}", toast.Id);
+                        }
                     }
-                }, cts.Token);
+                });
             }
         }
         finally
