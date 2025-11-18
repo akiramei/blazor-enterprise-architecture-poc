@@ -6291,54 +6291,76 @@ public sealed class IdempotencyBehavior<TRequest, TResponse> : IPipelineBehavior
     where TResponse : Result
 {
     private readonly IIdempotencyStore _store;
+    private readonly ICurrentUserService _currentUser;  // ✅ ユーザー/テナント分離のため必須
     private readonly ILogger<IdempotencyBehavior<TRequest, TResponse>> _logger;
-    
+
+    public IdempotencyBehavior(
+        IIdempotencyStore store,
+        ICurrentUserService currentUser,
+        ILogger<IdempotencyBehavior<TRequest, TResponse>> logger)
+    {
+        _store = store;
+        _currentUser = currentUser;
+        _logger = logger;
+    }
+
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
         // Commandからキーを取得
-        var idempotencyKey = GetIdempotencyKey(request);
-        
-        if (string.IsNullOrEmpty(idempotencyKey))
+        var requestKey = GetIdempotencyKey(request);
+
+        if (string.IsNullOrEmpty(requestKey))
         {
             return await next();  // キーがない場合はスキップ
         }
-        
+
+        // ✅ CRITICAL: キーに必ずユーザー/テナント情報を含める
+        var userSegment = _currentUser.UserId.ToString("N");
+        var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
         var commandType = typeof(TRequest).Name;
-        
+
+        var idempotencyKey = $"{commandType}:{tenantSegment}:{userSegment}:{requestKey}";
+        //                                    ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^
+        //                                    テナント分離      ユーザー分離
+
         // 既に処理済みかチェック
         var existingRecord = await _store.GetAsync(idempotencyKey, cancellationToken);
-        
+
         if (existingRecord != null)
         {
             _logger.LogInformation(
-                "冪等性により既存の結果を返します: {CommandType} [Key: {IdempotencyKey}]",
+                "冪等性により既存の結果を返します: {CommandType} [Key: {IdempotencyKey}, User: {UserId}, Tenant: {TenantId}]",
                 commandType,
-                idempotencyKey);
-            
+                idempotencyKey,
+                userSegment,
+                tenantSegment);
+
             return existingRecord.GetResult<TResponse>();
         }
-        
+
         // 新規処理を実行
         var response = await next();
-        
+
         // 成功した場合のみ記録
         if (response.IsSuccess)
         {
             var record = IdempotencyRecord.Create(idempotencyKey, commandType, response);
             await _store.SaveAsync(record, cancellationToken);
-            
+
             _logger.LogInformation(
-                "冪等性レコードを保存しました: {CommandType} [Key: {IdempotencyKey}]",
+                "冪等性レコードを保存しました: {CommandType} [Key: {IdempotencyKey}, User: {UserId}, Tenant: {TenantId}]",
                 commandType,
-                idempotencyKey);
+                idempotencyKey,
+                userSegment,
+                tenantSegment);
         }
-        
+
         return response;
     }
-    
+
     private string? GetIdempotencyKey(TRequest request)
     {
         var property = typeof(TRequest).GetProperty("IdempotencyKey");
@@ -6349,45 +6371,56 @@ public sealed class IdempotencyBehavior<TRequest, TResponse> : IPipelineBehavior
 
 #### **5. CachingBehavior(Query専用)**
 
+> **⚠️ ANTI-PATTERN WARNING**
+> The example below is **UNSAFE** because it uses cache keys without user/tenant separation, allowing data leakage across users.
+> **See section 10.4.2 for the SAFE implementation** with proper user/tenant isolation in cache keys.
+
 ```csharp
+// ❌ ANTI-PATTERN: キャッシュキーにユーザー/テナント情報が含まれていない
+// このコードは使用しないでください！
+
 public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IQuery<TResponse>, ICacheableQuery
 {
     private readonly IDistributedCache _cache;
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
-    
+
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
+        // ❌ UNSAFE: request.CacheKeyにユーザー/テナント情報が含まれていない
+        // → 異なるユーザー間でキャッシュが共有され、データ漏洩の危険性
         var cacheKey = request.CacheKey;
-        
+
         // キャッシュから取得
         var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
-        
+
         if (!string.IsNullOrEmpty(cachedData))
         {
             _logger.LogDebug("キャッシュヒット: {CacheKey}", cacheKey);
             return JsonSerializer.Deserialize<TResponse>(cachedData)!;
         }
-        
+
         // キャッシュミス: Queryを実行
         _logger.LogDebug("キャッシュミス: {CacheKey}", cacheKey);
         var response = await next();
-        
+
         // キャッシュに保存
         var serialized = JsonSerializer.Serialize(response);
         var options = new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = request.CacheDuration
         };
-        
+
         await _cache.SetStringAsync(cacheKey, serialized, options, cancellationToken);
-        
+
         return response;
     }
 }
+
+// ✅ 正しい実装は section 10.4.2「キャッシュキーの安全性規約」を参照してください
 ```
 
 #### **6. TransactionBehavior(Command専用)**
@@ -6882,11 +6915,16 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Authorization
 
 #### 10.4.2 キャッシュキーの安全性規約
 
+> **✅ SAFE PATTERN: この実装を使用してください**
+> Authorization後にキャッシュし、キーにユーザー/テナント情報を含めることで誤配信を防ぎます。
+
 **CRITICAL**: キーに必ずユーザー/テナント情報を含めて誤配信を防ぐ
 
 ```csharp
 /// <summary>
-/// キャッシュ誤配信を防ぐ改善版CachingBehavior
+/// ✅ 推奨: キャッシュ誤配信を防ぐ安全なCachingBehavior
+/// - Pipeline順序: Authorization → Caching (section 10.4.1参照)
+/// - キーにユーザー/テナント情報を含める
 /// </summary>
 public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IQuery<TResponse>, ICacheableQuery
@@ -6894,7 +6932,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
     private readonly IMemoryCache _cache;
     private readonly ICurrentUserService _currentUser;  // ✅ 必須依存
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
-    
+
     public CachingBehavior(
         IMemoryCache cache,
         ICurrentUserService currentUser,
@@ -6904,28 +6942,36 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         _currentUser = currentUser;
         _logger = logger;
     }
-    
+
     public async Task<TResponse> Handle(
-        TRequest request, 
-        RequestHandlerDelegate<TResponse> next, 
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
         CancellationToken ct)
     {
         // ✅ CRITICAL: キーに必ずユーザー/テナント情報を含める
         var userSegment = _currentUser.UserId.ToString("N");
         var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
         var requestSegment = request.CacheKey;
-        
+
         var cacheKey = $"{typeof(TRequest).Name}:{tenantSegment}:{userSegment}:{requestSegment}";
         //                                        ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^
         //                                        テナント分離      ユーザー分離
-        
+
         if (_cache.TryGetValue(cacheKey, out TResponse? cached))
         {
-            _logger.LogDebug("Cache hit: {Key}", cacheKey);
+            _logger.LogDebug(
+                "Cache hit: {Key} [User: {UserId}, Tenant: {TenantId}]",
+                cacheKey,
+                userSegment,
+                tenantSegment);
             return cached!;
         }
-        
-        _logger.LogDebug("Cache miss: {Key}", cacheKey);
+
+        _logger.LogDebug(
+            "Cache miss: {Key} [User: {UserId}, Tenant: {TenantId}]",
+            cacheKey,
+            userSegment,
+            tenantSegment);
         var response = await next();
         
         _cache.Set(
