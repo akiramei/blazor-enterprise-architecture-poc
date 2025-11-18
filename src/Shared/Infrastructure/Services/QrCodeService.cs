@@ -32,8 +32,6 @@ public class QrCodeService : IQrCodeService
 {
     /// <summary>
     /// QRコードに埋め込めるコンテンツの最大文字数
-    ///
-    /// 【制限理由】
     /// QRコードVersion 40 + ECCLevel.Q（中程度のエラー訂正）の理論上の上限は約1852文字（英数字）。
     /// 安全マージンを考慮して2048文字を上限とする。
     /// </summary>
