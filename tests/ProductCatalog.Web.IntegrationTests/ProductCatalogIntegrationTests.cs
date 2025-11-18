@@ -30,6 +30,7 @@ public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplication
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+    private readonly TestConfiguration.TestCredentials _testCredentials;
 
     public ProductCatalogIntegrationTests(CustomWebApplicationFactory factory)
     {
@@ -38,6 +39,9 @@ public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplication
         {
             AllowAutoRedirect = false // Disable auto redirect to test HTTP status codes properly
         });
+
+        // テスト認証情報を取得（環境変数または設定ファイルから）
+        _testCredentials = TestConfiguration.GetTestCredentials();
     }
 
     public async Task InitializeAsync()
@@ -59,8 +63,8 @@ public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplication
         // Arrange
         var loginRequest = new
         {
-            email = "admin@example.com",
-            password = "Admin@123"
+            email = _testCredentials.AdminEmail,
+            password = _testCredentials.AdminPassword
         };
 
         // Act
@@ -389,8 +393,8 @@ public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplication
     {
         var loginRequest = new
         {
-            email = "admin@example.com",
-            password = "Admin@123"
+            email = _testCredentials.AdminEmail,
+            password = _testCredentials.AdminPassword
         };
 
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);

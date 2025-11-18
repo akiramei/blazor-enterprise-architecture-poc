@@ -16,6 +16,7 @@ public class ErrorLoggingTests : IClassFixture<CustomWebApplicationFactory>, IAs
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
     private readonly ITestOutputHelper _output;
+    private readonly TestConfiguration.TestCredentials _testCredentials;
 
     public ErrorLoggingTests(CustomWebApplicationFactory factory, ITestOutputHelper output)
     {
@@ -25,6 +26,9 @@ public class ErrorLoggingTests : IClassFixture<CustomWebApplicationFactory>, IAs
         {
             AllowAutoRedirect = false
         });
+
+        // テスト認証情報を取得（環境変数または設定ファイルから）
+        _testCredentials = TestConfiguration.GetTestCredentials();
     }
 
     public async Task InitializeAsync()
@@ -84,16 +88,27 @@ public class ErrorLoggingTests : IClassFixture<CustomWebApplicationFactory>, IAs
         _output.WriteLine($"Response Body: {content}");
     }
 
+    /// <summary>
+    /// 認証トークンを取得（設定ファイルまたは環境変数から認証情報を読み込む）
+    /// </summary>
     private async Task<string> GetAuthTokenAsync()
     {
         var loginRequest = new
         {
-            email = "admin@example.com",
-            password = "Admin@123"
+            email = _testCredentials.AdminEmail,
+            password = _testCredentials.AdminPassword
         };
 
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _output.WriteLine($"Login failed for email: {_testCredentials.AdminEmail}");
+            _output.WriteLine($"Status: {response.StatusCode}");
+            _output.WriteLine($"Error: {errorContent}");
+            response.EnsureSuccessStatusCode();
+        }
 
         var result = await response.Content.ReadFromJsonAsync<JsonDocument>();
         return result!.RootElement.GetProperty("accessToken").GetString()!;
