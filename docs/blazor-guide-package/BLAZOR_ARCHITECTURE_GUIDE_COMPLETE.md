@@ -3249,6 +3249,7 @@ builder.Services.AddScoped<PreferencesStore>();
 
 ```razor
 @inject PreferencesStore PreferencesStore
+@implements IDisposable
 
 @code {
     protected override async Task OnInitializedAsync()
@@ -3257,7 +3258,7 @@ builder.Services.AddScoped<PreferencesStore>();
         await PreferencesStore.InitializeAsync();
 
         // 状態変更を購読
-        PreferencesStore.OnChangeAsync += StateHasChanged;
+        PreferencesStore.OnChangeAsync += HandleStateChangeAsync;
     }
 
     private async Task ChangeCulture(string culture)
@@ -3271,6 +3272,17 @@ builder.Services.AddScoped<PreferencesStore>();
     }
 
     private PreferencesState Prefs => PreferencesStore.GetState();
+
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        PreferencesStore.OnChangeAsync -= HandleStateChangeAsync;
+    }
 }
 ```
 
@@ -3286,12 +3298,13 @@ builder.Services.AddScoped<LayoutStore>();
 
 ```razor
 @inject LayoutStore LayoutStore
+@implements IDisposable
 
 @code {
     protected override async Task OnInitializedAsync()
     {
         await LayoutStore.InitializeAsync();
-        LayoutStore.OnChangeAsync += StateHasChanged;
+        LayoutStore.OnChangeAsync += HandleStateChangeAsync;
     }
 
     private async Task ToggleSidebar()
@@ -3305,6 +3318,17 @@ builder.Services.AddScoped<LayoutStore>();
     }
 
     private LayoutState Layout => LayoutStore.GetState();
+
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        LayoutStore.OnChangeAsync -= HandleStateChangeAsync;
+    }
 }
 ```
 
@@ -3523,10 +3547,10 @@ public sealed class ProductListActions
     protected override async Task OnInitializedAsync()
     {
         // ドメイン固有Store購読
-        Store.OnChangeAsync += StateHasChanged;
+        Store.OnChangeAsync += HandleStateChangeAsync;
 
         // システムレベルStore購読
-        NotificationStore.OnChangeAsync += StateHasChanged;
+        NotificationStore.OnChangeAsync += HandleStateChangeAsync;
 
         // データロード
         await Actions.LoadAsync();
@@ -3534,10 +3558,16 @@ public sealed class ProductListActions
 
     private bool CanDelete => SessionProvider.State.IsInRole("Admin");
 
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
-        Store.OnChangeAsync -= StateHasChanged;
-        NotificationStore.OnChangeAsync -= StateHasChanged;
+        Store.OnChangeAsync -= HandleStateChangeAsync;
+        NotificationStore.OnChangeAsync -= HandleStateChangeAsync;
     }
 }
 ```
@@ -3617,18 +3647,25 @@ public sealed class ProductListActions
 // ✅ GOOD
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += StateHasChanged;
+    Store.OnChangeAsync += HandleStateChangeAsync;
+}
+
+// OnChangeAsync (Func<Task>) との互換性のためのラッパー
+private Task HandleStateChangeAsync()
+{
+    return InvokeAsync(StateHasChanged);
 }
 
 public void Dispose()
 {
-    Store.OnChangeAsync -= StateHasChanged;  // 必ず解除
+    Store.OnChangeAsync -= HandleStateChangeAsync;  // 必ず解除
 }
 
 // ❌ BAD: Disposeしない（メモリリーク）
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += StateHasChanged;
+    Store.OnChangeAsync += HandleStateChangeAsync;
+    // Disposeで解除し忘れ → メモリリーク
 }
 ```
 
@@ -4750,7 +4787,7 @@ public class ProductList : ComponentBase
 
 ```csharp
 // ✅ GOOD: Storeから直接読む
-public class ProductList : ComponentBase
+public class ProductList : ComponentBase, IDisposable
 {
     [Inject] private ProductsStore Store { get; set; }
 
@@ -4759,7 +4796,18 @@ public class ProductList : ComponentBase
 
     protected override void OnInitialized()
     {
-        Store.OnChangeAsync += StateHasChanged;  // 変更通知を購読
+        Store.OnChangeAsync += HandleStateChangeAsync;  // 変更通知を購読
+    }
+
+    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
+    private Task HandleStateChangeAsync()
+    {
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= HandleStateChangeAsync;
     }
 }
 ```
@@ -4879,8 +4927,13 @@ public sealed record ProductEditState
 // ❌ BAD: 購読解除忘れでメモリリーク
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += StateHasChanged;
+    Store.OnChangeAsync += HandleStateChangeAsync;
     // Disposeで解除し忘れ → メモリリーク
+}
+
+private Task HandleStateChangeAsync()
+{
+    return InvokeAsync(StateHasChanged);
 }
 
 // Disposeが実装されていない or 解除忘れ
