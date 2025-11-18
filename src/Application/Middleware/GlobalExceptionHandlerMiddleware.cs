@@ -37,12 +37,29 @@ public sealed class GlobalExceptionHandlerMiddleware
                 correlationId,
                 context.Request.Path);
 
-            await HandleExceptionAsync(context, ex, correlationId);
+            await HandleExceptionAsync(context, ex, correlationId, _logger);
         }
     }
 
-    private static async Task HandleExceptionAsync(HttpContext context, Exception exception, string? correlationId)
+    private static async Task HandleExceptionAsync(
+        HttpContext context,
+        Exception exception,
+        string? correlationId,
+        ILogger<GlobalExceptionHandlerMiddleware> logger)
     {
+        // レスポンスが既に開始されている場合は、ヘッダーやボディを変更できないため
+        // 何もせずに戻る（ストリーミングレスポンスなどで発生する可能性がある）
+        if (context.Response.HasStarted)
+        {
+            logger.LogWarning(
+                "例外が発生しましたが、レスポンスは既に開始されているため、エラーレスポンスを送信できません。 " +
+                "[CorrelationId: {CorrelationId}] [Path: {Path}] [Exception: {ExceptionType}]",
+                correlationId,
+                context.Request.Path,
+                exception.GetType().Name);
+            return;
+        }
+
         var (statusCode, message) = exception switch
         {
             ValidationException validationEx => (
