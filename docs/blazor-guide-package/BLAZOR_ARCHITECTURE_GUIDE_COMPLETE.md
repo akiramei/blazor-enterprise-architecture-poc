@@ -6047,52 +6047,89 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBe
 
 #### **1. LoggingBehavior**
 
+> **⚠️ セキュリティ警告: PII漏洩のリスク**
+>
+> **絶対に行わないこと:**
+> - `{@Request}` でリクエスト全体をログに記録しない
+> - パスワード、トークン、メールアドレス、SSN、クレジットカード番号などの機密情報をログに出力しない
+>
+> **必須対応:**
+> - **本番環境では必ず Request Sanitizer を実装すること**
+> - ログには CorrelationId やメタデータのみを記録すること
+> - どうしてもリクエスト内容が必要な場合は、後述の `IRequestSanitizer` を使用してPIIをマスキングすること
+
 ```csharp
 public sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
-    
+    private readonly IRequestSanitizer _sanitizer;  // オプション: PIIマスキングが必要な場合
+
+    public LoggingBehavior(
+        ILogger<LoggingBehavior<TRequest, TResponse>> logger,
+        IRequestSanitizer sanitizer = null)  // nullの場合はリクエスト内容をログに出力しない
+    {
+        _logger = logger;
+        _sanitizer = sanitizer;
+    }
+
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
         var requestName = typeof(TRequest).Name;
-        var requestId = Guid.NewGuid();
-        
+        var correlationId = Guid.NewGuid().ToString();
+
+        // ログスコープにCorrelationIdを設定（全ての子ログに自動的に含まれる）
+        using var scope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["CorrelationId"] = correlationId,
+            ["RequestName"] = requestName
+        });
+
+        // ⭕ 安全: メタデータのみをログに記録
         _logger.LogInformation(
-            "処理開始: {RequestName} {@Request} [RequestId: {RequestId}]",
+            "処理開始: {RequestName} [CorrelationId: {CorrelationId}]",
             requestName,
-            request,
-            requestId);
-        
+            correlationId);
+
+        // オプション: サニタイズされたリクエスト内容をログに記録（開発環境のみ推奨）
+        if (_sanitizer != null)
+        {
+            var sanitizedRequest = _sanitizer.Sanitize(request);
+            _logger.LogDebug(
+                "リクエスト詳細(サニタイズ済): {RequestName} {@SanitizedRequest}",
+                requestName,
+                sanitizedRequest);
+        }
+
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             var response = await next();
-            
+
             stopwatch.Stop();
-            
+
             _logger.LogInformation(
-                "処理完了: {RequestName} [RequestId: {RequestId}] 実行時間: {ElapsedMs}ms",
+                "処理完了: {RequestName} [CorrelationId: {CorrelationId}] 実行時間: {ElapsedMs}ms",
                 requestName,
-                requestId,
+                correlationId,
                 stopwatch.ElapsedMilliseconds);
-            
+
             return response;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            
+
             _logger.LogError(ex,
-                "処理失敗: {RequestName} [RequestId: {RequestId}] 実行時間: {ElapsedMs}ms",
+                "処理失敗: {RequestName} [CorrelationId: {CorrelationId}] 実行時間: {ElapsedMs}ms",
                 requestName,
-                requestId,
+                correlationId,
                 stopwatch.ElapsedMilliseconds);
-            
+
             throw;
         }
     }
@@ -6393,6 +6430,361 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
         }
     }
 }
+```
+
+### 10.3 Request Sanitization (PII保護) - 必須セキュリティ対策
+
+> **⚠️ 本番環境での必須要件**
+>
+> ログに機密情報(PII/Secrets)が漏洩することは重大なセキュリティインシデントです。
+> 以下の対策を**必ず実装**してください:
+>
+> 1. **Request Sanitizer の実装と登録**
+> 2. **本番環境では LogLevel.Debug を無効化**
+> 3. **定期的なログ監査によるPII検出**
+
+#### **10.3.1 IRequestSanitizer インターフェース**
+
+リクエストオブジェクトから機密情報をマスキング・除外するための共通インターフェース:
+
+```csharp
+/// <summary>
+/// リクエストオブジェクトから PII/Secrets をマスキングするサニタイザー
+/// 実装場所: Application/Common/Logging/IRequestSanitizer.cs
+/// </summary>
+public interface IRequestSanitizer
+{
+    /// <summary>
+    /// リクエストオブジェクトをサニタイズ(PII除去)
+    /// </summary>
+    object Sanitize<TRequest>(TRequest request);
+}
+```
+
+#### **10.3.2 RequestSanitizer 実装例(フィールドレベルマスキング)**
+
+```csharp
+/// <summary>
+/// デフォルトのリクエストサニタイザー実装
+/// 実装場所: Infrastructure/Logging/RequestSanitizer.cs
+/// </summary>
+public sealed class RequestSanitizer : IRequestSanitizer
+{
+    private readonly ILogger<RequestSanitizer> _logger;
+    private readonly SanitizationPolicy _policy;
+
+    public RequestSanitizer(
+        ILogger<RequestSanitizer> logger,
+        IOptions<SanitizationPolicy> policy)
+    {
+        _logger = logger;
+        _policy = policy.Value;
+    }
+
+    public object Sanitize<TRequest>(TRequest request)
+    {
+        if (request == null)
+            return null;
+
+        try
+        {
+            // リクエストをJSONにシリアライズ
+            var json = JsonSerializer.Serialize(request);
+            var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // サニタイズされたディクショナリを構築
+            var sanitized = new Dictionary<string, object>();
+
+            foreach (var property in root.EnumerateObject())
+            {
+                var propertyName = property.Name;
+                var propertyValue = property.Value;
+
+                // Denylistチェック: 機密フィールドをマスク
+                if (_policy.SensitiveFieldPatterns.Any(pattern =>
+                    Regex.IsMatch(propertyName, pattern, RegexOptions.IgnoreCase)))
+                {
+                    sanitized[propertyName] = "***REDACTED***";
+                    continue;
+                }
+
+                // Allowlistチェック: 許可されたフィールドのみ記録
+                if (_policy.UseAllowlist &&
+                    !_policy.AllowedFields.Contains(propertyName, StringComparer.OrdinalIgnoreCase))
+                {
+                    sanitized[propertyName] = "***NOT_ALLOWED***";
+                    continue;
+                }
+
+                // 値のパターンチェック(email, token, SSNなど)
+                var valueString = propertyValue.ToString();
+                if (ContainsSensitivePattern(valueString))
+                {
+                    sanitized[propertyName] = "***MASKED***";
+                    continue;
+                }
+
+                // 安全な値として記録
+                sanitized[propertyName] = GetSafeValue(propertyValue);
+            }
+
+            return sanitized;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "リクエストのサニタイズ中にエラーが発生しました");
+            return new { Error = "Sanitization failed" };
+        }
+    }
+
+    private bool ContainsSensitivePattern(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        // Email pattern
+        if (Regex.IsMatch(value, @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"))
+            return true;
+
+        // JWT Token pattern (Bearer token)
+        if (Regex.IsMatch(value, @"^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$"))
+            return true;
+
+        // API Key pattern (長い英数字文字列)
+        if (Regex.IsMatch(value, @"^[A-Za-z0-9]{32,}$"))
+            return true;
+
+        // SSN pattern (XXX-XX-XXXX)
+        if (Regex.IsMatch(value, @"\b\d{3}-\d{2}-\d{4}\b"))
+            return true;
+
+        // Credit Card pattern (XXXX-XXXX-XXXX-XXXX)
+        if (Regex.IsMatch(value, @"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b"))
+            return true;
+
+        return false;
+    }
+
+    private object GetSafeValue(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => element.GetRawText()
+        };
+    }
+}
+```
+
+#### **10.3.3 Sanitization Policy 設定**
+
+```csharp
+/// <summary>
+/// サニタイゼーションポリシー設定
+/// 設定場所: appsettings.json → SanitizationPolicy セクション
+/// </summary>
+public sealed class SanitizationPolicy
+{
+    /// <summary>
+    /// Allowlist モードを使用するか(true: Allowlistのみ許可, false: Denylistのみ拒否)
+    /// </summary>
+    public bool UseAllowlist { get; set; } = false;
+
+    /// <summary>
+    /// 許可するフィールド名のリスト(Allowlist モード時)
+    /// </summary>
+    public HashSet<string> AllowedFields { get; set; } = new()
+    {
+        "ProductId",
+        "ProductName",
+        "CategoryId",
+        "Page",
+        "PageSize",
+        "OrderId",
+        "Quantity"
+        // 安全なフィールドのみ追加
+    };
+
+    /// <summary>
+    /// マスキングするフィールド名の正規表現パターン(Denylist)
+    /// </summary>
+    public List<string> SensitiveFieldPatterns { get; set; } = new()
+    {
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "auth",
+        "authorization",
+        "bearer",
+        "apikey",
+        "api_key",
+        "creditcard",
+        "credit_card",
+        "cardnumber",
+        "cvv",
+        "ssn",
+        "socialsecurity",
+        "email",
+        "mail",
+        "phone",
+        "tel",
+        "address",
+        "dob",
+        "dateofbirth",
+        "salary",
+        "income"
+    };
+}
+```
+
+#### **10.3.4 appsettings.json 設定例**
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      // ⚠️ 本番環境ではDebugを無効化
+      "Application": "Information",
+      "Microsoft": "Warning"
+    }
+  },
+
+  "SanitizationPolicy": {
+    "UseAllowlist": true,
+    "AllowedFields": [
+      "ProductId",
+      "ProductName",
+      "CategoryId",
+      "Page",
+      "PageSize",
+      "OrderId",
+      "Quantity",
+      "RequestId",
+      "CorrelationId"
+    ],
+    "SensitiveFieldPatterns": [
+      "password",
+      "passwd",
+      "pwd",
+      "secret",
+      "token",
+      "auth",
+      "authorization",
+      "bearer",
+      "apikey",
+      "api_key",
+      "creditcard",
+      "credit_card",
+      "cardnumber",
+      "cvv",
+      "ssn",
+      "email",
+      "phone"
+    ]
+  }
+}
+```
+
+#### **10.3.5 DI 登録 (Program.cs)**
+
+```csharp
+// Program.cs
+
+// Sanitization Policy の登録
+builder.Services.Configure<SanitizationPolicy>(
+    builder.Configuration.GetSection("SanitizationPolicy"));
+
+// Request Sanitizer の登録
+builder.Services.AddSingleton<IRequestSanitizer, RequestSanitizer>();
+
+// LoggingBehavior に Sanitizer を注入
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+```
+
+#### **10.3.6 本番環境での運用ガイドライン**
+
+**必須対応項目:**
+
+| 項目 | 対応内容 | 実装場所 |
+|------|---------|---------|
+| **1. Sanitizer実装** | `IRequestSanitizer` を実装し DI 登録 | Infrastructure/Logging |
+| **2. LogLevel設定** | 本番環境で `LogLevel.Debug` を無効化 | appsettings.Production.json |
+| **3. Policy設定** | Allowlist または Denylist を設定 | appsettings.json |
+| **4. ログ監査** | 定期的にログをスキャンしてPII漏洩をチェック | CI/CD Pipeline |
+| **5. 暗号化** | ログストレージを暗号化 | Infrastructure設定 |
+| **6. アクセス制御** | ログへのアクセスを最小限に制限 | IAM/RBAC |
+
+**環境別設定例:**
+
+```json
+// appsettings.Development.json (開発環境)
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",  // ✅ 開発環境はDebug許可(Sanitizer使用前提)
+      "Application": "Debug"
+    }
+  },
+  "SanitizationPolicy": {
+    "UseAllowlist": false  // 開発環境はDenylistのみ
+  }
+}
+
+// appsettings.Production.json (本番環境)
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",  // ⚠️ Debugを無効化
+      "Application": "Information",
+      "Microsoft": "Warning"
+    }
+  },
+  "SanitizationPolicy": {
+    "UseAllowlist": true  // ⚠️ 本番環境は厳格なAllowlist
+  }
+}
+```
+
+**ログ監査スクリプト例 (CI/CD統合):**
+
+```bash
+#!/bin/bash
+# scripts/audit-logs-for-pii.sh
+# 本番ログにPIIパターンが含まれていないかチェック
+
+SENSITIVE_PATTERNS=(
+  "password.*:.*[^*]"
+  "token.*:.*[^*]"
+  "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+  "\b\d{3}-\d{2}-\d{4}\b"
+  "\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b"
+)
+
+LOG_FILE="/var/log/app/production.log"
+VIOLATIONS=0
+
+for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+  if grep -E "$pattern" "$LOG_FILE" > /dev/null; then
+    echo "⚠️  WARNING: PII pattern detected: $pattern"
+    VIOLATIONS=$((VIOLATIONS + 1))
+  fi
+done
+
+if [ $VIOLATIONS -gt 0 ]; then
+  echo "❌ FAILED: $VIOLATIONS PII violations found in logs!"
+  exit 1
+else
+  echo "✅ PASSED: No PII detected in logs"
+  exit 0
+fi
 ```
 
 ### 10.4 Pipeline登録とBehavior順序規約 (v2.1改善)
