@@ -4,12 +4,12 @@ using Application.Infrastructure.Services;
 namespace Application.Infrastructure.Stores;
 
 /// <summary>
-/// 繝ｦ繝ｼ繧ｶ繝ｼ險ｭ螳壹・迥ｶ諷狗ｮ｡逅・
+/// ユーザー設定の状態管理
 ///
-/// 險ｭ險域婿驥・
-/// - 險隱槭・繧ｿ繧､繝繧ｾ繝ｼ繝ｳ繝ｻ譌･莉倥ヵ繧ｩ繝ｼ繝槭ャ繝育ｭ峨・繝ｦ繝ｼ繧ｶ繝ｼ險ｭ螳壹ｒ邂｡逅・
-/// - LocalStorage縺ｫ豌ｸ邯壼喧
-/// - 荳ｦ陦悟宛蠕｡縺ｫ繧医ｋ螳牙・縺ｪ迥ｶ諷区峩譁ｰ
+/// 設定方針:
+/// - 言語・タイムゾーン・日付フォーマット等のユーザー設定を管理
+/// - LocalStorageに永続化
+/// - 並行処理による安全な状態更新
 /// </summary>
 public sealed class PreferencesStore : IDisposable
 {
@@ -18,10 +18,10 @@ public sealed class PreferencesStore : IDisposable
 
     private const string StorageKey = "user-preferences";
 
-    // 荳ｦ陦悟宛蠕｡逕ｨ
+    // 並行処理用
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    // 迥ｶ諷具ｼ井ｸ榊､会ｼ・
+    // 状態（不変）
     private PreferencesState _state = PreferencesState.Default;
 
     public event Func<Task>? OnChangeAsync;
@@ -37,7 +37,7 @@ public sealed class PreferencesStore : IDisposable
     public PreferencesState GetState() => _state;
 
     /// <summary>
-    /// LocalStorage縺九ｉ險ｭ螳壹ｒ隱ｭ縺ｿ霎ｼ縺ｿ
+    /// LocalStorageから設定を読み込み
     /// </summary>
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -59,7 +59,7 @@ public sealed class PreferencesStore : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "險ｭ螳壹・隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆");
+            _logger.LogError(ex, "設定の読み込みに失敗しました");
             await SetStateAsync(PreferencesState.Default);
         }
         finally
@@ -69,7 +69,7 @@ public sealed class PreferencesStore : IDisposable
     }
 
     /// <summary>
-    /// 繧ｫ繝ｫ繝√Ε繧定ｨｭ螳・
+    /// カルチャを設定
     /// </summary>
     public async Task SetCultureAsync(string culture, CancellationToken ct = default)
     {
@@ -87,7 +87,7 @@ public sealed class PreferencesStore : IDisposable
     }
 
     /// <summary>
-    /// 繧ｿ繧､繝繧ｾ繝ｼ繝ｳ繧定ｨｭ螳・
+    /// タイムゾーンを設定
     /// </summary>
     public async Task SetTimeZoneAsync(string timeZoneId, CancellationToken ct = default)
     {
@@ -105,7 +105,7 @@ public sealed class PreferencesStore : IDisposable
     }
 
     /// <summary>
-    /// 譌･莉倥ヵ繧ｩ繝ｼ繝槭ャ繝医ｒ險ｭ螳・
+    /// 日付フォーマットを設定
     /// </summary>
     public async Task SetDateFormatAsync(string dateFormat, CancellationToken ct = default)
     {
@@ -123,7 +123,7 @@ public sealed class PreferencesStore : IDisposable
     }
 
     /// <summary>
-    /// 譎ょ綾繝輔か繝ｼ繝槭ャ繝医ｒ險ｭ螳・
+    /// 時刻フォーマットを設定
     /// </summary>
     public async Task SetTimeFormatAsync(string timeFormat, CancellationToken ct = default)
     {
@@ -141,7 +141,7 @@ public sealed class PreferencesStore : IDisposable
     }
 
     /// <summary>
-    /// 繝・ヵ繧ｩ繝ｫ繝医・繝ｼ繧ｸ繧ｵ繧､繧ｺ繧定ｨｭ螳・
+    /// デフォルトページサイズを設定
     /// </summary>
     public async Task SetDefaultPageSizeAsync(int pageSize, CancellationToken ct = default)
     {
@@ -159,7 +159,7 @@ public sealed class PreferencesStore : IDisposable
     }
 
     /// <summary>
-    /// 險ｭ螳壹ｒ繝ｪ繧ｻ繝・ヨ
+    /// 設定をリセット
     /// </summary>
     public async Task ResetAsync(CancellationToken ct = default)
     {
@@ -189,7 +189,7 @@ public sealed class PreferencesStore : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "迥ｶ諷句､画峩騾夂衍荳ｭ縺ｫ繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｾ縺励◆");
+                _logger.LogError(ex, "状態変更通知中にエラーが発生しました");
             }
         }
     }
