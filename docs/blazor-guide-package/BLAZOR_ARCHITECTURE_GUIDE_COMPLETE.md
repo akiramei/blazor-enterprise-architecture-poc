@@ -4144,7 +4144,7 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始
-            await SetState(_state with { IsLoading = true, ErrorMessage = null });
+            await SetStateAsync(_state with { IsLoading = true, ErrorMessage = null });
             
             // 2. 新しいスコープでMediatorを取得(DbContextリーク防止)
             using var scope = _scopeFactory.CreateScope();
@@ -4158,7 +4158,7 @@ public sealed class ProductsStore : IDisposable
             // 4. 結果を状態に反映
             if (result.IsSuccess)
             {
-                await SetState(_state with
+                await SetStateAsync(_state with
                 {
                     IsLoading = false,
                     Products = result.Value.Items.ToImmutableList(),
@@ -4168,7 +4168,7 @@ public sealed class ProductsStore : IDisposable
             }
             else
             {
-                await SetState(_state with
+                await SetStateAsync(_state with
                 {
                     IsLoading = false,
                     ErrorMessage = result.Error
@@ -4178,12 +4178,12 @@ public sealed class ProductsStore : IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogDebug("LoadAsyncがキャンセルされました");
-            await SetState(_state with { IsLoading = false });
+            await SetStateAsync(_state with { IsLoading = false });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品一覧の読み込みに失敗しました");
-            await SetState(_state with
+            await SetStateAsync(_state with
             {
                 IsLoading = false,
                 ErrorMessage = "データの読み込みに失敗しました"
@@ -4203,7 +4203,7 @@ public sealed class ProductsStore : IDisposable
         if (pageNumber < 1 || pageNumber > _state.TotalPages)
             return;
 
-        await SetState(_state with { CurrentPage = pageNumber });
+        await SetStateAsync(_state with { CurrentPage = pageNumber });
         await LoadAsync(ct);
     }
     
@@ -4215,21 +4215,21 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始(部分的)
-            await SetState(_state with { ErrorMessage = null });
-            
+            await SetStateAsync(_state with { ErrorMessage = null });
+
             // 2. 新しいスコープでCommandを実行
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-            
+
             var command = new DeleteProductCommand(productId);
             var result = await mediator.Send(command, ct);
 
             if (!result.IsSuccess)
             {
-                await SetState(_state with { ErrorMessage = result.Error });
+                await SetStateAsync(_state with { ErrorMessage = result.Error });
                 return false;
             }
-            
+
             // 3. 成功したら一覧を再読み込み
             await LoadAsync(ct);
             return true;
@@ -4237,7 +4237,7 @@ public sealed class ProductsStore : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品削除に失敗しました: {ProductId}", productId);
-            await SetState(_state with { ErrorMessage = "削除処理に失敗しました" });
+            await SetStateAsync(_state with { ErrorMessage = "削除処理に失敗しました" });
             return false;
         }
     }
@@ -4253,7 +4253,7 @@ public sealed class ProductsStore : IDisposable
         var successCount = 0;
         var failureCount = 0;
 
-        await SetState(_state with { IsLoading = true, ErrorMessage = null });
+        await SetStateAsync(_state with { IsLoading = true, ErrorMessage = null });
         
         foreach (var id in ids)
         {
@@ -4279,24 +4279,20 @@ public sealed class ProductsStore : IDisposable
     
     /// <summary>
     /// 状態を更新し、購読者に通知
+    /// 例外は呼び出し元に伝播させる
     /// </summary>
-    private async Task SetState(ProductsState newState)
+    private async Task SetStateAsync(ProductsState newState)
     {
         _state = newState;
-        
+
         if (OnChangeAsync is null) return;
-        
+
         // すべての購読者に通知
+        // 例外はキャッチせず呼び出し元に伝播させることで、
+        // 呼び出し側で適切なエラーハンドリングを可能にする
         foreach (var handler in OnChangeAsync.GetInvocationList().Cast<Func<Task>>())
         {
-            try
-            {
-                await handler();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "状態変更通知中にエラーが発生しました");
-            }
+            await handler();
         }
     }
     
@@ -5046,7 +5042,7 @@ private async void SetState(ProductsState newState)
 **改善版:**
 
 ```csharp
-// ✅ GOOD: Task を返す
+// ✅ GOOD: Task を返す（例外は呼び出し元に伝播）
 private async Task SetStateAsync(ProductsState newState)
 {
     // 差分がない場合はスキップ（パフォーマンス最適化）
@@ -5060,24 +5056,13 @@ private async Task SetStateAsync(ProductsState newState)
 
     if (OnChangeAsync is null) return;
 
-    // 全ての購読者に通知（並列実行）
-    var tasks = OnChangeAsync
-        .GetInvocationList()
-        .Cast<Func<Task>>()
-        .Select(async handler =>
-        {
-            try
-            {
-                await handler();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "State change notification failed");
-                // 1つの購読者のエラーが他に影響しないようにキャッチ
-            }
-        });
-
-    await Task.WhenAll(tasks);
+    // 全ての購読者に順次通知
+    // 例外はキャッチせず呼び出し元に伝播させる
+    // これにより呼び出し側で適切なエラーハンドリングが可能になる
+    foreach (var handler in OnChangeAsync.GetInvocationList().Cast<Func<Task>>())
+    {
+        await handler();
+    }
 }
 ```
 
@@ -5105,6 +5090,23 @@ public async Task LoadAsync(CancellationToken ct = default)
     }
 }
 ```
+
+**重要ポイント:**
+
+1. **例外を伝播させる**: `SetStateAsync` 内部で例外をキャッチしない
+   - 呼び出し側が適切にエラーハンドリングできる
+   - デバッグ時にスタックトレースが保持される
+   - エラーを隠蔽せず、問題を早期発見できる
+
+2. **呼び出し側の責任**: 各メソッド（LoadAsync、DeleteAsync等）が適切に try-catch を配置
+   - ビジネスロジックに応じたエラーメッセージを表示
+   - 必要に応じてリトライや代替処理を実装
+   - ログ記録とユーザー通知を適切に分離
+
+3. **Task を返す利点**:
+   - `await` による完了待機が可能
+   - 例外が適切に伝播する
+   - テストが容易（完了を検証できる）
 
 ---
 
