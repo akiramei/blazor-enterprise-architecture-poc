@@ -76,10 +76,38 @@ class PatternSelector:
         intent_name = best_intent[0]
         confidence = best_intent[1][0] * best_intent[1][1]
 
-        # RequestTypeにマッピング
-        request_type = RequestType(intent_name)
+        # RequestTypeにマッピング (名前または値で検索)
+        request_type = self._resolve_request_type(intent_name)
 
         return request_type, confidence
+
+    def _resolve_request_type(self, intent_name: str) -> RequestType:
+        """
+        intent_nameから適切なRequestTypeを解決する。
+
+        名前（例: "NEW_FEATURE"）または値（例: "新機能追加"）のどちらでも検索可能。
+        一致するものがない場合はデフォルトでNEW_FEATUREを返す。
+
+        Args:
+            intent_name: 検索する文字列（enum名またはenum値）
+
+        Returns:
+            RequestType: 解決されたRequestType
+        """
+        # 1. 名前で検索を試行
+        try:
+            return RequestType[intent_name]
+        except KeyError:
+            pass
+
+        # 2. 値で検索を試行
+        for member in RequestType:
+            if member.value == intent_name:
+                return member
+
+        # 3. 一致なし: デフォルトとしてNEW_FEATUREを返す
+        print(f"Warning: '{intent_name}'に一致するRequestTypeが見つかりません。NEW_FEATUREをデフォルトとして使用します。")
+        return RequestType.NEW_FEATURE
 
 # 使用例
 user_request = "商品を作成する機能を追加してください"
