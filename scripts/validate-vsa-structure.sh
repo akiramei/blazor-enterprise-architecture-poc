@@ -95,7 +95,7 @@ else
     # Check each feature slice for layer folders
     for SLICE in $FEATURE_SLICES; do
         SLICE_NAME=$(basename "$SLICE")
-        HAS_LAYERS=$(find "$SLICE" -maxdepth 1 -type d -name "Application" -o -name "Domain" -o -name "Infrastructure" -o -name "UI" 2>/dev/null | wc -l)
+        HAS_LAYERS=$(find "$SLICE" -maxdepth 1 -type d \( -name "Application" -o -name "Domain" -o -name "Infrastructure" -o -name "UI" \) 2>/dev/null | wc -l)
 
         if [ "$HAS_LAYERS" -eq 0 ]; then
             echo -e "${YELLOW}⚠️  WARNING: $SLICE_NAME has no layer folders${NC}"
