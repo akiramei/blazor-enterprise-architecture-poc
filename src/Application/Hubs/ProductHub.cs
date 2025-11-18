@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace Application.Hubs;
 
 /// <summary>
-/// 蝠・刀邂｡逅・畑 SignalR Hub
+/// SignalR Hub for product update notifications
 /// </summary>
 public sealed class ProductHub : Hub<IProductHubClient>
 {
@@ -16,24 +16,24 @@ public sealed class ProductHub : Hub<IProductHubClient>
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation("繧ｯ繝ｩ繧､繧｢繝ｳ繝域磁邯・ {ConnectionId}", Context.ConnectionId);
+        _logger.LogInformation("Client connected: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        _logger.LogInformation("繧ｯ繝ｩ繧､繧｢繝ｳ繝亥・譁ｭ: {ConnectionId}, 逅・罰: {Exception}",
+        _logger.LogInformation("Client disconnected: {ConnectionId}, Reason: {Exception}",
             Context.ConnectionId,
-            exception?.Message ?? "豁｣蟶ｸ蛻・妙");
+            exception?.Message ?? "Normal disconnection");
         await base.OnDisconnectedAsync(exception);
     }
 
     /// <summary>
-    /// 縺吶∋縺ｦ縺ｮ繧ｯ繝ｩ繧､繧｢繝ｳ繝医↓蝠・刀螟画峩繧帝夂衍
+    /// Notifies all connected clients about product changes
     /// </summary>
     public async Task NotifyProductChanged()
     {
-        _logger.LogInformation("蝠・刀螟画峩繧貞・繧ｯ繝ｩ繧､繧｢繝ｳ繝医↓騾夂衍: {ConnectionId}", Context.ConnectionId);
+        _logger.LogInformation("Broadcasting product change notification to all clients: {ConnectionId}", Context.ConnectionId);
         await Clients.All.ProductChanged();
     }
 }
