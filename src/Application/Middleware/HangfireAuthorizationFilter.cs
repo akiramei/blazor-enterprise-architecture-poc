@@ -8,7 +8,7 @@ namespace Application.Middleware;
 ///
 /// 【パターン: Role-Based Authorization Filter】
 ///
-/// 責務:
+/// 責任:
 /// - Hangfireダッシュボードへのアクセスを管理者(Admin)ロールのみに制限
 /// - 開発環境ではローカルホストからのアクセスを許可
 ///

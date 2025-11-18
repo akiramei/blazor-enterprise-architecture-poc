@@ -28,7 +28,8 @@ namespace Shared.Infrastructure.Platform.Stores;
 /// </summary>
 public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Application.Interfaces.IIdempotencyStore
 {
-    private readonly ConcurrentDictionary<string, LocalIdempotencyRecord> _store = new();
+    private const string LegacyCommandType = "Legacy";
+    private readonly ConcurrentDictionary<string, IdempotencyRecord> _store = new();
     private readonly ILogger<InMemoryIdempotencyStore> _logger;
 
     public InMemoryIdempotencyStore(ILogger<InMemoryIdempotencyStore> logger)
@@ -50,16 +51,10 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Applica
 
     public Task MarkAsProcessedAsync(string requestId, object? result, CancellationToken cancellationToken = default)
     {
-        var serializedResult = result != null
-            ? JsonSerializer.Serialize(result)
-            : null;
-
-        var record = new LocalIdempotencyRecord
-        {
-            RequestId = requestId,
-            Result = serializedResult,
-            ProcessedAt = DateTime.UtcNow
-        };
+        var record = IdempotencyRecord.Create(
+            key: requestId,
+            commandType: LegacyCommandType,
+            result: result ?? (object)"null");
 
         _store[requestId] = record;
 
@@ -74,9 +69,9 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Applica
         {
             _logger.LogDebug("処理済みリクエストの結果を取得しました。[RequestId: {RequestId}]", requestId);
 
-            // 簡略化: 結果をJSON文字列として返す
-            // 実際の実装では型情報も保存して復元する必要がある
-            object? result = record.Result;
+            // Return the JSON string as the result
+            // Note: The caller is responsible for deserializing if needed
+            object? result = record.ResultJson;
             return Task.FromResult(result);
         }
 
@@ -89,29 +84,17 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Applica
     {
         if (_store.TryGetValue(key, out var record))
         {
-            // Convert local record to domain record using reflection (not ideal, but works)
-            // Create using the static Create method - we don't have the generic type here, so we use the deserialized object
-            var domainRecord = IdempotencyRecord.Create(
-                key,
-                "Unknown", // CommandType not stored in old format
-                record.Result ?? "null");
-
-            return Task.FromResult<IdempotencyRecord?>(domainRecord);
+            _logger.LogDebug("冪等性レコードを取得しました。[Key: {Key}]", key);
+            return Task.FromResult<IdempotencyRecord?>(record);
         }
 
+        _logger.LogDebug("冪等性レコードが見つかりません。[Key: {Key}]", key);
         return Task.FromResult<IdempotencyRecord?>(null);
     }
 
     public Task SaveAsync(IdempotencyRecord record, CancellationToken ct = default)
     {
-        var localRecord = new LocalIdempotencyRecord
-        {
-            RequestId = record.Key,
-            Result = record.ResultJson,
-            ProcessedAt = record.CreatedAt
-        };
-
-        _store[record.Key] = localRecord;
+        _store[record.Key] = record;
 
         _logger.LogDebug("冪等性レコードを保存しました。[Key: {Key}]", record.Key);
 
@@ -127,7 +110,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Applica
         var cutoffTime = DateTime.UtcNow - expiration;
 
         var expiredKeys = _store
-            .Where(kvp => kvp.Value.ProcessedAt < cutoffTime)
+            .Where(kvp => kvp.Value.CreatedAt < cutoffTime)
             .Select(kvp => kvp.Key)
             .ToList();
 
@@ -142,12 +125,5 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Applica
         }
 
         return Task.CompletedTask;
-    }
-
-    private sealed record LocalIdempotencyRecord
-    {
-        public required string RequestId { get; init; }
-        public string? Result { get; init; }
-        public DateTime ProcessedAt { get; init; }
     }
 }
