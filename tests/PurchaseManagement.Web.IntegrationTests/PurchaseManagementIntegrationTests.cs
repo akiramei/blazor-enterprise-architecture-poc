@@ -31,6 +31,7 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+    private readonly TestConfiguration.TestCredentials _testCredentials;
 
     public PurchaseManagementIntegrationTests(CustomWebApplicationFactory factory)
     {
@@ -39,6 +40,9 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
         {
             AllowAutoRedirect = false
         });
+
+        // テスト認証情報を取得（環境変数または設定ファイルから）
+        _testCredentials = TestConfiguration.GetTestCredentials();
     }
 
     public async Task InitializeAsync()
@@ -590,8 +594,8 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
     {
         var loginRequest = new
         {
-            email = "admin@example.com",
-            password = "Admin@123"
+            email = _testCredentials.AdminEmail,
+            password = _testCredentials.AdminPassword
         };
 
         var response = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
