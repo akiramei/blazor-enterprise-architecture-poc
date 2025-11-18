@@ -9592,7 +9592,9 @@ public sealed class ProductsStore
 }
 
 // UI側の防御(ボタン無効化)
-<button class="btn btn-danger" 
+// 注: @onclick はSignalRイベントであり、HTTPリクエストではありません
+// そのためアンチフォージェリトークンは適用されません（詳細は14.6.3参照）
+<button class="btn btn-danger"
         @onclick="() => Actions.DeleteAsync(product.Id)"
         disabled="@_isDeleting">
     @if (_isDeleting)
@@ -9625,10 +9627,16 @@ public sealed class ProductsStore
 }
 ```
 
-#### 14.6.3 アンチフォージェリトークン
+#### 14.6.3 CSRF対策: HTTPフォームとSignalRイベントの違い
+
+> **重要**: `IAntiforgery` はHTTPフォームポスト（POST/PUT/DELETE）に対するCSRF保護を提供します。
+> Blazor ServerのSignalR接続を介したコンポーネントイベント（`@onclick`、`@onchange`など）には
+> アンチフォージェリトークンは**適用されません**。それぞれ異なる保護戦略が必要です。
+
+##### ケース1: HTTPフォーム送信（EditFormなど）
 
 ```csharp
-// Program.cs
+// Program.cs - .NET 8+
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -9637,28 +9645,113 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
-// _Host.cshtml または App.razor
-<component type="typeof(App)" render-mode="ServerPrerendered" />
-<script src="_framework/blazor.server.js" 
-        asp-append-version="true"
-        data-antiforgery-token="@Html.GetAntiforgeryToken()"></script>
+// Razorページ または Minimal API エンドポイント
+// .NET 8+では[RequireAntiforgeryToken]を使用
+app.MapPost("/api/products",
+    [RequireAntiforgeryToken] async (CreateProductCommand cmd, IMediator mediator) =>
+    {
+        var result = await mediator.Send(cmd);
+        return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+    });
 
-// Blazor Component での利用
-@inject IAntiforgery Antiforgery
+// EditFormでのトークン送信（.NET 8+）
+<EditForm Model="@Model" FormName="ProductForm" OnValidSubmit="HandleValidSubmit">
+    <AntiforgeryToken />  @* ✅ .NET 8+で自動トークン送信 *@
+
+    <InputText @bind-Value="Model.Name" />
+    <button type="submit">送信</button>
+</EditForm>
 
 @code {
-    [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
-    
-    private async Task SubmitFormAsync()
+    [SupplyParameterFromForm]
+    private ProductModel? Model { get; set; }
+
+    private async Task HandleValidSubmit()
     {
-        // ✅ トークン検証
-        await Antiforgery.ValidateRequestAsync(HttpContext!);
-        
-        // ... フォーム送信処理
+        // ✅ [RequireAntiforgeryToken]により自動検証される
+        // 手動でAntiforgery.ValidateRequestAsync()を呼ぶ必要なし
     }
 }
 ```
+
+##### ケース2: SignalRベースのコンポーネントイベント（@onclick等）
+
+**IAntiforgeryは適用されません** - 代わりに以下の多層防御を実施:
+
+```csharp
+// ❌ 誤解: 以下のボタンにはアンチフォージェリトークンは使えません
+// @onclick はSignalR接続を介したイベントであり、HTTPリクエストではありません
+<button class="btn btn-danger"
+        @onclick="() => Actions.DeleteAsync(product.Id)"
+        disabled="@_isDeleting">
+    削除
+</button>
+
+// ✅ SignalRイベントの保護戦略:
+// 1. 接続時の認証強制（Program.cs）
+builder.Services.AddServerSideBlazor(options =>
+{
+    options.MaximumReceiveMessageSize = 32 * 1024; // 32KB制限
+});
+
+app.UseAuthentication();  // ✅ SignalR接続前に認証を要求
+app.UseAuthorization();
+app.MapBlazorHub().RequireAuthorization();  // ✅ 認証済みユーザーのみ許可
+
+// 2. CORS制限（または明示的な許可）
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("StrictOrigin", policy =>
+    {
+        policy.WithOrigins("https://yourdomain.com")
+              .AllowCredentials();  // SignalRに必要
+    });
+});
+// または特定のエンドポイントで無効化
+// [DisableCors] を使用する場合は慎重に検討
+
+// 3. サーバー側での厳格な検証（Handler層）
+public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand, Result>
+{
+    private readonly ICurrentUserService _currentUser;
+    private readonly AppDbContext _context;
+
+    public async Task<Result> Handle(DeleteProductCommand request, CancellationToken ct)
+    {
+        // ✅ 認証確認
+        if (!_currentUser.IsAuthenticated)
+            return Result.Fail("認証が必要です");
+
+        // ✅ 権限確認
+        if (!_currentUser.HasPermission("Products.Delete"))
+            return Result.Fail("削除権限がありません");
+
+        var product = await _context.Products.FindAsync(request.Id);
+        if (product == null)
+            return Result.Fail("製品が見つかりません");
+
+        // ✅ 所有者確認（必要な場合）
+        if (product.CreatedBy != _currentUser.UserId && !_currentUser.IsAdmin())
+            return Result.Fail("他ユーザーの製品は削除できません");
+
+        _context.Products.Remove(product);
+        await _context.SaveChangesAsync(ct);
+
+        return Result.Ok();
+    }
+}
+```
+
+**SignalRイベントの保護まとめ**:
+
+| 保護層 | 実装方法 | 目的 |
+|--------|---------|------|
+| **接続認証** | `MapBlazorHub().RequireAuthorization()` | 未認証ユーザーの接続拒否 |
+| **CORS制限** | `AddCors()` または `[DisableCors]` | クロスオリジンリクエストの制御 |
+| **入力検証** | FluentValidation | 不正データの拒否 |
+| **認可チェック** | Handler内で`ICurrentUserService` | 権限のない操作の拒否 |
+| **所有権確認** | リソース所有者と現在ユーザーの照合 | 他ユーザーデータの保護 |
+| **二重実行防止** | `SemaphoreSlim` + `_isProcessing` | 重複実行の防止 |
 
 #### 14.6.4 サーキットごとのIServiceScope作法
 
@@ -9719,7 +9812,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
 | **2. イベント購読解除** | Dispose時に購読解除しているか | IDisposable実装 |
 | **3. 再接続処理** | 再接続時の初期化ロジックがあるか | EnsureInitializedAsync実装 |
 | **4. 二重実行防止** | 処理中フラグとセマフォがあるか | SemaphoreSlim + _isProcessing |
-| **5. CSRF対策** | アンチフォージェリトークン使用 | IAntiforgery設定 |
+| **5. CSRF対策** | HTTPフォーム: アンチフォージェリトークン使用<br>SignalRイベント: 接続認証+認可チェック | EditForm: AntiforgeryToken+[RequireAntiforgeryToken]<br>@onclick等: MapBlazorHub().RequireAuthorization() |
 | **6. Circuit制限** | 切断Circuit保持数を設定 | appsettings.json設定 |
 | **7. タイムアウト設定** | JSInterop/SignalRタイムアウト | CircuitOptions設定 |
 | **8. エラーログ** | Circuit切断/再接続をログ | ILogger使用 |
