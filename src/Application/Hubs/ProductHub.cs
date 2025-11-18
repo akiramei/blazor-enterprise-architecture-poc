@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 namespace Application.Hubs;
 
 /// <summary>
-/// SignalR Hub for product update notifications
+/// 製品通知用 SignalR Hub
 /// </summary>
 public sealed class ProductHub : Hub<IProductHubClient>
 {
@@ -16,24 +16,24 @@ public sealed class ProductHub : Hub<IProductHubClient>
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation("Client connected: {ConnectionId}", Context.ConnectionId);
+        _logger.LogInformation("クライアントが接続しました: {ConnectionId}", Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        _logger.LogInformation("Client disconnected: {ConnectionId}, Reason: {Exception}",
+        _logger.LogInformation("クライアントが切断: {ConnectionId}, 理由: {Exception}",
             Context.ConnectionId,
-            exception?.Message ?? "Normal disconnection");
+            exception?.Message ?? "正常切断");
         await base.OnDisconnectedAsync(exception);
     }
 
     /// <summary>
-    /// Notifies all connected clients about product changes
+    /// すべてのクライアントに製品変更を通知
     /// </summary>
     public async Task NotifyProductChanged()
     {
-        _logger.LogInformation("Broadcasting product change notification to all clients: {ConnectionId}", Context.ConnectionId);
+        _logger.LogInformation("製品変更を全クライアントに送信: {ConnectionId}", Context.ConnectionId);
         await Clients.All.ProductChanged();
     }
 }
