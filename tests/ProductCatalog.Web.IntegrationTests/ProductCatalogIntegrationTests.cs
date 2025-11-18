@@ -223,9 +223,6 @@ public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplication
         var existingProduct = await existingResponse.Content.ReadFromJsonAsync<ProductCatalog.Shared.Application.DTOs.ProductDetailDto>();
         existingProduct.Should().NotBeNull();
 
-        // DEBUG: Versionの値を確認
-        Console.WriteLine($"DEBUG: existingProduct.Version = {existingProduct!.Version}");
-
         var updateRequest = new
         {
             name = "Updated Product",
