@@ -22,9 +22,9 @@ public sealed class ProductHub : Hub<IProductHubClient>
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        _logger.LogInformation("繧ｯ繝ｩ繧､繧｢繝ｳ繝亥・譁ｭ: {ConnectionId}, 逅・罰: {Exception}",
+        _logger.LogInformation("クライアント切断: {ConnectionId}, 切断理由: {Exception}",
             Context.ConnectionId,
-            exception?.Message ?? "豁｣蟶ｸ蛻・妙");
+            exception?.Message ?? "なし");
         await base.OnDisconnectedAsync(exception);
     }
 
