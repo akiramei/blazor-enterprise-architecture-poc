@@ -4107,7 +4107,7 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始
-            SetState(_state with { IsLoading = true, ErrorMessage = null });
+            await SetState(_state with { IsLoading = true, ErrorMessage = null });
             
             // 2. 新しいスコープでMediatorを取得(DbContextリーク防止)
             using var scope = _scopeFactory.CreateScope();
@@ -4121,7 +4121,7 @@ public sealed class ProductsStore : IDisposable
             // 4. 結果を状態に反映
             if (result.IsSuccess)
             {
-                SetState(_state with
+                await SetState(_state with
                 {
                     IsLoading = false,
                     Products = result.Value.Items.ToImmutableList(),
@@ -4131,7 +4131,7 @@ public sealed class ProductsStore : IDisposable
             }
             else
             {
-                SetState(_state with
+                await SetState(_state with
                 {
                     IsLoading = false,
                     ErrorMessage = result.Error
@@ -4141,12 +4141,12 @@ public sealed class ProductsStore : IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogDebug("LoadAsyncがキャンセルされました");
-            SetState(_state with { IsLoading = false });
+            await SetState(_state with { IsLoading = false });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品一覧の読み込みに失敗しました");
-            SetState(_state with
+            await SetState(_state with
             {
                 IsLoading = false,
                 ErrorMessage = "データの読み込みに失敗しました"
@@ -4165,8 +4165,8 @@ public sealed class ProductsStore : IDisposable
     {
         if (pageNumber < 1 || pageNumber > _state.TotalPages)
             return;
-        
-        SetState(_state with { CurrentPage = pageNumber });
+
+        await SetState(_state with { CurrentPage = pageNumber });
         await LoadAsync(ct);
     }
     
@@ -4178,7 +4178,7 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始(部分的)
-            SetState(_state with { ErrorMessage = null });
+            await SetState(_state with { ErrorMessage = null });
             
             // 2. 新しいスコープでCommandを実行
             using var scope = _scopeFactory.CreateScope();
@@ -4186,10 +4186,10 @@ public sealed class ProductsStore : IDisposable
             
             var command = new DeleteProductCommand(productId);
             var result = await mediator.Send(command, ct);
-            
+
             if (!result.IsSuccess)
             {
-                SetState(_state with { ErrorMessage = result.Error });
+                await SetState(_state with { ErrorMessage = result.Error });
                 return false;
             }
             
@@ -4200,7 +4200,7 @@ public sealed class ProductsStore : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品削除に失敗しました: {ProductId}", productId);
-            SetState(_state with { ErrorMessage = "削除処理に失敗しました" });
+            await SetState(_state with { ErrorMessage = "削除処理に失敗しました" });
             return false;
         }
     }
@@ -4215,8 +4215,8 @@ public sealed class ProductsStore : IDisposable
         var ids = productIds.ToList();
         var successCount = 0;
         var failureCount = 0;
-        
-        SetState(_state with { IsLoading = true, ErrorMessage = null });
+
+        await SetState(_state with { IsLoading = true, ErrorMessage = null });
         
         foreach (var id in ids)
         {
@@ -4243,7 +4243,7 @@ public sealed class ProductsStore : IDisposable
     /// <summary>
     /// 状態を更新し、購読者に通知
     /// </summary>
-    private async void SetState(ProductsState newState)
+    private async Task SetState(ProductsState newState)
     {
         _state = newState;
         
