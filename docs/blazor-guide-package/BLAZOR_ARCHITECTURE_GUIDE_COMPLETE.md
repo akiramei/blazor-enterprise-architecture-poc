@@ -6406,7 +6406,7 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Authorization
 /// キャッシュ誤配信を防ぐ改善版CachingBehavior
 /// </summary>
 public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IQuery<TResponse>, ICacheable
+    where TRequest : IQuery<TResponse>, ICacheableQuery
 {
     private readonly IMemoryCache _cache;
     private readonly ICurrentUserService _currentUser;  // ✅ 必須依存
@@ -6430,7 +6430,7 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         // ✅ CRITICAL: キーに必ずユーザー/テナント情報を含める
         var userSegment = _currentUser.UserId.ToString("N");
         var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
-        var requestSegment = request.GetCacheKey();
+        var requestSegment = request.CacheKey;
         
         var cacheKey = $"{typeof(TRequest).Name}:{tenantSegment}:{userSegment}:{requestSegment}";
         //                                        ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^
@@ -6446,21 +6446,21 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         var response = await next();
         
         _cache.Set(
-            cacheKey, 
-            response, 
-            TimeSpan.FromMinutes(request.CacheDuration));
+            cacheKey,
+            response,
+            request.CacheDuration);
         
         return response;
     }
 }
 
 // ✅ 使用例(正しいキー設計)
-public record GetProductQuery(Guid Id) : IQuery<ProductDto>, ICacheable
+public record GetProductQuery(Guid Id) : IQuery<ProductDto>, ICacheableQuery
 {
     // ❌ 悪い例: "Product:123" → 全ユーザーで共有される
     // ✅ 良い例: Behaviorが自動的に "GetProductQuery:tenant456:user789:Product:123" に拡張
-    public string GetCacheKey() => $"Product:{Id}";
-    public int CacheDuration => 5;  // 分
+    public string CacheKey => $"Product:{Id}";
+    public TimeSpan CacheDuration => TimeSpan.FromMinutes(5);
 }
 ```
 
