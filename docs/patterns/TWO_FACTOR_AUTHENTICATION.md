@@ -392,21 +392,307 @@ curl -X POST https://localhost:5001/api/v1/auth/2fa/enable \
 ### 1. TOTP秘密鍵の保護
 
 **現在の実装:**
-- 秘密鍵はDBに**平文で保存**
+- 秘密鍵はDBに**平文で保存** ⚠️ **セキュリティリスク**
 
-**推奨される改善:**
+**必須の改善: 暗号化サービスの実装**
+
+#### 暗号化方式
+**AES-256-GCM（Galois/Counter Mode）を使用:**
+- 認証付き暗号化（Authenticated Encryption）
+- データの機密性と完全性を同時に保護
+- Nonce（IV）、認証タグ（Auth Tag）、暗号文を一緒に保存
+
+#### 実装例: 暗号化サービス
+
 ```csharp
-// 暗号化してDB保存
-user.TwoFactorSecretKey = _encryptionService.Encrypt(secretKey);
+// Infrastructure/Security/TotpEncryptionService.cs
+public interface ITotpEncryptionService
+{
+    string Encrypt(string plaintext);
+    string Decrypt(string ciphertext);
+}
 
-// 復号化して検証
-var decryptedKey = _encryptionService.Decrypt(user.TwoFactorSecretKey);
-_totpService.ValidateCode(decryptedKey, code);
+public class TotpEncryptionService : ITotpEncryptionService
+{
+    private readonly byte[] _encryptionKey;
+
+    public TotpEncryptionService(IConfiguration configuration)
+    {
+        // キーは環境変数またはKMSから取得
+        var keyBase64 = configuration["TotpEncryption:Key"]
+            ?? throw new InvalidOperationException("Encryption key not configured");
+        _encryptionKey = Convert.FromBase64String(keyBase64);
+
+        if (_encryptionKey.Length != 32) // AES-256 = 32バイト
+            throw new InvalidOperationException("Encryption key must be 256 bits");
+    }
+
+    public string Encrypt(string plaintext)
+    {
+        try
+        {
+            using var aes = new AesGcm(_encryptionKey);
+
+            var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+            var nonce = new byte[AesGcm.NonceByteSizes.MaxSize]; // 12バイト
+            var ciphertext = new byte[plaintextBytes.Length];
+            var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // 16バイト
+
+            RandomNumberGenerator.Fill(nonce); // ランダムなnonceを生成
+
+            aes.Encrypt(nonce, plaintextBytes, ciphertext, tag);
+
+            // フォーマット: nonce(12) + tag(16) + ciphertext(N)
+            var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+            Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
+            Buffer.BlockCopy(ciphertext, 0, result, nonce.Length + tag.Length, ciphertext.Length);
+
+            return Convert.ToBase64String(result);
+        }
+        catch (Exception ex)
+        {
+            throw new CryptographicException("Failed to encrypt TOTP secret", ex);
+        }
+    }
+
+    public string Decrypt(string encryptedData)
+    {
+        try
+        {
+            using var aes = new AesGcm(_encryptionKey);
+
+            var data = Convert.FromBase64String(encryptedData);
+
+            // フォーマット解析: nonce(12) + tag(16) + ciphertext(N)
+            var nonce = new byte[AesGcm.NonceByteSizes.MaxSize];
+            var tag = new byte[AesGcm.TagByteSizes.MaxSize];
+            var ciphertext = new byte[data.Length - nonce.Length - tag.Length];
+
+            Buffer.BlockCopy(data, 0, nonce, 0, nonce.Length);
+            Buffer.BlockCopy(data, nonce.Length, tag, 0, tag.Length);
+            Buffer.BlockCopy(data, nonce.Length + tag.Length, ciphertext, 0, ciphertext.Length);
+
+            var plaintext = new byte[ciphertext.Length];
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (CryptographicException)
+        {
+            throw new CryptographicException("Failed to decrypt TOTP secret - data may be corrupted or tampered");
+        }
+        catch (Exception ex)
+        {
+            throw new CryptographicException("Failed to decrypt TOTP secret", ex);
+        }
+    }
+}
 ```
 
-**暗号化方式:**
-- AES-256-GCM（Galois/Counter Mode）推奨
-- キー管理: Azure Key Vault / AWS KMS / Google Cloud KMS
+#### 使用例: Encrypt → Store
+
+```csharp
+// Features/TwoFactorAuthentication/Commands/EnableTwoFactorCommand.cs
+public class EnableTwoFactorCommandHandler : IRequestHandler<EnableTwoFactorCommand, EnableTwoFactorResult>
+{
+    private readonly IUserRepository _userRepository;
+    private readonly ITotpService _totpService;
+    private readonly ITotpEncryptionService _encryptionService;
+
+    public async Task<EnableTwoFactorResult> Handle(EnableTwoFactorCommand request, ...)
+    {
+        var user = await _userRepository.GetByIdAsync(request.UserId);
+
+        // 1. TOTP秘密鍵を生成
+        var secretKey = _totpService.GenerateSecretKey();
+
+        // 2. 暗号化してDB保存
+        user.TwoFactorSecretKey = _encryptionService.Encrypt(secretKey);
+        user.IsTwoFactorEnabled = true;
+
+        await _userRepository.UpdateAsync(user);
+
+        // 3. QRコード用に平文の秘密鍵を返す（一度だけ）
+        return new EnableTwoFactorResult
+        {
+            SecretKey = secretKey,
+            QrCodeUri = _totpService.GenerateQrCodeUri(user.Email, secretKey)
+        };
+    }
+}
+```
+
+#### 使用例: Decrypt → Validate
+
+```csharp
+// Features/TwoFactorAuthentication/Commands/VerifyTwoFactorCodeCommand.cs
+public class VerifyTwoFactorCodeCommandHandler : IRequestHandler<VerifyTwoFactorCodeCommand, bool>
+{
+    private readonly IUserRepository _userRepository;
+    private readonly ITotpService _totpService;
+    private readonly ITotpEncryptionService _encryptionService;
+
+    public async Task<bool> Handle(VerifyTwoFactorCodeCommand request, ...)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email);
+
+        if (user?.TwoFactorSecretKey == null)
+            return false;
+
+        try
+        {
+            // 1. 暗号化されたDB値を復号化
+            var decryptedKey = _encryptionService.Decrypt(user.TwoFactorSecretKey);
+
+            // 2. TOTPコードを検証
+            return _totpService.ValidateCode(decryptedKey, request.Code);
+        }
+        catch (CryptographicException ex)
+        {
+            // 復号化失敗 = データ改ざんまたは鍵の不一致
+            _logger.LogError(ex, "Failed to decrypt TOTP secret for user {Email}", request.Email);
+            return false;
+        }
+    }
+}
+```
+
+#### キー管理の推奨事項
+
+**1. 暗号化キーの保存場所（優先順位順）:**
+
+```csharp
+// オプション1: クラウドKMS（最推奨）
+public class KmsBackedEncryptionService : ITotpEncryptionService
+{
+    private readonly IAzureKeyVaultClient _keyVault;
+
+    public async Task<string> EncryptAsync(string plaintext)
+    {
+        // Azure Key Vault / AWS KMS / Google Cloud KMSでキーを管理
+        var dataKey = await _keyVault.GenerateDataKeyAsync("totp-encryption-key");
+        // ... AES-GCM暗号化処理
+    }
+}
+
+// オプション2: 環境変数（開発・小規模環境）
+// appsettings.json には絶対に保存しない
+{
+  "TotpEncryption": {
+    "Key": "#{TOTP_ENCRYPTION_KEY}#" // CI/CDで環境変数を注入
+  }
+}
+
+// オプション3: ASP.NET Core Data Protection API
+services.AddDataProtection()
+    .PersistKeysToAzureBlobStorage(...)
+    .ProtectKeysWithAzureKeyVault(...);
+```
+
+**2. キーのローテーション手順:**
+
+```csharp
+// 複数キーのサポート（ローテーション対応）
+public class VersionedEncryptionService : ITotpEncryptionService
+{
+    private readonly Dictionary<int, byte[]> _keys;
+    private readonly int _currentKeyVersion = 2;
+
+    public string Encrypt(string plaintext)
+    {
+        var encrypted = EncryptWithKey(_keys[_currentKeyVersion], plaintext);
+        return $"v{_currentKeyVersion}:{encrypted}"; // バージョンプレフィックス
+    }
+
+    public string Decrypt(string ciphertext)
+    {
+        var parts = ciphertext.Split(':', 2);
+        var version = int.Parse(parts[0].TrimStart('v'));
+        return DecryptWithKey(_keys[version], parts[1]); // 旧キーでも復号化可能
+    }
+}
+
+// ローテーション戦略
+// 1. 新しいキー（v2）を追加
+// 2. 新規暗号化はv2を使用
+// 3. 既存データは遅延再暗号化（ログイン時など）
+// 4. すべてのデータがv2になったらv1を削除
+```
+
+**3. バックアップとディザスタリカバリ:**
+
+```yaml
+# キーバックアップ手順
+procedures:
+  - キーは複数のセキュアな場所に暗号化して保管
+  - KMSのキーバックアップ機能を有効化（Azure Key Vault Soft Delete等）
+  - 定期的なキー回復テストの実施
+
+disaster_recovery:
+  - キー紛失時の対応手順を文書化
+  - ユーザーに2FAを再設定させる手順（最終手段）
+  - リカバリーコードでのアクセス回復手順
+```
+
+**4. エラーハンドリング:**
+
+```csharp
+public async Task<Result<bool>> ValidateTotpCodeAsync(string email, string code)
+{
+    try
+    {
+        var user = await _userRepository.GetByEmailAsync(email);
+        if (user?.TwoFactorSecretKey == null)
+            return Result<bool>.Failure("2FA not enabled");
+
+        var decryptedKey = _encryptionService.Decrypt(user.TwoFactorSecretKey);
+        var isValid = _totpService.ValidateCode(decryptedKey, code);
+
+        return Result<bool>.Success(isValid);
+    }
+    catch (CryptographicException ex)
+    {
+        _logger.LogError(ex, "Decryption failed for user {Email} - possible key mismatch or data corruption", email);
+
+        // セキュリティイベントとして記録
+        await _auditService.LogSecurityEventAsync(new SecurityEvent
+        {
+            EventType = "TotpDecryptionFailure",
+            UserId = email,
+            Timestamp = DateTime.UtcNow,
+            Severity = "High"
+        });
+
+        return Result<bool>.Failure("Unable to verify 2FA code - please contact support");
+    }
+}
+```
+
+**5. データベーススキーマ:**
+
+```sql
+-- 暗号化データの保存（Base64エンコード済み文字列）
+ALTER TABLE Users
+ALTER COLUMN TwoFactorSecretKey NVARCHAR(500) NULL; -- nonce(16) + tag(22) + cipher(44+) ≈ 120文字（Base64）
+
+-- 監査テーブル（オプション）
+CREATE TABLE TotpEncryptionAudit (
+    Id UNIQUEIDENTIFIER PRIMARY KEY,
+    UserId UNIQUEIDENTIFIER NOT NULL,
+    Operation NVARCHAR(50) NOT NULL, -- 'Encrypt', 'Decrypt', 'DecryptionFailure'
+    Timestamp DATETIME2 NOT NULL,
+    KeyVersion INT NULL,
+    Success BIT NOT NULL
+);
+```
+
+**重要事項:**
+- ❌ **絶対に暗号化キー自体をDBに保存しない**
+- ✅ Nonce/IV、認証タグ、暗号文のみをDBに保存
+- ✅ キーは環境変数またはKMSで管理
+- ✅ 暗号化/復号化の失敗は必ずログに記録
+- ✅ 定期的なキーローテーション計画を策定
 
 ### 2. リカバリーコードの保護
 
