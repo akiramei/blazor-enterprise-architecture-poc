@@ -93,7 +93,7 @@ public sealed class GlobalExceptionHandlerMiddleware
 
             InvalidOperationException => (
                 HttpStatusCode.BadRequest,
-                exception.Message),
+                "Invalid request"),
 
             UnauthorizedAccessException => (
                 HttpStatusCode.Unauthorized,
