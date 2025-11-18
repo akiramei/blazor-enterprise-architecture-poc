@@ -15,6 +15,7 @@
 ## 📊 ステップ1: ユーザー要求の分類
 
 ```python
+import re
 from enum import Enum
 from typing import List, Dict, Optional
 
@@ -38,17 +39,37 @@ class PatternSelector:
         """
         scores = {}
 
+        # Empty check: if decision_matrix is empty, return a default
+        if not self.decision_matrix:
+            # Return a default intent with low confidence
+            return RequestType.NEW_FEATURE, 0.0
+
         # 各カテゴリのスコアを計算
         for intent, config in self.decision_matrix.items():
             score = 0.0
             trigger_keywords = config["trigger_keywords"]
 
-            # キーワードマッチング
-            for keyword in trigger_keywords:
-                if keyword in user_request:
-                    score += 1.0 / len(trigger_keywords)
+            if not trigger_keywords:
+                scores[intent] = (0.0, config["confidence"])
+                continue
 
+            # 重複を避けるため、マッチしたキーワードを記録
+            matched_keywords = set()
+
+            # キーワードマッチング（単語境界を考慮、大文字小文字を区別しない）
+            for keyword in trigger_keywords:
+                # 単語境界を使った正規表現マッチング
+                pattern = r'\b' + re.escape(keyword) + r'\b'
+                if re.search(pattern, user_request, re.IGNORECASE) and keyword.lower() not in matched_keywords:
+                    matched_keywords.add(keyword.lower())
+
+            # スコアを計算（マッチ数 / 全キーワード数）、1.0を上限とする
+            score = min(len(matched_keywords) / len(trigger_keywords), 1.0)
             scores[intent] = (score, config["confidence"])
+
+        # Empty check: if no scores were computed, return a default
+        if not scores:
+            return RequestType.NEW_FEATURE, 0.0
 
         # 最もスコアが高いものを選択
         best_intent = max(scores.items(), key=lambda x: x[1][0] * x[1][1])
