@@ -33,7 +33,8 @@
       "Bash(nul)",
       "Bash(git diff:*)",
       "Bash(powershell:*)",
-      "Bash(pwsh:*)"
+      "Bash(pwsh:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
