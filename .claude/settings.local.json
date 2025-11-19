@@ -25,7 +25,15 @@
       "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\Users\\akira\\source\\repos\\VSASample\\scripts\\update-test-namespaces.ps1\")",
       "Bash(git commit:*)",
       "Bash(git reset:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(curl:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(nul)",
+      "Bash(git diff:*)",
+      "Bash(powershell:*)",
+      "Bash(pwsh:*)"
     ],
     "deny": [],
     "ask": []

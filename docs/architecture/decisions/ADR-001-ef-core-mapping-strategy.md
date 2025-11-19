@@ -47,8 +47,7 @@ public class Product : AggregateRoot<ProductId>
 {
     // 公開プロパティとしてマッピング
     public string Name { get; private set; } = default!;
-    public long Version { get; private set; }
-
+    public long Version { get; private set; } = default!;
     // 変更は専用メソッド経由
     public void ChangeName(string name)
     {
