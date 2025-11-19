@@ -26,7 +26,7 @@ function Read-Manifest {
     }
 
     try {
-        $manifest = Get-Content $Path -Raw | ConvertFrom-Json
+        $manifest = Get-Content $Path -Raw -Encoding UTF8 | ConvertFrom-Json
         Write-Success "マニフェストを読み込みました: $Path"
         return $manifest
     }
@@ -46,7 +46,7 @@ function Get-CatalogIndex {
     if ($CatalogUrl -match "^\.") {
         if (Test-Path $CatalogUrl) {
             try {
-                $content = Get-Content $CatalogUrl -Raw | ConvertFrom-Json
+                $content = Get-Content $CatalogUrl -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
                 Write-Success "カタログインデックスを読み込みました（ローカル）"
                 return $content
             }
