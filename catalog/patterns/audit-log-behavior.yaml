@@ -1,0 +1,421 @@
+id: audit-log-behavior
+version: 1.0.0
+name: AuditLogBehavior
+category: pipeline-behavior
+order_hint: 550
+intent: Command実行の監査ログを自動記録（操作履歴・変更履歴）
+description: |
+  IAuditableCommandを実装したCommandの実行を自動的に記録するPipeline Behavior。
+  ユーザーアクション、データ変更履歴、リクエスト情報を監査ログとして保存。
+  コンプライアンス対応、セキュリティ監査、トラブルシューティングに活用。
+
+scope: pipeline-behavior
+execution_order: |
+  Pipeline実行順序:
+  LoggingBehavior (600) → IdempotencyBehavior (300) →
+  **AuditLogBehavior (550)** → TransactionBehavior (400)
+
+  注意: TransactionBehaviorより前に実行され、同一トランザクション内でコミット
+
+ai_selection_hints:
+  trigger_phrases:
+    - "監査ログ"
+    - "操作履歴"
+    - "変更履歴"
+    - "操作ログ"
+    - "誰が何をした"
+
+  confidence_keywords:
+    high:    ["監査", "audit", "操作履歴", "変更履歴", "ログ"]
+    medium:  ["追跡", "記録", "履歴"]
+    low:     ["セキュリティ", "コンプライアンス"]
+
+  anti_patterns:
+    - "アプリケーションログ" # LoggingBehaviorが対応
+    - "エラーログ"           # LoggingBehaviorが対応
+    - "パフォーマンスログ"   # MetricsBehaviorが対応
+
+  typical_requests:
+    - "誰がいつ商品を削除したか記録したい"
+    - "データ変更の履歴を残してください"
+    - "監査ログを実装して"
+    - "操作履歴を追跡できるようにしてください"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. ユーザーアクションを記録したい（誰が・いつ・何を）
+    2. データ変更履歴を追跡したい（変更前後の値）
+    3. コンプライアンス・セキュリティ監査が必要
+
+    このパターンを選択すべきでない条件:
+    1. アプリケーションログ → LoggingBehavior
+    2. パフォーマンス測定 → MetricsBehavior
+    3. Query実行の記録 → 不要（Queryは副作用がないため）
+
+relationship:
+  works_with:
+    - transaction-behavior (同一トランザクション内でコミット)
+    - logging-behavior (エラー時のログ出力)
+
+  dependencies:
+    - IAuditableCommand (マーカーインターフェース)
+    - AuditLog (Domainエンティティ)
+    - IAuditLogRepository (リポジトリ)
+    - IAppContext (ユーザー・リクエスト情報)
+
+file_structure: |
+  src/Shared/Infrastructure/Behaviors/
+  └── AuditLogBehavior.cs                        # MediatR Pipeline Behavior
+
+  src/Shared/Domain/AuditLogs/
+  └── AuditLog.cs                                # 監査ログエンティティ
+
+  src/Shared/Application/Interfaces/
+  ├── IAuditableCommand.cs                       # マーカーインターフェース
+  └── IAuditLogRepository.cs                     # リポジトリインターフェース
+
+implementation:
+  # ===== Pipeline Behavior =====
+  behavior:
+    file_path: "src/Shared/Infrastructure/Behaviors/AuditLogBehavior.cs"
+    template: |
+      using System.Text.Json;
+      using MediatR;
+      using Microsoft.Extensions.Logging;
+      using Shared.Application.Interfaces;
+      using Shared.Domain.AuditLogs;
+
+      namespace Shared.Infrastructure.Behaviors;
+
+      /// <summary>
+      /// 監査ログ記録Behavior
+      ///
+      /// 【パターン: Pipeline Behavior - Audit Log】
+      ///
+      /// 処理フロー:
+      /// 1. IAuditableCommand実装チェック
+      /// 2. Command実行
+      /// 3. 実行成功後に監査ログを記録
+      ///
+      /// AI実装時の注意:
+      /// - Command実行成功後のみ記録（失敗時は記録しない）
+      /// - IAppContextから自動的にユーザー・リクエスト情報を取得
+      /// - 監査ログ記録エラーはビジネス処理に影響しない（警告ログのみ）
+      /// </summary>
+      public sealed class AuditLogBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+          where TRequest : notnull
+      {
+          private readonly ILogger<AuditLogBehavior<TRequest, TResponse>> _logger;
+          private readonly IAppContext _appContext;
+          private readonly IAuditLogRepository _auditLogRepository;
+
+          public AuditLogBehavior(
+              ILogger<AuditLogBehavior<TRequest, TResponse>> logger,
+              IAppContext appContext,
+              IAuditLogRepository auditLogRepository)
+          {
+              _logger = logger;
+              _appContext = appContext;
+              _auditLogRepository = auditLogRepository;
+          }
+
+          public async Task<TResponse> Handle(
+              TRequest request,
+              RequestHandlerDelegate<TResponse> next,
+              CancellationToken cancellationToken)
+          {
+              // IAuditableCommandを実装していない場合はスキップ
+              if (request is not IAuditableCommand auditableCommand)
+              {
+                  return await next();
+              }
+
+              // Command実行
+              var response = await next();
+
+              // 実行成功後に監査ログを記録
+              try
+              {
+                  await RecordAuditLogAsync(auditableCommand, cancellationToken);
+              }
+              catch (Exception ex)
+              {
+                  // 監査ログ記録エラーは警告ログを出力するが、Command実行結果には影響しない
+                  _logger.LogWarning(ex,
+                      "監査ログの記録に失敗しました: {Action} [CorrelationId: {CorrelationId}]",
+                      auditableCommand.GetAuditInfo().Action,
+                      _appContext.CorrelationId);
+              }
+
+              return response;
+          }
+
+          private async Task RecordAuditLogAsync(
+              IAuditableCommand auditableCommand,
+              CancellationToken cancellationToken)
+          {
+              var auditInfo = auditableCommand.GetAuditInfo();
+
+              // AdditionalDataをJSON形式に変換
+              string? additionalDataJson = null;
+              if (auditInfo.AdditionalData != null)
+              {
+                  additionalDataJson = JsonSerializer.Serialize(auditInfo.AdditionalData);
+              }
+
+              // AuditLogエンティティを作成
+              var auditLog = AuditLog.Create(
+                  userId: _appContext.UserId,
+                  userName: _appContext.UserName,
+                  tenantId: _appContext.TenantId,
+                  action: auditInfo.Action,
+                  entityType: auditInfo.EntityType,
+                  entityId: auditInfo.EntityId,
+                  oldValues: null, // TODO: 必要に応じてCommandから提供
+                  newValues: additionalDataJson,
+                  correlationId: _appContext.CorrelationId,
+                  requestId: _appContext.RequestId,
+                  requestPath: _appContext.RequestPath,
+                  httpMethod: _appContext.HttpMethod,
+                  clientIpAddress: _appContext.ClientIpAddress,
+                  userAgent: _appContext.UserAgent);
+
+              // リポジトリに追加（SaveChangesはTransactionBehaviorで実行される）
+              await _auditLogRepository.AddAsync(auditLog, cancellationToken);
+
+              _logger.LogInformation(
+                  "監査ログを記録: {Action} on {EntityType}:{EntityId} by {UserName}",
+                  auditInfo.Action,
+                  auditInfo.EntityType,
+                  auditInfo.EntityId,
+                  _appContext.UserName);
+          }
+      }
+
+  # ===== Domain Layer =====
+  domain_entity:
+    file_path: "src/Shared/Domain/AuditLogs/AuditLog.cs"
+    template: |
+      namespace Shared.Domain.AuditLogs;
+
+      /// <summary>
+      /// 監査ログエンティティ
+      ///
+      /// 【パターン: 監査ログ（Audit Log）】
+      ///
+      /// 責務:
+      /// - ユーザーアクションの記録
+      /// - データ変更履歴の追跡
+      /// - コンプライアンス対応
+      /// - セキュリティ監査
+      ///
+      /// 設計:
+      /// - イミュータブル（削除・更新不可）
+      /// - JSON形式で変更前後のデータを保存
+      /// - Correlation IDによる分散トレーシング対応
+      /// </summary>
+      public class AuditLog
+      {
+          public Guid Id { get; private set; }
+          public Guid UserId { get; private set; }
+          public string UserName { get; private set; }
+          public Guid? TenantId { get; private set; }
+          public string Action { get; private set; }
+          public string EntityType { get; private set; }
+          public string EntityId { get; private set; }
+          public string? OldValues { get; private set; }
+          public string? NewValues { get; private set; }
+          public string CorrelationId { get; private set; }
+          public Guid RequestId { get; private set; }
+          public string? RequestPath { get; private set; }
+          public string? HttpMethod { get; private set; }
+          public string? ClientIpAddress { get; private set; }
+          public string? UserAgent { get; private set; }
+          public DateTime TimestampUtc { get; private set; }
+
+          private AuditLog() { } // EF Core用
+
+          public static AuditLog Create(
+              Guid userId,
+              string userName,
+              Guid? tenantId,
+              string action,
+              string entityType,
+              string entityId,
+              string? oldValues,
+              string? newValues,
+              string correlationId,
+              Guid requestId,
+              string? requestPath = null,
+              string? httpMethod = null,
+              string? clientIpAddress = null,
+              string? userAgent = null)
+          {
+              return new AuditLog
+              {
+                  Id = Guid.NewGuid(),
+                  UserId = userId,
+                  UserName = userName,
+                  TenantId = tenantId,
+                  Action = action,
+                  EntityType = entityType,
+                  EntityId = entityId,
+                  OldValues = oldValues,
+                  NewValues = newValues,
+                  CorrelationId = correlationId,
+                  RequestId = requestId,
+                  RequestPath = requestPath,
+                  HttpMethod = httpMethod,
+                  ClientIpAddress = clientIpAddress,
+                  UserAgent = userAgent,
+                  TimestampUtc = DateTime.UtcNow
+              };
+          }
+      }
+
+  # ===== Application Layer (Interface) =====
+  marker_interface:
+    file_path: "src/Shared/Application/Interfaces/IAuditableCommand.cs"
+    template: |
+      namespace Shared.Application.Interfaces;
+
+      /// <summary>
+      /// 監査ログ対象のCommandマーカーインターフェース
+      ///
+      /// 【パターン: マーカーインターフェース】
+      ///
+      /// 使用例:
+      /// <code>
+      /// public record DeleteProductCommand(Guid ProductId)
+      ///     : ICommand<Result>, IAuditableCommand
+      /// {
+      ///     public AuditInfo GetAuditInfo()
+      ///     {
+      ///         return new AuditInfo(
+      ///             Action: "DeleteProduct",
+      ///             EntityType: "Product",
+      ///             EntityId: ProductId.ToString());
+      ///     }
+      /// }
+      /// </code>
+      /// </summary>
+      public interface IAuditableCommand
+      {
+          AuditInfo GetAuditInfo();
+      }
+
+      /// <summary>
+      /// 監査情報
+      /// </summary>
+      public record AuditInfo(
+          string Action,
+          string EntityType,
+          string EntityId,
+          object? AdditionalData = null);
+
+  repository_interface:
+    file_path: "src/Shared/Application/Interfaces/IAuditLogRepository.cs"
+    template: |
+      using Shared.Domain.AuditLogs;
+
+      namespace Shared.Application.Interfaces;
+
+      public interface IAuditLogRepository
+      {
+          Task AddAsync(AuditLog auditLog, CancellationToken cancellationToken = default);
+          Task<AuditLog?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+          Task<IEnumerable<AuditLog>> GetByEntityAsync(
+              string entityType,
+              string entityId,
+              CancellationToken cancellationToken = default);
+          Task<IEnumerable<AuditLog>> GetByUserAsync(
+              Guid userId,
+              int page = 1,
+              int pageSize = 50,
+              CancellationToken cancellationToken = default);
+          Task<IEnumerable<AuditLog>> GetByDateRangeAsync(
+              DateTime startUtc,
+              DateTime endUtc,
+              int page = 1,
+              int pageSize = 50,
+              CancellationToken cancellationToken = default);
+      }
+
+ai_guidance:
+  when_to_use:
+    - "ユーザーの操作履歴を記録したい場合"
+    - "データ変更の履歴を追跡したい場合"
+    - "コンプライアンス・セキュリティ監査が必要な場合"
+
+  implementation_steps:
+    - step: 1
+      description: "AuditLogBehavior を Shared/Infrastructure/Behaviors に作成"
+      files: ["AuditLogBehavior.cs"]
+    - step: 2
+      description: "AuditLog エンティティを Shared/Domain/AuditLogs に作成"
+      files: ["AuditLog.cs"]
+    - step: 3
+      description: "IAuditableCommand, IAuditLogRepository を Shared/Application/Interfaces に作成"
+      files: ["IAuditableCommand.cs", "IAuditLogRepository.cs"]
+    - step: 4
+      description: "監査が必要なCommandにIAuditableCommandを実装"
+    - step: 5
+      description: "Program.csでBehaviorを登録（order_hint: 550）"
+
+  common_mistakes:
+    - mistake: "すべてのCommandに IAuditableCommand を実装する"
+      solution: "Query（読み取り）には不要。Create/Update/Deleteのみ実装する。"
+    - mistake: "監査ログ記録エラーでビジネス処理を失敗させる"
+      solution: "監査ログ記録エラーは警告ログのみ出力し、ビジネス処理には影響しない。"
+    - mistake: "変更前後の値（OldValues/NewValues）を記録しない"
+      solution: "重要なデータ変更は JSON形式で OldValues/NewValues に記録する。"
+
+  key_patterns:
+    - pattern: "マーカーインターフェース"
+      description: "IAuditableCommand で監査対象を明示的に指定"
+    - pattern: "自動記録"
+      description: "Pipeline Behavior による自動記録。Commandに記録ロジックを書かない"
+    - pattern: "トランザクション連携"
+      description: "TransactionBehaviorより前に実行され、同一トランザクション内でコミット"
+    - pattern: "失敗時の分離"
+      description: "監査ログ記録失敗はビジネス処理に影響しない"
+
+  design_decision:
+    query_logging: |
+      Queryの監査ログ記録について:
+
+      推奨: Queryは記録しない
+      - Queryは副作用がない（読み取り専用）
+      - 大量のログが発生し、ストレージを圧迫
+      - パフォーマンスへの影響
+
+      例外: 機密情報へのアクセスを記録する場合
+      - 個人情報閲覧
+      - 給与情報閲覧
+      - 監査要件がある場合
+
+    old_values_new_values: |
+      変更前後の値の記録について:
+
+      推奨: 重要なデータ変更は記録する
+      - Command のプロパティを JSON形式で AdditionalData に設定
+      - Update Command: OldValues（変更前）、NewValues（変更後）
+      - Delete Command: OldValues（削除されたデータ）
+
+      実装例:
+      - GetAuditInfo() の AdditionalData に Command全体を渡す
+      - AuditLogBehavior が自動的に JSON に変換
+
+evidence:
+  behavior: "src/Shared/Infrastructure/Behaviors/AuditLogBehavior.cs"
+  domain: "src/Shared/Domain/AuditLogs/AuditLog.cs"
+  interface: "src/Shared/Application/Interfaces/IAuditableCommand.cs"
+  repository: "src/Shared/Application/Interfaces/IAuditLogRepository.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "AuditLogBehaviorの実装を元にパターン化"
+      - "IAuditableCommand マーカーインターフェース"
