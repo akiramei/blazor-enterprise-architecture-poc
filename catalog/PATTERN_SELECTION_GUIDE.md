@@ -139,19 +139,16 @@ graph TD
    feature-create-entity
 
 4. 生成するファイル:
-   Application/
+   src/Application/Features/CreateProduct/
    ├── CreateProductCommand.cs
-   ├── CreateProductHandler.cs
-   └── CreateProductValidator.cs
+   └── CreateProductCommandHandler.cs
 
-   UI/
-   ├── Api/Dtos/CreateProductRequest.cs
-   └── ...
+   src/Domain/ProductCatalog/Products/
+   └── Product.cs (factory method)
 
-   Shared/UI/
-   ├── Store/ProductEditStore.cs
-   ├── Actions/ProductEditActions.cs
-   └── Components/ProductEditForm.razor
+   src/Application/Shared/ProductCatalog/UI/
+   ├── Store/ProductsStore.cs
+   └── Actions/ProductListActions.cs
 ```
 
 ### 例2: "ProductEditStoreだけ追加してください"
@@ -170,9 +167,9 @@ graph TD
    layer-store
 
 4. 生成するファイル:
-   Shared/UI/Store/
-   ├── ProductEditState.cs
-   └── ProductEditStore.cs
+   src/Application/Shared/ProductCatalog/UI/Store/
+   ├── ProductsState.cs
+   └── ProductsStore.cs
 ```
 
 ### 例3: "入力検証を追加してください"
@@ -190,7 +187,7 @@ graph TD
    validation-behavior
 
 4. 生成するファイル:
-   Application/Common/Behaviors/
+   src/Application/Common/Behaviors/
    └── ValidationBehavior.cs
 
    + DI登録コード
@@ -307,4 +304,5 @@ dependencies:
 
 ---
 
-**最終更新: 2025-11-05**
+**最終更新: 2025-11-19**
+**カタログバージョン: v2025.11.19**

@@ -1,7 +1,7 @@
 {
   "$schema": "../patterns.manifest.schema.json",
-  "version": "v2025.11.0",
-  "last_updated": "2025-11-05",
+  "version": "v2025.11.19",
+  "last_updated": "2025-11-19",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "categories": {
@@ -259,9 +259,9 @@
       "7. 生成されたコードを提示"
     ],
     "template_variables": {
-      "Entity_PascalCase": "エンティティ名（PascalCase）例: Product, Order, Customer (テンプレート内では {Entity})",
-      "entity_camelCase": "エンティティ名（camelCase）例: product, order, customer (テンプレート内では {entity})",
-      "BoundedContext_PascalCase": "境界づけられたコンテキスト名 例: ProductCatalog, OrderManagement (テンプレート内では {BoundedContext})"
+      "Entity": "エンティティ名（PascalCase）例: Product, Order, Customer",
+      "entity": "エンティティ名（camelCase）例: product, order, customer",
+      "BoundedContext": "境界コンテキスト名（PascalCase）例: ProductCatalog, PurchaseManagement"
     },
     "evidence_traceability": "各パターンの evidence フィールドに実装例のファイルパスが記載されています"
   },

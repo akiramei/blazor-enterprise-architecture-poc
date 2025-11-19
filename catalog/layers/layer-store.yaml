@@ -23,8 +23,10 @@ comparison:
 
 implementation:
   state:
-    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}{Operation}State.cs"
+    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}{Operation}State.cs"
     template: |
+      using System.Collections.Immutable;
+
       namespace {BoundedContext}.Shared.UI.Store;
 
       /// <summary>
@@ -35,28 +37,30 @@ implementation:
       /// 責務:
       /// - UIの状態を保持する不変オブジェクト
       /// - record型でイミュータブルに実装
+      /// - ImmutableListを使用してコレクションも不変に保つ
       /// </summary>
       public sealed record {Entity}{Operation}State
       {
-          public Guid? {Entity}Id { get; init; }
-          public string Name { get; init; } = string.Empty;
+          public ImmutableList<{Entity}Dto> {Entity}s { get; init; } = ImmutableList<{Entity}Dto>.Empty;
           public bool IsLoading { get; init; }
           public string? ErrorMessage { get; init; }
-          public bool IsDirty { get; init; }
 
           public static {Entity}{Operation}State Empty => new();
       }
 
   store:
-    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}{Operation}Store.cs"
+    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}{Operation}Store.cs"
     template: |
+      using System.Collections.Concurrent;
+      using System.Collections.Immutable;
       using MediatR;
       using Microsoft.Extensions.DependencyInjection;
+      using Microsoft.Extensions.Logging;
 
       namespace {BoundedContext}.Shared.UI.Store;
 
       /// <summary>
-      /// {Entity}{Operation}Store
+      /// {Entity}{Operation}の状態管理とI/O実行（並行制御強化版）
       ///
       /// 【パターン: Store（状態管理+I/O）】
       ///
@@ -64,73 +68,151 @@ implementation:
       /// - 状態の保持と更新
       /// - MediatRを使用したCommand/Queryの送信
       /// - 変更通知（OnChangeAsync イベント）
+      /// - 並行制御（SemaphoreSlim + single-flight + versioning）
       ///
       /// AI実装時の注意:
       /// - UI手順（確認ダイアログ、画面遷移、トースト）はPageActionsに実装
       /// - Storeは純粋にI/Oと状態管理のみ
       /// - IServiceScopeFactoryを使ってMediatRを取得（スコープ管理）
       /// </summary>
-      public sealed class {Entity}{Operation}Store
+      public sealed class {Entity}{Operation}Store : IDisposable
       {
           private readonly IServiceScopeFactory _scopeFactory;
+          private readonly ILogger<{Entity}{Operation}Store> _logger;
+
+          // 並行制御用
+          private readonly SemaphoreSlim _gate = new(1, 1);
+          private readonly ConcurrentDictionary<string, Task> _inflightRequests = new();
+          private CancellationTokenSource? _cts;
+
+          // バージョン管理（連打対策）
+          private long _version;
+
+          // 状態（不変）
           private {Entity}{Operation}State _state = {Entity}{Operation}State.Empty;
 
-          public {Entity}{Operation}Store(IServiceScopeFactory scopeFactory)
+          public event Func<Task>? OnChangeAsync;
+
+          public {Entity}{Operation}Store(
+              IServiceScopeFactory scopeFactory,
+              ILogger<{Entity}{Operation}Store> logger)
           {
               _scopeFactory = scopeFactory;
+              _logger = logger;
           }
 
-          /// <summary>
-          /// 現在の状態を取得
-          /// </summary>
           public {Entity}{Operation}State GetState() => _state;
 
           /// <summary>
-          /// 状態変更時のイベント（Componentが購読）
+          /// 同一キーの読み込みは合流し、結果を共有（single-flight）
           /// </summary>
-          public event Func<Task>? OnChangeAsync;
-
-          /// <summary>
-          /// フィールドを更新
-          /// </summary>
-          public void UpdateField(Func<{Entity}{Operation}State, {Entity}{Operation}State> updater)
+          public Task LoadAsync(CancellationToken ct = default)
           {
-              _state = updater(_state) with { IsDirty = true };
-              OnChangeAsync?.Invoke();
+              const string key = "{entity}s-load";  // 固有キー
+
+              // single-flight: 同時リクエストは1つに合流
+              return _inflightRequests.GetOrAdd(key, _ => LoadInternalAsync(ct))
+                  .ContinueWith(t =>
+                  {
+                      _inflightRequests.TryRemove(key, out _);  // クリーンアップ
+                      return t;
+                  }, ct, TaskContinuationOptions.None, TaskScheduler.Default)
+                  .Unwrap();
           }
 
           /// <summary>
-          /// Command/Queryを実行
+          /// 実際の読み込み処理（versioning併用）
           /// </summary>
-          public async Task<bool> ExecuteAsync(CancellationToken ct = default)
+          private async Task LoadInternalAsync(CancellationToken ct)
           {
-              _state = _state with { IsLoading = true, ErrorMessage = null };
-              await NotifyStateChangedAsync();
+              // 現在の実行のバージョンを記録
+              var currentVersion = Interlocked.Increment(ref _version);
 
+              // 既存の処理をキャンセル
+              _cts?.Cancel();
+              _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+              await _gate.WaitAsync(_cts.Token);
               try
               {
+                  // versioning: 古い実行は結果を破棄
+                  if (currentVersion != _version)
+                  {
+                      _logger.LogDebug("古い実行をスキップ: Version {Current} != {Latest}",
+                          currentVersion, _version);
+                      return;
+                  }
+
+                  await SetStateAsync(_state with { IsLoading = true, ErrorMessage = null });
+
+                  // 実際のDB読み込み（重い処理）
                   using var scope = _scopeFactory.CreateScope();
                   var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-                  // Command/Queryの送信
-                  // ...
+                  var result = await mediator.Send(new Get{Entity}sQuery(), _cts.Token);
 
-                  _state = _state with { IsLoading = false, IsDirty = false };
-                  await NotifyStateChangedAsync();
-                  return true;
+                  // 最新版のみ反映
+                  if (currentVersion == _version && result.IsSuccess)
+                  {
+                      await SetStateAsync(_state with
+                      {
+                          IsLoading = false,
+                          {Entity}s = result.Value?.ToImmutableList() ?? ImmutableList<{Entity}Dto>.Empty,
+                          ErrorMessage = null
+                      });
+                  }
+                  else if (result.IsSuccess == false)
+                  {
+                      await SetStateAsync(_state with
+                      {
+                          IsLoading = false,
+                          ErrorMessage = result.Error
+                      });
+                  }
+              }
+              catch (OperationCanceledException)
+              {
+                  _logger.LogDebug("読み込み処理がキャンセルされました: Version {Version}", currentVersion);
               }
               catch (Exception ex)
               {
-                  _state = _state with { IsLoading = false, ErrorMessage = ex.Message };
-                  await NotifyStateChangedAsync();
-                  return false;
+                  _logger.LogError(ex, "{Entity}一覧の読み込みに失敗しました");
+                  await SetStateAsync(_state with
+                  {
+                      IsLoading = false,
+                      ErrorMessage = "データの読み込みに失敗しました"
+                  });
+              }
+              finally
+              {
+                  _gate.Release();
               }
           }
 
-          private async Task NotifyStateChangedAsync()
+          private async Task SetStateAsync({Entity}{Operation}State newState)
           {
-              if (OnChangeAsync != null)
-                  await OnChangeAsync.Invoke();
+              _state = newState;
+
+              if (OnChangeAsync is null) return;
+
+              foreach (var handler in OnChangeAsync.GetInvocationList().Cast<Func<Task>>())
+              {
+                  try
+                  {
+                      await handler();
+                  }
+                  catch (Exception ex)
+                  {
+                      _logger.LogError(ex, "状態変更通知中にエラーが発生しました");
+                  }
+              }
+          }
+
+          public void Dispose()
+          {
+              _cts?.Cancel();
+              _cts?.Dispose();
+              _gate.Dispose();
           }
       }
 
@@ -195,9 +277,9 @@ ai_guidance:
       solution: "IServiceScopeFactoryを使ってスコープ管理"
 
 evidence:
-  implementation: "src/ProductCatalog/Shared/UI/Store/ProductEditStore.cs"
-  state: "src/ProductCatalog/Shared/UI/Store/ProductEditState.cs"
-  test: "tests/ProductCatalog.UI.Tests/Store/ProductEditStoreTests.cs"
+  implementation: "src/Application/Shared/ProductCatalog/UI/Store/ProductsStore.cs"
+  state: "src/Application/Shared/ProductCatalog/UI/Store/ProductsState.cs"
+  test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

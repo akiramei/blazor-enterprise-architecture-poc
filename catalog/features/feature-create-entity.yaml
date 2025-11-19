@@ -95,27 +95,20 @@ dependencies:
     - MediatR: "^12.0.0"
 
 file_structure: |
-  src/{BoundedContext}/Features/Create{Entity}/
-  ├── Application/
-  │   ├── Create{Entity}Command.cs         # Command定義
-  │   ├── Create{Entity}Handler.cs         # Handler実装
-  │   ├── Create{Entity}Validator.cs       # FluentValidation
-  │   └── Create{Entity}.Application.csproj
-  ├── UI/
-  │   ├── Api/
-  │   │   └── Dtos/
-  │   │       └── Create{Entity}Request.cs # API DTO
-  │   └── Create{Entity}.UI.csproj
-  └── README.md                            # 機能の説明
+  src/Application/Features/Create{Entity}/
+  ├── Create{Entity}Command.cs             # Command定義
+  ├── Create{Entity}CommandHandler.cs      # Handler実装
+  └── Create{Entity}Validator.cs           # FluentValidation (オプション)
 
-  src/{BoundedContext}/Shared/UI/
+  src/Domain/{BoundedContext}/{Entity}s/
+  └── {Entity}.cs                          # Domain Entity with factory method
+
+  src/Application/Shared/{BoundedContext}/UI/
   ├── Store/
-  │   ├── {Entity}EditState.cs             # 編集状態
-  │   └── {Entity}EditStore.cs             # 状態管理+I/O
-  ├── Actions/
-  │   └── {Entity}EditActions.cs           # UI手順
-  └── Components/
-      └── {Entity}EditForm.razor           # フォームコンポーネント
+  │   ├── {Entity}sState.cs                # 一覧状態
+  │   └── {Entity}sStore.cs                # 状態管理+I/O
+  └── Actions/
+      └── {Entity}ListActions.cs           # UI手順
 
 implementation:
   # ===== Application Layer =====
@@ -583,17 +576,18 @@ ai_guidance:
 
 evidence:
   application_layer:
-    command: "src/ProductCatalog/Features/CreateProduct/Application/CreateProductCommand.cs"
-    handler: "src/ProductCatalog/Features/CreateProduct/Application/CreateProductHandler.cs"
-    validator: "src/ProductCatalog/Features/CreateProduct/Application/CreateProductValidator.cs"
+    command: "src/Application/Features/CreateProduct/CreateProductCommand.cs"
+    handler: "src/Application/Features/CreateProduct/CreateProductCommandHandler.cs"
+    validator: "未実装 - 今後の実装予定"
+  domain_layer:
+    entity: "src/Domain/ProductCatalog/Products/Product.cs"
+    factory_method: "src/Domain/ProductCatalog/Products/Product.cs (Create method)"
   ui_layer:
-    api_dto: "src/ProductCatalog/Features/CreateProduct/UI/Api/Dtos/CreateProductRequest.cs"
-    store_state: "src/ProductCatalog/Shared/UI/Store/ProductEditState.cs"
-    store: "src/ProductCatalog/Shared/UI/Store/ProductEditStore.cs"
-    page_actions: "src/ProductCatalog/Shared/UI/Actions/ProductEditActions.cs"
+    store_state: "src/Application/Shared/ProductCatalog/UI/Store/ProductsState.cs"
+    store: "src/Application/Shared/ProductCatalog/UI/Store/ProductsStore.cs"
+    page_actions: "src/Application/Shared/ProductCatalog/UI/Actions/ProductListActions.cs"
   tests:
-    handler_test: "tests/ProductCatalog.Application.Tests/Features/CreateProduct/CreateProductHandlerTests.cs"
-    validator_test: "tests/ProductCatalog.Application.Tests/Features/CreateProduct/CreateProductValidatorTests.cs"
+    test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

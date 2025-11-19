@@ -14,27 +14,44 @@ wiring:
     - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(IdempotencyBehavior<,>))"
   dependencies:
     nuget:
-      - Microsoft.Extensions.Caching.Memory: "^8.0.0"
+      - Microsoft.Extensions.Logging: "^8.0.0"
+    interfaces:
+      - IIdempotencyStore
+    domain:
+      - Shared.Domain.Idempotency.IdempotencyRecord
 
 preconditions:
-  - "IMemoryCache が DI 登録されている"
+  - "IIdempotencyStore が実装されている"
+  - "IdempotencyRecord ドメインモデルが定義されている"
   - "すべての Command が IdempotencyKey プロパティを持つ"
 
 implementation:
-  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/IdempotencyBehavior.cs"
+  file_path: "src/Shared/Infrastructure/Behaviors/IdempotencyBehavior.cs"
+  namespace: "Shared.Infrastructure.Behaviors"
   template: |
-    public sealed class IdempotencyBehavior<TRequest, TResponse>
-        : IPipelineBehavior<TRequest, TResponse>
-        where TRequest : IRequest<TResponse>
+    using MediatR;
+    using Microsoft.Extensions.Logging;
+    using Shared.Application;
+    using Shared.Domain.Idempotency;
+    using Shared.Application.Interfaces;
+
+    namespace Shared.Infrastructure.Behaviors;
+
+    /// <summary>
+    /// 冪等性保証のPipeline Behavior（Command専用）
+    /// </summary>
+    public sealed class IdempotencyBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : ICommand<TResponse>
+        where TResponse : Result
     {
-        private readonly IMemoryCache _cache;
+        private readonly IIdempotencyStore _store;
         private readonly ILogger<IdempotencyBehavior<TRequest, TResponse>> _logger;
 
         public IdempotencyBehavior(
-            IMemoryCache cache,
+            IIdempotencyStore store,
             ILogger<IdempotencyBehavior<TRequest, TResponse>> logger)
         {
-            _cache = cache;
+            _store = store;
             _logger = logger;
         }
 
@@ -43,60 +60,51 @@ implementation:
             RequestHandlerDelegate<TResponse> next,
             CancellationToken cancellationToken)
         {
-            // Query の場合はスキップ
-            if (request is not ICommand)
-                return await next();
+            // Commandからキーを取得
+            var idempotencyKey = GetIdempotencyKey(request);
 
-            // IdempotencyKey を取得
-            var idempotencyKeyProperty = typeof(TRequest).GetProperty("IdempotencyKey");
-            if (idempotencyKeyProperty == null)
+            if (string.IsNullOrEmpty(idempotencyKey))
             {
-                _logger.LogWarning(
-                    "{RequestName} に IdempotencyKey プロパティがありません",
-                    typeof(TRequest).Name);
-                return await next();
+                return await next();  // キーがない場合はスキップ
             }
 
-            var idempotencyKey = idempotencyKeyProperty.GetValue(request) as string;
-            if (string.IsNullOrEmpty(idempotencyKey))
-                return await next();
+            var commandType = typeof(TRequest).Name;
 
-            var cacheKey = $"idempotency_{typeof(TRequest).Name}_{idempotencyKey}";
+            // 既に処理済みかチェック
+            var existingRecord = await _store.GetAsync(idempotencyKey, cancellationToken);
 
-            // キャッシュから取得
-            if (_cache.TryGetValue<TResponse>(cacheKey, out var cachedResponse))
+            if (existingRecord != null)
             {
                 _logger.LogInformation(
-                    "冪等性: キャッシュから返却 {RequestName} - {IdempotencyKey}",
-                    typeof(TRequest).Name, idempotencyKey);
-                return cachedResponse!;
+                    "冪等性により既存の結果を返します: {CommandType} [Key: {IdempotencyKey}]",
+                    commandType,
+                    idempotencyKey);
+
+                return existingRecord.GetResult<TResponse>();
             }
 
-            // 処理実行
+            // 新規処理を実行
             var response = await next();
 
-            // 成功した場合のみキャッシュ
-            if (IsSuccessfulResponse(response))
+            // 成功した場合のみ記録
+            if (response.IsSuccess)
             {
-                var cacheOptions = new MemoryCacheEntryOptions()
-                    .SetAbsoluteExpiration(TimeSpan.FromHours(24));
-
-                _cache.Set(cacheKey, response, cacheOptions);
+                var record = IdempotencyRecord.Create(idempotencyKey, commandType, response);
+                await _store.SaveAsync(record, cancellationToken);
 
                 _logger.LogInformation(
-                    "冪等性: キャッシュに保存 {RequestName} - {IdempotencyKey}",
-                    typeof(TRequest).Name, idempotencyKey);
+                    "冪等性レコードを保存しました: {CommandType} [Key: {IdempotencyKey}]",
+                    commandType,
+                    idempotencyKey);
             }
 
             return response;
         }
 
-        private static bool IsSuccessfulResponse(TResponse response)
+        private string? GetIdempotencyKey(TRequest request)
         {
-            if (response is IResult result)
-                return result.IsSuccess;
-
-            return true;
+            var property = typeof(TRequest).GetProperty("IdempotencyKey");
+            return property?.GetValue(request) as string;
         }
     }
 
@@ -194,10 +202,10 @@ changelog:
       - "Redis ベースの分散キャッシュ対応（予定）"
 
 evidence:
-  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/IdempotencyBehavior.cs"
-  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/IdempotencyBehaviorTests.cs"
-  example_command: "src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs"
+  implementation_file: "src/Shared/Infrastructure/Behaviors/IdempotencyBehavior.cs"
+  test_file: "未実装 - 今後の実装予定"
+  domain_model: "src/Shared/Domain/Idempotency/IdempotencyRecord.cs"
 
 notes: |
-  現在はメモリキャッシュベースですが、本番環境では Redis 等の分散キャッシュの使用を推奨します。
-  複数サーバー構成の場合、サーバー間で冪等性が保証されません。
+  IIdempotencyStore の実装により、永続化ストアを選択できます（SQL Server、Redis等）。
+  IdempotencyRecord ドメインモデルを使用して、Result型のシリアライズ/デシリアライズを管理します。

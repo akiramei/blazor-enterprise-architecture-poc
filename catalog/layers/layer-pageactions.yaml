@@ -22,110 +22,92 @@ comparison:
   redux: "Action Creators"
 
 implementation:
-  file_path: "src/{BoundedContext}/Shared/UI/Actions/{Entity}{Operation}Actions.cs"
+  file_path: "src/Application/Shared/{BoundedContext}/UI/Actions/{Entity}{Operation}Actions.cs"
   template: |
-    using Microsoft.AspNetCore.Components;
+    using Microsoft.Extensions.Logging;
+    using MediatR;
 
     namespace {BoundedContext}.Shared.UI.Actions;
 
     /// <summary>
-    /// {Entity}{Operation}Actions
+    /// {Entity}一覧画面のUI手順を管理
     ///
     /// 【パターン: PageActions（UI手順のみ）】
     ///
     /// 責務:
-    /// - UI手順のオーケストレーション（確認、通知、遷移）
+    /// - UI手順のオーケストレーション
     /// - Storeへの委譲
+    /// - ログ記録
     ///
     /// AI実装時の注意:
     /// - I/Oや状態管理はStoreに委譲
     /// - PageActionsは「UIフロー」のみを実装
     /// - ビジネスロジックはDomain層に実装
+    /// - 確認ダイアログやトーストが必要な場合は、Componentで実装
     /// </summary>
-    public sealed class {Entity}{Operation}Actions
+    public sealed class {Entity}ListActions
     {
-        private readonly {Entity}{Operation}Store _store;
-        private readonly NavigationManager _navigation;
-        private readonly IToastService _toast;
-        private readonly IConfirmService _confirm;
+        private readonly {Entity}sStore _store;
+        private readonly IMediator _mediator;
+        private readonly ILogger<{Entity}ListActions> _logger;
 
-        public {Entity}{Operation}Actions(
-            {Entity}{Operation}Store store,
-            NavigationManager navigation,
-            IToastService toast,
-            IConfirmService confirm)
+        public {Entity}ListActions(
+            {Entity}sStore store,
+            IMediator mediator,
+            ILogger<{Entity}ListActions> logger)
         {
             _store = store;
-            _navigation = navigation;
-            _toast = toast;
-            _confirm = confirm;
+            _mediator = mediator;
+            _logger = logger;
         }
 
-        /// <summary>
-        /// 保存処理（UI手順）
-        /// </summary>
-        public async Task SaveAsync(CancellationToken ct = default)
+        public async Task LoadAsync(CancellationToken ct = default)
         {
-            // Storeに委譲してI/O実行
-            var success = await _store.ExecuteAsync(ct);
+            try
+            {
+                await _store.LoadAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "{Entity}一覧の読み込みに失敗しました");
+            }
+        }
+
+        public async Task DeleteAsync(Guid {entity}Id, CancellationToken ct = default)
+        {
+            // Note: In a real application, you would show a confirmation dialog
+            var success = await _store.DeleteAsync({entity}Id, ct);
 
             if (success)
             {
-                // 成功時のUI手順
-                _toast.Success("{Entity}を保存しました");
-                _navigation.NavigateTo($"/{entity}s");
+                _logger.LogInformation("{Entity}を削除しました: {Id}", {entity}Id);
             }
             else
             {
-                // 失敗時のUI手順
-                var errorMessage = _store.GetState().ErrorMessage ?? "保存に失敗しました";
-                _toast.Error(errorMessage);
+                _logger.LogWarning("{Entity}削除に失敗しました: {Id}", {entity}Id);
             }
         }
 
-        /// <summary>
-        /// キャンセル処理（UI手順）
-        /// </summary>
-        public async Task CancelAsync()
+        public async Task<BulkOperationResult> BulkDeleteAsync(IEnumerable<Guid> {entity}Ids, CancellationToken ct = default)
         {
-            // 変更がある場合は確認ダイアログ
-            if (_store.GetState().IsDirty)
+            try
             {
-                var confirmed = await _confirm.ShowAsync(
-                    "確認",
-                    "編集内容が保存されていません。破棄してよろしいですか？");
+                var result = await _store.BulkDeleteAsync({entity}Ids, ct);
 
-                if (!confirmed) return;
+                _logger.LogInformation(
+                    "一括削除を実行しました: 成功={SucceededCount}, 失敗={FailedCount}, 合計={TotalCount}",
+                    result.SucceededCount,
+                    result.FailedCount,
+                    result.TotalCount);
+
+                return result;
             }
-
-            // 前の画面に戻る
-            _navigation.NavigateTo($"/{entity}s");
-        }
-
-        /// <summary>
-        /// 削除処理（UI手順）
-        /// </summary>
-        public async Task DeleteAsync(Guid id, CancellationToken ct = default)
-        {
-            // 確認ダイアログ
-            var confirmed = await _confirm.ShowAsync(
-                "削除確認",
-                "本当に削除してよろしいですか？この操作は取り消せません。");
-
-            if (!confirmed) return;
-
-            // Storeに委譲してI/O実行
-            var success = await _store.DeleteAsync(id, ct);
-
-            if (success)
+            catch (Exception ex)
             {
-                _toast.Success("{Entity}を削除しました");
-                await _store.LoadAsync(ct); // リスト再読み込み
-            }
-            else
-            {
-                var errorMessage = _store.GetState().ErrorMessage ?? "削除に失敗しました";
-                _toast.Error(errorMessage);
+                _logger.LogError(ex, "一括削除処理に失敗しました");
+                return BulkOperationResult.AllFailed(
+                    {entity}Ids.Count(),
+                    new[] { ex.Message });
             }
         }
     }
@@ -204,8 +186,8 @@ ai_guidance:
       solution: "確認ダイアログはPageActionsで表示。StoreはI/Oのみ"
 
 evidence:
-  implementation: "src/ProductCatalog/Shared/UI/Actions/ProductEditActions.cs"
-  test: "tests/ProductCatalog.UI.Tests/Actions/ProductEditActionsTests.cs"
+  implementation: "src/Application/Shared/ProductCatalog/UI/Actions/ProductListActions.cs"
+  test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

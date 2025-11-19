@@ -13,30 +13,52 @@ wiring:
     - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(MetricsBehavior<,>))"
   dependencies:
     nuget:
+      - OpenTelemetry: "^1.9.0"
       - System.Diagnostics.DiagnosticSource: "^8.0.0"
 
 preconditions:
-  - "IMetricsCollector が実装されている"
+  - "ApplicationMetrics が実装されている"
+  - "OpenTelemetry が構成されている"
 
 implementation:
-  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/MetricsBehavior.cs"
+  file_path: "src/Shared/Infrastructure/Behaviors/MetricsBehavior.cs"
+  namespace: "Shared.Infrastructure.Behaviors"
   template: |
-    public interface IMetricsCollector
-    {
-        void RecordRequestDuration(string requestName, long durationMs, bool success);
-        void IncrementRequestCount(string requestName);
-        void IncrementErrorCount(string requestName, string errorType);
-    }
+    using System.Diagnostics;
+    using MediatR;
+    using Shared.Infrastructure.Metrics;
 
-    public sealed class MetricsBehavior<TRequest, TResponse>
-        : IPipelineBehavior<TRequest, TResponse>
-        where TRequest : IRequest<TResponse>
-    {
-        private readonly IMetricsCollector _metricsCollector;
+    namespace Shared.Infrastructure.Behaviors;
 
-        public MetricsBehavior(IMetricsCollector metricsCollector)
+    /// <summary>
+    /// メトリクス収集Behavior
+    ///
+    /// 【パターン: Pipeline Behavior - Metrics】
+    ///
+    /// 使用シナリオ:
+    /// - すべてのCommand/Queryの実行時間を自動計測
+    /// - 成功/失敗数の自動カウント
+    /// - パフォーマンス監視・ボトルネック特定
+    ///
+    /// 実装方針:
+    /// - OpenTelemetry Metricsを使用
+    /// - すべてのリクエストを自動計測（オーバーヘッド最小）
+    /// - タグによる分類（request_type, success/failure）
+    ///
+    /// Pipeline順序:
+    /// - すべてのBehaviorの最外層（最初）で実行して全体の実行時間を計測
+    /// - LoggingBehaviorより前に実行されるため、ログ出力時間も含めて計測
+    /// </summary>
+    /// <typeparam name="TRequest">リクエスト型</typeparam>
+    /// <typeparam name="TResponse">レスポンス型</typeparam>
+    public sealed class MetricsBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : notnull
+    {
+        private readonly ApplicationMetrics _metrics;
+
+        public MetricsBehavior(ApplicationMetrics metrics)
         {
-            _metricsCollector = metricsCollector;
+            _metrics = metrics;
         }
 
         public async Task<TResponse> Handle(
@@ -44,78 +66,45 @@ implementation:
             RequestHandlerDelegate<TResponse> next,
             CancellationToken cancellationToken)
         {
-            var requestName = typeof(TRequest).Name;
-            _metricsCollector.IncrementRequestCount(requestName);
-
+            var requestType = typeof(TRequest).Name;
             var stopwatch = Stopwatch.StartNew();
+            var success = false;
+
             try
             {
+                // リクエスト実行
                 var response = await next();
-                stopwatch.Stop();
-
-                var success = IsSuccessfulResponse(response);
-                _metricsCollector.RecordRequestDuration(
-                    requestName,
-                    stopwatch.ElapsedMilliseconds,
-                    success);
-
+                success = true;
                 return response;
             }
-            catch (Exception ex)
+            finally
             {
                 stopwatch.Stop();
 
-                _metricsCollector.RecordRequestDuration(
-                    requestName,
-                    stopwatch.ElapsedMilliseconds,
-                    success: false);
+                // メトリクス記録
+                var duration = stopwatch.Elapsed.TotalMilliseconds;
+                var status = success ? "success" : "failure";
 
-                _metricsCollector.IncrementErrorCount(
-                    requestName,
-                    ex.GetType().Name);
+                // 実行時間を記録（タグ付き）
+                _metrics.RequestDuration.Record(
+                    duration,
+                    new KeyValuePair<string, object?>("request_type", requestType),
+                    new KeyValuePair<string, object?>("status", status));
 
-                throw;
+                // リクエスト数をカウント
+                _metrics.RequestCount.Add(
+                    1,
+                    new KeyValuePair<string, object?>("request_type", requestType),
+                    new KeyValuePair<string, object?>("status", status));
+
+                // エラー数をカウント（失敗時のみ）
+                if (!success)
+                {
+                    _metrics.RequestErrors.Add(
+                        1,
+                        new KeyValuePair<string, object?>("request_type", requestType));
+                }
             }
-        }
-
-        private static bool IsSuccessfulResponse(TResponse response)
-        {
-            if (response is IResult result)
-                return result.IsSuccess;
-
-            return true; // Result型以外はデフォルトで成功扱い
-        }
-    }
-
-    // Application Insights 実装例
-    public sealed class ApplicationInsightsMetricsCollector : IMetricsCollector
-    {
-        private readonly TelemetryClient _telemetryClient;
-
-        public ApplicationInsightsMetricsCollector(TelemetryClient telemetryClient)
-        {
-            _telemetryClient = telemetryClient;
-        }
-
-        public void RecordRequestDuration(string requestName, long durationMs, bool success)
-        {
-            _telemetryClient.TrackMetric(
-                $"request.duration.{requestName}",
-                durationMs,
-                new Dictionary<string, string> { ["success"] = success.ToString() });
-        }
-
-        public void IncrementRequestCount(string requestName)
-        {
-            _telemetryClient.TrackMetric($"request.count.{requestName}", 1);
-        }
-
-        public void IncrementErrorCount(string requestName, string errorType)
-        {
-            _telemetryClient.TrackMetric(
-                $"request.error.{requestName}",
-                1,
-                new Dictionary<string, string> { ["errorType"] = errorType });
         }
     }
 
@@ -184,5 +173,6 @@ changelog:
       - "初版リリース"
 
 evidence:
-  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/MetricsBehavior.cs"
-  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/MetricsBehaviorTests.cs"
+  implementation_file: "src/Shared/Infrastructure/Behaviors/MetricsBehavior.cs"
+  test_file: "未実装 - 今後の実装予定"
+  metrics_class: "src/Shared/Infrastructure/Metrics/ApplicationMetrics.cs"

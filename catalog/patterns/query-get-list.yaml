@@ -14,52 +14,67 @@ dependencies:
     - Dapper: "^2.1.0"
 
 implementation:
-  file_path: "src/{BoundedContext}/Features/Get{Entity}s/Get{Entity}sQuery.cs"
+  file_path: "src/Application/Features/Get{Entity}s/Get{Entity}sQuery.cs"
   template: |
-    // Query 定義
-    public sealed record Get{Entity}sQuery()
-        : IQuery<Result<IEnumerable<{Entity}Dto>>>, ICacheableQuery
+    using {BoundedContext}.Shared.Application;
+    using {BoundedContext}.Shared.Application.DTOs;
+    using Shared.Application;
+    using Shared.Application.Interfaces;
+
+    namespace Application.Features.Get{Entity}s;
+
+    /// <summary>
+    /// {Entity}一覧取得Query
+    /// </summary>
+    public class Get{Entity}sQuery : IQuery<Result<IEnumerable<{Entity}Dto>>>, ICacheableQuery
     {
-        public string GetCacheKey() => "{entity}-all";
+        /// <summary>
+        /// キャッシュキー（全{Entity}一覧は固定キー）
+        /// </summary>
+        public string GetCacheKey() => "{entity}s-all";
+
+        /// <summary>
+        /// キャッシュ期間: 5分
+        /// </summary>
         public int CacheDurationMinutes => 5;
     }
 
     // Handler 実装
-    public sealed class Get{Entity}sHandler
-        : IRequestHandler<Get{Entity}sQuery, Result<IEnumerable<{Entity}Dto>>>
+    /// <summary>
+    /// {Entity}一覧取得クエリハンドラー (工業製品化版)
+    ///
+    /// 【処理フロー】
+    /// 1. I{Entity}ReadRepository経由でデータ取得（Dapper）
+    /// 2. DTOのリストを返す
+    ///
+    /// 【実装ガイド】
+    /// - Read Model（Dapper）を使用して最適化
+    /// - Repository（EF Core）ではなくReadRepository（Dapper）を使用
+    /// - キャッシュはCachingBehaviorが自動的に処理
+    /// - 参照系なので書き込み処理は行わない
+    /// </summary>
+    public class Get{Entity}sQueryHandler
+        : QueryPipeline<Get{Entity}sQuery, IEnumerable<{Entity}Dto>>
     {
-        private readonly IDbConnection _connection;
+        private readonly I{Entity}ReadRepository _readRepository;
 
-        public Get{Entity}sHandler(IDbConnection connection)
+        public Get{Entity}sQueryHandler(I{Entity}ReadRepository readRepository)
         {
-            _connection = connection;
+            _readRepository = readRepository;
         }
 
-        public async Task<Result<IEnumerable<{Entity}Dto>>> Handle(
+        protected override async Task<Result<IEnumerable<{Entity}Dto>>> ExecuteAsync(
             Get{Entity}sQuery query,
-            CancellationToken cancellationToken)
+            CancellationToken ct)
         {
-            var sql = @"
-                SELECT Id, Name, Description, Price, Stock, Status
-                FROM {Entity}s
-                WHERE IsDeleted = 0
-                ORDER BY CreatedAt DESC";
-
-            var items = await _connection.QueryAsync<{Entity}Dto>(sql);
+            // I{Entity}ReadRepository経由で取得（Dapper使用）
+            // - SELECT * FROM {Entity}s WHERE IsDeleted = 0
+            // - シンプルなクエリで高速
+            var items = await _readRepository.GetAllAsync(ct);
 
             return Result.Success(items);
         }
     }
-
-    // DTO 定義
-    public sealed record {Entity}Dto(
-        Guid Id,
-        string Name,
-        string Description,
-        decimal Price,
-        int Stock,
-        string Status
-    );
 
 example_usage: |
   // ProductCatalog の場合
@@ -87,10 +102,14 @@ example_usage: |
   }
 
 file_structure: |
-  src/{BoundedContext}/Features/Get{Entity}s/
-  ├── Get{Entity}sQuery.cs       # Query定義
-  ├── Get{Entity}sHandler.cs     # Handler実装
-  └── {Entity}Dto.cs             # DTO定義
+  src/Application/Features/Get{Entity}s/
+  ├── Get{Entity}sQuery.cs           # Query定義 + Handler実装
+
+  src/Application/Shared/{BoundedContext}/Application/DTOs/
+  └── {Entity}Dto.cs                 # DTO定義
+
+  src/Application/Core/Queries/
+  └── QueryPipeline.cs               # Base class for query handlers
 
 tests:
   - name: "全件取得が成功する"
@@ -144,4 +163,7 @@ changelog:
       - "初版リリース"
 
 evidence:
-  implementation_example: "src/ProductCatalog/Features/GetProducts/"
+  query: "src/Application/Features/GetProducts/GetProductsQuery.cs"
+  handler: "src/Application/Features/GetProducts/GetProductsQueryHandler.cs"
+  dto: "src/Application/Shared/ProductCatalog/Application/DTOs/ProductDto.cs"
+  read_repository: "src/Application/Shared/ProductCatalog/Application/ProductReadRepository.cs"

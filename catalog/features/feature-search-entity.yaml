@@ -84,21 +84,19 @@ dependencies:
     - Dapper: "^2.1.0"
 
 file_structure: |
-  src/{BoundedContext}/Features/Search{Entity}s/
-  ├── Application/
-  │   ├── Search{Entity}sQuery.cs          # Query定義
-  │   ├── Search{Entity}sHandler.cs        # Handler実装
-  │   └── Search{Entity}s.Application.csproj
-  └── README.md
+  src/Application/Features/Search{Entity}s/
+  ├── Search{Entity}sQuery.cs              # Query定義
+  └── Search{Entity}sQueryHandler.cs       # Handler実装
 
-  src/{BoundedContext}/Shared/UI/
+  src/Application/Shared/{BoundedContext}/Application/DTOs/
+  └── {Entity}Dto.cs                       # DTO定義
+
+  src/Application/Shared/{BoundedContext}/UI/
   ├── Store/
-  │   ├── {Entity}SearchState.cs           # 検索状態
-  │   └── {Entity}SearchStore.cs           # 状態管理+I/O
-  ├── Actions/
-  │   └── {Entity}SearchActions.cs         # UI手順
-  └── Components/
-      └── {Entity}SearchForm.razor         # 検索フォーム
+  │   ├── {Entity}sState.cs                # 一覧状態（検索結果含む）
+  │   └── {Entity}sStore.cs                # 状態管理+I/O
+  └── Actions/
+      └── {Entity}ListActions.cs           # UI手順
 
 implementation:
   query:
@@ -366,9 +364,15 @@ ai_guidance:
       solution: "すべての検索条件をキャッシュキーに含める"
 
 evidence:
-  query: "src/ProductCatalog/Features/SearchProducts/Application/SearchProductsQuery.cs"
-  handler: "src/ProductCatalog/Features/SearchProducts/Application/SearchProductsHandler.cs"
-  store: "src/ProductCatalog/Shared/UI/Store/ProductSearchStore.cs"
+  application_layer:
+    query: "src/Application/Features/SearchProducts/SearchProductsQuery.cs"
+    handler: "src/Application/Features/SearchProducts/SearchProductsQueryHandler.cs"
+  ui_layer:
+    store_state: "src/Application/Shared/ProductCatalog/UI/Store/ProductsState.cs"
+    store: "src/Application/Shared/ProductCatalog/UI/Store/ProductsStore.cs"
+    page_actions: "src/Application/Shared/ProductCatalog/UI/Actions/ProductListActions.cs"
+  tests:
+    test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

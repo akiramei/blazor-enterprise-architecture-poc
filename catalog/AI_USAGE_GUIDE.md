@@ -151,9 +151,9 @@ public sealed record CreateProductCommand(
 ```
 
 **テンプレート変数:**
-- `{Entity}` → `Product` (PascalCase)
-- `{entity}` → `product` (camelCase)
-- `{BoundedContext}` → `ProductCatalog`
+- `{Entity}` → `Product` (PascalCase) - エンティティ名
+- `{entity}` → `product` (camelCase) - エンティティ名
+- `{BoundedContext}` → `ProductCatalog` (PascalCase) - 境界コンテキスト名
 
 ### ステップ3: 依存パターンの確認
 
@@ -176,20 +176,22 @@ implementation:
 
 → 実際のパス:
 ```
-src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs
+src/Application/Features/CreateProduct/CreateProductCommand.cs
 ```
 
 ### ステップ5: エビデンスの提示
 
 ```yaml
 evidence:
-  implementation_example: "src/ProductCatalog/Features/CreateProduct/"
+  command: "src/Application/Features/CreateProduct/CreateProductCommand.cs"
+  handler: "src/Application/Features/CreateProduct/CreateProductCommandHandler.cs"
 ```
 
 → AIはユーザーに対して:
 ```
 実装例はこちらで確認できます:
-src/ProductCatalog/Features/CreateProduct/
+- Command: src/Application/Features/CreateProduct/CreateProductCommand.cs
+- Handler: src/Application/Features/CreateProduct/CreateProductCommandHandler.cs
 ```
 
 ---
@@ -270,9 +272,9 @@ ai_guidance:
 
 ```yaml
 evidence:
-  implementation_file: "src/ProductCatalog/Application/Common/Behaviors/ValidationBehavior.cs"
-  test_file: "tests/ProductCatalog.Application.Tests/Behaviors/ValidationBehaviorTests.cs"
-  example_command: "src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs"
+  implementation_file: "src/Application/Common/Behaviors/ValidationBehavior.cs"
+  test_file: "未実装 - 今後の実装予定"
+  example_command: "src/Application/Features/CreateProduct/CreateProductCommand.cs"
 ```
 
 AIは、コード生成後にこれらのファイルパスをユーザーに提示することで:
@@ -320,7 +322,8 @@ AIは、コード生成後にこれらのファイルパスをユーザーに提
 6. **エビデンスを提示**
    ```
    実装例:
-   src/ProductCatalog/Features/CreateProduct/
+   - Command: src/Application/Features/CreateProduct/CreateProductCommand.cs
+   - Handler: src/Application/Features/CreateProduct/CreateProductCommandHandler.cs
    ```
 
 7. **注意点を伝える**
@@ -376,5 +379,5 @@ AIがカタログを参照する際は、**必ずタグ固定**してくださ�
 
 ---
 
-**最終更新: 2025-11-05**
-**カタログバージョン: v2025.11.0**
+**最終更新: 2025-11-19**
+**カタログバージョン: v2025.11.19**

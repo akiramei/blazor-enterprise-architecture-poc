@@ -2,12 +2,15 @@ id: transaction-behavior
 version: 2.0.0
 name: TransactionBehavior
 category: pipeline-behavior
-intent: Command を単一トランザクションで実行し、エラー時に自動ロールバック
+intent: Command を単一トランザクションで実行し、Outboxパターンでドメインイベントを管理
 order_hint: 400
 description: |
   ICommand を実装したリクエストを単一トランザクション内で実行します。
   Handler 内で例外が発生した場合は自動的にロールバックされます。
-  Query (IQuery) には適用されません。
+  ドメインイベントをOutboxテーブルに保存し、確実な配信を保証します。
+
+  【重要】このBehaviorはBounded Context固有の実装です。
+  各Bounded Contextは独自のDbContextとOutbox実装を持ちます。
 
 wiring:
   service_registrations:
@@ -15,27 +18,58 @@ wiring:
   dependencies:
     nuget:
       - Microsoft.EntityFrameworkCore: "^8.0.0"
+    domain:
+      - Shared.Domain.Outbox.OutboxMessage
+      - Shared.Kernel.Entity
 
 preconditions:
-  - "AppDbContext が DbContext を継承している"
+  - "{BoundedContext}DbContext が DbContext を継承している"
   - "ICommand インターフェースが定義されている"
   - "すべての Command が ICommand を実装している"
+  - "OutboxMessages DbSet が定義されている"
 
 implementation:
-  file_path: "src/{BoundedContext}/Infrastructure/Behaviors/TransactionBehavior.cs"
+  file_path: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
+  namespace: "ProductCatalog.Shared.Infrastructure.Persistence.Behaviors"
   template: |
-    public sealed class TransactionBehavior<TRequest, TResponse>
-        : IPipelineBehavior<TRequest, TResponse>
-        where TRequest : IRequest<TResponse>
+    using System.Text.Json;
+    using MediatR;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.Logging;
+    using Shared.Application;
+    using Shared.Application.Interfaces;
+    using Shared.Kernel;
+    using Shared.Domain.Outbox;
+
+    namespace ProductCatalog.Shared.Infrastructure.Persistence.Behaviors;
+
+    /// <summary>
+    /// トランザクション管理のPipeline Behavior（Command専用）
+    ///
+    /// 【トランザクショナルOutboxパターン】
+    ///
+    /// 責務:
+    /// - ビジネスエンティティ更新とOutbox保存の原子性確保
+    /// - ドメインイベントをOutboxに変換して永続化
+    /// - トランザクション管理（コミット/ロールバック）
+    ///
+    /// 設計:
+    /// - ProductCatalogDbContext使用（Product + Outbox物理同居）
+    /// - 単一トランザクションで原子性確保
+    /// - ネストトランザクション回避
+    /// </summary>
+    public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : ICommand<TResponse>
+        where TResponse : Result
     {
-        private readonly AppDbContext _dbContext;
+        private readonly ProductCatalogDbContext _context;
         private readonly ILogger<TransactionBehavior<TRequest, TResponse>> _logger;
 
         public TransactionBehavior(
-            AppDbContext dbContext,
+            ProductCatalogDbContext context,
             ILogger<TransactionBehavior<TRequest, TResponse>> logger)
         {
-            _dbContext = dbContext;
+            _context = context;
             _logger = logger;
         }
 
@@ -44,33 +78,81 @@ implementation:
             RequestHandlerDelegate<TResponse> next,
             CancellationToken cancellationToken)
         {
-            // Query の場合はトランザクション不要
-            if (request is not ICommand)
+            // ネストされたトランザクションを防ぐため、既存トランザクションがあればスキップ
+            if (_context.Database.CurrentTransaction != null)
+            {
                 return await next();
+            }
 
-            // すでにトランザクション内にいる場合はスキップ
-            if (_dbContext.Database.CurrentTransaction != null)
-                return await next();
+            var commandName = typeof(TRequest).Name;
 
-            var requestName = typeof(TRequest).Name;
-            _logger.LogInformation("トランザクション開始: {RequestName}", requestName);
+            _logger.LogDebug("トランザクション開始: {CommandName}", commandName);
 
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
             try
             {
                 var response = await next();
 
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                if (response.IsSuccess)
+                {
+                    // ドメインイベントをディスパッチ
+                    await DispatchDomainEventsAsync(cancellationToken);
 
-                _logger.LogInformation("トランザクションコミット成功: {RequestName}", requestName);
+                    // Commit
+                    await _context.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+
+                    _logger.LogDebug("トランザクションコミット: {CommandName}", commandName);
+                }
+                else
+                {
+                    // ビジネスルール違反の場合もロールバック
+                    await transaction.RollbackAsync(cancellationToken);
+                    _logger.LogDebug("トランザクションロールバック(ビジネスルール違反): {CommandName}", commandName);
+                }
+
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "トランザクションロールバック: {RequestName}", requestName);
                 await transaction.RollbackAsync(cancellationToken);
+                _logger.LogError(ex, "トランザクションロールバック(例外): {CommandName}", commandName);
                 throw;
+            }
+        }
+
+        private async Task DispatchDomainEventsAsync(CancellationToken ct)
+        {
+            var domainEntities = _context.ChangeTracker
+                .Entries<Entity>()
+                .Where(x => x.Entity.GetDomainEvents().Any())
+                .ToList();
+
+            var domainEvents = domainEntities
+                .SelectMany(x => x.Entity.GetDomainEvents())
+                .ToList();
+
+            domainEntities.ForEach(entity => entity.Entity.ClearDomainEvents());
+
+            // Outbox Pattern: ドメインイベントをOutboxテーブルに保存
+            // トランザクション内で保存するため、確実に配信される
+            foreach (var domainEvent in domainEvents)
+            {
+                var eventType = domainEvent.GetType();
+                var eventTypeName = eventType.Name;
+                var eventContent = JsonSerializer.Serialize(domainEvent, eventType, new JsonSerializerOptions
+                {
+                    WriteIndented = false
+                });
+
+                var outboxMessage = OutboxMessage.Create(eventTypeName, eventContent);
+                await _context.OutboxMessages.AddAsync(outboxMessage, ct);
+
+                _logger.LogInformation(
+                    "ドメインイベントをOutboxに保存: {EventType} [OutboxMessageId: {OutboxMessageId}]",
+                    eventType,
+                    outboxMessage.Id);
             }
         }
     }
@@ -144,6 +226,7 @@ ai_guidance:
   when_to_use:
     - "データベースへの書き込みを伴う Command"
     - "複数テーブルへの変更を原子性を保って実行したい場合"
+    - "ドメインイベントを確実に配信したい場合（Outboxパターン）"
     - "エラー時に自動ロールバックさせたい場合"
 
   when_not_to_use:
@@ -160,6 +243,19 @@ ai_guidance:
 
     - mistake: "Query に ICommand を実装する"
       solution: "Query は IQuery、Command は ICommand を実装する"
+
+    - mistake: "Result.Fail時にドメインイベントが発行される"
+      solution: "Success時のみドメインイベントをOutboxに保存"
+
+  bounded_context_notes: |
+    このBehaviorはBounded Context固有の実装です。
+
+    現在の実装:
+    - ProductCatalog: src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs
+    - PurchaseManagement: 同様の実装が存在（各Bounded Contextが独立）
+
+    各Bounded Contextは独自のDbContextとOutbox実装を持ち、
+    異なるデータベーススキーマやテーブル設計を持つ可能性があります。
 
 changelog:
   - version: 2.0.0
@@ -179,6 +275,6 @@ changelog:
       - "初版リリース"
 
 evidence:
-  implementation_file: "src/ProductCatalog/Infrastructure/Behaviors/TransactionBehavior.cs"
-  test_file: "tests/ProductCatalog.Infrastructure.Tests/Behaviors/TransactionBehaviorTests.cs"
-  example_command: "src/ProductCatalog/Features/CreateProduct/CreateProductCommand.cs"
+  implementation_file: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
+  test_file: "未実装 - 今後の実装予定"
+  outbox_entity: "src/Shared/Domain/Outbox/OutboxMessage.cs"

@@ -23,11 +23,22 @@ preconditions:
   - "Result 型が定義されている"
 
 implementation:
-  file_path: "src/{BoundedContext}/Application/Common/Behaviors/ValidationBehavior.cs"
+  file_path: "src/Shared/Infrastructure/Behaviors/ValidationBehavior.cs"
+  namespace: "Shared.Infrastructure.Behaviors"
   template: |
-    public sealed class ValidationBehavior<TRequest, TResponse>
-        : IPipelineBehavior<TRequest, TResponse>
+    using FluentValidation;
+    using MediatR;
+    using Shared.Application;
+
+    namespace Shared.Infrastructure.Behaviors;
+
+    /// <summary>
+    /// バリデーションのPipeline Behavior
+    /// FluentValidationを使用してリクエストを検証
+    /// </summary>
+    public sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
+        where TResponse : Result
     {
         private readonly IEnumerable<IValidator<TRequest>> _validators;
 
@@ -42,12 +53,14 @@ implementation:
             CancellationToken cancellationToken)
         {
             if (!_validators.Any())
+            {
                 return await next();
+            }
 
             var context = new ValidationContext<TRequest>(request);
+
             var validationResults = await Task.WhenAll(
-                _validators.Select(v => v.ValidateAsync(context, cancellationToken))
-            );
+                _validators.Select(v => v.ValidateAsync(context, cancellationToken)));
 
             var failures = validationResults
                 .SelectMany(r => r.Errors)
@@ -57,28 +70,12 @@ implementation:
             if (failures.Any())
             {
                 var errorMessage = string.Join("; ", failures.Select(f => f.ErrorMessage));
-                return CreateFailedResult<TResponse>(errorMessage);
+
+                // Result型にエラーを設定して返す
+                return (TResponse)(object)Result.Fail(errorMessage);
             }
 
             return await next();
-        }
-
-        private static TResult CreateFailedResult<TResult>(string error)
-        {
-            var resultType = typeof(TResult);
-            if (resultType.IsGenericType && resultType.GetGenericTypeDefinition() == typeof(Result<>))
-            {
-                var valueType = resultType.GetGenericArguments()[0];
-                var failMethod = typeof(Result<>)
-                    .MakeGenericType(valueType)
-                    .GetMethod("Fail", new[] { typeof(string) });
-                return (TResult)failMethod!.Invoke(null, new object[] { error })!;
-            }
-            else if (resultType == typeof(Result))
-            {
-                return (TResult)(object)Result.Fail(error);
-            }
-            throw new InvalidOperationException($"Unsupported result type: {resultType}");
         }
     }
 
@@ -160,6 +157,6 @@ changelog:
       - "初版リリース"
 
 evidence:
-  implementation_file: "src/ProductCatalog/Application/Common/Behaviors/ValidationBehavior.cs"
-  test_file: "tests/ProductCatalog.Application.Tests/Behaviors/ValidationBehaviorTests.cs"
-  example_validator: "src/ProductCatalog/Features/CreateProduct/CreateProductValidator.cs"
+  implementation_file: "src/Shared/Infrastructure/Behaviors/ValidationBehavior.cs"
+  test_file: "未実装 - 今後の実装予定"
+  example_validator: "src/Application/Features/CreateProduct/CreateProductCommandValidator.cs"
