@@ -1,0 +1,422 @@
+id: domain-approval-history
+version: 1.0.0
+name: Approval History Pattern
+category: domain-pattern
+intent: 承認履歴を記録・追跡（誰が・いつ・何を承認/却下したか）
+description: |
+  承認履歴を記録・追跡するドメインパターン。
+  ApprovalStepエンティティで個別の承認ステップを管理し、承認者、承認日時、コメントを記録。
+  集約ルートのコレクションとして保持し、1トランザクションで整合性を保証。
+
+scope: domain-pattern
+layers:
+  - domain
+
+ai_selection_hints:
+  trigger_phrases:
+    - "承認履歴"
+    - "承認記録"
+    - "承認ログ"
+    - "誰が承認したか"
+    - "approval history"
+
+  confidence_keywords:
+    high:    ["承認履歴", "approval history", "承認記録", "承認ログ"]
+    medium:  ["承認者", "承認日時", "承認コメント"]
+    low:     ["履歴", "ログ"]
+
+  anti_patterns:
+    - "監査ログ"          # audit-log-behavior（システム全体の監査）
+    - "操作履歴"          # audit-log-behavior
+    - "変更履歴"          # audit-log-behavior
+
+  typical_requests:
+    - "誰がいつ承認したか記録したい"
+    - "承認履歴を表示してください"
+    - "承認コメントを保存したい"
+    - "承認フロー全体を可視化したい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 承認ワークフローの履歴を記録したい
+    2. 誰が・いつ・何を承認/却下したか追跡
+    3. 承認フロー全体を可視化
+
+    このパターンを選択すべきでない条件:
+    1. システム全体の監査ログ → audit-log-behavior
+    2. データ変更履歴 → audit-log-behavior
+    3. 単一承認のみ → 簡易版でOK
+
+relationship:
+  works_with:
+    - feature-approval-workflow (承認ワークフロー)
+    - domain-state-machine (状態遷移)
+    - audit-log-behavior (システム監査ログと併用)
+
+  dependencies: []
+
+file_structure: |
+  src/Domain/{BoundedContext}/{Entity}Requests/
+  ├── ApprovalStep.cs                      # 承認ステップ（エンティティ）
+  └── {Entity}Request.cs                   # 集約ルート（ApprovalStepsコレクションを保持）
+
+implementation:
+  # ===== Domain Layer =====
+  approval_step:
+    file_path: "src/Domain/{BoundedContext}/{Entity}Requests/ApprovalStep.cs"
+    template: |
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}Requests;
+
+      /// <summary>
+      /// 承認ステップ（エンティティ）
+      ///
+      /// 【パターン: 承認履歴】
+      ///
+      /// 責務:
+      /// - 個別の承認ステップの状態管理
+      /// - 承認者情報の保持（ApproverId, ApproverName, ApproverRole）
+      /// - 承認/却下の記録（ApprovedAt, RejectedAt, Comment）
+      ///
+      /// 設計:
+      /// - イミュータブル（承認後は変更不可）
+      /// - 承認/却下のどちらか一方のみ
+      /// - コメントは必須ではない（承認時）、却下時は必須
+      ///
+      /// AI実装時の注意:
+      /// - 集約ルートのコレクションとして管理
+      /// - 1トランザクションで整合性保証
+      /// - Approve(), Reject()で状態変更
+      /// </summary>
+      public class ApprovalStep : Entity
+      {
+          public Guid Id { get; init; }
+          public int StepNumber { get; init; }
+          public Guid ApproverId { get; init; }
+          public string ApproverName { get; init; } = string.Empty;
+          public string ApproverRole { get; init; } = string.Empty;
+          public ApprovalStepStatus Status { get; private set; }
+          public string? Comment { get; private set; }
+          public DateTime? ApprovedAt { get; private set; }
+          public DateTime? RejectedAt { get; private set; }
+
+          public bool IsPending => Status == ApprovalStepStatus.Pending;
+          public bool IsApproved => Status == ApprovalStepStatus.Approved;
+          public bool IsRejected => Status == ApprovalStepStatus.Rejected;
+
+          /// <summary>
+          /// パラメータレスコンストラクタ（EF Core用）
+          /// </summary>
+          private ApprovalStep() { }
+
+          /// <summary>
+          /// 承認ステップを作成（初期状態: Pending）
+          /// </summary>
+          public ApprovalStep(int stepNumber, Guid approverId, string approverName, string approverRole)
+          {
+              Id = Guid.NewGuid();
+              StepNumber = stepNumber;
+              ApproverId = approverId;
+              ApproverName = approverName;
+              ApproverRole = approverRole;
+              Status = ApprovalStepStatus.Pending;
+          }
+
+          /// <summary>
+          /// 承認
+          /// </summary>
+          public void Approve(string comment)
+          {
+              if (Status != ApprovalStepStatus.Pending)
+                  throw new DomainException("このステップは既に処理されています");
+
+              Status = ApprovalStepStatus.Approved;
+              Comment = comment;
+              ApprovedAt = DateTime.UtcNow;
+          }
+
+          /// <summary>
+          /// 却下
+          /// </summary>
+          public void Reject(string reason)
+          {
+              if (Status != ApprovalStepStatus.Pending)
+                  throw new DomainException("このステップは既に処理されています");
+
+              if (string.IsNullOrWhiteSpace(reason))
+                  throw new DomainException("却下理由は必須です");
+
+              Status = ApprovalStepStatus.Rejected;
+              Comment = reason;
+              RejectedAt = DateTime.UtcNow;
+          }
+      }
+
+      /// <summary>
+      /// 承認ステップのステータス
+      /// </summary>
+      public enum ApprovalStepStatus
+      {
+          /// <summary>承認待ち</summary>
+          Pending = 0,
+
+          /// <summary>承認済み</summary>
+          Approved = 1,
+
+          /// <summary>却下</summary>
+          Rejected = 2
+      }
+
+  # ===== Usage in Aggregate Root =====
+  usage_in_aggregate:
+    file_path: "src/Domain/{BoundedContext}/{Entity}Requests/{Entity}Request.cs"
+    template: |
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}Requests;
+
+      /// <summary>
+      /// {Entity}申請（集約ルート）
+      ///
+      /// 【パターン: 承認履歴の使用例】
+      /// </summary>
+      public class {Entity}Request : AggregateRoot<Guid>
+      {
+          private readonly List<ApprovalStep> _approvalSteps = new();
+
+          /// <summary>
+          /// 承認履歴（読み取り専用）
+          /// </summary>
+          public IReadOnlyList<ApprovalStep> ApprovalSteps => _approvalSteps.AsReadOnly();
+
+          /// <summary>
+          /// 現在の承認ステップ（Pending状態の最初のステップ）
+          /// </summary>
+          public ApprovalStep? CurrentApprovalStep => _approvalSteps.FirstOrDefault(s => s.IsPending);
+
+          /// <summary>
+          /// 承認済みのステップ数
+          /// </summary>
+          public int ApprovedStepCount => _approvalSteps.Count(s => s.IsApproved);
+
+          /// <summary>
+          /// 承認フロー全体の進捗率
+          /// </summary>
+          public decimal ProgressPercentage =>
+              _approvalSteps.Count == 0 ? 0 :
+              (decimal)ApprovedStepCount / _approvalSteps.Count * 100;
+
+          /// <summary>
+          /// 申請提出（承認フローを設定）
+          /// </summary>
+          public void Submit(ApprovalFlow approvalFlow)
+          {
+              // 承認フローを設定
+              foreach (var step in approvalFlow.Steps)
+              {
+                  _approvalSteps.Add(new ApprovalStep(
+                      step.StepNumber,
+                      step.ApproverId,
+                      step.ApproverName,
+                      step.ApproverRole
+                  ));
+              }
+
+              Status = {Entity}RequestStatus.Submitted;
+              SubmittedAt = DateTime.UtcNow;
+          }
+
+          /// <summary>
+          /// 承認
+          /// </summary>
+          public void Approve(Guid approverId, string comment)
+          {
+              var currentStep = CurrentApprovalStep;
+              if (currentStep is null)
+                  throw new DomainException("承認待ちのステップがありません");
+
+              if (currentStep.ApproverId != approverId)
+                  throw new DomainException("このステップの承認者ではありません");
+
+              // 承認ステップを完了（履歴に記録）
+              currentStep.Approve(comment);
+
+              // 次のステップがあるか確認
+              var nextStep = _approvalSteps.FirstOrDefault(s => s.StepNumber == currentStep.StepNumber + 1);
+              if (nextStep is null)
+              {
+                  // 最終承認完了
+                  Status = {Entity}RequestStatus.Approved;
+                  ApprovedAt = DateTime.UtcNow;
+              }
+          }
+
+          /// <summary>
+          /// 却下
+          /// </summary>
+          public void Reject(Guid approverId, string reason)
+          {
+              var currentStep = CurrentApprovalStep;
+              if (currentStep is null)
+                  throw new DomainException("承認待ちのステップがありません");
+
+              if (currentStep.ApproverId != approverId)
+                  throw new DomainException("このステップの承認者ではありません");
+
+              // 承認ステップを却下（履歴に記録）
+              currentStep.Reject(reason);
+
+              Status = {Entity}RequestStatus.Rejected;
+              RejectedAt = DateTime.UtcNow;
+          }
+
+          /// <summary>
+          /// 承認履歴を取得（タイムライン表示用）
+          /// </summary>
+          public IEnumerable<ApprovalHistoryEntry> GetApprovalHistory()
+          {
+              return _approvalSteps.Select(step => new ApprovalHistoryEntry(
+                  StepNumber: step.StepNumber,
+                  ApproverName: step.ApproverName,
+                  ApproverRole: step.ApproverRole,
+                  Status: step.Status.ToString(),
+                  Comment: step.Comment,
+                  ProcessedAt: step.ApprovedAt ?? step.RejectedAt
+              ));
+          }
+      }
+
+      /// <summary>
+      /// 承認履歴エントリ（DTO）
+      /// </summary>
+      public record ApprovalHistoryEntry(
+          int StepNumber,
+          string ApproverName,
+          string ApproverRole,
+          string Status,
+          string? Comment,
+          DateTime? ProcessedAt
+      );
+
+  # ===== Query Example =====
+  query_example:
+    file_path: "src/Application/Features/Get{Entity}RequestById/Get{Entity}RequestByIdQuery.cs"
+    template: |
+      namespace Application.Features.Get{Entity}RequestById;
+
+      /// <summary>
+      /// {Entity}申請詳細クエリ（承認履歴を含む）
+      /// </summary>
+      public record {Entity}RequestDetailDto
+      {
+          public Guid Id { get; init; }
+          public string Title { get; init; } = string.Empty;
+          public string Status { get; init; } = string.Empty;
+
+          /// <summary>
+          /// 承認履歴
+          /// </summary>
+          public IReadOnlyList<ApprovalStepDto> ApprovalSteps { get; init; } = Array.Empty<ApprovalStepDto>();
+
+          /// <summary>
+          /// 進捗率
+          /// </summary>
+          public decimal ProgressPercentage { get; init; }
+      }
+
+      public record ApprovalStepDto
+      {
+          public int StepNumber { get; init; }
+          public string ApproverName { get; init; } = string.Empty;
+          public string ApproverRole { get; init; } = string.Empty;
+          public string Status { get; init; } = string.Empty;
+          public string? Comment { get; init; }
+          public DateTime? ApprovedAt { get; init; }
+          public DateTime? RejectedAt { get; init; }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "承認ワークフローの履歴を記録したい場合"
+    - "誰が・いつ・何を承認/却下したか追跡する場合"
+    - "承認フロー全体を可視化する場合"
+
+  implementation_steps:
+    - step: 1
+      description: "ApprovalStepエンティティを作成"
+      files: ["ApprovalStep.cs", "ApprovalStepStatus enum"]
+    - step: 2
+      description: "集約ルートにApprovalStepsコレクションを追加"
+      files: ["{Entity}Request.cs"]
+    - step: 3
+      description: "Submit()時に承認フローからApprovalStepを生成"
+    - step: 4
+      description: "Approve(), Reject()でApprovalStepの状態を更新"
+    - step: 5
+      description: "Query側でApprovalStepsを含むDTOを返す"
+
+  common_mistakes:
+    - mistake: "承認履歴を別テーブルで管理する"
+      solution: "ApprovalStepは集約の一部（コレクション）として管理。1トランザクションで整合性保証。"
+    - mistake: "承認後にApprovalStepを変更する"
+      solution: "ApprovalStepはイミュータブル。承認/却下後は変更不可。"
+    - mistake: "コメントを必須にする"
+      solution: "承認時はコメント任意、却下時は必須。ビジネスルールに応じて調整。"
+    - mistake: "承認履歴を監査ログと混同する"
+      solution: "承認履歴はドメイン概念、監査ログはシステム全体の記録。両方併用可能。"
+
+  key_patterns:
+    - pattern: "エンティティコレクション"
+      description: "ApprovalStepを集約ルートのコレクションとして管理。"
+    - pattern: "イミュータブル"
+      description: "承認/却下後は変更不可。履歴の改ざん防止。"
+    - pattern: "CurrentApprovalStep"
+      description: "Pending状態の最初のステップを取得。次に処理すべきステップを特定。"
+    - pattern: "進捗率計算"
+      description: "承認済みステップ数 / 全ステップ数 * 100。UI表示用。"
+
+  design_decision:
+    approval_step_vs_audit_log: |
+      承認履歴（ApprovalStep） vs 監査ログ（AuditLog）:
+
+      承認履歴（ApprovalStep）:
+      - ドメイン概念（承認ワークフローの一部）
+      - 集約ルートのコレクション
+      - ビジネスロジックで使用（進捗率、次の承認者）
+      - 1トランザクションで整合性保証
+
+      監査ログ（AuditLog）:
+      - システム全体の監査記録
+      - 独立したテーブル
+      - コンプライアンス対応
+      - 削除・変更不可
+
+      推奨: 両方併用
+      - ApprovalStepでワークフロー管理
+      - AuditLogでシステム監査
+
+    comment_strategy: |
+      コメント戦略:
+
+      承認時のコメント:
+      - 任意（空文字列OK）
+      - 「承認します」等の定型文でOK
+
+      却下時のコメント:
+      - 必須（ビジネスルール）
+      - 却下理由を明確に記載
+      - 申請者が修正できるように具体的に
+
+evidence:
+  domain_layer:
+    approval_step: "src/Domain/PurchaseManagement/PurchaseRequests/ApprovalStep.cs"
+    usage: "src/Domain/PurchaseManagement/PurchaseRequests/PurchaseRequest.cs (line 14, 39-40, 184-192, 223, 258, 265)"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "ApprovalStepの実装を元にパターン化"
+      - "承認履歴記録・追跡機能を標準装備"

@@ -243,6 +243,37 @@
       "intent": "SignalRを使用したリアルタイム通知でUI自動更新を実現",
       "tags": ["signalr", "realtime", "notification", "ui-sync", "blazor"],
       "stability": "stable"
+    },
+    {
+      "id": "feature-approval-workflow",
+      "name": "Approval Workflow Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-approval-workflow.yaml",
+      "intent": "稟議・申請の承認ワークフローを実装（マルチステップ承認）",
+      "tags": ["approval", "workflow", "ringi", "multi-step", "domain-driven"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
+      "id": "domain-state-machine",
+      "name": "State Machine Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-state-machine.yaml",
+      "intent": "ステートマシンによる状態遷移管理（不正な遷移を防止）",
+      "tags": ["state-machine", "state-transition", "domain", "validation"],
+      "stability": "stable"
+    },
+    {
+      "id": "domain-approval-history",
+      "name": "Approval History Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-approval-history.yaml",
+      "intent": "承認履歴を記録・追跡（誰が・いつ・何を承認/却下したか）",
+      "tags": ["approval-history", "audit", "tracking", "domain"],
+      "stability": "stable"
     }
   ],
   "recommended_combinations": [

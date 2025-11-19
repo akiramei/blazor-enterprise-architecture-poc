@@ -1,0 +1,351 @@
+id: domain-state-machine
+version: 1.0.0
+name: State Machine Pattern
+category: domain-pattern
+intent: ステートマシンによる状態遷移管理（不正な遷移を防止）
+description: |
+  ステートマシンパターンにより、状態遷移ルールを厳密に定義し、不正な遷移を防止する。
+  Dictionary<TState, List<TState>>で許可された遷移を定義し、ValidateTransition()で検証。
+  集約ルートから独立したクラスとして実装し、テスト容易性を確保。
+
+scope: domain-pattern
+layers:
+  - domain
+
+ai_selection_hints:
+  trigger_phrases:
+    - "ステートマシン"
+    - "状態遷移"
+    - "ステータス管理"
+    - "状態管理"
+    - "state machine"
+
+  confidence_keywords:
+    high:    ["ステートマシン", "state machine", "状態遷移", "遷移"]
+    medium:  ["ステータス", "状態", "フロー"]
+    low:     ["ワークフロー"]
+
+  anti_patterns:
+    - "単純なenum"      # ステートマシン不要
+    - "UI状態"          # フロントエンド状態管理
+
+  typical_requests:
+    - "注文のステータス遷移を厳密に管理したい"
+    - "状態遷移ルールを定義してください"
+    - "不正な状態遷移を防ぎたい"
+    - "ワークフローの状態管理を実装して"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 複雑な状態遷移ルールがある
+    2. 不正な遷移を防ぐ必要がある
+    3. 状態遷移のテストが重要
+
+    このパターンを選択すべきでない条件:
+    1. 2-3個の単純なステータスのみ → enum で十分
+    2. UI側の状態管理 → Blazor State Management
+    3. データベース側の制約 → CHECK制約
+
+relationship:
+  works_with:
+    - feature-approval-workflow (承認ワークフロー)
+    - domain-pattern (集約ルート)
+
+  dependencies:
+    - IStateMachine<TState> (Shared層のインターフェース)
+
+file_structure: |
+  src/Domain/{BoundedContext}/{Entity}s/StateMachine/
+  └── {Entity}StateMachine.cs                 # ステートマシン実装
+
+  src/Shared/Domain/StateMachine/
+  ├── IStateMachine.cs                        # ステートマシンインターフェース
+  └── InvalidStateTransitionException.cs      # 不正遷移例外
+
+implementation:
+  # ===== Shared Layer (Interface) =====
+  interface:
+    file_path: "src/Shared/Domain/StateMachine/IStateMachine.cs"
+    template: |
+      namespace Shared.Domain.StateMachine;
+
+      /// <summary>
+      /// ステートマシンインターフェース
+      ///
+      /// 【パターン: State Machine】
+      ///
+      /// 責務:
+      /// - 状態遷移の可否判定
+      /// - 状態遷移の検証
+      /// - 許可された遷移先の取得
+      ///
+      /// AI実装時の注意:
+      /// - TStateはenumで定義
+      /// - ValidateTransition()は例外をスロー
+      /// - CanTransition()はboolを返す（検証なし）
+      /// </summary>
+      public interface IStateMachine<TState> where TState : Enum
+      {
+          /// <summary>
+          /// 状態遷移が可能かチェック
+          /// </summary>
+          bool CanTransition(TState from, TState to);
+
+          /// <summary>
+          /// 状態遷移を検証（不正な場合は例外スロー）
+          /// </summary>
+          void ValidateTransition(TState from, TState to);
+
+          /// <summary>
+          /// 指定した状態から遷移可能な状態の一覧を取得
+          /// </summary>
+          IEnumerable<TState> GetAllowedTransitions(TState from);
+      }
+
+  exception:
+    file_path: "src/Shared/Domain/StateMachine/InvalidStateTransitionException.cs"
+    template: |
+      namespace Shared.Domain.StateMachine;
+
+      /// <summary>
+      /// 不正な状態遷移例外
+      ///
+      /// 【パターン: Domain Exception】
+      /// </summary>
+      public class InvalidStateTransitionException : Exception
+      {
+          public InvalidStateTransitionException(string message) : base(message) { }
+      }
+
+  # ===== Domain Layer =====
+  state_machine:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/StateMachine/{Entity}StateMachine.cs"
+    template: |
+      using Shared.Domain.StateMachine;
+
+      namespace Domain.{BoundedContext}.{Entity}s.StateMachine;
+
+      /// <summary>
+      /// {Entity}の状態遷移ロジック
+      ///
+      /// 【パターン: State Machine】
+      ///
+      /// 状態遷移ルール:
+      /// - Draft → Submitted
+      /// - Submitted → PendingApproval or Cancelled
+      /// - PendingApproval → Approved or Rejected
+      /// - Approved/Rejected/Cancelled → 終端状態（遷移なし）
+      ///
+      /// AI実装時の注意:
+      /// - 許可された遷移をDictionaryで定義
+      /// - 終端状態（Approved, Rejected等）は空のリスト
+      /// - ValidateTransition()で不正遷移をチェック
+      /// </summary>
+      public class {Entity}StateMachine : IStateMachine<{Entity}Status>
+      {
+          // 許可された状態遷移の定義
+          private static readonly Dictionary<{Entity}Status, List<{Entity}Status>> _allowedTransitions = new()
+          {
+              // 下書き → 提出
+              { {Entity}Status.Draft, new() { {Entity}Status.Submitted } },
+
+              // 提出済み → 承認待ち or キャンセル
+              { {Entity}Status.Submitted, new()
+                  {
+                      {Entity}Status.PendingApproval,
+                      {Entity}Status.Cancelled
+                  }
+              },
+
+              // 承認待ち → 承認済み or 却下
+              { {Entity}Status.PendingApproval, new()
+                  {
+                      {Entity}Status.Approved,
+                      {Entity}Status.Rejected
+                  }
+              },
+
+              // 承認済み → 遷移なし（終端状態）
+              { {Entity}Status.Approved, new() { } },
+
+              // 却下 → 遷移なし（終端状態）
+              { {Entity}Status.Rejected, new() { } },
+
+              // キャンセル → 遷移なし（終端状態）
+              { {Entity}Status.Cancelled, new() { } }
+          };
+
+          public bool CanTransition({Entity}Status from, {Entity}Status to)
+          {
+              return _allowedTransitions.TryGetValue(from, out var allowed) && allowed.Contains(to);
+          }
+
+          public void ValidateTransition({Entity}Status from, {Entity}Status to)
+          {
+              if (!CanTransition(from, to))
+              {
+                  throw new InvalidStateTransitionException(
+                      $"状態遷移が許可されていません: {from} → {to}");
+              }
+          }
+
+          public IEnumerable<{Entity}Status> GetAllowedTransitions({Entity}Status from)
+          {
+              return _allowedTransitions.TryGetValue(from, out var allowed)
+                  ? allowed
+                  : Enumerable.Empty<{Entity}Status>();
+          }
+      }
+
+  # ===== Usage in Aggregate Root =====
+  usage_example:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/{Entity}.cs"
+    template: |
+      using Domain.{BoundedContext}.{Entity}s.StateMachine;
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      /// <summary>
+      /// {Entity}集約ルート
+      ///
+      /// 【パターン: ステートマシン使用例】
+      /// </summary>
+      public class {Entity} : AggregateRoot<Guid>
+      {
+          private readonly {Entity}StateMachine _stateMachine = new();
+
+          public {Entity}Status Status { get; private set; }
+
+          /// <summary>
+          /// 提出
+          /// </summary>
+          public void Submit()
+          {
+              // ステートマシンで状態遷移を検証
+              _stateMachine.ValidateTransition(Status, {Entity}Status.Submitted);
+
+              // ビジネスロジック
+              // ...
+
+              // 状態変更
+              Status = {Entity}Status.Submitted;
+              SubmittedAt = DateTime.UtcNow;
+          }
+
+          /// <summary>
+          /// 承認
+          /// </summary>
+          public void Approve()
+          {
+              _stateMachine.ValidateTransition(Status, {Entity}Status.Approved);
+
+              Status = {Entity}Status.Approved;
+              ApprovedAt = DateTime.UtcNow;
+          }
+
+          /// <summary>
+          /// 却下
+          /// </summary>
+          public void Reject(string reason)
+          {
+              _stateMachine.ValidateTransition(Status, {Entity}Status.Rejected);
+
+              if (string.IsNullOrWhiteSpace(reason))
+                  throw new DomainException("却下理由は必須です");
+
+              Status = {Entity}Status.Rejected;
+              RejectedReason = reason;
+              RejectedAt = DateTime.UtcNow;
+          }
+
+          /// <summary>
+          /// 次に遷移可能な状態を取得
+          /// </summary>
+          public IEnumerable<{Entity}Status> GetAvailableActions()
+          {
+              return _stateMachine.GetAllowedTransitions(Status);
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "複雑な状態遷移ルールがある場合"
+    - "不正な状態遷移を防ぐ必要がある場合"
+    - "ワークフローの状態管理を実装する場合"
+
+  implementation_steps:
+    - step: 1
+      description: "Shared層にIStateMachine, InvalidStateTransitionExceptionを作成（まだなければ）"
+      files: ["IStateMachine.cs", "InvalidStateTransitionException.cs"]
+    - step: 2
+      description: "Domain層にStateMachineフォルダを作成し、{Entity}StateMachineを実装"
+      files: ["{Entity}StateMachine.cs"]
+    - step: 3
+      description: "集約ルートにStateMachineのインスタンスを持たせる"
+      files: ["{Entity}.cs"]
+    - step: 4
+      description: "状態を変更するメソッドでValidateTransition()を呼び出す"
+
+  common_mistakes:
+    - mistake: "集約ルート内に状態遷移ロジックを直接書く"
+      solution: "StateMachineクラスを分離。テスト容易性とSingle Responsibilityを確保。"
+    - mistake: "CanTransition()とValidateTransition()を混同する"
+      solution: "CanTransition()はbool返却、ValidateTransition()は例外スロー。用途に応じて使い分け。"
+    - mistake: "終端状態を定義しない"
+      solution: "Approved, Rejected等の終端状態は空のリスト。明示的に遷移なしを示す。"
+    - mistake: "状態遷移マップを定数で定義しない"
+      solution: "static readonly Dictionaryで定義。実行時に変更されない。"
+
+  key_patterns:
+    - pattern: "Dictionary<TState, List<TState>>"
+      description: "許可された状態遷移をマップで定義。from → toのリスト。"
+    - pattern: "ValidateTransition()"
+      description: "不正な遷移時にInvalidStateTransitionExceptionをスロー。"
+    - pattern: "GetAllowedTransitions()"
+      description: "UI側で次に可能なアクションを表示する際に使用。"
+    - pattern: "終端状態"
+      description: "Approved, Rejected等は空のリスト。これ以上遷移しない。"
+
+  design_decision:
+    when_to_use_state_machine: |
+      ステートマシンを使用すべき条件:
+
+      使用すべき:
+      - 状態が4個以上ある
+      - 状態遷移ルールが複雑（A→B, A→C, B→D, B→E...）
+      - 不正な遷移を厳密に防ぐ必要がある
+      - 承認ワークフロー、注文ライフサイクル
+
+      不要:
+      - 状態が2-3個のみ（Active/Inactive等）
+      - 遷移ルールが単純（一方向のみ）
+      - enum + if文で十分
+
+    testing_strategy: |
+      テスト戦略:
+
+      1. StateMachineの単体テスト:
+         - すべての許可された遷移が成功すること
+         - すべての不正な遷移が例外をスローすること
+         - GetAllowedTransitions()が正しいリストを返すこと
+
+      2. 集約ルートのテスト:
+         - Submit(), Approve()等が正しく状態遷移すること
+         - 不正な順序で呼び出すと例外がスローされること
+
+evidence:
+  shared_layer:
+    interface: "src/Shared/Domain/StateMachine/IStateMachine.cs"
+    exception: "src/Shared/Domain/StateMachine/InvalidStateTransitionException.cs"
+  domain_layer:
+    state_machine: "src/Domain/PurchaseManagement/PurchaseRequests/StateMachine/PurchaseRequestStateMachine.cs"
+    usage: "src/Domain/PurchaseManagement/PurchaseRequests/PurchaseRequest.cs (line 13, 178, 231, 237, 268, 304)"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "PurchaseRequestStateMachineの実装を元にパターン化"
+      - "Dictionary<TState, List<TState>>による状態遷移管理"

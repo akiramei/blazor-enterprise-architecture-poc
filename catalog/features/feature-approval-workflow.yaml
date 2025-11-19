@@ -1,0 +1,636 @@
+id: feature-approval-workflow
+version: 1.0.0
+name: Approval Workflow Feature Slice
+category: feature-slice
+intent: 稟議・申請の承認ワークフローを実装（マルチステップ承認）
+description: |
+  稟議・申請の承認ワークフローを実装する垂直スライス。
+  申請作成 → 承認待ち → 承認/却下 → 完了のライフサイクルを管理。
+  マルチステップ承認（課長 → 部長 → 役員）、承認履歴記録、承認資格チェックを含む。
+
+scope: vertical-slice
+layers:
+  - application
+  - domain
+  - ui
+
+ai_selection_hints:
+  trigger_phrases:
+    - "承認ワークフロー"
+    - "稟議"
+    - "申請・承認"
+    - "マルチステップ承認"
+    - "承認フロー"
+
+  confidence_keywords:
+    high:    ["承認", "稟議", "申請", "ワークフロー", "approval"]
+    medium:  ["承認待ち", "承認者", "承認履歴"]
+    low:     ["フロー", "ステータス"]
+
+  anti_patterns:
+    - "タスク管理"        # 別パターン（Task Management）
+    - "プロセス管理"      # 別パターン（Process Management）
+    - "通知"              # realtime-notification-pattern
+
+  typical_requests:
+    - "購買申請の承認機能を実装してください"
+    - "稟議の承認ワークフローを作りたい"
+    - "経費精算の承認フローを追加して"
+    - "マルチステップ承認を実装したい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 申請・承認のワークフローが必要
+    2. 複数段階の承認（課長 → 部長 → 役員）
+    3. 承認履歴の記録と追跡が必要
+
+    このパターンを選択すべきでない条件:
+    1. 単純な状態管理のみ → domain-state-machine
+    2. タスク管理システム → task-management-pattern
+    3. 単一承認のみ → 簡易版でOK
+
+relationship:
+  contains:
+    - command-pattern
+    - domain-pattern
+    - domain-state-machine
+    - domain-approval-history
+
+  works_with:
+    - transaction-behavior
+    - audit-log-behavior
+    - logging-behavior
+    - realtime-notification-pattern (承認完了通知)
+
+  related_features:
+    - feature-create-entity (申請作成)
+    - feature-update-entity (申請修正)
+    - feature-delete-entity (申請キャンセル)
+
+dependencies:
+  nuget: []
+
+file_structure: |
+  src/Application/Features/
+  ├── Submit{Entity}Request/              # 申請提出
+  │   ├── Submit{Entity}RequestCommand.cs
+  │   └── Submit{Entity}RequestCommandHandler.cs
+  ├── Approve{Entity}Request/             # 承認
+  │   ├── Approve{Entity}RequestCommand.cs
+  │   └── Approve{Entity}RequestCommandHandler.cs
+  └── Reject{Entity}Request/              # 却下
+      ├── Reject{Entity}RequestCommand.cs
+      └── Reject{Entity}RequestCommandHandler.cs
+
+  src/Domain/{BoundedContext}/{Entity}Requests/
+  ├── {Entity}Request.cs                  # 集約ルート
+  ├── {Entity}RequestStatus.cs            # ステータス列挙型
+  ├── ApprovalStep.cs                     # 承認ステップ（エンティティ）
+  ├── ApprovalFlow.cs                     # 承認フロー定義（ValueObject）
+  └── StateMachine/
+      └── {Entity}RequestStateMachine.cs  # 状態遷移ロジック
+
+implementation:
+  # ===== Domain Layer =====
+  aggregate_root:
+    file_path: "src/Domain/{BoundedContext}/{Entity}Requests/{Entity}Request.cs"
+    template: |
+      using Domain.{BoundedContext}.{Entity}Requests.Events;
+      using Domain.{BoundedContext}.{Entity}Requests.StateMachine;
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}Requests;
+
+      /// <summary>
+      /// {Entity}申請（集約ルート）
+      ///
+      /// 【パターン: 承認ワークフロー - 集約ルート】
+      ///
+      /// 責務:
+      /// - 申請のライフサイクル管理
+      /// - 承認フローの実行
+      /// - ビジネスルールの検証
+      /// - ドメインイベントの発行
+      ///
+      /// AI実装時の注意:
+      /// - ステートマシンで状態遷移を検証
+      /// - 承認ステップをコレクションで管理
+      /// - 承認者の資格チェックは外部（Boundary/Service）
+      /// </summary>
+      public class {Entity}Request : AggregateRoot<Guid>, IMultiTenant
+      {
+          private readonly {Entity}RequestStateMachine _stateMachine = new();
+          private readonly List<ApprovalStep> _approvalSteps = new();
+
+          public Guid TenantId { get; private set; }
+          public Guid RequesterId { get; private set; }
+          public string RequesterName { get; private set; } = string.Empty;
+          public string Title { get; private set; } = string.Empty;
+          public string Description { get; private set; } = string.Empty;
+          public {Entity}RequestStatus Status { get; private set; }
+
+          public DateTime CreatedAt { get; private set; }
+          public DateTime? SubmittedAt { get; private set; }
+          public DateTime? ApprovedAt { get; private set; }
+          public DateTime? RejectedAt { get; private set; }
+
+          public IReadOnlyList<ApprovalStep> ApprovalSteps => _approvalSteps.AsReadOnly();
+          public ApprovalStep? CurrentApprovalStep => _approvalSteps.FirstOrDefault(s => s.IsPending);
+
+          private {Entity}Request() { }
+
+          public static {Entity}Request Create(
+              Guid requesterId,
+              string requesterName,
+              string title,
+              string description,
+              Guid tenantId)
+          {
+              if (string.IsNullOrWhiteSpace(title))
+                  throw new DomainException("タイトルは必須です");
+
+              return new {Entity}Request
+              {
+                  Id = Guid.NewGuid(),
+                  RequesterId = requesterId,
+                  RequesterName = requesterName,
+                  Title = title,
+                  Description = description,
+                  TenantId = tenantId,
+                  Status = {Entity}RequestStatus.Draft,
+                  CreatedAt = DateTime.UtcNow
+              };
+          }
+
+          /// <summary>
+          /// 申請提出
+          /// </summary>
+          public void Submit(ApprovalFlow approvalFlow)
+          {
+              _stateMachine.ValidateTransition(Status, {Entity}RequestStatus.Submitted);
+
+              // 承認フローを設定
+              foreach (var step in approvalFlow.Steps)
+              {
+                  _approvalSteps.Add(new ApprovalStep(
+                      step.StepNumber,
+                      step.ApproverId,
+                      step.ApproverName,
+                      step.ApproverRole
+                  ));
+              }
+
+              Status = {Entity}RequestStatus.Submitted;
+              SubmittedAt = DateTime.UtcNow;
+
+              RaiseDomainEvent(new {Entity}RequestSubmittedEvent(
+                  Id, RequesterId, RequesterName, SubmittedAt.Value));
+          }
+
+          /// <summary>
+          /// 承認
+          /// </summary>
+          public void Approve(Guid approverId, string comment)
+          {
+              var currentStep = CurrentApprovalStep;
+              if (currentStep is null)
+                  throw new DomainException("承認待ちのステップがありません");
+
+              if (currentStep.ApproverId != approverId)
+                  throw new DomainException("このステップの承認者ではありません");
+
+              // 承認ステップを完了
+              currentStep.Approve(comment);
+
+              // 次のステップがあるか確認
+              var nextStep = _approvalSteps.FirstOrDefault(s => s.StepNumber == currentStep.StepNumber + 1);
+              if (nextStep is not null)
+              {
+                  // 次の承認ステップへ
+                  Status = GetNextApprovalStatus(nextStep.StepNumber);
+              }
+              else
+              {
+                  // 最終承認完了
+                  _stateMachine.ValidateTransition(Status, {Entity}RequestStatus.Approved);
+                  Status = {Entity}RequestStatus.Approved;
+                  ApprovedAt = DateTime.UtcNow;
+
+                  RaiseDomainEvent(new {Entity}RequestApprovedEvent(
+                      Id, RequesterId, approverId, ApprovedAt.Value));
+              }
+          }
+
+          /// <summary>
+          /// 却下
+          /// </summary>
+          public void Reject(Guid approverId, string reason)
+          {
+              var currentStep = CurrentApprovalStep;
+              if (currentStep is null)
+                  throw new DomainException("承認待ちのステップがありません");
+
+              if (currentStep.ApproverId != approverId)
+                  throw new DomainException("このステップの承認者ではありません");
+
+              currentStep.Reject(reason);
+
+              _stateMachine.ValidateTransition(Status, {Entity}RequestStatus.Rejected);
+              Status = {Entity}RequestStatus.Rejected;
+              RejectedAt = DateTime.UtcNow;
+
+              RaiseDomainEvent(new {Entity}RequestRejectedEvent(
+                  Id, RequesterId, approverId, reason, RejectedAt.Value));
+          }
+
+          private {Entity}RequestStatus GetNextApprovalStatus(int stepNumber)
+          {
+              return stepNumber switch
+              {
+                  1 => {Entity}RequestStatus.PendingFirstApproval,
+                  2 => {Entity}RequestStatus.PendingSecondApproval,
+                  3 => {Entity}RequestStatus.PendingFinalApproval,
+                  _ => throw new DomainException($"無効なステップ番号: {stepNumber}")
+              };
+          }
+      }
+
+  status_enum:
+    file_path: "src/Domain/{BoundedContext}/{Entity}Requests/{Entity}RequestStatus.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Entity}Requests;
+
+      /// <summary>
+      /// {Entity}申請のステータス
+      ///
+      /// 【パターン: ワークフロー状態】
+      /// </summary>
+      public enum {Entity}RequestStatus
+      {
+          /// <summary>下書き（未提出）</summary>
+          Draft = 0,
+
+          /// <summary>申請中（提出済み、承認待ち）</summary>
+          Submitted = 1,
+
+          /// <summary>1次承認待ち</summary>
+          PendingFirstApproval = 2,
+
+          /// <summary>2次承認待ち</summary>
+          PendingSecondApproval = 3,
+
+          /// <summary>最終承認待ち</summary>
+          PendingFinalApproval = 4,
+
+          /// <summary>承認済み</summary>
+          Approved = 5,
+
+          /// <summary>却下</summary>
+          Rejected = 6,
+
+          /// <summary>キャンセル</summary>
+          Cancelled = 7
+      }
+
+  approval_step:
+    file_path: "src/Domain/{BoundedContext}/{Entity}Requests/ApprovalStep.cs"
+    template: |
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}Requests;
+
+      /// <summary>
+      /// 承認ステップ（エンティティ）
+      ///
+      /// 【パターン: 承認履歴】
+      ///
+      /// 責務:
+      /// - 個別の承認ステップの状態管理
+      /// - 承認者情報の保持
+      /// - 承認/却下の記録
+      /// </summary>
+      public class ApprovalStep : Entity
+      {
+          public Guid Id { get; init; }
+          public int StepNumber { get; init; }
+          public Guid ApproverId { get; init; }
+          public string ApproverName { get; init; } = string.Empty;
+          public string ApproverRole { get; init; } = string.Empty;
+          public ApprovalStepStatus Status { get; private set; }
+          public string? Comment { get; private set; }
+          public DateTime? ApprovedAt { get; private set; }
+          public DateTime? RejectedAt { get; private set; }
+
+          public bool IsPending => Status == ApprovalStepStatus.Pending;
+          public bool IsApproved => Status == ApprovalStepStatus.Approved;
+          public bool IsRejected => Status == ApprovalStepStatus.Rejected;
+
+          private ApprovalStep() { }
+
+          public ApprovalStep(int stepNumber, Guid approverId, string approverName, string approverRole)
+          {
+              Id = Guid.NewGuid();
+              StepNumber = stepNumber;
+              ApproverId = approverId;
+              ApproverName = approverName;
+              ApproverRole = approverRole;
+              Status = ApprovalStepStatus.Pending;
+          }
+
+          public void Approve(string comment)
+          {
+              if (Status != ApprovalStepStatus.Pending)
+                  throw new DomainException("このステップは既に処理されています");
+
+              Status = ApprovalStepStatus.Approved;
+              Comment = comment;
+              ApprovedAt = DateTime.UtcNow;
+          }
+
+          public void Reject(string reason)
+          {
+              if (Status != ApprovalStepStatus.Pending)
+                  throw new DomainException("このステップは既に処理されています");
+
+              if (string.IsNullOrWhiteSpace(reason))
+                  throw new DomainException("却下理由は必須です");
+
+              Status = ApprovalStepStatus.Rejected;
+              Comment = reason;
+              RejectedAt = DateTime.UtcNow;
+          }
+      }
+
+      public enum ApprovalStepStatus
+      {
+          Pending = 0,
+          Approved = 1,
+          Rejected = 2
+      }
+
+  approval_flow:
+    file_path: "src/Domain/{BoundedContext}/{Entity}Requests/ApprovalFlow.cs"
+    template: |
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}Requests;
+
+      /// <summary>
+      /// 承認フロー定義（ValueObject）
+      ///
+      /// 【パターン: 承認フロー】
+      ///
+      /// 責務:
+      /// - 承認ステップの定義
+      /// - 承認者の順序決定
+      /// - フロー構造の検証
+      ///
+      /// AI実装時の注意:
+      /// - 金額に応じて承認フローを切り替える
+      /// - 最大5段階までサポート
+      /// - ステップ番号は1から連続
+      /// </summary>
+      public class ApprovalFlow : ValueObject
+      {
+          public IReadOnlyList<ApprovalFlowStep> Steps { get; }
+
+          public ApprovalFlow(IEnumerable<ApprovalFlowStep> steps)
+          {
+              var stepList = steps.ToList();
+
+              if (stepList.Count == 0)
+                  throw new DomainException("承認フローには最低1つのステップが必要です");
+
+              if (stepList.Count > 5)
+                  throw new DomainException("承認フローは最大5段階までです");
+
+              for (int i = 0; i < stepList.Count; i++)
+              {
+                  if (stepList[i].StepNumber != i + 1)
+                      throw new DomainException("承認ステップ番号が連続していません");
+              }
+
+              Steps = stepList.AsReadOnly();
+          }
+
+          protected override IEnumerable<object> GetEqualityComponents()
+          {
+              foreach (var step in Steps)
+                  yield return step;
+          }
+
+          /// <summary>
+          /// 1段階承認フロー（例: 10万円未満）
+          /// </summary>
+          public static ApprovalFlow SingleStep(Guid approverId, string approverName, string approverRole = "Manager")
+          {
+              return new ApprovalFlow(new[]
+              {
+                  new ApprovalFlowStep(1, approverId, approverName, approverRole)
+              });
+          }
+
+          /// <summary>
+          /// 2段階承認フロー（例: 10万円以上50万円未満）
+          /// </summary>
+          public static ApprovalFlow TwoStep(
+              Guid firstApproverId, string firstApproverName,
+              Guid secondApproverId, string secondApproverName)
+          {
+              return new ApprovalFlow(new[]
+              {
+                  new ApprovalFlowStep(1, firstApproverId, firstApproverName, "Manager"),
+                  new ApprovalFlowStep(2, secondApproverId, secondApproverName, "Director")
+              });
+          }
+
+          /// <summary>
+          /// 3段階承認フロー（例: 50万円以上）
+          /// </summary>
+          public static ApprovalFlow ThreeStep(
+              Guid firstApproverId, string firstApproverName,
+              Guid secondApproverId, string secondApproverName,
+              Guid thirdApproverId, string thirdApproverName)
+          {
+              return new ApprovalFlow(new[]
+              {
+                  new ApprovalFlowStep(1, firstApproverId, firstApproverName, "Manager"),
+                  new ApprovalFlowStep(2, secondApproverId, secondApproverName, "Director"),
+                  new ApprovalFlowStep(3, thirdApproverId, thirdApproverName, "Executive")
+              });
+          }
+      }
+
+      public record ApprovalFlowStep(
+          int StepNumber,
+          Guid ApproverId,
+          string ApproverName,
+          string ApproverRole
+      );
+
+  # ===== Application Layer =====
+  approve_command:
+    file_path: "src/Application/Features/Approve{Entity}Request/Approve{Entity}RequestCommand.cs"
+    template: |
+      using MediatR;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Approve{Entity}Request;
+
+      /// <summary>
+      /// {Entity}申請承認コマンド
+      ///
+      /// 【パターン: 承認ワークフロー - Command】
+      /// </summary>
+      public class Approve{Entity}RequestCommand : ICommand<Result<Unit>>
+      {
+          public Guid RequestId { get; init; }
+          public string Comment { get; init; } = string.Empty;
+          public string IdempotencyKey { get; init; } = string.Empty;
+      }
+
+  approve_handler:
+    file_path: "src/Application/Features/Approve{Entity}Request/Approve{Entity}RequestCommandHandler.cs"
+    template: |
+      using Application.Core.Commands;
+      using Domain.{BoundedContext}.{Entity}Requests;
+      using MediatR;
+      using Shared.Application;
+
+      namespace Application.Features.Approve{Entity}Request;
+
+      /// <summary>
+      /// {Entity}申請承認コマンドハンドラー
+      ///
+      /// 【パターン: 承認ワークフロー - Handler】
+      ///
+      /// 処理フロー:
+      /// 1. 申請を取得
+      /// 2. 承認資格チェック（現在の承認者か？）
+      /// 3. 承認処理（Domain層）
+      /// 4. 永続化
+      ///
+      /// AI実装時の注意:
+      /// - 承認者チェックはDomain層で実施
+      /// - 次の承認者への通知は別途（Domain Event Handler）
+      /// - CommandPipeline継承で横断的関心事は自動処理
+      /// </summary>
+      public class Approve{Entity}RequestCommandHandler
+          : CommandPipeline<Approve{Entity}RequestCommand, Unit>
+      {
+          private readonly I{Entity}RequestRepository _repository;
+          private readonly ICurrentUserService _currentUserService;
+
+          public Approve{Entity}RequestCommandHandler(
+              I{Entity}RequestRepository repository,
+              ICurrentUserService currentUserService)
+          {
+              _repository = repository;
+              _currentUserService = currentUserService;
+          }
+
+          protected override async Task<Result<Unit>> ExecuteAsync(
+              Approve{Entity}RequestCommand cmd,
+              CancellationToken ct)
+          {
+              // 1. 申請を取得
+              var request = await _repository.GetByIdAsync(cmd.RequestId, ct);
+              if (request is null)
+                  return Result.Fail<Unit>("{Entity}申請が見つかりません");
+
+              // 2. 承認処理 (ドメインロジック)
+              // 承認者チェックはDomain層のApprove()メソッドで実施
+              request.Approve(_currentUserService.UserId, cmd.Comment);
+
+              // 3. 永続化
+              await _repository.SaveAsync(request, ct);
+
+              return Result.Success(Unit.Value);
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "稟議・申請の承認機能を実装する場合"
+    - "マルチステップ承認（課長 → 部長 → 役員）が必要な場合"
+    - "承認履歴を記録・追跡する場合"
+
+  implementation_steps:
+    - step: 1
+      description: "Domain層に集約ルート、ステータス、承認ステップ、承認フローを作成"
+      files: ["{Entity}Request.cs", "{Entity}RequestStatus.cs", "ApprovalStep.cs", "ApprovalFlow.cs"]
+    - step: 2
+      description: "StateMachine を作成（domain-state-machine パターン）"
+      files: ["{Entity}RequestStateMachine.cs"]
+    - step: 3
+      description: "Application層に Submit, Approve, Reject Command/Handler を作成"
+      files: ["SubmitCommand.cs", "ApproveCommand.cs", "RejectCommand.cs"]
+    - step: 4
+      description: "承認フロー決定サービスを作成（金額に応じた承認者割当）"
+
+  common_mistakes:
+    - mistake: "承認者チェックをApplication層で実施する"
+      solution: "承認者チェックはDomain層（Approve()メソッド）で実施。ビジネスルールはドメインに集約。"
+    - mistake: "承認履歴を別テーブルで管理する"
+      solution: "ApprovalStepは集約の一部（コレクション）として管理。1トランザクションで整合性保証。"
+    - mistake: "状態遷移を検証しない"
+      solution: "StateMachineパターンで状態遷移を検証。不正な遷移はDomainExceptionをスロー。"
+    - mistake: "承認完了を同期的に通知する"
+      solution: "Domain Eventを発行し、Event Handlerで非同期通知。承認処理と通知を分離。"
+
+  key_patterns:
+    - pattern: "集約ルート"
+      description: "{Entity}Requestが集約ルート。ApprovalStepは内部エンティティ。"
+    - pattern: "ステートマシン"
+      description: "状態遷移ルールを厳密に定義。不正な遷移を防止。"
+    - pattern: "承認フロー"
+      description: "ApprovalFlowで承認者の順序を定義。金額に応じて切り替え。"
+    - pattern: "承認履歴"
+      description: "ApprovalStepで承認/却下の履歴を記録。誰が・いつ・何をしたか。"
+    - pattern: "Domain Event"
+      description: "承認完了/却下時にイベント発行。通知・後続処理を分離。"
+
+  design_decision:
+    approval_flow_strategy: |
+      承認フロー決定戦略:
+
+      1. 金額ベース:
+         - 10万円未満: 1段階承認（課長）
+         - 10万円以上50万円未満: 2段階承認（課長 → 部長）
+         - 50万円以上: 3段階承認（課長 → 部長 → 役員）
+
+      2. 部門ベース:
+         - 営業部: 営業課長 → 営業部長
+         - 開発部: 開発課長 → 開発部長 → CTO
+
+      3. カスタマイズ:
+         - ApprovalFlowServiceで動的に決定
+         - テナントごとに異なるフローも可能
+
+    approval_eligibility: |
+      承認資格チェック:
+
+      推奨: Boundaryパターンで分離
+      - Domain層: 現在の承認者かチェック（ApproverId一致）
+      - Boundary層: 承認資格チェック（権限、組織、代理承認）
+
+      複雑なチェックはBoundaryで実施し、結果をDomainに渡す。
+
+evidence:
+  domain_layer:
+    aggregate: "src/Domain/PurchaseManagement/PurchaseRequests/PurchaseRequest.cs"
+    status: "src/Domain/PurchaseManagement/PurchaseRequests/PurchaseRequestStatus.cs"
+    approval_step: "src/Domain/PurchaseManagement/PurchaseRequests/ApprovalStep.cs"
+    approval_flow: "src/Domain/PurchaseManagement/PurchaseRequests/ApprovalFlow.cs"
+  application_layer:
+    approve_command: "src/Application/Features/ApprovePurchaseRequest/ApprovePurchaseRequestCommand.cs"
+    approve_handler: "src/Application/Features/ApprovePurchaseRequest/ApprovePurchaseRequestCommandHandler.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "PurchaseRequestの承認ワークフロー実装を元にパターン化"
+      - "マルチステップ承認、承認履歴、状態遷移管理を含む"
