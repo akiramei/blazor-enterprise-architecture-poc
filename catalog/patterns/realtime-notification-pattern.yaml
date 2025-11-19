@@ -1,0 +1,385 @@
+id: realtime-notification-pattern
+version: 1.0.0
+name: Real-time Notification Pattern (SignalR)
+category: ui-pattern
+intent: SignalRを使用したリアルタイム通知でUI自動更新を実現
+description: |
+  SignalR Hubを使用して、サーバー側のデータ変更を全クライアントにリアルタイム通知するパターン。
+  CRUD操作後に他のユーザーの画面を自動更新し、データの一貫性を保つ。
+  Command実行後に通知サービスを呼び出すことで実現。
+
+scope: infrastructure-pattern
+layers:
+  - application
+  - ui
+
+ai_selection_hints:
+  trigger_phrases:
+    - "リアルタイム通知"
+    - "他のユーザーに通知"
+    - "画面を自動更新"
+    - "SignalR"
+    - "リアルタイム更新"
+
+  confidence_keywords:
+    high:    ["SignalR", "リアルタイム", "通知", "自動更新", "リアルタイム通知"]
+    medium:  ["通知", "更新通知", "他のユーザー"]
+    low:     ["画面更新", "自動"]
+
+  anti_patterns:
+    - "メール通知"        # 別パターン（Email Notification）
+    - "プッシュ通知"      # 別パターン（Push Notification）
+    - "アラート"          # 別パターン（Alert/Toast）
+
+  typical_requests:
+    - "商品を更新したら他のユーザーの画面も更新したい"
+    - "SignalRで通知を送りたい"
+    - "リアルタイムで一覧を同期させたい"
+    - "他のユーザーが編集中であることを通知したい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. データ変更を他のユーザーにリアルタイム通知したい
+    2. 複数ユーザーが同じ画面を見ている可能性がある
+    3. 画面の自動更新が必要
+
+    このパターンを選択すべきでない条件:
+    1. メール通知 → email-notification-pattern
+    2. プッシュ通知 → push-notification-pattern
+    3. 単一ユーザー環境 → 不要
+
+relationship:
+  works_with:
+    - feature-create-entity
+    - feature-update-entity
+    - feature-delete-entity
+    - feature-import-csv
+    - feature-export-csv
+
+  dependencies:
+    - Microsoft.AspNetCore.SignalR
+    - IHubContext<THub, TClient>
+
+file_structure: |
+  src/Application/Hubs/
+  ├── ProductHub.cs                          # SignalR Hub
+  └── IProductHubClient.cs                   # クライアント側メソッド定義
+
+  src/Application/Services/
+  └── ProductNotificationService.cs          # 通知サービス実装
+
+  src/Shared/Application/Interfaces/
+  └── IProductNotificationService.cs         # 通知サービスインターフェース
+
+  src/Application/Program.cs                 # SignalR登録
+
+implementation:
+  # ===== Application Layer (Hub) =====
+  hub:
+    file_path: "src/Application/Hubs/{Entity}Hub.cs"
+    template: |
+      using Microsoft.AspNetCore.SignalR;
+
+      namespace Application.Hubs;
+
+      /// <summary>
+      /// {Entity}通知用 SignalR Hub
+      ///
+      /// 【パターン: SignalR Hub】
+      ///
+      /// 責務:
+      /// - クライアント接続/切断管理
+      /// - 全クライアントへのブロードキャスト
+      /// - 特定グループへの通知（オプション）
+      ///
+      /// AI実装時の注意:
+      /// - Hub<T> を継承（T はクライアント側メソッド定義）
+      /// - OnConnectedAsync/OnDisconnectedAsync でログ出力
+      /// - Clients.All で全クライアント、Clients.Group で特定グループ
+      /// </summary>
+      public sealed class {Entity}Hub : Hub<I{Entity}HubClient>
+      {
+          private readonly ILogger<{Entity}Hub> _logger;
+
+          public {Entity}Hub(ILogger<{Entity}Hub> logger)
+          {
+              _logger = logger;
+          }
+
+          public override async Task OnConnectedAsync()
+          {
+              _logger.LogInformation("クライアントが接続しました: {ConnectionId}", Context.ConnectionId);
+              await base.OnConnectedAsync();
+          }
+
+          public override async Task OnDisconnectedAsync(Exception? exception)
+          {
+              _logger.LogInformation("クライアントが切断: {ConnectionId}, 理由: {Exception}",
+                  Context.ConnectionId,
+                  exception?.Message ?? "正常切断");
+              await base.OnDisconnectedAsync(exception);
+          }
+
+          /// <summary>
+          /// すべてのクライアントに{Entity}変更を通知
+          /// </summary>
+          public async Task Notify{Entity}Changed()
+          {
+              _logger.LogInformation("{Entity}変更を全クライアントに送信: {ConnectionId}", Context.ConnectionId);
+              await Clients.All.{Entity}Changed();
+          }
+      }
+
+  hub_client_interface:
+    file_path: "src/Application/Hubs/I{Entity}HubClient.cs"
+    template: |
+      namespace Application.Hubs;
+
+      /// <summary>
+      /// SignalR クライアント用のメソッド定義
+      ///
+      /// 【パターン: SignalR クライアントインターフェース】
+      ///
+      /// 責務:
+      /// - クライアント側が実装すべきメソッドを定義
+      /// - サーバー側からの通知メソッド
+      ///
+      /// AI実装時の注意:
+      /// - メソッド名はクライアント側のJavaScript関数名と一致させる
+      /// - すべて Task を返す（非同期）
+      /// - パラメータはJSON Serializableな型のみ
+      /// </summary>
+      public interface I{Entity}HubClient
+      {
+          /// <summary>
+          /// {Entity}が変更されたことを通知し、他のユーザーの画面を更新する
+          /// </summary>
+          Task {Entity}Changed();
+      }
+
+  # ===== Application Layer (Service) =====
+  notification_service:
+    file_path: "src/Application/Services/{Entity}NotificationService.cs"
+    template: |
+      using Microsoft.AspNetCore.SignalR;
+      using Shared.Application.Interfaces;
+      using Application.Hubs;
+
+      namespace Application.Services;
+
+      /// <summary>
+      /// SignalRを使用した{Entity}変更通知サービス
+      ///
+      /// 【パターン: 通知サービス】
+      ///
+      /// 責務:
+      /// - IHubContext経由でSignalR通知を送信
+      /// - Command実行後に他のユーザーへ通知
+      ///
+      /// AI実装時の注意:
+      /// - IHubContext<THub, TClient>をDI
+      /// - Clients.All で全クライアント通知
+      /// - Clients.Group(groupName) で特定グループ通知
+      /// - Clients.AllExcept(connectionId) で特定クライアント除外
+      /// </summary>
+      public sealed class {Entity}NotificationService : I{Entity}NotificationService
+      {
+          private readonly IHubContext<{Entity}Hub, I{Entity}HubClient> _hubContext;
+          private readonly ILogger<{Entity}NotificationService> _logger;
+
+          public {Entity}NotificationService(
+              IHubContext<{Entity}Hub, I{Entity}HubClient> hubContext,
+              ILogger<{Entity}NotificationService> logger)
+          {
+              _hubContext = hubContext;
+              _logger = logger;
+          }
+
+          public async Task Notify{Entity}ChangedAsync(CancellationToken cancellationToken = default)
+          {
+              _logger.LogInformation("{Entity}変更を全クライアントに通知");
+              await _hubContext.Clients.All.{Entity}Changed();
+          }
+      }
+
+  notification_service_interface:
+    file_path: "src/Shared/Application/Interfaces/I{Entity}NotificationService.cs"
+    template: |
+      namespace Shared.Application.Interfaces;
+
+      /// <summary>
+      /// {Entity}変更通知サービス（リアルタイム更新通知）
+      ///
+      /// 【パターン: 通知サービスインターフェース】
+      ///
+      /// 責務:
+      /// - {Entity}データ変更を他のユーザーに通知
+      ///
+      /// 使用シナリオ:
+      /// - Create{Entity}Command実行後
+      /// - Update{Entity}Command実行後
+      /// - Delete{Entity}Command実行後
+      /// </summary>
+      public interface I{Entity}NotificationService
+      {
+          /// <summary>
+          /// {Entity}が変更されたことを全クライアントに通知
+          /// </summary>
+          Task Notify{Entity}ChangedAsync(CancellationToken cancellationToken = default);
+      }
+
+  # ===== Handler Integration =====
+  handler_integration:
+    file_path: "src/Application/Features/Update{Entity}/Update{Entity}CommandHandler.cs"
+    template: |
+      using Application.Core.Commands;
+      using Domain.{BoundedContext}.{Entity}s;
+      using MediatR;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Update{Entity};
+
+      public class Update{Entity}CommandHandler
+          : CommandPipeline<Update{Entity}Command, Unit>
+      {
+          private readonly I{Entity}Repository _repository;
+          private readonly I{Entity}NotificationService _notificationService;
+
+          public Update{Entity}CommandHandler(
+              I{Entity}Repository repository,
+              I{Entity}NotificationService notificationService)
+          {
+              _repository = repository;
+              _notificationService = notificationService;
+          }
+
+          protected override async Task<Result<Unit>> ExecuteAsync(
+              Update{Entity}Command cmd,
+              CancellationToken ct)
+          {
+              // 1. エンティティ取得・更新
+              var entity = await _repository.GetAsync(new {Entity}Id(cmd.{Entity}Id), ct);
+              if (entity is null)
+                  return Result.Fail<Unit>("{Entity}が見つかりません");
+
+              entity.Update(/* ... */);
+              await _repository.SaveAsync(entity, ct);
+
+              // 2. 他のユーザーに通知（非同期・エラーは無視）
+              try
+              {
+                  await _notificationService.Notify{Entity}ChangedAsync(ct);
+              }
+              catch (Exception ex)
+              {
+                  // 通知失敗はビジネス処理に影響しない（警告ログのみ）
+                  _logger.LogWarning(ex, "SignalR通知に失敗しました");
+              }
+
+              return Result.Success(Unit.Value);
+          }
+      }
+
+  # ===== Program.cs Registration =====
+  program_registration:
+    file_path: "src/Application/Program.cs"
+    template: |
+      // SignalR 登録
+      builder.Services.AddSignalR();
+
+      // 通知サービス登録
+      builder.Services.AddScoped<IProductNotificationService, ProductNotificationService>();
+
+      // --- app.Build() ---
+
+      // SignalR Hub エンドポイント
+      app.MapHub<ProductHub>("/hubs/product");
+
+ai_guidance:
+  when_to_use:
+    - "データ変更を他のユーザーにリアルタイム通知したい場合"
+    - "複数ユーザーが同じ画面を見ている可能性がある場合"
+    - "画面の自動更新が必要な場合（在庫数、注文数など）"
+
+  implementation_steps:
+    - step: 1
+      description: "Hub, IHubClient インターフェースを Application/Hubs に作成"
+      files: ["{Entity}Hub.cs", "I{Entity}HubClient.cs"]
+    - step: 2
+      description: "NotificationService と Interface を作成"
+      files: ["{Entity}NotificationService.cs", "I{Entity}NotificationService.cs"]
+    - step: 3
+      description: "Program.cs に SignalR 登録とHub エンドポイント追加"
+      files: ["Program.cs"]
+    - step: 4
+      description: "Command Handler から NotificationService を呼び出す"
+      files: ["Update{Entity}CommandHandler.cs", "Create{Entity}CommandHandler.cs", "Delete{Entity}CommandHandler.cs"]
+    - step: 5
+      description: "クライアント側（Blazor/JavaScript）でSignalR接続・受信処理を実装"
+
+  common_mistakes:
+    - mistake: "通知失敗でビジネス処理を失敗させる"
+      solution: "通知失敗は警告ログのみ出力し、ビジネス処理には影響しない。try-catchでラップする。"
+    - mistake: "Hub にビジネスロジックを書く"
+      solution: "Hub は通信のみ担当。ビジネスロジックは Handler に書く。"
+    - mistake: "自分自身にも通知を送る"
+      solution: "必要に応じて Clients.AllExcept(Context.ConnectionId) を使用して自分を除外する。"
+    - mistake: "クライアント側のメソッド名が一致しない"
+      solution: "I{Entity}HubClient のメソッド名とクライアント側のJavaScript関数名を一致させる（大文字小文字区別あり）。"
+
+  key_patterns:
+    - pattern: "Hub<TClient> パターン"
+      description: "強く型付けされたクライアントメソッド。コンパイル時に型チェック可能。"
+    - pattern: "IHubContext<THub, TClient>"
+      description: "Hub外部（Service）からSignalR通知を送信するためのコンテキスト。"
+    - pattern: "Clients.All"
+      description: "全クライアントに通知。複数ユーザー環境で画面同期に使用。"
+    - pattern: "通知エラー分離"
+      description: "通知失敗はビジネス処理に影響しない。警告ログのみ出力。"
+
+  design_decision:
+    notification_scope: |
+      通知スコープの選択:
+
+      1. Clients.All（全クライアント）:
+         - 使用ケース: 全ユーザーに影響するデータ変更（商品マスタ、価格変更）
+         - メリット: 実装が簡単
+         - デメリット: 無関係なユーザーにも通知される
+
+      2. Clients.Group(groupName)（特定グループ）:
+         - 使用ケース: テナント別、部門別のデータ変更
+         - メリット: 関係者のみに通知
+         - デメリット: グループ管理が必要（OnConnectedAsync でグループ追加）
+
+      3. Clients.User(userId)（特定ユーザー）:
+         - 使用ケース: 個人向け通知（承認完了、タスク割当）
+         - メリット: プライバシー保護
+         - デメリット: ユーザーIDマッピングが必要
+
+    error_handling: |
+      通知エラーハンドリング:
+
+      推奨: try-catch でラップし、警告ログのみ出力
+      - 通知失敗はビジネス処理に影響しない
+      - SignalR接続エラーでトランザクションをロールバックしない
+      - クライアント側でポーリング等のフォールバック機能を用意
+
+evidence:
+  application_layer:
+    hub: "src/Application/Hubs/ProductHub.cs"
+    hub_client: "src/Application/Hubs/IProductHubClient.cs"
+    service: "src/Application/Services/ProductNotificationService.cs"
+    interface: "src/Shared/Application/Interfaces/IProductNotificationService.cs"
+  handler_integration:
+    create: "src/Application/Features/CreateProduct/CreateProductCommandHandler.cs"
+    update: "src/Application/Features/UpdateProduct/UpdateProductCommandHandler.cs"
+    delete: "src/Application/Features/DeleteProduct/DeleteProductCommandHandler.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "ProductNotificationServiceの実装を元にパターン化"
+      - "SignalR Hubパターンの標準化"

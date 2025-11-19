@@ -105,6 +105,17 @@
       "stability": "stable"
     },
     {
+      "id": "audit-log-behavior",
+      "name": "AuditLogBehavior",
+      "category": "pipeline-behavior",
+      "version": "1.0.0",
+      "order_hint": 550,
+      "file": "patterns/audit-log-behavior.yaml",
+      "intent": "Command実行の監査ログを自動記録（操作履歴・変更履歴）",
+      "tags": ["audit-log", "compliance", "security", "tracking"],
+      "stability": "stable"
+    },
+    {
       "id": "query-get-list",
       "name": "GetListQuery Pattern",
       "category": "query-pattern",
@@ -222,6 +233,16 @@
       "tags": ["ui", "orchestration", "pageactions", "blazor"],
       "stability": "stable",
       "layer": "UI"
+    },
+    {
+      "id": "realtime-notification-pattern",
+      "name": "Real-time Notification Pattern (SignalR)",
+      "category": "ui-pattern",
+      "version": "1.0.0",
+      "file": "patterns/realtime-notification-pattern.yaml",
+      "intent": "SignalRを使用したリアルタイム通知でUI自動更新を実現",
+      "tags": ["signalr", "realtime", "notification", "ui-sync", "blazor"],
+      "stability": "stable"
     }
   ],
   "recommended_combinations": [
