@@ -1,0 +1,226 @@
+id: feature-export-csv
+version: 1.0.0
+name: CSV Export Feature Slice
+category: feature-slice
+intent: 検索条件に基づいたデータをCSV形式でエクスポートする機能
+description: |
+  検索条件に一致するデータをCSVファイルとしてダウンロードする機能の垂直スライス。
+  Query、Handler、CsvHelperによる生成ロジックを含みます。
+  大量データのメモリ枯渇を防ぐための上限設定や、Excel対応（UTF-8 BOM）を考慮しています。
+
+scope: vertical-slice
+layers:
+  - application
+  - ui
+
+ai_selection_hints:
+  trigger_phrases:
+    - "CSVエクスポート"
+    - "CSV出力"
+    - "データをダウンロード"
+    - "Excelで開けるように"
+    - "一覧をCSVで"
+
+  confidence_keywords:
+    high:    ["CSV", "エクスポート", "出力", "ダウンロード"]
+    medium:  ["Excel", "一覧", "保存"]
+    low:     ["ファイル"]
+
+  anti_patterns:
+    - "インポート"
+    - "取り込み"
+    - "アップロード"
+
+  typical_requests:
+    - "商品一覧をCSVでダウンロードできるようにしてください"
+    - "検索結果をExcelで開けるCSVとして出力したい"
+    - "売上データをCSVエクスポートする機能を追加して"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. データをCSV形式でファイルとして取得したい
+    2. 検索条件に基づいたフィルタリングが必要
+    3. Excelでの閲覧を想定している（BOM付きUTF-8）
+
+    このパターンを選択すべきでない条件:
+    1. データの取り込み（インポート） → feature-import-csv (未実装)
+    2. PDF出力 → 別パターン
+    3. 画面表示のみ → feature-search-entity
+
+relationship:
+  contains:
+    - query-pattern
+    - handler-pattern
+
+  works_with:
+    - feature-search-entity (検索条件の共有)
+    - logging-behavior
+
+  related_features:
+    - feature-search-entity
+    - feature-import-csv
+
+dependencies:
+  nuget:
+    - CsvHelper: "^30.0.0"
+
+file_structure: |
+  src/Application/Features/Export{Entity}sToCsv/
+  ├── Export{Entity}sToCsvQuery.cs         # Query定義
+  ├── Export{Entity}sToCsvQueryHandler.cs  # Handler実装 (CSV生成ロジック含む)
+  └── {Entity}CsvDto.cs                    # CSV出力用DTO
+
+implementation:
+  # ===== Application Layer =====
+  query:
+    file_path: "src/Application/Features/Export{Entity}sToCsv/Export{Entity}sToCsvQuery.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+      using {BoundedContext}.Shared.Domain.{Entity}s; // 必要に応じて調整
+
+      namespace Application.Features.Export{Entity}sToCsv;
+
+      /// <summary>
+      /// {Entity}一覧CSV エクスポートクエリ
+      ///
+      /// 【パターン: CSVエクスポート - Query】
+      ///
+      /// 使用シナリオ:
+      /// - {Entity}一覧をCSV形式でダウンロード
+      /// - 検索条件に一致する{Entity}のみをエクスポート
+      ///
+      /// AI実装時の注意:
+      /// - 検索条件は Search{Entity}sQuery と同じパラメータを受け取ることを推奨
+      /// - 戻り値は byte[] (CSVファイルのバイナリデータ)
+      /// </summary>
+      public record Export{Entity}sToCsvQuery : IQuery<Result<byte[]>>
+      {
+          // 検索条件プロパティをここに定義
+          public string? Keyword { get; init; }
+          // public {Entity}Status? Status { get; init; }
+      }
+
+  dto:
+    file_path: "src/Application/Features/Export{Entity}sToCsv/{Entity}CsvDto.cs"
+    template: |
+      using CsvHelper.Configuration.Attributes;
+
+      namespace Application.Features.Export{Entity}sToCsv;
+
+      /// <summary>
+      /// CSV出力用DTO
+      /// </summary>
+      public record {Entity}CsvDto
+      {
+          [Name("ID")]
+          [Index(0)]
+          public string Id { get; init; } = default!;
+
+          [Name("名称")]
+          [Index(1)]
+          public string Name { get; init; } = default!;
+
+          // その他のプロパティ
+      }
+
+  handler:
+    file_path: "src/Application/Features/Export{Entity}sToCsv/Export{Entity}sToCsvQueryHandler.cs"
+    template: |
+      using System.Globalization;
+      using System.Text;
+      using CsvHelper;
+      using CsvHelper.Configuration;
+      using Shared.Application;
+      using Application.Core.Queries;
+      // using {BoundedContext}.Shared.Application; // ReadRepository用
+
+      namespace Application.Features.Export{Entity}sToCsv;
+
+      /// <summary>
+      /// {Entity}CSV エクスポートハンドラ
+      ///
+      /// 【パターン: CSVエクスポート - Handler】
+      ///
+      /// 実装ガイド:
+      /// - ReadRepository でデータを取得
+      /// - CsvHelper でCSVを生成
+      /// - MemoryStream を使用してインメモリでCSV生成
+      /// - UTF-8 with BOM でエンコード（Excel対応）
+      /// </summary>
+      public class Export{Entity}sToCsvQueryHandler : QueryPipeline<Export{Entity}sToCsvQuery, byte[]>
+      {
+          // private readonly I{Entity}ReadRepository _readRepository;
+          private const int MaxExportCount = 10000;
+
+          public Export{Entity}sToCsvQueryHandler(/* I{Entity}ReadRepository readRepository */)
+          {
+              // _readRepository = readRepository;
+          }
+
+          protected override async Task<Result<byte[]>> ExecuteAsync(
+              Export{Entity}sToCsvQuery query,
+              CancellationToken ct)
+          {
+              // 1. データ取得 (検索条件適用、上限チェック)
+              // var items = await _readRepository.SearchAsync(query..., limit: MaxExportCount + 1);
+
+              // 2. 上限チェック
+              // if (items.Count > MaxExportCount) return Result.Fail...
+
+              // 3. DTO変換
+              // var csvData = items.Select(x => new {Entity}CsvDto { ... }).ToList();
+              var csvData = new List<{Entity}CsvDto>(); // ダミー
+
+              // 4. CSV生成
+              var csvBytes = GenerateCsv(csvData);
+
+              return Result.Success(csvBytes);
+          }
+
+          private byte[] GenerateCsv(List<{Entity}CsvDto> data)
+          {
+              using var memoryStream = new MemoryStream();
+              using var streamWriter = new StreamWriter(memoryStream, new UTF8Encoding(true)); // UTF-8 with BOM
+              using var csvWriter = new CsvWriter(streamWriter, new CsvConfiguration(CultureInfo.GetCultureInfo("ja-JP"))
+              {
+                  HasHeaderRecord = true,
+              });
+
+              csvWriter.WriteRecords(data);
+              streamWriter.Flush();
+
+              return memoryStream.ToArray();
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "一覧画面にエクスポート機能を追加する場合"
+    - "データを二次利用のためにダウンロードしたい場合"
+
+  implementation_steps:
+    - step: 1
+      description: "Query, Handler, Dto を Features フォルダに作成"
+      files: ["Export{Entity}sToCsvQuery.cs", "Export{Entity}sToCsvQueryHandler.cs", "{Entity}CsvDto.cs"]
+    - step: 2
+      description: "UI側（PageActionsなど）から呼び出し処理を追加"
+
+  common_mistakes:
+    - mistake: "BOMなしUTF-8で出力する"
+      solution: "Excelで文字化けするため、必ず `new UTF8Encoding(true)` を使用する"
+    - mistake: "全件取得でメモリ不足になる"
+      solution: "必ず上限件数（例: 10,000件）を設定するか、ストリーム処理を検討する"
+
+evidence:
+  application_layer:
+    query: "src/Application/Features/ExportProductsToCsv/ExportProductsToCsvQuery.cs"
+    handler: "src/Application/Features/ExportProductsToCsv/ExportProductsToCsvQueryHandler.cs"
+    dto: "src/Application/Features/ExportProductsToCsv/ProductCsvDto.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "ExportProductsToCsvの実装を元にパターン化"

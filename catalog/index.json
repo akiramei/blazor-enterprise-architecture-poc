@@ -147,6 +147,17 @@
       "scope": "vertical-slice"
     },
     {
+      "id": "feature-export-csv",
+      "name": "CSV Export Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-export-csv.yaml",
+      "intent": "検索条件に基づいたデータをCSV形式でエクスポートする機能",
+      "tags": ["feature-slice", "csv", "export", "download"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
       "id": "layer-store",
       "name": "Store Pattern (State Management + I/O)",
       "category": "layer-element",
