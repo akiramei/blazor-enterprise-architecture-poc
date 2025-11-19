@@ -1,8 +1,101 @@
 # Pattern Catalog
 
+**v2025.11.19 - 20パターン実装済み**
+
 このディレクトリは、業務アプリケーション開発で再利用可能なパターンのカタログです。
 
 AIエージェント（Claude、ChatGPT等）が参照して、一貫性のあるコードを生成できるように設計されています。
+
+---
+
+## 📊 カタログ概要
+
+### パターン統計（v2025.11.19）
+
+| カテゴリ | パターン数 | 説明 |
+|---------|----------|------|
+| **Pipeline Behaviors** | 7 | 横断的関心事（自動実行） |
+| **Feature Slices** | 8 | 垂直スライス（完全な機能） |
+| **Domain Patterns** | 2 | ドメインパターン |
+| **Query Patterns** | 1 | データ取得パターン |
+| **Command Patterns** | 1 | データ変更パターン |
+| **Layer Elements** | 2 | レイヤー要素 |
+| **UI Patterns** | 1 | UI実装パターン |
+| **合計** | **20** | |
+
+### Phase別実装状況
+
+- ✅ **Phase 1**: CRUD完成（Update, Delete）
+- ✅ **Phase 2**: データ連携（CSV Import, File Upload）
+- ✅ **Phase 3**: 監査・通知（Audit Log, SignalR Notification）
+- ✅ **Phase 4**: 承認ワークフロー（Approval Workflow, State Machine, Approval History）
+
+---
+
+## 📖 パターン一覧
+
+### 🔄 Pipeline Behaviors（横断的関心事）
+
+実行順序（`order_hint`）に従って自動実行されるパイプライン処理。
+
+| ID | パターン名 | 順序 | 目的 | 安定性 |
+|---|----------|-----|------|-------|
+| `metrics-behavior` | MetricsBehavior | 50 | ビジネスメトリクス・パフォーマンスメトリクス自動収集 | stable |
+| `validation-behavior` | ValidationBehavior | 100 | FluentValidation による入力検証を自動実行 | stable |
+| `authorization-behavior` | AuthorizationBehavior | 200 | ロールベース認可チェックを自動実行 | stable |
+| `idempotency-behavior` | IdempotencyBehavior | 300 | Command の冪等性を保証し、重複実行を防止 | beta |
+| `transaction-behavior` | TransactionBehavior | 400 | Command を単一トランザクションで実行、エラー時自動ロールバック | stable |
+| `audit-log-behavior` | AuditLogBehavior | 550 | Command実行の監査ログを自動記録（操作履歴・変更履歴） | stable |
+| `logging-behavior` | LoggingBehavior | 600 | すべての Command/Query のログ出力 | stable |
+
+### 🎯 Feature Slices（垂直スライス）
+
+完全な機能実装（Application + UI + API）。
+
+| ID | パターン名 | 目的 | 安定性 |
+|---|----------|------|-------|
+| `feature-create-entity` | Create Entity Feature Slice | エンティティ作成の完全な垂直スライス | stable |
+| `feature-search-entity` | Search Entity Feature Slice | エンティティ検索・フィルタリング・ページングの完全な垂直スライス | stable |
+| `feature-export-csv` | CSV Export Feature Slice | 検索条件に基づいたデータをCSV形式でエクスポート | stable |
+| `feature-update-entity` | Update Entity Feature Slice | エンティティ更新（楽観的排他制御・冪等性保証） | stable |
+| `feature-delete-entity` | Delete Entity Feature Slice | エンティティ削除（論理削除 or 物理削除） | stable |
+| `feature-import-csv` | CSV Import Feature Slice | CSVファイルからデータを一括インポート | stable |
+| `feature-file-upload` | File Upload Feature Slice | ファイルアップロード（添付ファイル・画像アップロード） | stable |
+| `feature-approval-workflow` | Approval Workflow Feature Slice | 稟議・申請の承認ワークフロー（マルチステップ承認） | stable |
+
+### 🏛️ Domain Patterns（ドメインパターン）
+
+ドメイン層の実装パターン。
+
+| ID | パターン名 | 目的 | 安定性 |
+|---|----------|------|-------|
+| `domain-state-machine` | State Machine Pattern | ステートマシンによる状態遷移管理（不正な遷移を防止） | stable |
+| `domain-approval-history` | Approval History Pattern | 承認履歴を記録・追跡（誰が・いつ・何を承認/却下したか） | stable |
+
+### 🔍 Query Patterns（データ取得）
+
+| ID | パターン名 | 目的 | 安定性 |
+|---|----------|------|-------|
+| `query-get-list` | GetListQuery Pattern | 全件取得クエリ（キャッシュ対応） | stable |
+
+### ✏️ Command Patterns（データ変更）
+
+| ID | パターン名 | 目的 | 安定性 |
+|---|----------|------|-------|
+| `command-create` | CreateCommand Pattern | 新規エンティティ作成コマンド | stable |
+
+### 📦 Layer Elements（レイヤー要素）
+
+| ID | パターン名 | 目的 | レイヤー | 安定性 |
+|---|----------|------|---------|-------|
+| `layer-store` | Store Pattern | UI層の状態管理とI/Oを担当 | UI | stable |
+| `layer-pageactions` | PageActions Pattern | UI手順のオーケストレーションを担当 | UI | stable |
+
+### 🎨 UI Patterns（UI実装パターン）
+
+| ID | パターン名 | 目的 | 安定性 |
+|---|----------|------|-------|
+| `realtime-notification-pattern` | Real-time Notification Pattern (SignalR) | SignalRを使用したリアルタイム通知でUI自動更新 | stable |
 
 ---
 
@@ -12,16 +105,24 @@ AIエージェント（Claude、ChatGPT等）が参照して、一貫性のあ�
 catalog/
 ├── README.md                         # このファイル
 ├── AI_USAGE_GUIDE.md                 # AI向けの利用ガイド
-├── index.json                        # パターンカタログの索引
-└── patterns/                         # 個別パターン定義（YAML）
-    ├── validation-behavior.yaml
-    ├── transaction-behavior.yaml
-    ├── authorization-behavior.yaml
-    ├── logging-behavior.yaml
-    ├── metrics-behavior.yaml
-    ├── idempotency-behavior.yaml
-    ├── query-get-list.yaml
-    └── command-create.yaml
+├── PATTERN_SELECTION_GUIDE.md        # パターン選択ガイド
+├── DECISION_FLOWCHART.md             # 意思決定フローチャート
+├── index.json                        # パターンカタログの索引（マスターファイル）
+├── patterns/                         # Pipeline Behaviors, Domain Patterns等
+│   ├── validation-behavior.yaml
+│   ├── transaction-behavior.yaml
+│   ├── audit-log-behavior.yaml
+│   ├── domain-state-machine.yaml
+│   └── ...
+├── features/                         # Feature Slices（垂直スライス）
+│   ├── feature-create-entity.yaml
+│   ├── feature-approval-workflow.yaml
+│   └── ...
+├── layers/                           # Layer Elements（レイヤー要素）
+│   ├── layer-store.yaml
+│   └── layer-pageactions.yaml
+├── behaviors/                        # Pipeline Behaviors（シンボリックリンク）
+└── domain-patterns/                  # Domain Patterns（シンボリックリンク）
 ```
 
 ---
@@ -35,12 +136,14 @@ catalog/
 ```json
 {
   "$schema": "./patterns.manifest.schema.json",
-  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11",
+  "catalog_version": "v2025.11.19",
+  "catalog_index": "./catalog/index.json",
   "selected_patterns": [
     {
       "id": "validation-behavior",
       "version": "1.3.0",
-      "mode": "package"
+      "enabled": true,
+      "order": 100
     }
   ]
 }
@@ -57,40 +160,6 @@ catalog/
 ```powershell
 ./scripts/pattern-scaffolder.ps1 -Command list
 ```
-
----
-
-## 📖 パターンの種類
-
-### Pipeline Behaviors（横断的関心事）
-
-実行順序（`order_hint`）に従って自動実行されるパイプライン処理。
-
-| パターン | 順序 | 目的 |
-|---------|-----|------|
-| **MetricsBehavior** | 50 | メトリクス収集 |
-| **ValidationBehavior** | 100 | 入力検証 |
-| **AuthorizationBehavior** | 200 | 認可チェック |
-| **IdempotencyBehavior** | 300 | 冪等性保証 |
-| **TransactionBehavior** | 400 | トランザクション管理 |
-| **LoggingBehavior** | 600 | ログ出力 |
-
-### Query Patterns（データ取得）
-
-| パターン | 目的 |
-|---------|------|
-| **query-get-list** | 全件取得（キャッシュ対応） |
-| **query-get-by-id** | ID指定取得 |
-| **query-search** | 検索・フィルタリング・ページング |
-
-### Command Patterns（データ変更）
-
-| パターン | 目的 |
-|---------|------|
-| **command-create** | 新規作成 |
-| **command-update** | 更新 |
-| **command-delete** | 削除 |
-| **command-bulk-operation** | 一括処理 |
 
 ---
 
@@ -126,34 +195,21 @@ name: ValidationBehavior
 category: pipeline-behavior
 intent: "FluentValidation による入力検証"
 order_hint: 100
+stability: stable
 
-# DI登録とNuGet依存関係
-wiring:
-  service_registrations:
-    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>))"
-  dependencies:
-    nuget:
-      - FluentValidation: "^11.0.0"
-
-# 前提条件
-preconditions:
-  - "FluentValidation がインストールされている"
+# AI選択ヒント
+ai_selection_hints:
+  trigger_phrases: ["入力検証", "バリデーション"]
+  confidence_keywords:
+    high: ["validation", "検証"]
+  typical_requests:
+    - "入力値をチェックしてください"
 
 # 実装テンプレート
 implementation:
-  file_path: "src/{BoundedContext}/..."
+  file_path: "src/Shared/Infrastructure/Behaviors/ValidationBehavior.cs"
   template: |
     public sealed class ValidationBehavior<TRequest, TResponse> { }
-
-# 使用例
-example_usage: |
-  public sealed record CreateProductCommand(...);
-
-# テストケース
-tests:
-  - name: "未入力で検証エラー"
-    given: "Name が空文字列"
-    expect: "検証エラー"
 
 # AI向けガイダンス
 ai_guidance:
@@ -163,15 +219,15 @@ ai_guidance:
     - mistake: "Validator を DI 登録し忘れる"
       solution: "services.AddValidatorsFromAssembly()"
 
+# エビデンス（実装例）
+evidence:
+  implementation_file: "src/Shared/Infrastructure/Behaviors/ValidationBehavior.cs"
+
 # 変更履歴
 changelog:
   - version: 1.3.0
     date: 2025-11-05
     changes: ["Result 型への対応"]
-
-# エビデンス（実装例）
-evidence:
-  implementation_file: "src/ProductCatalog/..."
 ```
 
 ---
@@ -184,17 +240,14 @@ evidence:
 - **Minor**: 後方互換性のある機能追加
 - **Patch**: バグ修正
 
-### タグ固定
+### 安定性レベル
 
-カタログを参照する際は、必ずタグを固定してください:
-
-```json
-{
-  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11"
-}
-```
-
-これにより、同じバージョンのパターンを常に取得でき、再現性が保証されます。
+| レベル | 説明 |
+|-------|------|
+| **stable** | 本番環境で使用可能。破壊的変更はメジャーバージョンアップ時のみ |
+| **beta** | 機能は動作するが、APIが変更される可能性あり |
+| **alpha** | 実験的機能。本番環境では使用非推奨 |
+| **deprecated** | 非推奨。将来のバージョンで削除予定 |
 
 ---
 
@@ -204,7 +257,7 @@ evidence:
 
 ```powershell
 # カタログ全体の検証
-./scripts/validate-catalog.ps1
+./scripts/validate-catalog-sync.ps1
 
 # マニフェストの検証
 ./scripts/pattern-scaffolder.ps1 -Command validate
@@ -218,28 +271,13 @@ GitHub Actions で自動検証:
 
 ---
 
-## 📊 メトリクス
-
-### カタログの統計
-
-```powershell
-$catalogIndex = Get-Content ./catalog/index.json | ConvertFrom-Json
-
-Write-Host "パターン総数: $($catalogIndex.patterns.Count)"
-Write-Host "  - Pipeline Behaviors: $(($catalogIndex.patterns | Where-Object { $_.category -eq 'pipeline-behavior' }).Count)"
-Write-Host "  - Query Patterns: $(($catalogIndex.patterns | Where-Object { $_.category -eq 'query-pattern' }).Count)"
-Write-Host "  - Command Patterns: $(($catalogIndex.patterns | Where-Object { $_.category -eq 'command-pattern' }).Count)"
-```
-
----
-
 ## 🤝 コントリビューション
 
 新しいパターンを追加する場合:
 
-1. `catalog/patterns/` に YAML ファイルを作成
+1. `catalog/patterns/` または `catalog/features/` に YAML ファイルを作成
 2. `catalog/index.json` にパターンを登録
-3. `./scripts/validate-catalog.ps1` で検証
+3. `./scripts/validate-catalog-sync.ps1` で検証
 4. プルリクエストを作成
 
 ### パターン作成のガイドライン
@@ -247,9 +285,10 @@ Write-Host "  - Command Patterns: $(($catalogIndex.patterns | Where-Object { $_.
 - **id**: kebab-case（例: `validation-behavior`）
 - **version**: セマンティックバージョニング
 - **category**: 適切なカテゴリを選択
+- **ai_selection_hints**: AIが適切にパターンを選択できるようにトリガーフレーズを含める
 - **ai_guidance**: AI向けの詳細なガイダンスを含める
 - **evidence**: 実装例へのファイルパスを明示
-- **tests**: 期待される動作をGiven-When-Then形式で記述
+- **stability**: 安定性レベルを明記
 
 ---
 
@@ -266,5 +305,6 @@ MIT License
 
 ---
 
-**最終更新: 2025-11-05**
-**カタログバージョン: v2025.11.0**
+**最終更新: 2025-11-19**
+**カタログバージョン: v2025.11.19**
+**パターン総数: 20**

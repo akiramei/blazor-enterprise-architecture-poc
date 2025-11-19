@@ -14,7 +14,7 @@
 このプロジェクトは以下の3つの特徴を持ちます：
 
 1. **Vertical Slice Architecture (VSA)**: 機能単位で完結する垂直統合構造
-2. **Pattern Catalog**: AIエージェント向けの実装パターンテンプレート（12パターン）
+2. **Pattern Catalog**: AIエージェント向けの実装パターンテンプレート（**20パターン**）
 3. **実装証跡**: すべてのパターンが実際のコードと同期され、検証可能
 
 サンプルアプリケーション「Product Catalog」を通じて、CQRS、DDD、Storeパターンなどを組み合わせた実践的な設計を示しています。
@@ -27,18 +27,34 @@
 
 `catalog/`フォルダには、AIが正確なコードを生成するためのパターンテンプレートが含まれています：
 
-- **12個のYAMLパターン定義**: Pipeline Behaviors、Query/Command Patterns、Feature Slices、UI Layers
+- **20個のYAMLパターン定義**: Pipeline Behaviors (7)、Feature Slices (8)、Domain Patterns (2)、Query/Command Patterns (2)、UI Patterns (1)
+- **Phase別実装**: Phase 1-4完了（CRUD、データ連携、監査・通知、承認ワークフロー）
 - **実装証跡（Evidence）**: すべてのパターンが実装済みファイルにリンク
-- **自動検証スクリプト**: `scripts/validate-catalog-sync.ps1`でカタログの整合性を確認（66チェック、0警告）
+- **自動検証スクリプト**: `scripts/validate-catalog-sync.ps1`でカタログの整合性を確認
 - **AIガイドドキュメント**: パターン選択フローと使用方法
 
 **主要なパターン:**
+
+**Pipeline Behaviors（横断的関心事）:**
 - `validation-behavior` (v1.3.0): FluentValidation自動実行
 - `transaction-behavior` (v2.0.0): トランザクション管理 + Outboxパターン
-- `command-create` (v1.0.0): エンティティ作成テンプレート
-- `layer-store` (v1.0.0): UI状態管理パターン（並行制御含む）
+- `audit-log-behavior` (v1.0.0): 監査ログ自動記録
 
-詳細: [catalog/README.md](catalog/README.md) | [AI Usage Guide](catalog/AI_USAGE_GUIDE.md)
+**Feature Slices（垂直スライス）:**
+- `feature-create-entity` (v1.0.0): エンティティ作成の完全実装
+- `feature-approval-workflow` (v1.0.0): 承認ワークフロー（マルチステップ承認）
+- `feature-import-csv` (v1.0.0): CSV一括インポート
+- `feature-file-upload` (v1.0.0): ファイルアップロード
+
+**Domain Patterns:**
+- `domain-state-machine` (v1.0.0): ステートマシンによる状態遷移管理
+- `domain-approval-history` (v1.0.0): 承認履歴記録・追跡
+
+**UI Patterns:**
+- `layer-store` (v1.0.0): UI状態管理パターン（並行制御含む）
+- `realtime-notification-pattern` (v1.0.0): SignalRリアルタイム通知
+
+詳細: [カタログサマリー](CATALOG_SUMMARY.md) | [catalog/README.md](catalog/README.md) | [AI Usage Guide](catalog/AI_USAGE_GUIDE.md)
 
 ### Pattern Manifest
 
