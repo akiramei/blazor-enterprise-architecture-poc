@@ -158,6 +158,28 @@
       "scope": "vertical-slice"
     },
     {
+      "id": "feature-update-entity",
+      "name": "Update Entity Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-update-entity.yaml",
+      "intent": "エンティティの更新機能（楽観的排他制御・冪等性保証）",
+      "tags": ["feature-slice", "update", "edit", "crud", "optimistic-lock"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
+      "id": "feature-delete-entity",
+      "name": "Delete Entity Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-delete-entity.yaml",
+      "intent": "エンティティの削除機能（論理削除 or 物理削除）",
+      "tags": ["feature-slice", "delete", "crud", "soft-delete", "hard-delete"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
       "id": "layer-store",
       "name": "Store Pattern (State Management + I/O)",
       "category": "layer-element",

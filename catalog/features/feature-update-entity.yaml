@@ -1,0 +1,512 @@
+id: feature-update-entity
+version: 1.0.0
+name: Update Entity Feature Slice
+category: feature-slice
+intent: エンティティの更新機能（楽観的排他制御・冪等性保証）
+description: |
+  既存エンティティのデータを更新する機能の垂直スライス。
+  Command、Handler、Validator、UI層（Store、PageActions）を含みます。
+  楽観的排他制御（Version）と冪等性保証（IdempotencyKey）を標準装備。
+
+scope: vertical-slice
+layers:
+  - application
+  - ui
+
+ai_selection_hints:
+  trigger_phrases:
+    - "更新機能"
+    - "編集機能"
+    - "変更できるように"
+    - "修正機能"
+    - "Edit"
+
+  confidence_keywords:
+    high:    ["更新", "編集", "変更", "修正", "Update", "Edit"]
+    medium:  ["保存", "Save"]
+    low:     ["データ変更"]
+
+  anti_patterns:
+    - "新規作成"
+    - "削除"
+    - "検索"
+    - "一覧"
+
+  typical_requests:
+    - "商品を編集できるようにしてください"
+    - "ユーザー情報を更新する機能を追加して"
+    - "注文内容を変更できるようにしたい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 既存データの更新・編集が必要
+    2. 楽観的排他制御が必要（複数ユーザーの同時編集対策）
+    3. 冪等性保証が必要（重複実行防止）
+
+    このパターンを選択すべきでない条件:
+    1. 新規作成 → feature-create-entity
+    2. 削除 → feature-delete-entity
+    3. 検索・表示のみ → feature-search-entity
+
+relationship:
+  contains:
+    - command-pattern
+    - handler-pattern
+    - validation-pattern
+
+  works_with:
+    - validation-behavior
+    - transaction-behavior
+    - idempotency-behavior
+    - logging-behavior
+    - layer-store
+    - layer-pageactions
+
+  related_features:
+    - feature-create-entity
+    - feature-delete-entity
+
+dependencies:
+  nuget:
+    - FluentValidation: "^11.0.0"
+
+file_structure: |
+  src/Application/Features/Update{Entity}/
+  ├── Update{Entity}Command.cs              # Command定義
+  ├── Update{Entity}CommandHandler.cs       # Handler実装
+  └── Update{Entity}Validator.cs            # FluentValidation検証ルール（オプション）
+
+  src/Application/Shared/{BoundedContext}/UI/
+  ├── Store/{Entity}EditStore.cs            # 状態管理 + I/O
+  ├── Actions/{Entity}EditActions.cs        # UI手順のオーケストレーション
+  └── Store/{Entity}EditState.cs            # 状態クラス
+
+implementation:
+  # ===== Application Layer =====
+  command:
+    file_path: "src/Application/Features/Update{Entity}/Update{Entity}Command.cs"
+    template: |
+      using MediatR;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Update{Entity};
+
+      /// <summary>
+      /// {Entity}更新Command
+      ///
+      /// 【パターン: エンティティ更新 - Command】
+      ///
+      /// 使用シナリオ:
+      /// - {Entity}の既存データを更新
+      /// - 楽観的排他制御による同時編集対策
+      /// - 冪等性保証による重複実行防止
+      ///
+      /// AI実装時の注意:
+      /// - Version フィールドは必須（楽観的排他制御）
+      /// - IdempotencyKey は自動生成（重複実行防止）
+      /// </summary>
+      public class Update{Entity}Command : ICommand<Result<Unit>>
+      {
+          public Guid {Entity}Id { get; init; }
+
+          // 更新対象のプロパティをここに定義
+          public string Name { get; init; } = string.Empty;
+          // public string Description { get; init; } = string.Empty;
+          // public decimal Price { get; init; }
+
+          /// <summary>
+          /// 楽観的排他制御用バージョン（必須）
+          /// </summary>
+          public long Version { get; init; }
+
+          /// <summary>
+          /// 冪等性キー（重複実行防止）
+          /// </summary>
+          public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+      }
+
+  handler:
+    file_path: "src/Application/Features/Update{Entity}/Update{Entity}CommandHandler.cs"
+    template: |
+      using Application.Core.Commands;
+      using Domain.{BoundedContext}.{Entity}s;
+      using MediatR;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+      using Shared.Kernel;
+
+      namespace Application.Features.Update{Entity};
+
+      /// <summary>
+      /// {Entity}更新コマンドハンドラー
+      ///
+      /// 【パターン: エンティティ更新 - Handler + CommandPipeline】
+      ///
+      /// 処理フロー:
+      /// 1. Repositoryから集約を取得
+      /// 2. 存在チェック
+      /// 3. 楽観的排他制御（Versionチェック）
+      /// 4. Domainメソッド経由で変更
+      /// 5. Repository経由で保存
+      /// 6. キャッシュ無効化（オプション）
+      ///
+      /// AI実装時の注意:
+      /// - CommandPipeline を継承（横断的関心事は自動適用）
+      /// - Version不一致時は同時編集エラーを返す
+      /// - Domainメソッド（ChangeName等）経由で変更する
+      /// </summary>
+      public class Update{Entity}CommandHandler
+          : CommandPipeline<Update{Entity}Command, Unit>
+      {
+          private readonly I{Entity}Repository _repository;
+          // private readonly ICacheInvalidationService _cacheInvalidation;
+
+          public Update{Entity}CommandHandler(
+              I{Entity}Repository repository
+              // ICacheInvalidationService cacheInvalidation
+          )
+          {
+              _repository = repository;
+              // _cacheInvalidation = cacheInvalidation;
+          }
+
+          protected override async Task<Result<Unit>> ExecuteAsync(
+              Update{Entity}Command cmd,
+              CancellationToken ct)
+          {
+              // 1. 集約を取得
+              var entity = await _repository.GetAsync(new {Entity}Id(cmd.{Entity}Id), ct);
+              if (entity is null)
+                  return Result.Fail<Unit>("{Entity}が見つかりません");
+
+              // 2. 楽観的排他制御（Versionチェック）
+              if (entity.Version != cmd.Version)
+              {
+                  return Result.Fail<Unit>(
+                      "他のユーザーによって更新されています。" +
+                      "最新のデータを取得してから再度お試しください。");
+              }
+
+              // 3. Domainメソッド経由で変更
+              // DomainExceptionは CommandPipeline.Handle() で Result.Fail に変換される
+              entity.ChangeName(cmd.Name);
+              // entity.ChangeDescription(cmd.Description);
+              // entity.ChangePrice(new Money(cmd.Price));
+
+              // 4. Repository経由で保存
+              await _repository.SaveAsync(entity, ct);
+
+              // 5. キャッシュ無効化（オプション）
+              // _cacheInvalidation.Invalidate{Entity}(cmd.{Entity}Id);
+
+              return Result.Success(Unit.Value);
+          }
+      }
+
+  validator:
+    file_path: "src/Application/Features/Update{Entity}/Update{Entity}Validator.cs"
+    template: |
+      using FluentValidation;
+
+      namespace Application.Features.Update{Entity};
+
+      /// <summary>
+      /// {Entity}更新バリデーター（オプション）
+      ///
+      /// 【パターン: FluentValidation】
+      ///
+      /// AI実装時の注意:
+      /// - ValidationBehavior が自動的に実行
+      /// - ビジネスルールはDomain層で検証
+      /// - ここでは入力値の形式チェックのみ
+      /// </summary>
+      public class Update{Entity}Validator : AbstractValidator<Update{Entity}Command>
+      {
+          public Update{Entity}Validator()
+          {
+              RuleFor(x => x.{Entity}Id)
+                  .NotEmpty()
+                  .WithMessage("{Entity}IDは必須です");
+
+              RuleFor(x => x.Name)
+                  .NotEmpty()
+                  .WithMessage("名前は必須です")
+                  .MaximumLength(200)
+                  .WithMessage("名前は200文字以内で入力してください");
+
+              RuleFor(x => x.Version)
+                  .GreaterThanOrEqualTo(0)
+                  .WithMessage("バージョンが不正です");
+          }
+      }
+
+  # ===== UI Layer =====
+  store:
+    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}EditStore.cs"
+    template: |
+      using MediatR;
+      using Microsoft.Extensions.DependencyInjection;
+      using Microsoft.Extensions.Logging;
+      using Shared.Application;
+      using {BoundedContext}.Shared.Application.DTOs;
+      using Application.Features.Update{Entity};
+      using Application.Features.Get{Entity}ById;
+
+      namespace {BoundedContext}.Shared.UI.Store;
+
+      /// <summary>
+      /// {Entity}編集の状態管理とI/O実行
+      ///
+      /// 【パターン: Store - State Management + I/O】
+      ///
+      /// 責務:
+      /// - 状態管理（IsLoading, IsSaving, ErrorMessage等）
+      /// - MediatR経由でCommand/Query実行
+      /// - 状態変更通知（OnChangeAsync イベント）
+      /// </summary>
+      public sealed class {Entity}EditStore : IDisposable
+      {
+          private readonly IServiceScopeFactory _scopeFactory;
+          private readonly ILogger<{Entity}EditStore> _logger;
+
+          private readonly SemaphoreSlim _gate = new(1, 1);
+          private CancellationTokenSource? _cts;
+
+          private {Entity}EditState _state = {Entity}EditState.Empty;
+
+          public event Func<Task>? OnChangeAsync;
+
+          public {Entity}EditStore(
+              IServiceScopeFactory scopeFactory,
+              ILogger<{Entity}EditStore> logger)
+          {
+              _scopeFactory = scopeFactory;
+              _logger = logger;
+          }
+
+          public {Entity}EditState GetState() => _state;
+
+          /// <summary>
+          /// {Entity}データを読み込む
+          /// </summary>
+          public async Task LoadAsync(Guid {entity}Id, CancellationToken ct = default)
+          {
+              _cts?.Cancel();
+              _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+              await _gate.WaitAsync(_cts.Token);
+              try
+              {
+                  await SetStateAsync(_state with { IsLoading = true, ErrorMessage = null });
+
+                  using var scope = _scopeFactory.CreateScope();
+                  var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+                  var query = new Get{Entity}ByIdQuery { {Entity}Id = {entity}Id };
+                  var result = await mediator.Send(query, _cts.Token);
+
+                  if (result.IsSuccess)
+                  {
+                      await SetStateAsync(_state with
+                      {
+                          IsLoading = false,
+                          {Entity} = result.Value,
+                          ErrorMessage = null
+                      });
+                  }
+                  else
+                  {
+                      await SetStateAsync(_state with
+                      {
+                          IsLoading = false,
+                          ErrorMessage = result.Error
+                      });
+                  }
+              }
+              finally
+              {
+                  _gate.Release();
+              }
+          }
+
+          /// <summary>
+          /// {Entity}を更新
+          /// </summary>
+          public async Task<bool> SaveAsync(
+              Guid {entity}Id,
+              string name,
+              long version,
+              CancellationToken ct = default)
+          {
+              _cts?.Cancel();
+              _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+              await _gate.WaitAsync(_cts.Token);
+              try
+              {
+                  await SetStateAsync(_state with { IsSaving = true, ErrorMessage = null, SuccessMessage = null });
+
+                  using var scope = _scopeFactory.CreateScope();
+                  var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+                  var command = new Update{Entity}Command
+                  {
+                      {Entity}Id = {entity}Id,
+                      Name = name,
+                      Version = version
+                  };
+                  var result = await mediator.Send(command, _cts.Token);
+
+                  if (result.IsSuccess)
+                  {
+                      await SetStateAsync(_state with
+                      {
+                          IsSaving = false,
+                          SuccessMessage = "{Entity}を更新しました",
+                          ErrorMessage = null
+                      });
+
+                      // 最新データを再読み込み
+                      await LoadAsync({entity}Id, ct);
+                      return true;
+                  }
+                  else
+                  {
+                      await SetStateAsync(_state with
+                      {
+                          IsSaving = false,
+                          ErrorMessage = result.Error
+                      });
+                      return false;
+                  }
+              }
+              finally
+              {
+                  _gate.Release();
+              }
+          }
+
+          private async Task SetStateAsync({Entity}EditState newState)
+          {
+              _state = newState;
+              if (OnChangeAsync != null)
+                  await OnChangeAsync.Invoke();
+          }
+
+          public void Dispose()
+          {
+              _cts?.Cancel();
+              _cts?.Dispose();
+              _gate.Dispose();
+          }
+      }
+
+  actions:
+    file_path: "src/Application/Shared/{BoundedContext}/UI/Actions/{Entity}EditActions.cs"
+    template: |
+      using Microsoft.Extensions.Logging;
+      using {BoundedContext}.Shared.UI.Store;
+
+      namespace {BoundedContext}.Shared.UI.Actions;
+
+      /// <summary>
+      /// {Entity}編集画面のUI手順を管理
+      ///
+      /// 【パターン: PageActions - UI Procedures】
+      ///
+      /// 責務:
+      /// - UI手順のオーケストレーション
+      /// - エラーハンドリング
+      /// - Store呼び出しのラッパー
+      /// </summary>
+      public sealed class {Entity}EditActions
+      {
+          private readonly {Entity}EditStore _store;
+          private readonly ILogger<{Entity}EditActions> _logger;
+
+          public {Entity}EditActions(
+              {Entity}EditStore store,
+              ILogger<{Entity}EditActions> logger)
+          {
+              _store = store;
+              _logger = logger;
+          }
+
+          public async Task LoadAsync(Guid {entity}Id, CancellationToken ct = default)
+          {
+              try
+              {
+                  await _store.LoadAsync({entity}Id, ct);
+              }
+              catch (Exception ex)
+              {
+                  _logger.LogError(ex, "{Entity}データの読み込みに失敗しました: {{Entity}Id}", {entity}Id);
+              }
+          }
+
+          public async Task<bool> SaveAsync(
+              Guid {entity}Id,
+              string name,
+              long version,
+              CancellationToken ct = default)
+          {
+              try
+              {
+                  return await _store.SaveAsync({entity}Id, name, version, ct);
+              }
+              catch (Exception ex)
+              {
+                  _logger.LogError(ex, "{Entity}更新に失敗しました: {{Entity}Id}", {entity}Id);
+                  return false;
+              }
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "既存データを編集する画面を作成する場合"
+    - "CRUDのU（Update）を実装する場合"
+    - "楽観的排他制御が必要な場合"
+
+  implementation_steps:
+    - step: 1
+      description: "Command, Handler, Validator を Features フォルダに作成"
+      files: ["Update{Entity}Command.cs", "Update{Entity}CommandHandler.cs", "Update{Entity}Validator.cs"]
+    - step: 2
+      description: "UI層に Store, Actions を作成"
+      files: ["{Entity}EditStore.cs", "{Entity}EditActions.cs", "{Entity}EditState.cs"]
+    - step: 3
+      description: "編集画面（Blazor Component）から Actions を呼び出す"
+
+  common_mistakes:
+    - mistake: "Versionチェックを省略する"
+      solution: "必ずVersion不一致時のエラーハンドリングを実装する。同時編集による上書きを防ぐため必須。"
+    - mistake: "Domainメソッドを呼ばず、プロパティを直接変更する"
+      solution: "entity.ChangeName() のようなDomainメソッド経由で変更する。ビジネスルールの検証が実行される。"
+    - mistake: "保存後にキャッシュ無効化を忘れる"
+      solution: "GetByIdQueryでキャッシュを使用している場合、更新後は必ずキャッシュを無効化する。"
+
+  key_patterns:
+    - pattern: "楽観的排他制御"
+      description: "Versionフィールドで同時編集を検出し、エラーを返す"
+    - pattern: "冪等性保証"
+      description: "IdempotencyKeyで重複実行を防止（IdempotencyBehaviorが自動処理）"
+    - pattern: "CommandPipeline継承"
+      description: "ValidationBehavior、TransactionBehavior等が自動適用される"
+
+evidence:
+  application_layer:
+    command: "src/Application/Features/UpdateProduct/UpdateProductCommand.cs"
+    handler: "src/Application/Features/UpdateProduct/UpdateProductCommandHandler.cs"
+  ui_layer:
+    store: "src/Application/Shared/ProductCatalog/UI/Store/ProductEditStore.cs"
+    actions: "src/Application/Shared/ProductCatalog/UI/Actions/ProductEditActions.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "UpdateProductの実装を元にパターン化"
+      - "楽観的排他制御・冪等性保証を標準装備"

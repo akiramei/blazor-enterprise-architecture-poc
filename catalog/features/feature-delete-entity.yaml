@@ -1,0 +1,394 @@
+id: feature-delete-entity
+version: 1.0.0
+name: Delete Entity Feature Slice
+category: feature-slice
+intent: エンティティの削除機能（論理削除 or 物理削除）
+description: |
+  既存エンティティを削除する機能の垂直スライス。
+  Command、Handler、UI層（Store、PageActions）を含みます。
+  論理削除（Soft Delete）と物理削除（Hard Delete）の両方に対応。
+  削除前のビジネスルール検証（依存関係チェック等）を含む。
+
+scope: vertical-slice
+layers:
+  - application
+  - domain
+  - ui
+
+ai_selection_hints:
+  trigger_phrases:
+    - "削除機能"
+    - "削除できるように"
+    - "除去"
+    - "消去"
+    - "Delete"
+
+  confidence_keywords:
+    high:    ["削除", "Delete", "除去", "消去"]
+    medium:  ["削除ボタン", "削除処理"]
+    low:     ["クリア", "リセット"]
+
+  anti_patterns:
+    - "新規作成"
+    - "更新"
+    - "検索"
+    - "一覧"
+
+  typical_requests:
+    - "商品を削除できるようにしてください"
+    - "ユーザーアカウントを削除する機能を追加して"
+    - "注文をキャンセル（削除）できるようにしたい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. データの削除が必要
+    2. 論理削除（IsDeleted フラグ）or 物理削除（DBから削除）
+    3. 削除前のビジネスルール検証が必要
+
+    このパターンを選択すべきでない条件:
+    1. 新規作成 → feature-create-entity
+    2. 更新・編集 → feature-update-entity
+    3. 一括削除 → feature-bulk-delete (別パターン)
+
+relationship:
+  contains:
+    - command-pattern
+    - handler-pattern
+
+  works_with:
+    - transaction-behavior
+    - idempotency-behavior
+    - logging-behavior
+    - audit-log-behavior
+    - layer-store
+    - layer-pageactions
+
+  related_features:
+    - feature-create-entity
+    - feature-update-entity
+    - feature-bulk-delete
+
+dependencies:
+  nuget: []
+
+file_structure: |
+  src/Application/Features/Delete{Entity}/
+  ├── Delete{Entity}Command.cs              # Command定義
+  └── Delete{Entity}CommandHandler.cs       # Handler実装
+
+  src/Domain/{BoundedContext}/{Entity}s/
+  └── {Entity}.cs                            # Delete() メソッドを追加
+
+  src/Application/Shared/{BoundedContext}/UI/
+  ├── Store/{Entity}ListStore.cs            # 削除アクション追加
+  └── Actions/{Entity}ListActions.cs        # 削除手順追加
+
+implementation:
+  # ===== Application Layer =====
+  command:
+    file_path: "src/Application/Features/Delete{Entity}/Delete{Entity}Command.cs"
+    template: |
+      using MediatR;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Delete{Entity};
+
+      /// <summary>
+      /// {Entity}削除Command
+      ///
+      /// 【パターン: エンティティ削除 - Command】
+      ///
+      /// 使用シナリオ:
+      /// - {Entity}の削除（論理削除 or 物理削除）
+      /// - 削除前のビジネスルール検証
+      /// - 冪等性保証による重複実行防止
+      ///
+      /// AI実装時の注意:
+      /// - IdempotencyKey は自動生成（重複実行防止）
+      /// - 論理削除 vs 物理削除はDomain層で決定
+      /// </summary>
+      public class Delete{Entity}Command : ICommand<Result<Unit>>
+      {
+          public Guid {Entity}Id { get; init; }
+
+          /// <summary>
+          /// 冪等性キー（重複実行防止）
+          /// </summary>
+          public string IdempotencyKey { get; init; } = Guid.NewGuid().ToString();
+      }
+
+  handler:
+    file_path: "src/Application/Features/Delete{Entity}/Delete{Entity}CommandHandler.cs"
+    template: |
+      using Application.Core.Commands;
+      using Domain.{BoundedContext}.{Entity}s;
+      using MediatR;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Delete{Entity};
+
+      /// <summary>
+      /// {Entity}削除コマンドハンドラー
+      ///
+      /// 【パターン: エンティティ削除 - Handler + CommandPipeline】
+      ///
+      /// 処理フロー:
+      /// 1. Repositoryから集約を取得
+      /// 2. 存在チェック
+      /// 3. Entity.Delete()呼び出し（論理削除 or ビジネスルール検証）
+      /// 4. Repository経由で保存 or 削除
+      ///
+      /// AI実装時の注意:
+      /// - CommandPipeline を継承（横断的関心事は自動適用）
+      /// - 論理削除: entity.Delete() → IsDeleted = true
+      /// - 物理削除: repository.DeleteAsync(id)
+      /// - ビジネスルール: 依存関係がある場合は削除不可エラー
+      /// </summary>
+      public class Delete{Entity}CommandHandler
+          : CommandPipeline<Delete{Entity}Command, Unit>
+      {
+          private readonly I{Entity}Repository _repository;
+          // private readonly INotificationService _notificationService;
+
+          public Delete{Entity}CommandHandler(
+              I{Entity}Repository repository
+              // INotificationService notificationService
+          )
+          {
+              _repository = repository;
+              // _notificationService = notificationService;
+          }
+
+          protected override async Task<Result<Unit>> ExecuteAsync(
+              Delete{Entity}Command cmd,
+              CancellationToken ct)
+          {
+              // 1. 集約を取得
+              var entity = await _repository.GetAsync(new {Entity}Id(cmd.{Entity}Id), ct);
+              if (entity is null)
+                  return Result.Fail<Unit>("{Entity}が見つかりません");
+
+              // 2. 論理削除（ビジネスルール検証はDomain層）
+              // DomainExceptionは CommandPipeline.Handle() で Result.Fail に変換される
+              entity.Delete();
+
+              // 3. Repository経由で保存（論理削除の場合）
+              await _repository.SaveAsync(entity, ct);
+
+              // 物理削除の場合は以下を使用:
+              // await _repository.DeleteAsync(new {Entity}Id(cmd.{Entity}Id), ct);
+
+              // 4. 通知（オプション）
+              // await _notificationService.NotifyAsync("{Entity}が削除されました", ct);
+
+              return Result.Success(Unit.Value);
+          }
+      }
+
+  # ===== Domain Layer =====
+  domain_entity:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/{Entity}.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      public class {Entity} : AggregateRoot<{Entity}Id>
+      {
+          // ... 既存のプロパティ ...
+
+          /// <summary>
+          /// 論理削除（Soft Delete）
+          ///
+          /// 【パターン: ビジネスルール検証】
+          ///
+          /// ビジネスルール例:
+          /// - 在庫がある商品は削除できない
+          /// - 承認済みの申請は削除できない
+          /// - 関連データが存在する場合は削除できない
+          /// </summary>
+          public void Delete()
+          {
+              // ビジネスルール検証（例）
+              // if (_stock > 0)
+              //     throw new DomainException("在庫がある商品は削除できません");
+
+              // if (Status == {Entity}Status.Approved)
+              //     throw new DomainException("承認済みの{Entity}は削除できません");
+
+              // 論理削除フラグを立てる
+              IsDeleted = true;
+              DeletedAt = DateTime.UtcNow;
+
+              // ドメインイベント発火（オプション）
+              // AddDomainEvent(new {Entity}DeletedEvent(Id));
+          }
+      }
+
+  # ===== UI Layer =====
+  store:
+    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}ListStore.cs"
+    template: |
+      using MediatR;
+      using Microsoft.Extensions.DependencyInjection;
+      using Microsoft.Extensions.Logging;
+      using Shared.Application;
+      using Application.Features.Delete{Entity};
+
+      namespace {BoundedContext}.Shared.UI.Store;
+
+      /// <summary>
+      /// {Entity}一覧の状態管理とI/O実行
+      ///
+      /// 【パターン: Store - 削除アクション追加】
+      /// </summary>
+      public sealed class {Entity}ListStore
+      {
+          private readonly IServiceScopeFactory _scopeFactory;
+          private readonly ILogger<{Entity}ListStore> _logger;
+
+          public {Entity}ListStore(
+              IServiceScopeFactory scopeFactory,
+              ILogger<{Entity}ListStore> logger)
+          {
+              _scopeFactory = scopeFactory;
+              _logger = logger;
+          }
+
+          /// <summary>
+          /// {Entity}を削除
+          /// </summary>
+          public async Task<bool> DeleteAsync(Guid {entity}Id, CancellationToken ct = default)
+          {
+              using var scope = _scopeFactory.CreateScope();
+              var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+              var command = new Delete{Entity}Command
+              {
+                  {Entity}Id = {entity}Id
+              };
+
+              var result = await mediator.Send(command, ct);
+
+              if (result.IsSuccess)
+              {
+                  _logger.LogInformation("{Entity}を削除しました: {{Entity}Id}", {entity}Id);
+                  return true;
+              }
+              else
+              {
+                  _logger.LogWarning("{Entity}削除に失敗しました: {Error}", result.Error);
+                  return false;
+              }
+          }
+      }
+
+  actions:
+    file_path: "src/Application/Shared/{BoundedContext}/UI/Actions/{Entity}ListActions.cs"
+    template: |
+      using Microsoft.Extensions.Logging;
+      using {BoundedContext}.Shared.UI.Store;
+
+      namespace {BoundedContext}.Shared.UI.Actions;
+
+      /// <summary>
+      /// {Entity}一覧画面のUI手順を管理
+      ///
+      /// 【パターン: PageActions - 削除アクション追加】
+      /// </summary>
+      public sealed class {Entity}ListActions
+      {
+          private readonly {Entity}ListStore _store;
+          private readonly ILogger<{Entity}ListActions> _logger;
+
+          public {Entity}ListActions(
+              {Entity}ListStore store,
+              ILogger<{Entity}ListActions> logger)
+          {
+              _store = store;
+              _logger = logger;
+          }
+
+          /// <summary>
+          /// {Entity}を削除（確認ダイアログ後）
+          /// </summary>
+          public async Task<bool> DeleteAsync(Guid {entity}Id, CancellationToken ct = default)
+          {
+              try
+              {
+                  // 確認ダイアログは呼び出し側（Blazor Component）で実施
+                  return await _store.DeleteAsync({entity}Id, ct);
+              }
+              catch (Exception ex)
+              {
+                  _logger.LogError(ex, "{Entity}削除に失敗しました: {{Entity}Id}", {entity}Id);
+                  return false;
+              }
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "データを削除する機能を実装する場合"
+    - "CRUDのD（Delete）を実装する場合"
+    - "論理削除（Soft Delete）を実装する場合"
+
+  implementation_steps:
+    - step: 1
+      description: "Command, Handler を Features フォルダに作成"
+      files: ["Delete{Entity}Command.cs", "Delete{Entity}CommandHandler.cs"]
+    - step: 2
+      description: "Domain層に Delete() メソッドを追加（ビジネスルール検証）"
+      files: ["{Entity}.cs"]
+    - step: 3
+      description: "UI層の Store, Actions に削除メソッドを追加"
+      files: ["{Entity}ListStore.cs", "{Entity}ListActions.cs"]
+    - step: 4
+      description: "一覧画面（Blazor Component）に削除ボタンと確認ダイアログを追加"
+
+  common_mistakes:
+    - mistake: "物理削除と論理削除を混同する"
+      solution: "論理削除: IsDeleted フラグ、物理削除: repository.DeleteAsync()。監査要件がある場合は論理削除を推奨。"
+    - mistake: "削除前のビジネスルール検証を省略する"
+      solution: "Domain層の Delete() メソッドで検証する。例: 在庫がある商品は削除不可、承認済み申請は削除不可。"
+    - mistake: "確認ダイアログを実装しない"
+      solution: "削除は不可逆操作のため、UI層で必ず確認ダイアログを表示する。"
+    - mistake: "削除後にキャッシュ無効化を忘れる"
+      solution: "一覧画面のキャッシュを無効化し、削除後は自動的に再読み込みする。"
+
+  key_patterns:
+    - pattern: "論理削除（Soft Delete）"
+      description: "IsDeleted = true, DeletedAt = DateTime.UtcNow。データは残るが、検索結果から除外される。"
+    - pattern: "物理削除（Hard Delete）"
+      description: "repository.DeleteAsync(id)。DBから完全に削除される。監査要件がある場合は使用しない。"
+    - pattern: "ビジネスルール検証"
+      description: "Domain層の Delete() メソッドで削除可否を判定。DomainException をスローする。"
+    - pattern: "冪等性保証"
+      description: "IdempotencyKeyで重複実行を防止（IdempotencyBehaviorが自動処理）"
+
+  design_decision:
+    soft_delete_vs_hard_delete: |
+      論理削除（Soft Delete）を推奨する場合:
+      - 監査要件がある（削除履歴を保持する必要がある）
+      - データ復元の可能性がある
+      - 関連データとの整合性を保つ必要がある
+
+      物理削除（Hard Delete）を使用する場合:
+      - GDPR等の法規制で完全削除が必要
+      - ストレージコスト削減が必要
+      - テストデータのクリーンアップ
+
+evidence:
+  application_layer:
+    command: "src/Application/Features/DeleteProduct/DeleteProductCommand.cs"
+    handler: "src/Application/Features/DeleteProduct/DeleteProductCommandHandler.cs"
+  domain_layer:
+    entity: "src/Domain/ProductCatalog/Products/Product.cs (Delete() メソッド)"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "DeleteProductの実装を元にパターン化"
+      - "論理削除と物理削除の両方に対応"
