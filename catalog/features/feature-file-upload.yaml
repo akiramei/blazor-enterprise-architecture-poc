@@ -1,0 +1,525 @@
+id: feature-file-upload
+version: 1.0.0
+name: File Upload Feature Slice
+category: feature-slice
+intent: ファイルアップロード機能（添付ファイル・画像アップロード）
+description: |
+  ファイルをストレージに保存し、メタデータをDBに記録する機能の垂直スライス。
+  Command、Handler、Storage抽象化層、Domain Entityを含みます。
+  ローカルファイルストレージ、Azure Blob Storage、AWS S3に対応可能な設計。
+
+scope: vertical-slice + infrastructure
+layers:
+  - application
+  - domain
+  - infrastructure
+
+ai_selection_hints:
+  trigger_phrases:
+    - "ファイルアップロード"
+    - "添付ファイル"
+    - "画像アップロード"
+    - "ファイル添付"
+    - "ドキュメントアップロード"
+
+  confidence_keywords:
+    high:    ["アップロード", "添付", "ファイル", "画像", "ドキュメント"]
+    medium:  ["PDF", "Excel", "画像", "領収書", "資料"]
+    low:     ["保存"]
+
+  anti_patterns:
+    - "ダウンロード"
+    - "CSVインポート"
+    - "エクスポート"
+
+  typical_requests:
+    - "経費精算に領収書を添付できるようにしてください"
+    - "稟議書にPDFファイルをアップロードする機能を追加して"
+    - "商品画像をアップロードできるようにしたい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 任意のファイルをアップロードしたい
+    2. ファイルのメタデータ（ファイル名、サイズ、MIME Type）を記録したい
+    3. クラウドストレージ（Azure Blob, S3）に対応したい
+
+    このパターンを選択すべきでない条件:
+    1. CSVインポート → feature-import-csv
+    2. ファイルダウンロードのみ → 別パターン
+    3. 画像処理（リサイズ等） → 別パターン
+
+relationship:
+  contains:
+    - command-pattern
+    - handler-pattern
+    - domain-entity
+
+  works_with:
+    - transaction-behavior
+    - logging-behavior
+    - validation-behavior
+
+  related_features:
+    - feature-import-csv
+    - feature-export-csv
+
+dependencies:
+  nuget:
+    - Azure.Storage.Blobs: "^12.0.0" (Azure Blob使用時)
+    - AWSSDK.S3: "^3.7.0" (AWS S3使用時)
+
+file_structure: |
+  src/Application/Features/Upload{FileType}/
+  ├── Upload{FileType}Command.cs                    # Command定義
+  └── Upload{FileType}CommandHandler.cs             # Handler実装
+
+  src/Domain/{BoundedContext}/{FileType}s/
+  └── {FileType}.cs                                  # ファイルメタデータエンティティ
+
+  src/Shared/Abstractions/
+  └── IFileStorageService.cs                         # ストレージ抽象化
+
+  src/Shared/Infrastructure/Platform/
+  ├── LocalFileStorageService.cs                     # ローカルファイルシステム実装
+  ├── AzureBlobStorageService.cs                     # Azure Blob Storage実装
+  └── S3StorageService.cs                            # AWS S3実装
+
+implementation:
+  # ===== Application Layer =====
+  command:
+    file_path: "src/Application/Features/Upload{FileType}/Upload{FileType}Command.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Upload{FileType};
+
+      /// <summary>
+      /// {FileType}アップロードCommand
+      ///
+      /// 【パターン: ファイルアップロード - Command】
+      ///
+      /// 使用シナリオ:
+      /// - {ParentEntity}に{FileType}を添付
+      /// - ファイルストレージに保存
+      /// - メタデータをDBに記録
+      ///
+      /// AI実装時の注意:
+      /// - FileContent は byte[] で受け取る
+      /// - ファイルサイズ制限をチェック（例: 10MB）
+      /// - ContentType を検証（ホワイトリスト方式）
+      /// </summary>
+      public class Upload{FileType}Command : ICommand<Result<Guid>>
+      {
+          /// <summary>
+          /// 親エンティティID（例: PurchaseRequestId）
+          /// </summary>
+          public Guid {ParentEntity}Id { get; init; }
+
+          /// <summary>
+          /// ファイル名（元のファイル名）
+          /// </summary>
+          public string FileName { get; init; } = string.Empty;
+
+          /// <summary>
+          /// ファイルの内容（バイナリデータ）
+          /// </summary>
+          public byte[] FileContent { get; init; } = Array.Empty<byte>();
+
+          /// <summary>
+          /// Content Type (MIME Type)
+          /// </summary>
+          public string ContentType { get; init; } = string.Empty;
+
+          /// <summary>
+          /// 説明・コメント（任意）
+          /// </summary>
+          public string? Description { get; init; }
+      }
+
+  handler:
+    file_path: "src/Application/Features/Upload{FileType}/Upload{FileType}CommandHandler.cs"
+    template: |
+      using Application.Core.Commands;
+      using Domain.{BoundedContext}.{ParentEntity}s;
+      using Domain.{BoundedContext};
+      using Shared.Abstractions;
+      using Shared.Application;
+
+      namespace Application.Features.Upload{FileType};
+
+      /// <summary>
+      /// {FileType}アップロードコマンドハンドラー
+      ///
+      /// 【パターン: ファイルアップロード - Handler + CommandPipeline】
+      ///
+      /// 処理フロー:
+      /// 1. 親エンティティの存在確認
+      /// 2. {FileType}エンティティを作成（Domain.Create）
+      /// 3. ファイルストレージへの保存（IFileStorageService）
+      /// 4. メタデータの永続化
+      ///
+      /// AI実装時の注意:
+      /// - IFileStorageService を使用（抽象化層）
+      /// - ファイル保存失敗時はResult.Failを返す
+      /// - ストレージパスはエンティティが生成（例: "purchase-requests/{id}/{uuid}.pdf"）
+      /// </summary>
+      public class Upload{FileType}CommandHandler
+          : CommandPipeline<Upload{FileType}Command, Guid>
+      {
+          private readonly I{ParentEntity}Repository _repository;
+          private readonly IFileStorageService _fileStorageService;
+          private readonly ICurrentUserService _currentUserService;
+
+          public Upload{FileType}CommandHandler(
+              I{ParentEntity}Repository repository,
+              IFileStorageService fileStorageService,
+              ICurrentUserService currentUserService)
+          {
+              _repository = repository;
+              _fileStorageService = fileStorageService;
+              _currentUserService = currentUserService;
+          }
+
+          protected override async Task<Result<Guid>> ExecuteAsync(
+              Upload{FileType}Command cmd,
+              CancellationToken ct)
+          {
+              // 1. 親エンティティの存在確認
+              var parentEntity = await _repository.GetByIdAsync(cmd.{ParentEntity}Id, ct);
+              if (parentEntity is null)
+                  return Result.Fail<Guid>("{ParentEntity}が見つかりません");
+
+              // 2. {FileType}エンティティを作成
+              // DomainExceptionは CommandPipeline.Handle() で Result.Fail に変換される
+              var fileEntity = {FileType}.Create(
+                  cmd.{ParentEntity}Id,
+                  cmd.FileName,
+                  cmd.FileContent.Length,
+                  cmd.ContentType,
+                  _currentUserService.UserId,
+                  _currentUserService.UserName ?? "Unknown",
+                  cmd.Description
+              );
+
+              // 3. ファイルをストレージに保存
+              try
+              {
+                  using var stream = new MemoryStream(cmd.FileContent);
+                  await _fileStorageService.UploadAsync(
+                      stream,
+                      fileEntity.StoragePath,
+                      cmd.ContentType,
+                      ct
+                  );
+              }
+              catch (Exception ex)
+              {
+                  return Result.Fail<Guid>($"ファイルの保存に失敗しました: {ex.Message}");
+              }
+
+              // 4. 親エンティティに添付ファイルを追加
+              parentEntity.Add{FileType}(fileEntity);
+
+              // 5. 永続化
+              await _repository.SaveAsync(parentEntity, ct);
+
+              return Result.Success(fileEntity.Id);
+          }
+      }
+
+  # ===== Domain Layer =====
+  domain_entity:
+    file_path: "src/Domain/{BoundedContext}/{FileType}s/{FileType}.cs"
+    template: |
+      using Shared.Domain;
+
+      namespace Domain.{BoundedContext};
+
+      /// <summary>
+      /// {FileType}エンティティ
+      ///
+      /// 【パターン: ファイルメタデータ】
+      ///
+      /// 責務:
+      /// - ファイルのメタデータを管理
+      /// - ストレージパスの生成
+      /// - ビジネスルール検証（ファイルサイズ上限、MIME Type制限）
+      /// </summary>
+      public class {FileType} : Entity<Guid>
+      {
+          public Guid {ParentEntity}Id { get; private set; }
+          public string FileName { get; private set; } = string.Empty;
+          public long FileSize { get; private set; }
+          public string ContentType { get; private set; } = string.Empty;
+          public string StoragePath { get; private set; } = string.Empty;
+          public string UploadedBy { get; private set; } = string.Empty;
+          public string UploadedByName { get; private set; } = string.Empty;
+          public DateTime UploadedAt { get; private set; }
+          public string? Description { get; private set; }
+
+          // 論理削除フラグ
+          public bool IsDeleted { get; private set; }
+          public DateTime? DeletedAt { get; private set; }
+
+          private {FileType}() { } // EF Core用
+
+          /// <summary>
+          /// {FileType}を作成
+          ///
+          /// ビジネスルール:
+          /// - ファイルサイズ上限: 10MB
+          /// - 許可するMIME Type: application/pdf, image/*, など
+          /// </summary>
+          public static {FileType} Create(
+              Guid {parentEntity}Id,
+              string fileName,
+              long fileSize,
+              string contentType,
+              string uploadedBy,
+              string uploadedByName,
+              string? description = null)
+          {
+              // ビジネスルール検証
+              if (fileSize > 10 * 1024 * 1024) // 10MB
+                  throw new DomainException("ファイルサイズが上限（10MB）を超えています");
+
+              var allowedContentTypes = new[]
+              {
+                  "application/pdf",
+                  "image/jpeg",
+                  "image/png",
+                  "application/vnd.ms-excel",
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              };
+
+              if (!allowedContentTypes.Any(ct => contentType.StartsWith(ct)))
+                  throw new DomainException($"サポートされていないファイル形式です: {contentType}");
+
+              var id = Guid.NewGuid();
+              var extension = Path.GetExtension(fileName);
+              var storagePath = $"{parentEntity}s/{{{parentEntity}Id}}/{id}{extension}";
+
+              return new {FileType}
+              {
+                  Id = id,
+                  {ParentEntity}Id = {parentEntity}Id,
+                  FileName = fileName,
+                  FileSize = fileSize,
+                  ContentType = contentType,
+                  StoragePath = storagePath,
+                  UploadedBy = uploadedBy,
+                  UploadedByName = uploadedByName,
+                  UploadedAt = DateTime.UtcNow,
+                  Description = description,
+                  IsDeleted = false
+              };
+          }
+
+          /// <summary>
+          /// 論理削除
+          /// </summary>
+          public void Delete()
+          {
+              if (IsDeleted)
+                  throw new InvalidOperationException("このファイルは既に削除されています");
+
+              IsDeleted = true;
+              DeletedAt = DateTime.UtcNow;
+          }
+      }
+
+  # ===== Infrastructure Layer (Storage Abstraction) =====
+  storage_interface:
+    file_path: "src/Shared/Abstractions/IFileStorageService.cs"
+    template: |
+      namespace Shared.Abstractions;
+
+      /// <summary>
+      /// ファイルストレージサービス インターフェース
+      ///
+      /// 【パターン: Storage Abstraction Layer】
+      ///
+      /// 責務:
+      /// - ファイルのアップロード・ダウンロード・削除操作を抽象化
+      /// - 複数のストレージバックエンド（Azure Blob, AWS S3, ローカルファイル）に対応
+      ///
+      /// 実装例:
+      /// - LocalFileStorageService: ローカルディスク（開発環境用）
+      /// - AzureBlobStorageService: Azure Blob Storage（本番環境推奨）
+      /// - S3StorageService: AWS S3（本番環境推奨）
+      /// </summary>
+      public interface IFileStorageService
+      {
+          Task<string> UploadAsync(
+              Stream stream,
+              string storagePath,
+              string contentType,
+              CancellationToken cancellationToken = default);
+
+          Task<Stream> DownloadAsync(
+              string storagePath,
+              CancellationToken cancellationToken = default);
+
+          Task DeleteAsync(
+              string storagePath,
+              CancellationToken cancellationToken = default);
+
+          Task<bool> ExistsAsync(
+              string storagePath,
+              CancellationToken cancellationToken = default);
+
+          Task<string> GetDownloadUrlAsync(
+              string storagePath,
+              TimeSpan? expiresIn = null,
+              CancellationToken cancellationToken = default);
+      }
+
+  storage_local:
+    file_path: "src/Shared/Infrastructure/Platform/LocalFileStorageService.cs"
+    template: |
+      using Microsoft.Extensions.Configuration;
+      using Microsoft.Extensions.Logging;
+      using Shared.Abstractions;
+
+      namespace Shared.Infrastructure.Platform;
+
+      /// <summary>
+      /// ローカルファイルストレージサービス
+      ///
+      /// 【パターン: Local File System Storage】
+      ///
+      /// 注意:
+      /// - **開発環境・テスト環境専用**
+      /// - 本番環境では使用しない（クラウドストレージを使用）
+      /// - パストラバーサル攻撃対策を実装
+      /// </summary>
+      public sealed class LocalFileStorageService : IFileStorageService
+      {
+          private readonly string _rootPath;
+          private readonly ILogger<LocalFileStorageService> _logger;
+
+          public LocalFileStorageService(
+              IConfiguration configuration,
+              ILogger<LocalFileStorageService> logger)
+          {
+              _rootPath = configuration["FileStorage:RootPath"] ?? "./uploads";
+              _logger = logger;
+
+              if (!Directory.Exists(_rootPath))
+              {
+                  Directory.CreateDirectory(_rootPath);
+              }
+          }
+
+          public async Task<string> UploadAsync(
+              Stream stream,
+              string storagePath,
+              string contentType,
+              CancellationToken cancellationToken = default)
+          {
+              var fullPath = GetFullPath(storagePath);
+
+              var directory = Path.GetDirectoryName(fullPath);
+              if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+              {
+                  Directory.CreateDirectory(directory);
+              }
+
+              using (var fileStream = new FileStream(fullPath, FileMode.Create))
+              {
+                  await stream.CopyToAsync(fileStream, cancellationToken);
+              }
+
+              _logger.LogInformation("ファイルをアップロードしました: {StoragePath}", storagePath);
+              return storagePath;
+          }
+
+          // DownloadAsync, DeleteAsync, ExistsAsync, GetDownloadUrlAsync の実装...
+
+          private string GetFullPath(string storagePath)
+          {
+              // パストラバーサル攻撃対策
+              if (storagePath.Contains("..") || Path.IsPathRooted(storagePath))
+                  throw new ArgumentException("無効なストレージパスです");
+
+              var fullPath = Path.Combine(_rootPath, storagePath);
+              var normalizedFullPath = Path.GetFullPath(fullPath);
+              var normalizedRootPath = Path.GetFullPath(_rootPath);
+
+              if (!normalizedFullPath.StartsWith(normalizedRootPath))
+                  throw new UnauthorizedAccessException("ルートディレクトリ外へのアクセスは禁止されています");
+
+              return normalizedFullPath;
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "添付ファイルをアップロードする機能を実装する場合"
+    - "画像・PDF・Excelファイルなどを保存する場合"
+    - "クラウドストレージ（Azure Blob, S3）に対応したい場合"
+
+  implementation_steps:
+    - step: 1
+      description: "IFileStorageService インターフェースを Shared/Abstractions に作成"
+      files: ["IFileStorageService.cs"]
+    - step: 2
+      description: "LocalFileStorageService を Shared/Infrastructure/Platform に作成"
+      files: ["LocalFileStorageService.cs"]
+    - step: 3
+      description: "Domain層に{FileType}エンティティを作成"
+      files: ["{FileType}.cs"]
+    - step: 4
+      description: "Command, Handler を Features フォルダに作成"
+      files: ["Upload{FileType}Command.cs", "Upload{FileType}CommandHandler.cs"]
+    - step: 5
+      description: "DI設定（Program.cs）にIFileStorageServiceを登録"
+
+  common_mistakes:
+    - mistake: "ファイルサイズ制限をチェックしない"
+      solution: "必ずファイルサイズ上限（例: 10MB）をチェックする。DoS攻撃対策。"
+    - mistake: "MIME Type検証を省略する"
+      solution: "ホワイトリスト方式でMIME Typeを検証。実行可能ファイルのアップロードを防止。"
+    - mistake: "ストレージパスにユーザー入力を使用"
+      solution: "ストレージパスはUUIDを使用。パストラバーサル攻撃を防止。"
+    - mistake: "本番環境でローカルファイルストレージを使用"
+      solution: "本番環境では必ずクラウドストレージ（Azure Blob, S3）を使用。"
+
+  key_patterns:
+    - pattern: "Storage Abstraction Layer"
+      description: "IFileStorageService で抽象化。実装を切り替え可能（Local / Azure Blob / S3）。"
+    - pattern: "Domain-driven File Metadata"
+      description: "ファイルメタデータをDomain Entityとして管理。ビジネスルール検証を実装。"
+    - pattern: "UUID-based Storage Path"
+      description: "ストレージパスはUUID生成。ファイル名の重複やパストラバーサル攻撃を防止。"
+    - pattern: "MIME Type Whitelist"
+      description: "許可するMIME Typeをホワイトリストで管理。セキュリティリスクを最小化。"
+
+  security_considerations:
+    - rule: "ファイルサイズ上限"
+      description: "DoS攻撃を防ぐため、必ず上限（例: 10MB）を設定"
+    - rule: "MIME Type検証"
+      description: "ホワイトリスト方式。実行可能ファイル（.exe, .sh）の拒否"
+    - rule: "ウイルススキャン（推奨）"
+      description: "ClamAV等でアップロード時にスキャン"
+    - rule: "署名付きURL"
+      description: "ダウンロード時は署名付きURL（SAS, Presigned URL）を使用"
+
+evidence:
+  application_layer:
+    command: "src/Application/Features/UploadAttachment/UploadAttachmentCommand.cs"
+    handler: "src/Application/Features/UploadAttachment/UploadAttachmentCommandHandler.cs"
+  domain_layer:
+    entity: "src/Domain/PurchaseManagement/PurchaseRequestAttachment.cs"
+  infrastructure_layer:
+    interface: "src/Shared/Abstractions/IFileStorageService.cs"
+    local_impl: "src/Shared/Infrastructure/Platform/LocalFileStorageService.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "UploadAttachmentの実装を元にパターン化"
+      - "Storage Abstraction Layer（Local/Azure/S3対応）"

@@ -1,0 +1,393 @@
+id: feature-import-csv
+version: 1.0.0
+name: CSV Import Feature Slice
+category: feature-slice
+intent: CSVファイルからデータを一括インポートする機能
+description: |
+  CSVファイルから複数のエンティティを一括登録する機能の垂直スライス。
+  Command、Handler、CSV用DTO、UI層を含みます。
+  行単位のバリデーション、部分成功/失敗の追跡、エラー報告を実装。
+
+scope: vertical-slice
+layers:
+  - application
+  - ui
+
+ai_selection_hints:
+  trigger_phrases:
+    - "CSVインポート"
+    - "CSV取り込み"
+    - "CSVアップロード"
+    - "一括登録"
+    - "一括インポート"
+
+  confidence_keywords:
+    high:    ["CSV", "インポート", "取り込み", "一括登録", "アップロード"]
+    medium:  ["Excel", "ファイルから", "一括"]
+    low:     ["マスタ登録"]
+
+  anti_patterns:
+    - "エクスポート"
+    - "ダウンロード"
+    - "出力"
+
+  typical_requests:
+    - "商品マスタをCSVから一括登録できるようにしてください"
+    - "ユーザーデータをCSVでインポートしたい"
+    - "Excelファイルから取引先を一括登録する機能を追加して"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. CSVファイルからデータを一括登録したい
+    2. 行単位でバリデーションエラーを報告したい
+    3. 部分成功（一部の行は成功、一部は失敗）に対応したい
+
+    このパターンを選択すべきでない条件:
+    1. データのエクスポート → feature-export-csv
+    2. 単一ファイルのアップロード → feature-file-upload
+    3. Excelファイル（.xlsx） → feature-import-excel (別パターン)
+
+relationship:
+  contains:
+    - command-pattern
+    - handler-pattern
+
+  works_with:
+    - validation-behavior
+    - transaction-behavior (オプション)
+    - logging-behavior
+    - layer-store
+    - layer-pageactions
+
+  related_features:
+    - feature-export-csv
+    - feature-file-upload
+    - feature-create-entity
+
+dependencies:
+  nuget:
+    - CsvHelper: "^30.0.0"
+
+file_structure: |
+  src/Application/Features/Import{Entity}sFromCsv/
+  ├── Import{Entity}sFromCsvCommand.cs       # Command定義
+  ├── Import{Entity}sFromCsvCommandHandler.cs # Handler実装
+  └── {Entity}CsvImportDto.cs                 # CSV読み込み用DTO
+
+  src/Shared/Application/Common/
+  └── BulkOperationResult.cs                  # 一括操作結果クラス
+
+implementation:
+  # ===== Application Layer =====
+  command:
+    file_path: "src/Application/Features/Import{Entity}sFromCsv/Import{Entity}sFromCsvCommand.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Common;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Import{Entity}sFromCsv;
+
+      /// <summary>
+      /// {Entity}CSV インポートコマンド
+      ///
+      /// 【パターン: CSVインポート - Command】
+      ///
+      /// 使用シナリオ:
+      /// - CSVファイルから{Entity}データを一括登録
+      /// - エラー行を特定して報告
+      /// - 部分成功/失敗の追跡
+      ///
+      /// AI実装時の注意:
+      /// - CSVファイルはStreamで受け取る（メモリ効率）
+      /// - 行ごとにバリデーションを実施
+      /// - ファイルサイズ上限をチェック（例: 10MB）
+      /// - 最大インポート件数制限（例: 1,000件）
+      /// </summary>
+      public record Import{Entity}sFromCsvCommand : ICommand<Result<BulkOperationResult>>
+      {
+          public Stream CsvStream { get; init; } = Stream.Null;
+      }
+
+      /// <summary>
+      /// CSVインポート用DTO
+      ///
+      /// 【パターン: CSV DTO - CsvHelper属性】
+      ///
+      /// AI実装時の注意:
+      /// - プロパティ名はCSVヘッダーと一致させる
+      /// - CsvHelper.Configuration.Attributes を使用してマッピング可能
+      /// - すべてnullableにして、バリデーションはHandler側で実施
+      /// </summary>
+      public class {Entity}CsvImportDto
+      {
+          public string Name { get; set; } = string.Empty;
+          // public string? Description { get; set; }
+          // public decimal Price { get; set; }
+      }
+
+  handler:
+    file_path: "src/Application/Features/Import{Entity}sFromCsv/Import{Entity}sFromCsvCommandHandler.cs"
+    template: |
+      using System.Globalization;
+      using System.Text;
+      using CsvHelper;
+      using CsvHelper.Configuration;
+      using Shared.Application;
+      using Shared.Application.Common;
+      using Application.Core.Commands;
+      using Shared.Kernel;
+      using Domain.{BoundedContext}.{Entity}s;
+
+      namespace Application.Features.Import{Entity}sFromCsv;
+
+      /// <summary>
+      /// {Entity}CSV インポートハンドラ
+      ///
+      /// 【パターン: CSVインポート - Handler + CommandPipeline】
+      ///
+      /// 処理フロー:
+      /// 1. CSVファイルをパース（CsvHelper）
+      /// 2. 件数チェック（上限: 1,000件）
+      /// 3. 各行をバリデーション
+      /// 4. エンティティを作成（Domain.Create）
+      /// 5. 成功した行のみを保存
+      /// 6. BulkOperationResult を返す（成功数、失敗数、エラー詳細）
+      ///
+      /// AI実装時の注意:
+      /// - ヘッダー行の検証（必須カラムチェック）
+      /// - 各行のバリデーション（必須項目、型変換エラー）
+      /// - エラーメッセージには行番号を含める
+      /// - using でStreamを確実にクローズ
+      /// </summary>
+      public class Import{Entity}sFromCsvCommandHandler
+          : CommandPipeline<Import{Entity}sFromCsvCommand, BulkOperationResult>
+      {
+          private readonly I{Entity}Repository _repository;
+          private const int MaxImportCount = 1000;
+
+          public Import{Entity}sFromCsvCommandHandler(
+              I{Entity}Repository repository)
+          {
+              _repository = repository;
+          }
+
+          protected override async Task<Result<BulkOperationResult>> ExecuteAsync(
+              Import{Entity}sFromCsvCommand command,
+              CancellationToken ct)
+          {
+              var entities = new List<{Entity}>();
+              var errors = new List<string>();
+              var lineNumber = 1; // ヘッダー行
+
+              using var reader = new StreamReader(command.CsvStream, Encoding.UTF8);
+              using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.GetCultureInfo("ja-JP"))
+              {
+                  HasHeaderRecord = true,
+                  MissingFieldFound = null, // 欠損フィールドを許容
+              });
+
+              // CSVレコードを読み込み
+              var records = csv.GetRecords<{Entity}CsvImportDto>().ToList();
+
+              if (records.Count == 0)
+              {
+                  return Result.Fail<BulkOperationResult>("CSVファイルにデータがありません");
+              }
+
+              if (records.Count > MaxImportCount)
+              {
+                  return Result.Fail<BulkOperationResult>($"インポート件数が上限({MaxImportCount}件)を超えています");
+              }
+
+              // 各行を処理
+              foreach (var record in records)
+              {
+                  lineNumber++;
+
+                  try
+                  {
+                      // バリデーション
+                      if (string.IsNullOrWhiteSpace(record.Name))
+                      {
+                          errors.Add($"行{lineNumber}: 名前は必須です");
+                          continue;
+                      }
+
+                      // {Entity}エンティティを作成
+                      var entity = {Entity}.Create(
+                          record.Name
+                          // record.Description ?? string.Empty,
+                          // new Money(record.Price)
+                      );
+
+                      entities.Add(entity);
+                  }
+                  catch (Exception ex)
+                  {
+                      errors.Add($"行{lineNumber}: {ex.Message}");
+                  }
+              }
+
+              // 成功した{Entity}を保存
+              var succeededCount = 0;
+              var entityIndex = lineNumber - entities.Count; // 保存失敗時の行番号計算用
+
+              foreach (var entity in entities)
+              {
+                  entityIndex++;
+                  try
+                  {
+                      await _repository.SaveAsync(entity, ct);
+                      succeededCount++;
+                  }
+                  catch (Exception ex)
+                  {
+                      errors.Add($"行{entityIndex}: 保存失敗 - {ex.Message}");
+                  }
+              }
+
+              return Result.Success(BulkOperationResult.PartiallySucceeded(
+                  succeededCount,
+                  errors.Count,
+                  errors));
+          }
+      }
+
+  # ===== Shared Application Layer =====
+  bulk_result:
+    file_path: "src/Shared/Application/Common/BulkOperationResult.cs"
+    template: |
+      namespace Shared.Application.Common;
+
+      /// <summary>
+      /// 一括操作の結果
+      ///
+      /// 【パターン: 部分成功/失敗の追跡】
+      ///
+      /// 使用シナリオ:
+      /// - CSVインポート、一括更新、一括削除の結果を表現
+      /// - 成功数、失敗数、エラー詳細をまとめて返す
+      /// </summary>
+      public sealed record BulkOperationResult
+      {
+          public int SucceededCount { get; init; }
+          public int FailedCount { get; init; }
+          public int TotalCount => SucceededCount + FailedCount;
+          public IReadOnlyList<string> Errors { get; init; } = Array.Empty<string>();
+
+          public bool IsAllSucceeded => FailedCount == 0;
+          public bool HasAnySucceeded => SucceededCount > 0;
+
+          public static BulkOperationResult AllSucceeded(int count)
+          {
+              return new BulkOperationResult
+              {
+                  SucceededCount = count,
+                  FailedCount = 0,
+                  Errors = Array.Empty<string>()
+              };
+          }
+
+          public static BulkOperationResult AllFailed(int count, IReadOnlyList<string> errors)
+          {
+              return new BulkOperationResult
+              {
+                  SucceededCount = 0,
+                  FailedCount = count,
+                  Errors = errors
+              };
+          }
+
+          public static BulkOperationResult PartiallySucceeded(int succeededCount, int failedCount, IReadOnlyList<string> errors)
+          {
+              return new BulkOperationResult
+              {
+                  SucceededCount = succeededCount,
+                  FailedCount = failedCount,
+                  Errors = errors
+              };
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "CSVファイルからマスタデータを一括登録する場合"
+    - "データ移行やバッチ登録機能を実装する場合"
+    - "Excelで作成したデータをシステムに取り込む場合"
+
+  implementation_steps:
+    - step: 1
+      description: "Command, Handler, DTO を Features フォルダに作成"
+      files: ["Import{Entity}sFromCsvCommand.cs", "Import{Entity}sFromCsvCommandHandler.cs", "{Entity}CsvImportDto.cs"]
+    - step: 2
+      description: "BulkOperationResult クラスを Shared/Application/Common に作成（まだなければ）"
+      files: ["BulkOperationResult.cs"]
+    - step: 3
+      description: "UI側にファイルアップロード処理を追加"
+
+  common_mistakes:
+    - mistake: "全件トランザクションで処理する"
+      solution: "部分成功を許容する設計の場合は、各行独立で処理する。トランザクションが必要な場合は、エラー時に全件ロールバック。"
+    - mistake: "メモリに全データをロードする"
+      solution: "Stream を使用してストリーム処理。大量データでもメモリを圧迫しない。"
+    - mistake: "エラー行の情報が不足"
+      solution: "エラーメッセージには必ず行番号とエラー内容を含める。ユーザーがCSVを修正しやすくする。"
+    - mistake: "上限件数チェックを省略"
+      solution: "必ず最大件数（例: 1,000件）をチェックし、超過時はエラーを返す。DoS攻撃対策。"
+
+  key_patterns:
+    - pattern: "CsvHelper 使用"
+      description: "CsvHelper ライブラリでCSVをパース。ヘッダー自動マッピング、型変換、エラーハンドリングが容易。"
+    - pattern: "BulkOperationResult"
+      description: "成功数、失敗数、エラー詳細をまとめて返す。UI側で結果を適切に表示できる。"
+    - pattern: "行単位バリデーション"
+      description: "各行を独立して処理。1行エラーでも他の行は処理継続。"
+    - pattern: "Stream処理"
+      description: "ファイルをStreamで受け取り、メモリ効率を重視。"
+
+  csv_format_example: |
+    Name,Description,Price,Stock
+    商品A,説明A,1000,100
+    商品B,説明B,2000,200
+    商品C,説明C,3000,300
+
+  validation_rules:
+    - rule: "必須項目チェック"
+      description: "Name等の必須カラムが空でないか確認"
+    - rule: "型変換チェック"
+      description: "Price, Stock等の数値カラムが正しく変換できるか確認"
+    - rule: "ビジネスルール検証"
+      description: "Price > 0, Stock >= 0 等のビジネスルールを検証"
+    - rule: "重複チェック（オプション）"
+      description: "同一名称の{Entity}が既に存在しないか確認"
+
+  design_decision:
+    transaction_strategy: |
+      トランザクション戦略の選択:
+
+      1. 各行独立処理（部分成功許容）:
+         - メリット: 一部のエラーで全体が失敗しない
+         - デメリット: データの一貫性が保証されない
+         - 推奨: マスタデータの一括登録
+
+      2. 全件トランザクション:
+         - メリット: All or Nothing。データの一貫性が保証される
+         - デメリット: 1行エラーで全体ロールバック
+         - 推奨: 会計データなど整合性が重要な場合
+
+evidence:
+  application_layer:
+    command: "src/Application/Features/ImportProductsFromCsv/ImportProductsFromCsvCommand.cs"
+    handler: "src/Application/Features/ImportProductsFromCsv/ImportProductsFromCsvCommandHandler.cs"
+    dto: "src/Application/Features/ImportProductsFromCsv/ImportProductsFromCsvCommand.cs (ProductCsvImportDto)"
+  shared_layer:
+    bulk_result: "src/Shared/Application/Common/BulkOperationResult.cs"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-19
+    changes:
+      - "初版リリース"
+      - "ImportProductsFromCsvの実装を元にパターン化"
+      - "部分成功/失敗の追跡機能を標準装備"

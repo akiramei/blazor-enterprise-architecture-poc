@@ -180,6 +180,28 @@
       "scope": "vertical-slice"
     },
     {
+      "id": "feature-import-csv",
+      "name": "CSV Import Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-import-csv.yaml",
+      "intent": "CSVファイルからデータを一括インポートする機能",
+      "tags": ["feature-slice", "csv", "import", "bulk-operation", "upload"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
+      "id": "feature-file-upload",
+      "name": "File Upload Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-file-upload.yaml",
+      "intent": "ファイルアップロード機能（添付ファイル・画像アップロード）",
+      "tags": ["feature-slice", "file-upload", "attachment", "storage", "azure-blob", "s3"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
       "id": "layer-store",
       "name": "Store Pattern (State Management + I/O)",
       "category": "layer-element",
