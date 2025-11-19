@@ -366,8 +366,8 @@
       "7. 生成されたコードを提示"
     ],
     "template_variables": {
-      "Entity": "エンティティ名（PascalCase）例: Product, Order, Customer",
-      "entity": "エンティティ名（camelCase）例: product, order, customer",
+      "EntityPascalCase": "エンティティ名（PascalCase）例: Product, Order, Customer",
+      "EntityCamelCase": "エンティティ名（camelCase）例: product, order, customer",
       "BoundedContext": "境界コンテキスト名（PascalCase）例: ProductCatalog, PurchaseManagement"
     },
     "evidence_traceability": "各パターンの evidence フィールドに実装例のファイルパスが記載されています"
