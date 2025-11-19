@@ -1,10 +1,65 @@
-# Product Catalog - Blazor Enterprise Architecture 実証実験
+# Blazor Enterprise Architecture PoC
 
-このプロジェクトは、**Blazor Enterprise Architecture Guide**に基づいた中規模業務アプリケーションの実証実験です。
+**AI駆動開発を前提とした、工業製品化されたエンタープライズアーキテクチャの実証実験プロジェクト**
+
+このプロジェクトは、**Vertical Slice Architecture (VSA)** と **Pattern Catalog** を組み合わせ、AIエージェントと人間が協調して開発できる中規模業務アプリケーションの実装パターンを提供します。
+
+**バージョン情報:**
+- Catalog Version: **v2025.11.19**
+- .NET Version: **9.0**
+- 最終更新: **2025-11-19**
 
 ## 📋 プロジェクト概要
 
-**Vertical Slice Architecture (VSA)** を採用し、機能単位で完結する構造により、CQRS、DDD、Storeパターンなどを組み合わせた実践的なアプリケーション設計を示しています。
+このプロジェクトは以下の3つの特徴を持ちます：
+
+1. **Vertical Slice Architecture (VSA)**: 機能単位で完結する垂直統合構造
+2. **Pattern Catalog**: AIエージェント向けの実装パターンテンプレート（12パターン）
+3. **実装証跡**: すべてのパターンが実際のコードと同期され、検証可能
+
+サンプルアプリケーション「Product Catalog」を通じて、CQRS、DDD、Storeパターンなどを組み合わせた実践的な設計を示しています。
+
+## 🤖 AI駆動開発サポート
+
+このプロジェクトは**AIエージェントと人間の協調開発**を前提に設計されています。
+
+### Pattern Catalog (v2025.11.19)
+
+`catalog/`フォルダには、AIが正確なコードを生成するためのパターンテンプレートが含まれています：
+
+- **12個のYAMLパターン定義**: Pipeline Behaviors、Query/Command Patterns、Feature Slices、UI Layers
+- **実装証跡（Evidence）**: すべてのパターンが実装済みファイルにリンク
+- **自動検証スクリプト**: `scripts/validate-catalog-sync.ps1`でカタログの整合性を確認（66チェック、0警告）
+- **AIガイドドキュメント**: パターン選択フローと使用方法
+
+**主要なパターン:**
+- `validation-behavior` (v1.3.0): FluentValidation自動実行
+- `transaction-behavior` (v2.0.0): トランザクション管理 + Outboxパターン
+- `command-create` (v1.0.0): エンティティ作成テンプレート
+- `layer-store` (v1.0.0): UI状態管理パターン（並行制御含む）
+
+詳細: [catalog/README.md](catalog/README.md) | [AI Usage Guide](catalog/AI_USAGE_GUIDE.md)
+
+### Pattern Manifest
+
+`patterns.manifest.json`で、プロジェクトで使用するパターンを宣言的に管理：
+
+```json
+{
+  "catalog_version": "v2025.11.19",
+  "catalog_index": "./catalog/index.json",
+  "selected_patterns": [
+    { "id": "validation-behavior", "version": "1.3.0", "enabled": true, "order": 100 },
+    { "id": "transaction-behavior", "version": "2.0.0", "enabled": true, "order": 400 }
+  ]
+}
+```
+
+- **採用パターンの明示的な選択**: どのパターンを使用するか宣言
+- **Pipeline実行順序の制御**: MediatR Behaviorの実行順序を管理
+- **バージョン管理**: 各パターンのバージョンをトレース可能
+
+詳細: [patterns.manifest.README.md](patterns.manifest.README.md)
 
 ## 🏗️ アーキテクチャ構成
 
@@ -216,7 +271,9 @@ dotnet run
 
 ブラウザで `https://localhost:5001` を開き、上記アカウントでログイン後、「商品管理」を選択します（管理者のみアクセス可）。
 
-## 📊 実装機能
+## 📊 サンプルアプリケーション: Product Catalog
+
+このリポジトリには、アーキテクチャパターンを実証するための**商品管理サンプルアプリケーション**が含まれています。
 
 ### 認証・認可機能
 - **ASP.NET Core Identity**: 本番用認証基盤
@@ -323,15 +380,17 @@ Shared/ (Kernel, Domain, Application, Infrastructure, Platform, Abstractions)
 **目次（全20章）:**
 - **[00_README.md](docs/blazor-guide-package/docs/00_README.md)** - 目次と推奨される読み方
 
+**🤖 AI開発者向け（最重要）:**
+- **[19_AIへの実装ガイド](docs/blazor-guide-package/docs/19_AIへの実装ガイド.md)** - AIが正しく実装を生成するための指針
+- **[02_このプロジェクトについて](docs/blazor-guide-package/docs/02_このプロジェクトについて.md)** - AI駆動開発のための実装パターンカタログ
+- **[05_パターンカタログ一覧](docs/blazor-guide-package/docs/05_パターンカタログ一覧.md)** - 実装済み全パターンの詳細
+
 **主要な章:**
-- [02_このプロジェクトについて](docs/blazor-guide-package/docs/02_このプロジェクトについて.md) - AI駆動開発のための実装パターンカタログ
 - [03_アーキテクチャ概要](docs/blazor-guide-package/docs/03_アーキテクチャ概要.md) - 設計原則と3層アーキテクチャとの対応
-- [05_パターンカタログ一覧](docs/blazor-guide-package/docs/05_パターンカタログ一覧.md) - 実装済み全パターンの詳細
 - [09_UI層の詳細設計](docs/blazor-guide-package/docs/09_UI層の詳細設計.md) - Store/PageActions/Component設計
 - [10_Application層の詳細設計](docs/blazor-guide-package/docs/10_Application層の詳細設計.md) - CQRS/MediatR/Pipeline Behaviors
 - [13_信頼性パターン](docs/blazor-guide-package/docs/13_信頼性パターン.md) - Outbox/リトライ/エラーハンドリング
 - [18_3層アーキテクチャからの移行ガイド](docs/blazor-guide-package/docs/18_3層アーキテクチャからの移行ガイド.md) - WPF/WinForms経験者向け
-- [19_AIへの実装ガイド](docs/blazor-guide-package/docs/19_AIへの実装ガイド.md) - AIが正しく実装を生成するための指針
 
 **完全版（単一ファイル - 自動生成）:**
 - [BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md](docs/blazor-guide-package/BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md) - 全章を結合した完全版（章別ファイルから自動生成）
