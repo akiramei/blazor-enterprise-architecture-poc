@@ -1,5 +1,7 @@
 {
   "$schema": "./patterns.manifest.schema.json",
+  "catalog_version": "v2025.11.19",
+  "last_updated": "2025-11-19",
   "catalog_index": "./catalog/index.json",
   "selected_patterns": [
     {

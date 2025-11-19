@@ -29,7 +29,7 @@
 
 ```json
 {
-  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11"
+  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11.19"
 }
 ```
 
@@ -103,7 +103,7 @@ GitHub Actions が自動的に検証します：
 
 ```json
 {
-  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11"
+  "catalog_index": "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11.19"
 }
 ```
 
@@ -131,4 +131,4 @@ GitHubタグを使用して、安定版を参照。
 
 ---
 
-**最終更新: 2025-11-05**
+**最終更新: 2025-11-19**

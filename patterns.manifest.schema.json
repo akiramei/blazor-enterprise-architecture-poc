@@ -6,12 +6,24 @@
   "type": "object",
   "required": ["catalog_index", "selected_patterns"],
   "properties": {
+    "catalog_version": {
+      "type": "string",
+      "description": "参照するカタログのバージョン（トレーサビリティ用）",
+      "examples": ["v2025.11.19", "v2025.12"]
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date",
+      "description": "最終更新日（YYYY-MM-DD形式）",
+      "examples": ["2025-11-19"]
+    },
     "catalog_index": {
       "type": "string",
       "description": "参照するカタログのURL（GitHubタグ固定推奨）",
       "examples": [
-        "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11",
-        "https://raw.githubusercontent.com/akiramei/blazor-enterprise-architecture-poc/v2025.11/catalog/index.json"
+        "./catalog/index.json",
+        "github:akiramei/blazor-enterprise-architecture-poc/catalog/index.json@v2025.11.19",
+        "https://raw.githubusercontent.com/akiramei/blazor-enterprise-architecture-poc/v2025.11.19/catalog/index.json"
       ]
     },
     "selected_patterns": {
