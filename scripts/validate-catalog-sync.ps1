@@ -156,7 +156,31 @@ Write-Host "3. Template Variable Validation" -ForegroundColor Yellow
 $templateChecks = 0
 $templatePassed = 0
 
-$expectedVariables = @('{Entity}', '{entity}', '{BoundedContext}')
+$expectedVariables = @(
+    # Core template variables
+    '{Entity}', '{entity}', '{BoundedContext}',
+    # Entity properties
+    '{Id}', '{Name}',
+    # Search/Filter parameters
+    '{NameFilter}', '{MinPrice}', '{MaxPrice}', '{Status}',
+    '{Page}', '{PageSize}', '{OrderBy}', '{IsDescending}',
+    # Operation-specific
+    '{Operation}',
+    # Versioning
+    '{Current}', '{Latest}', '{Version}',
+    # Bulk operation results
+    '{SucceededCount}', '{FailedCount}', '{TotalCount}',
+    # Request/Command context
+    '{RequestType}', '{RequestName}', '{CommandType}', '{CommandName}',
+    # Authorization
+    '{Policy}', '{UserName}', '{Roles}',
+    # Idempotency
+    '{IdempotencyKey}',
+    # Logging/Tracing
+    '{RequestId}', '{CorrelationId}', '{ElapsedMs}',
+    # Events
+    '{EventType}', '{OutboxMessageId}'
+)
 
 Get-ChildItem -Path $catalogRoot -Filter "*.yaml" -Recurse | ForEach-Object {
     $content = Get-Content $_.FullName -Raw -Encoding UTF8

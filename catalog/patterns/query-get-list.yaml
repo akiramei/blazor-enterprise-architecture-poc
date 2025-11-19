@@ -166,4 +166,5 @@ evidence:
   query: "src/Application/Features/GetProducts/GetProductsQuery.cs"
   handler: "src/Application/Features/GetProducts/GetProductsQueryHandler.cs"
   dto: "src/Application/Shared/ProductCatalog/Application/DTOs/ProductDto.cs"
-  read_repository: "src/Application/Shared/ProductCatalog/Application/ProductReadRepository.cs"
+  read_repository_interface: "src/Application/Shared/ProductCatalog/Application/IProductReadRepository.cs"
+  read_repository_implementation: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Repositories/DapperProductReadRepository.cs"

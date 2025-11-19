@@ -222,6 +222,7 @@ changelog:
 evidence:
   command: "src/Application/Features/CreateProduct/CreateProductCommand.cs"
   handler: "src/Application/Features/CreateProduct/CreateProductCommandHandler.cs"
-  validator: "src/Application/Features/CreateProduct/CreateProductValidator.cs"
+  validator: "未実装 - FluentValidationは使用していない"
   domain_entity: "src/Domain/ProductCatalog/Products/Product.cs"
-  repository: "src/Application/Shared/ProductCatalog/Application/ProductRepository.cs"
+  repository_interface: "src/Domain/ProductCatalog/Products/IProductRepository.cs"
+  repository_implementation: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Repositories/EfProductRepository.cs"

@@ -581,7 +581,6 @@ evidence:
     validator: "未実装 - 今後の実装予定"
   domain_layer:
     entity: "src/Domain/ProductCatalog/Products/Product.cs"
-    factory_method: "src/Domain/ProductCatalog/Products/Product.cs (Create method)"
   ui_layer:
     store_state: "src/Application/Shared/ProductCatalog/UI/Store/ProductsState.cs"
     store: "src/Application/Shared/ProductCatalog/UI/Store/ProductsStore.cs"
