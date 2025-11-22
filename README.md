@@ -2,6 +2,27 @@
 
 **AI駆動開発を前提とした、工業製品化されたエンタープライズアーキテクチャの実証実験プロジェクト**
 
+---
+
+## 🤖 AI Agents: Start Here
+
+**AIエージェント（Claude、ChatGPT等）は、実装前に以下を必ず読んでください。**
+
+| 順序 | ファイル | 目的 |
+|:---:|----------|------|
+| 1 | **[CLAUDE.md](CLAUDE.md)** | 実装ルール・禁止事項・クイックリファレンス |
+| 2 | **[catalog/AI_USAGE_GUIDE.md](catalog/AI_USAGE_GUIDE.md)** | 詳細な実装ガイド・アーキテクチャ全体像 |
+| 3 | **[catalog/index.json](catalog/index.json)** | パターン索引・意思決定マトリクス |
+
+**Critical Constraints（絶対禁止）:**
+- `SaveChangesAsync()` をHandler内で呼ばない（TransactionBehaviorが自動実行）
+- すべてのサービスは `Scoped` で登録（Singleton不可）
+- エラーは `Result<T>` で返す（例外をthrowしない）
+
+**判断に迷った場合**: `feature-slice` パターンをデフォルトで選択
+
+---
+
 このプロジェクトは、**Vertical Slice Architecture (VSA)** と **Pattern Catalog** を組み合わせ、AIエージェントと人間が協調して開発できる中規模業務アプリケーションの実装パターンを提供します。
 
 **バージョン情報:**

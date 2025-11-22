@@ -1,9 +1,68 @@
 {
   "$schema": "../patterns.manifest.schema.json",
   "version": "v2025.11.19",
-  "last_updated": "2025-11-19",
+  "last_updated": "2025-11-23",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
+  "ai_bootstrap": {
+    "description": "AI エージェントが最初に読むべき情報",
+    "priority_reading_order": [
+      {
+        "order": 1,
+        "file": "CLAUDE.md",
+        "purpose": "critical_constraints",
+        "description": "実装ルール・禁止事項・クイックリファレンス",
+        "required": true
+      },
+      {
+        "order": 2,
+        "file": "catalog/AI_USAGE_GUIDE.md",
+        "purpose": "implementation_guide",
+        "description": "詳細な実装ガイド・アーキテクチャ全体像",
+        "required": true
+      },
+      {
+        "order": 3,
+        "file": "catalog/index.json",
+        "purpose": "pattern_index",
+        "description": "パターン索引・意思決定マトリクス",
+        "required": true
+      },
+      {
+        "order": 4,
+        "file": "patterns.manifest.json",
+        "purpose": "enabled_patterns",
+        "description": "有効なパターン一覧",
+        "required": true
+      },
+      {
+        "order": 5,
+        "file": "catalog/DECISION_FLOWCHART.md",
+        "purpose": "pattern_selection",
+        "description": "パターン選択アルゴリズム",
+        "required": false
+      }
+    ],
+    "skip_if_familiar": [
+      "docs/blazor-guide-package/docs/00_README.md",
+      "docs/architecture/*.md"
+    ],
+    "critical_constraints": {
+      "never_do": [
+        "Handler内でSaveChangesAsync()を呼ばない（TransactionBehaviorが自動実行）",
+        "SingletonでDbContextやScopedサービスを注入しない",
+        "MediatRのHandleメソッド名をHandleAsyncにしない",
+        "独自のCQRS基盤を作らない（MediatRを使用）",
+        "例外をthrowしてエラーを伝播しない（Result<T>を使用）"
+      ],
+      "always_do": [
+        "CommandはResult<T>を返す",
+        "サービスはScopedで登録",
+        "パターンのYAMLを読んでから実装"
+      ]
+    },
+    "default_pattern_on_uncertainty": "feature-slice"
+  },
   "categories": {
     "pipeline-behavior": {
       "name": "Pipeline Behaviors",
