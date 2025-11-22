@@ -10,12 +10,33 @@ description: |
 
 wiring:
   service_registrations:
-    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>))"
+    - registration: "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>))"
+      lifetime: "Scoped"
+      note: "MediatRパイプラインはScopedなので、BehaviorもScopedで登録"
   dependencies:
     nuget:
-      - FluentValidation.DependencyInjectionExtensions: "^11.0.0"
+      - name: "FluentValidation"
+        version: "^11.0.0"
+        required: true
+      - name: "FluentValidation.DependencyInjectionExtensions"
+        version: "^11.0.0"
+        required: true
+      - name: "MediatR"
+        version: "^12.0.0"
+        required: true
+        note: "ValidationBehaviorはMediatRのIPipelineBehaviorを実装"
     assembly_scanner:
       - "services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly())"
+
+  blazor_wasm_notes:
+    - "Blazor WebAssemblyではScopedとSingletonは同じ動作だが、Scopedで統一すること"
+    - "MediatRに依存するサービスは必ずScopedで登録"
+
+  lifetime_rules:
+    - rule: "MediatRに依存するサービスはScopedで登録"
+      reason: "MediatRがScopedなので、依存するサービスもScopedにしないとDIエラー"
+    - rule: "ValidatorはAddValidatorsFromAssemblyで自動登録"
+      reason: "手動登録は漏れの原因になる"
 
 preconditions:
   - "FluentValidation がインストールされている"
@@ -135,9 +156,32 @@ ai_guidance:
   common_mistakes:
     - mistake: "Validator を DI 登録し忘れる"
       solution: "services.AddValidatorsFromAssembly() を呼び出す"
+      severity: "high"
 
     - mistake: "Result 型以外の戻り値を使う"
       solution: "すべての Command/Query は Result または Result<T> を返す"
+      severity: "high"
+
+    - mistake: "Singleton/Scoped混在によるDIエラー"
+      description: "MediatR(Scoped)に依存するサービスをSingletonで登録するとDIエラー"
+      solution: "すべてScopedに統一する"
+      severity: "high"
+      error_message: "Cannot consume scoped service from singleton"
+
+    - mistake: "HandleAsyncメソッド名を使用"
+      description: "MediatRのIRequestHandlerはHandleメソッド（Asyncなし）"
+      solution: "Task<T> Handle(TRequest request, CancellationToken cancellationToken) を使用"
+      severity: "medium"
+
+    - mistake: "独自のCQRS/Mediator実装を作成"
+      description: "このプロジェクトはMediatRを使用しており、独自実装は不要"
+      solution: "MediatRのIRequest<T>とIRequestHandler<TRequest, TResponse>を使用"
+      severity: "critical"
+
+    - mistake: "FluentValidationをインストールせずにValidator作成"
+      description: "AbstractValidator<T>はFluentValidationパッケージに含まれる"
+      solution: "dotnet add package FluentValidation.DependencyInjectionExtensions"
+      severity: "high"
 
 changelog:
   - version: 1.3.0

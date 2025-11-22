@@ -14,13 +14,31 @@ description: |
 
 wiring:
   service_registrations:
-    - "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>))"
+    - registration: "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>))"
+      lifetime: "Scoped"
+      note: "DbContextがScopedなので、BehaviorもScopedで登録"
   dependencies:
     nuget:
-      - Microsoft.EntityFrameworkCore: "^8.0.0"
+      - name: "Microsoft.EntityFrameworkCore"
+        version: "^8.0.0"
+        required: true
+      - name: "MediatR"
+        version: "^12.0.0"
+        required: true
+        note: "IPipelineBehavior<,>を提供"
     domain:
       - Shared.Domain.Outbox.OutboxMessage
       - Shared.Kernel.Entity
+
+  blazor_wasm_notes:
+    - "Blazor WebAssemblyではScopedとSingletonは同じ動作だが、Scopedで統一すること"
+    - "DbContextに依存するサービスは必ずScopedで登録"
+
+  lifetime_rules:
+    - rule: "DbContextに依存するサービスはScopedで登録"
+      reason: "DbContextがScopedなので、依存するサービスもScopedにしないとDIエラー"
+    - rule: "TransactionBehaviorはBounded Context固有の実装"
+      reason: "各Bounded Contextは独自のDbContextを持つため"
 
 preconditions:
   - "{BoundedContext}DbContext が DbContext を継承している"
@@ -236,16 +254,33 @@ ai_guidance:
 
   common_mistakes:
     - mistake: "Handler 内で SaveChangesAsync を呼び出す"
-      solution: "TransactionBehavior が自動で SaveChangesAsync を呼ぶため不要"
+      description: "TransactionBehaviorがパイプラインで自動的にSaveChangesAsyncを呼ぶ"
+      solution: "Handler内でSaveChangesAsyncを呼ばない。TransactionBehaviorに任せる"
+      severity: "high"
 
     - mistake: "ネストしたトランザクションを開始しようとする"
       solution: "CurrentTransaction をチェックしてスキップする"
+      severity: "medium"
 
     - mistake: "Query に ICommand を実装する"
+      description: "ICommandを実装するとTransactionBehaviorが動作してしまう"
       solution: "Query は IQuery、Command は ICommand を実装する"
+      severity: "high"
 
     - mistake: "Result.Fail時にドメインイベントが発行される"
       solution: "Success時のみドメインイベントをOutboxに保存"
+      severity: "medium"
+
+    - mistake: "Singleton/Scoped混在によるDIエラー"
+      description: "DbContext(Scoped)に依存するサービスをSingletonで登録するとDIエラー"
+      solution: "TransactionBehavior、DbContext、RepositoryはすべてScopedで登録"
+      severity: "high"
+      error_message: "Cannot consume scoped service from singleton"
+
+    - mistake: "独自のトランザクション管理を実装"
+      description: "このプロジェクトはTransactionBehaviorでトランザクションを管理している"
+      solution: "TransactionBehaviorに任せる。独自のBeginTransaction/Commitは不要"
+      severity: "critical"
 
   bounded_context_notes: |
     このBehaviorはBounded Context固有の実装です。

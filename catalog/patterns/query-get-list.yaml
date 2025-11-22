@@ -11,7 +11,28 @@ dependencies:
   patterns:
     - caching-behavior
   nuget:
-    - Dapper: "^2.1.0"
+    - name: "MediatR"
+      version: "^12.0.0"
+      required: true
+      note: "IRequest<T>とIRequestHandler<,>を提供"
+    - name: "Dapper"
+      version: "^2.1.0"
+      required: true
+      note: "Read Modelの高速クエリ用"
+
+wiring:
+  service_registrations:
+    - registration: "services.AddScoped<I{Entity}ReadRepository, Dapper{Entity}ReadRepository>()"
+      lifetime: "Scoped"
+      note: "ReadRepositoryはScopedで登録"
+
+  blazor_wasm_notes:
+    - "Blazor WebAssemblyではScopedとSingletonは同じ動作だが、Scopedで統一すること"
+    - "MediatRに依存するサービスは必ずScopedで登録"
+
+  lifetime_rules:
+    - rule: "QueryHandler、ReadRepositoryはすべてScopedで登録"
+      reason: "MediatRがScopedなので、依存するサービスもScopedにしないとDIエラー"
 
 implementation:
   file_path: "src/Application/Features/Get{Entity}s/Get{Entity}sQuery.cs"
@@ -142,14 +163,43 @@ ai_guidance:
     - "条件検索が必要な場合 → SearchQuery を使用"
 
   common_mistakes:
+    - mistake: "独自のCQRS/Mediator実装を作成"
+      description: "このプロジェクトはMediatRを使用しており、独自のQuery/Handler基盤は不要"
+      solution: "MediatRのIRequest<T>とIRequestHandler<TRequest, TResponse>を使用"
+      severity: "critical"
+
     - mistake: "ICacheableQuery を実装し忘れる"
       solution: "頻繁にアクセスされるクエリには必ずキャッシュを実装"
+      severity: "medium"
 
     - mistake: "大量データを全件取得しようとする"
       solution: "1000件以上の場合は SearchQuery + Paging パターンを使用"
+      severity: "high"
 
     - mistake: "削除済みデータをフィルタしない"
       solution: "WHERE IsDeleted = 0 を必ず追加"
+      severity: "high"
+
+    - mistake: "Singleton/Scoped混在によるDIエラー"
+      description: "MediatR(Scoped)に依存するサービスをSingletonで登録するとDIエラー"
+      solution: "QueryHandler、ReadRepositoryはすべてScopedで登録"
+      severity: "high"
+      error_message: "Cannot consume scoped service from singleton"
+
+    - mistake: "HandleAsyncメソッド名を使用"
+      description: "MediatRのIRequestHandlerはHandleメソッド（Asyncなし）"
+      solution: "Task<T> Handle(TRequest request, CancellationToken cancellationToken) を使用"
+      severity: "medium"
+
+    - mistake: "QueryでEF Coreを使用"
+      description: "このプロジェクトはCQRSを採用しており、QueryはDapper（Read Model）を使用"
+      solution: "ReadRepositoryをDapperで実装し、EF Coreは書き込み側でのみ使用"
+      severity: "medium"
+
+    - mistake: "MediatRパッケージをインストールせずにQuery作成"
+      description: "IRequest<T>、IRequestHandler<,>はMediatRパッケージに含まれる"
+      solution: "dotnet add package MediatR"
+      severity: "critical"
 
 performance:
   without_cache: "50-100ms (データベースクエリ)"

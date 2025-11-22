@@ -4,6 +4,42 @@
 
 ---
 
+## 🚨 実装前に必ず読むこと（MUST READ）
+
+**独自実装による手戻りを防ぐため、以下の手順を必ず実行してください。**
+
+### なぜカタログ参照が必須なのか
+
+このプロジェクトは MediatR + FluentValidation + Pipeline Behaviors を使用しています。
+カタログを参照せずに実装すると、以下の問題が発生します：
+
+| よくある失敗 | 原因 | 結果 |
+|-------------|------|------|
+| 独自CQRS実装 | MediatRの存在を知らない | 全面的な書き直し |
+| DIライフタイム不一致 | Singleton/Scoped混在 | 実行時エラー |
+| HandleAsyncメソッド名 | MediatRはHandle | コンパイルエラー |
+| SaveChangesAsync呼び出し | TransactionBehaviorが自動実行 | 二重保存 |
+
+### 実装前チェックリスト
+
+```
+□ catalog/index.json を読んだか？
+□ 該当パターンの YAML を読んだか？
+□ wiring セクションの依存パッケージを確認したか？
+□ ai_guidance.common_mistakes を確認したか？
+```
+
+**このチェックリストをスキップすると、独自実装→修正の手戻りが発生します。**
+
+### クイックスタート
+
+1. **まず `catalog/index.json` を読む**
+2. **該当パターンの YAML を読む**（例: `catalog/patterns/command-create.yaml`）
+3. **`wiring` セクションを確認** → 必要なNuGetパッケージとDI登録
+4. **`ai_guidance.common_mistakes` を確認** → 陥りやすいミスを回避
+
+---
+
 ## 📚 カタログの構造
 
 ```

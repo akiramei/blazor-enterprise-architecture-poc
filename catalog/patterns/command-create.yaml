@@ -13,7 +13,41 @@ dependencies:
     - transaction-behavior
     - idempotency-behavior
   nuget:
-    - FluentValidation: "^11.0.0"
+    - name: "MediatR"
+      version: "^12.0.0"
+      required: true
+      note: "Command/Handlerの基盤。IRequest<T>とIRequestHandler<,>を提供"
+    - name: "FluentValidation"
+      version: "^11.0.0"
+      required: true
+    - name: "FluentValidation.DependencyInjectionExtensions"
+      version: "^11.0.0"
+      required: true
+      note: "AddValidatorsFromAssembly()を提供"
+
+wiring:
+  service_registrations:
+    - registration: |
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            cfg.AddOpenBehavior(typeof(TransactionBehavior<,>));
+        });
+      lifetime: "Scoped"
+      note: "MediatRとPipeline Behaviorsの登録"
+    - registration: "services.AddValidatorsFromAssembly(typeof(Program).Assembly)"
+      note: "FluentValidationのValidator自動登録"
+
+  blazor_wasm_notes:
+    - "Blazor WebAssemblyではScopedとSingletonは同じ動作だが、Scopedで統一すること"
+    - "MediatRに依存するサービスは必ずScopedで登録"
+
+  lifetime_rules:
+    - rule: "CommandHandler、Repository、DbContextはすべてScopedで登録"
+      reason: "MediatRがScopedなので、依存するサービスもScopedにしないとDIエラー"
+    - rule: "SingletonでMediatRを使うサービスを登録しない"
+      reason: "Cannot consume scoped service from singletonエラーが発生"
 
 implementation:
   file_path: "src/Application/Features/Create{Entity}/Create{Entity}Command.cs"
@@ -188,17 +222,48 @@ ai_guidance:
     - "一括作成 → BulkCreateCommand を使用"
 
   common_mistakes:
+    - mistake: "独自のCQRS/Mediator実装を作成"
+      description: "このプロジェクトはMediatRを使用しており、独自のCommand/Handler基盤は不要"
+      solution: "MediatRのIRequest<T>とIRequestHandler<TRequest, TResponse>を使用"
+      severity: "critical"
+
     - mistake: "ドメインロジックを Handler に書く"
       solution: "ビジネスルールは Domain/{Entity}.cs に実装"
+      severity: "medium"
 
     - mistake: "SaveChangesAsync を呼び出す"
-      solution: "TransactionBehavior が自動で SaveChangesAsync を呼ぶため不要"
+      description: "TransactionBehaviorがパイプラインで自動的にSaveChangesAsyncを呼ぶ"
+      solution: "Handler内でSaveChangesAsyncを呼ばない。TransactionBehaviorに任せる"
+      severity: "high"
 
     - mistake: "IdempotencyKey を毎回新しく生成する"
       solution: "画面表示時に1回だけ生成し、再試行時は同じ値を使う"
+      severity: "medium"
 
     - mistake: "作成後にキャッシュをクリアしない"
       solution: "一覧画面のキャッシュを無効化する（Create後にStore.LoadAsync()を呼ぶ）"
+      severity: "low"
+
+    - mistake: "Singleton/Scoped混在によるDIエラー"
+      description: "MediatR(Scoped)に依存するサービスをSingletonで登録するとDIエラー"
+      solution: "CommandHandler、Repository、DbContextはすべてScopedで登録"
+      severity: "high"
+      error_message: "Cannot consume scoped service from singleton"
+
+    - mistake: "HandleAsyncメソッド名を使用"
+      description: "MediatRのIRequestHandlerはHandleメソッド（Asyncなし）"
+      solution: "Task<T> Handle(TRequest request, CancellationToken cancellationToken) を使用"
+      severity: "medium"
+
+    - mistake: "MediatRパッケージをインストールせずにCommand作成"
+      description: "IRequest<T>、IRequestHandler<,>はMediatRパッケージに含まれる"
+      solution: "dotnet add package MediatR"
+      severity: "critical"
+
+    - mistake: "Program.csでMediatRを登録し忘れる"
+      description: "MediatRは明示的にDI登録が必要"
+      solution: "services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly))"
+      severity: "critical"
 
 performance:
   typical_duration: "20-50ms"
