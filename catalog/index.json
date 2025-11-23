@@ -311,6 +311,16 @@
       "stability": "stable"
     },
     {
+      "id": "undo-redo-pattern",
+      "name": "Undo/Redo Pattern (UI State Management)",
+      "category": "ui-pattern",
+      "version": "1.0.0",
+      "file": "patterns/undo-redo-pattern.yaml",
+      "intent": "ユーザー操作の取り消し・やり直し機能をUI層の責務として実装",
+      "tags": ["undo", "redo", "history", "ui-state", "blazor"],
+      "stability": "stable"
+    },
+    {
       "id": "feature-approval-workflow",
       "name": "Approval Workflow Feature Slice",
       "category": "feature-slice",

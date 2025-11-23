@@ -1,0 +1,589 @@
+id: undo-redo-pattern
+version: 1.0.0
+name: Undo/Redo Pattern (UI State Management)
+category: ui-pattern
+intent: ユーザー操作の取り消し・やり直し機能をUI層の責務として実装する
+description: |
+  Undo/Redoパターンは、ユーザー操作の履歴管理をUI層で行い、
+  操作の取り消し可否判定はBoundary経由で行う設計パターン。
+
+  重要な設計原則:
+  - Undo/Redo履歴管理はUI層の責務
+  - 操作の取り消し可否判定はBoundary（ドメイン層）の責務
+  - 実際の操作はCommand経由で実行（Actionが直接Commandを呼ばない）
+
+scope: ui-pattern
+layers:
+  - ui
+  - application
+  - domain
+
+ai_selection_hints:
+  trigger_phrases:
+    - "元に戻す"
+    - "やり直し"
+    - "Undo"
+    - "Redo"
+    - "取り消し"
+    - "履歴管理"
+
+  confidence_keywords:
+    high:    ["Undo", "Redo", "元に戻す", "やり直し", "取り消し"]
+    medium:  ["履歴", "操作履歴", "Ctrl+Z"]
+    low:     ["戻る", "キャンセル"]
+
+  anti_patterns:
+    - "ブラウザ履歴"        # ナビゲーション → 別の機能
+    - "監査ログ"           # AuditLogBehavior
+    - "バージョン管理"      # Git的な機能
+
+  typical_requests:
+    - "カード移動を元に戻せるようにしたい"
+    - "Ctrl+Zで操作を取り消したい"
+    - "Undo/Redo機能を実装したい"
+    - "最後の操作をやり直したい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. ユーザー操作を取り消し可能にしたい
+    2. 複数ステップの操作履歴を管理したい
+    3. Ctrl+Z / Ctrl+Y のショートカットを実装したい
+
+    このパターンを選択すべきでない条件:
+    1. 監査ログ（誰が何をしたか）→ AuditLogBehavior
+    2. データのバージョン管理 → 別のパターン
+    3. ブラウザ履歴・ナビゲーション → NavigationManager
+
+relationship:
+  works_with:
+    - boundary-pattern (操作可否判定)
+    - layer-store (状態管理)
+    - layer-pageactions (UI手順)
+
+  dependencies:
+    - MediatR (Command実行)
+    - Boundary (操作可否判定)
+
+design_principle: |
+  責務の分離:
+
+  | 責務 | 配置場所 | 説明 |
+  |-----|---------|------|
+  | 履歴管理（50件制限など） | UI層（UndoRedoManager） | スタック管理、履歴数制限 |
+  | 「元に戻す」ボタン表示 | UI層（Component） | CanUndo で有効/無効切替 |
+  | 取り消し可否判定 | Domain層（Boundary） | ビジネスルールに基づく判定 |
+  | 実際の操作実行 | Application層（Command） | MediatR経由で実行 |
+
+  設計選択肢:
+
+  | 方式 | 適用場面 | 複雑度 | 説明 |
+  |-----|---------|-------|------|
+  | Command逆操作 | 単純な操作 | 低 | Undoコマンドを別途定義 |
+  | ドメインイベント | イベント駆動設計 | 中 | イベントから逆操作を復元 |
+  | Memento（スナップショット） | 複雑な状態復元 | 高 | 状態全体を保存・復元 |
+
+  推奨: 単純な操作には「Command逆操作」方式を使用
+
+file_structure: |
+  src/Application/
+  ├── Stores/UndoRedo/
+  │   ├── UndoRedoManager.cs           # 履歴管理（UI層）
+  │   ├── IUndoableAction.cs           # Undoable操作インターフェース
+  │   └── Actions/
+  │       └── MoveCardAction.cs        # 個別操作の定義
+  │
+  ├── Features/{Feature}/
+  │   ├── {Operation}Command.cs        # 順方向操作
+  │   └── Undo{Operation}Command.cs    # 逆方向操作（Undo用）
+  │
+  └── Shared/{BC}/
+      └── Boundaries/
+          └── I{Aggregate}Boundary.cs  # CanUndo判定を含む
+
+implementation:
+  # ===== IUndoableAction (インターフェース) =====
+  interface:
+    file_path: "src/Application/Stores/UndoRedo/IUndoableAction.cs"
+    template: |
+      namespace Application.Stores.UndoRedo;
+
+      /// <summary>
+      /// Undoable操作インターフェース
+      ///
+      /// 【パターン: Undo/Redo Pattern】
+      ///
+      /// 責務:
+      /// - 操作の実行（Execute）
+      /// - 操作の取り消し（Undo）
+      /// - 操作の説明（表示用）
+      ///
+      /// AI実装時の注意:
+      /// - ExecuteAsync/UndoAsyncは直接Commandを呼ばない
+      /// - PageActions経由でCommandを実行する
+      /// - Boundary経由で可否判定を行う
+      /// </summary>
+      public interface IUndoableAction
+      {
+          /// <summary>操作の説明（UI表示用）</summary>
+          string Description { get; }
+
+          /// <summary>操作を実行</summary>
+          Task<bool> ExecuteAsync();
+
+          /// <summary>操作を取り消し</summary>
+          Task<bool> UndoAsync();
+
+          /// <summary>取り消し可能か判定</summary>
+          bool CanUndo { get; }
+
+          /// <summary>やり直し可能か判定</summary>
+          bool CanRedo { get; }
+      }
+
+  # ===== UndoRedoManager (履歴管理) =====
+  manager:
+    file_path: "src/Application/Stores/UndoRedo/UndoRedoManager.cs"
+    template: |
+      namespace Application.Stores.UndoRedo;
+
+      /// <summary>
+      /// Undo/Redo履歴管理
+      ///
+      /// 【パターン: Undo/Redo Pattern】
+      ///
+      /// 責務:
+      /// - 操作履歴のスタック管理
+      /// - 履歴数制限（MaxHistorySize）
+      /// - Undo/Redo実行の制御
+      ///
+      /// AI実装時の注意:
+      /// - UI層の責務として実装
+      /// - Singletonではなく適切なスコープで管理
+      /// - 状態変更時にイベント通知（StateHasChanged用）
+      /// </summary>
+      public class UndoRedoManager
+      {
+          private readonly Stack<IUndoableAction> _undoStack = new();
+          private readonly Stack<IUndoableAction> _redoStack = new();
+          private readonly int _maxHistorySize;
+
+          /// <summary>状態変更通知</summary>
+          public event Action? OnStateChanged;
+
+          public UndoRedoManager(int maxHistorySize = 50)
+          {
+              _maxHistorySize = maxHistorySize;
+          }
+
+          /// <summary>Undo可能か</summary>
+          public bool CanUndo => _undoStack.Count > 0 && _undoStack.Peek().CanUndo;
+
+          /// <summary>Redo可能か</summary>
+          public bool CanRedo => _redoStack.Count > 0 && _redoStack.Peek().CanRedo;
+
+          /// <summary>Undo履歴数</summary>
+          public int UndoCount => _undoStack.Count;
+
+          /// <summary>Redo履歴数</summary>
+          public int RedoCount => _redoStack.Count;
+
+          /// <summary>
+          /// 操作を実行して履歴に追加
+          /// </summary>
+          public async Task<bool> ExecuteAsync(IUndoableAction action)
+          {
+              var success = await action.ExecuteAsync();
+              if (success)
+              {
+                  _undoStack.Push(action);
+                  _redoStack.Clear();  // 新操作でRedo履歴クリア
+
+                  // 履歴数制限
+                  TrimHistory();
+
+                  OnStateChanged?.Invoke();
+              }
+              return success;
+          }
+
+          /// <summary>
+          /// 直前の操作を取り消し
+          /// </summary>
+          public async Task<bool> UndoAsync()
+          {
+              if (!CanUndo) return false;
+
+              var action = _undoStack.Pop();
+              var success = await action.UndoAsync();
+              if (success)
+              {
+                  _redoStack.Push(action);
+                  OnStateChanged?.Invoke();
+              }
+              else
+              {
+                  // 失敗時はスタックに戻す
+                  _undoStack.Push(action);
+              }
+              return success;
+          }
+
+          /// <summary>
+          /// 取り消した操作をやり直し
+          /// </summary>
+          public async Task<bool> RedoAsync()
+          {
+              if (!CanRedo) return false;
+
+              var action = _redoStack.Pop();
+              var success = await action.ExecuteAsync();
+              if (success)
+              {
+                  _undoStack.Push(action);
+                  OnStateChanged?.Invoke();
+              }
+              else
+              {
+                  _redoStack.Push(action);
+              }
+              return success;
+          }
+
+          /// <summary>履歴をクリア</summary>
+          public void Clear()
+          {
+              _undoStack.Clear();
+              _redoStack.Clear();
+              OnStateChanged?.Invoke();
+          }
+
+          private void TrimHistory()
+          {
+              while (_undoStack.Count > _maxHistorySize)
+              {
+                  // 古い履歴を削除（Stackなので一時的に別のコレクションに移す必要あり）
+                  var items = _undoStack.ToList();
+                  items.RemoveAt(items.Count - 1);
+                  _undoStack.Clear();
+                  foreach (var item in items.AsEnumerable().Reverse())
+                  {
+                      _undoStack.Push(item);
+                  }
+              }
+          }
+      }
+
+  # ===== Action実装例 (正しいパターン) =====
+  action_correct:
+    file_path: "src/Application/Stores/UndoRedo/Actions/MoveCardAction.cs"
+    template: |
+      using Application.Features.Kanban.MoveCard;
+      using Domain.Kanban.Boards.Boundaries;
+
+      namespace Application.Stores.UndoRedo.Actions;
+
+      /// <summary>
+      /// カード移動アクション
+      ///
+      /// 【パターン: Undo/Redo Pattern - 正しい実装】
+      ///
+      /// 責務:
+      /// - 移動前後の状態を保持
+      /// - PageActions経由でCommand実行
+      /// - Boundary経由で可否判定
+      ///
+      /// AI実装時の注意:
+      /// - ❌ MediatRを直接呼ばない
+      /// - ✅ PageActions経由でCommandを実行
+      /// - ✅ Boundary経由で可否判定
+      /// </summary>
+      public class MoveCardAction : IUndoableAction
+      {
+          private readonly IKanbanPageActions _pageActions;
+          private readonly IBoardBoundary _boundary;
+
+          // 移動情報
+          private readonly Guid _cardId;
+          private readonly Guid _fromColumnId;
+          private readonly int _fromPosition;
+          private readonly Guid _toColumnId;
+          private readonly int _toPosition;
+
+          public string Description => $"カードを移動";
+
+          public MoveCardAction(
+              IKanbanPageActions pageActions,
+              IBoardBoundary boundary,
+              Guid cardId,
+              Guid fromColumnId,
+              int fromPosition,
+              Guid toColumnId,
+              int toPosition)
+          {
+              _pageActions = pageActions;
+              _boundary = boundary;
+              _cardId = cardId;
+              _fromColumnId = fromColumnId;
+              _fromPosition = fromPosition;
+              _toColumnId = toColumnId;
+              _toPosition = toPosition;
+          }
+
+          public bool CanUndo
+          {
+              get
+              {
+                  // Boundary経由で取り消し可否を判定
+                  var decision = _boundary.CanMoveCard(_cardId, _fromColumnId);
+                  return decision.IsAllowed;
+              }
+          }
+
+          public bool CanRedo
+          {
+              get
+              {
+                  var decision = _boundary.CanMoveCard(_cardId, _toColumnId);
+                  return decision.IsAllowed;
+              }
+          }
+
+          public async Task<bool> ExecuteAsync()
+          {
+              // PageActions経由でCommand実行（直接MediatRを呼ばない）
+              var result = await _pageActions.MoveCardAsync(
+                  _cardId, _toColumnId, _toPosition);
+              return result.IsSuccess;
+          }
+
+          public async Task<bool> UndoAsync()
+          {
+              // 逆操作: 元の位置に戻す
+              var result = await _pageActions.MoveCardAsync(
+                  _cardId, _fromColumnId, _fromPosition);
+              return result.IsSuccess;
+          }
+      }
+
+  # ===== Action実装例 (よくある間違い) =====
+  action_wrong:
+    description: "❌ よくある間違い - 直接MediatRを呼ぶ"
+    template: |
+      // ❌ 間違った実装例
+      public class MoveCardAction_Wrong : IUndoableAction
+      {
+          private readonly IMediator _mediator;  // ❌ 直接MediatRを注入
+
+          public async Task<bool> ExecuteAsync()
+          {
+              // ❌ 問題点:
+              // 1. MediatRを直接呼んでいる（密結合）
+              // 2. Boundary判定をバイパスしている
+              // 3. PageActionsの責務を侵害している
+              await _mediator.Send(new MoveCardCommand(...));
+              return true;
+          }
+      }
+
+  # ===== Boundary拡張 =====
+  boundary_extension:
+    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/I{Aggregate}Boundary.cs"
+    template: |
+      /// <summary>
+      /// Undo/Redo用のBoundary拡張
+      /// </summary>
+      public interface I{Aggregate}Boundary
+      {
+          // 既存のメソッド...
+
+          /// <summary>
+          /// 操作の取り消しが可能か判定
+          /// </summary>
+          /// <param name="actionType">操作種別</param>
+          /// <param name="entityId">対象エンティティ</param>
+          BoundaryDecision CanUndo(string actionType, Guid entityId);
+
+          /// <summary>
+          /// カード移動が可能か判定（Undo/Redo両方で使用）
+          /// </summary>
+          BoundaryDecision CanMoveCard(Guid cardId, Guid targetColumnId);
+      }
+
+  # ===== UI使用例 =====
+  usage_ui:
+    file_path: "src/Application/Features/{Feature}/UI/{Feature}Page.razor"
+    template: |
+      @* Undo/Redo使用例 *@
+
+      @inject UndoRedoManager UndoRedoManager
+
+      <div class="toolbar">
+          <button @onclick="UndoAsync"
+                  disabled="@(!UndoRedoManager.CanUndo)"
+                  title="元に戻す (Ctrl+Z)">
+              Undo (@UndoRedoManager.UndoCount)
+          </button>
+
+          <button @onclick="RedoAsync"
+                  disabled="@(!UndoRedoManager.CanRedo)"
+                  title="やり直し (Ctrl+Y)">
+              Redo (@UndoRedoManager.RedoCount)
+          </button>
+      </div>
+
+      @code {
+          protected override void OnInitialized()
+          {
+              UndoRedoManager.OnStateChanged += StateHasChanged;
+          }
+
+          private async Task UndoAsync()
+          {
+              await UndoRedoManager.UndoAsync();
+          }
+
+          private async Task RedoAsync()
+          {
+              await UndoRedoManager.RedoAsync();
+          }
+
+          // キーボードショートカット
+          private async Task HandleKeyDown(KeyboardEventArgs e)
+          {
+              if (e.CtrlKey && e.Key == "z")
+              {
+                  await UndoAsync();
+              }
+              else if (e.CtrlKey && e.Key == "y")
+              {
+                  await RedoAsync();
+              }
+          }
+
+          public void Dispose()
+          {
+              UndoRedoManager.OnStateChanged -= StateHasChanged;
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "ユーザー操作を取り消し可能にしたい"
+    - "Ctrl+Z / Ctrl+Y を実装したい"
+    - "操作履歴を管理したい"
+
+  when_not_to_use:
+    - "監査ログ（誰が何をしたか）→ AuditLogBehavior"
+    - "データのバージョン管理 → 別のパターン"
+    - "ブラウザ履歴 → NavigationManager"
+
+  implementation_steps:
+    - step: 1
+      description: "IUndoableActionインターフェースを定義"
+      files: ["IUndoableAction.cs"]
+    - step: 2
+      description: "UndoRedoManagerを実装"
+      files: ["UndoRedoManager.cs"]
+    - step: 3
+      description: "Boundaryに取り消し可否判定を追加"
+      files: ["I{Aggregate}Boundary.cs"]
+    - step: 4
+      description: "個別のActionを実装（PageActions経由）"
+      files: ["Actions/{Operation}Action.cs"]
+    - step: 5
+      description: "UIにUndo/Redoボタンを追加"
+      files: ["{Feature}Page.razor"]
+    - step: 6
+      description: "DIに登録（Scoped推奨）"
+      files: ["Program.cs"]
+
+  common_mistakes:
+    - mistake: "ActionがMediatRを直接呼ぶ"
+      solution: "PageActions経由でCommandを実行。Actionはオーケストレーション層を使う。"
+    - mistake: "Boundary判定をバイパスする"
+      solution: "CanUndo/CanRedoでBoundary経由の判定を行う。"
+    - mistake: "Storeでドメイン検索ロジックを書く"
+      solution: "元の状態取得はBoundaryまたはQueryService経由で行う。"
+    - mistake: "UndoRedoManagerをSingletonで登録"
+      solution: "ユーザーセッション単位で管理。Scopedまたは画面単位で生成。"
+    - mistake: "履歴数を無制限にする"
+      solution: "MaxHistorySizeで制限（推奨: 50件程度）。メモリ消費を抑える。"
+    - mistake: "Execute失敗時にRedo履歴をクリアしない"
+      solution: "新しい操作成功時のみRedo履歴をクリア。"
+
+  key_patterns:
+    - pattern: "UndoRedoManager"
+      description: "履歴管理のUI層コンポーネント。Undo/Redoスタックを管理。"
+    - pattern: "IUndoableAction"
+      description: "Undoable操作のインターフェース。Execute/Undo/CanUndo/CanRedoを定義。"
+    - pattern: "PageActions経由"
+      description: "ActionはPageActionsを呼び、PageActionsがCommandを実行。直接MediatRを呼ばない。"
+    - pattern: "Boundary判定"
+      description: "CanUndo/CanRedoはBoundary経由でビジネスルールをチェック。"
+
+  design_decision:
+    approach_comparison: |
+      Undo/Redo実装方式の比較:
+
+      | 方式 | 長所 | 短所 | 適用場面 |
+      |-----|------|------|---------|
+      | Command逆操作 | シンプル、理解しやすい | 逆操作Commandを別途定義 | 単純な操作 |
+      | ドメインイベント | イベント駆動と整合 | イベント設計が必要 | DDD徹底時 |
+      | Memento | 複雑な状態も復元可 | メモリ消費大 | 複雑な状態 |
+
+      推奨: まず「Command逆操作」方式で実装し、必要に応じて拡張
+
+    responsibility_separation: |
+      責務の分離（重要）:
+
+      ❌ 間違い: Action → MediatR → Handler
+         - Boundaryをバイパス
+         - PageActionsの責務を侵害
+
+      ✅ 正しい: Action → PageActions → MediatR → Handler
+         - Boundary経由で可否判定
+         - 責務が明確
+
+    testing_strategy: |
+      テスト戦略:
+
+      1. UndoRedoManagerの単体テスト:
+         - 履歴スタックの動作
+         - 履歴数制限の動作
+         - CanUndo/CanRedoの判定
+
+      2. Actionの単体テスト:
+         - Execute/Undoの動作
+         - Boundary判定の連携
+
+      3. 統合テスト:
+         - UI → UndoRedoManager → PageActions → Command
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<UndoRedoManager>();"
+
+  dependencies:
+    nuget: []
+    patterns:
+      - "boundary-pattern (操作可否判定)"
+      - "layer-pageactions (オーケストレーション)"
+      - "layer-store (状態管理)"
+
+evidence:
+  notes: |
+    このパターンはカンバンシステム実装時のフィードバックから生まれました。
+    当初の実装ではActionがMediatRを直接呼んでいたため、
+    Boundaryをバイパスし、責務が曖昧になる問題がありました。
+
+    このパターンでは、責務の分離を明確にし、
+    UI層・Application層・Domain層の役割を適切に定義しています。
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-23
+    changes:
+      - "初版リリース"
+      - "カンバンシステム実装のフィードバックからパターン化"
+      - "責務分離（UI層/Boundary/PageActions）を明確化"
+      - "よくある間違いと正しい実装パターンを文書化"
