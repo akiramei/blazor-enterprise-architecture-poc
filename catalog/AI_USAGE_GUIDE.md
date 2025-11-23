@@ -8,6 +8,10 @@
 
 **独自実装による手戻りを防ぐため、以下の手順を必ず実行してください。**
 
+> **⚠️ まず [COMMON_MISTAKES.md](COMMON_MISTAKES.md) を読んでください**
+>
+> 頻出する実装ミス（SaveChangesAsync重複、Value Object比較、Boundary判定など）がまとまっています。
+
 ### なぜカタログ参照が必須なのか
 
 このプロジェクトは MediatR + FluentValidation + Pipeline Behaviors を使用しています。

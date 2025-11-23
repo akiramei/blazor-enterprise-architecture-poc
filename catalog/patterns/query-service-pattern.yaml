@@ -1,0 +1,377 @@
+id: query-service-pattern
+version: 1.0.0
+name: Query Service Pattern (CQRS Query Side)
+category: query-pattern
+intent: Query HandlerからDbContext直接使用を排除し、Query側の実装を統一する
+description: |
+  CQRS Query側の実装一貫性パターン。
+  Command側はRepository経由で統一されているが、Query側はDbContext直接使用が混在しがち。
+  QueryServiceを導入することで、AsNoTracking最適化の適用を統一し、
+  読み取り専用クエリの再利用性を向上させる。
+
+  Command側: Repository（集約ルートの保護、書き込み最適化）
+  Query側 : QueryService（AsNoTracking最適化、読み取り専用）
+
+scope: query-pattern
+layers:
+  - application
+  - infrastructure
+
+ai_selection_hints:
+  trigger_phrases:
+    - "Query統一"
+    - "読み取り専用"
+    - "AsNoTracking"
+    - "QueryService"
+    - "CQRS Query側"
+
+  confidence_keywords:
+    high:    ["QueryService", "AsNoTracking", "読み取り専用クエリ"]
+    medium:  ["Query", "検索", "取得"]
+    low:     ["一覧", "リスト"]
+
+  anti_patterns:
+    - "単純なGetById"      # Repositoryで十分
+    - "書き込み操作"        # Command側 → Repository
+
+  typical_requests:
+    - "Query HandlerでDbContextを直接使っているのを統一したい"
+    - "AsNoTrackingの適用を統一したい"
+    - "複数のHandlerで同じクエリロジックを共有したい"
+    - "CQRS Query側の実装パターンを統一したい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 複数のQuery Handlerで同じクエリロジックを共有したい
+    2. AsNoTracking最適化を確実に適用したい
+    3. Query側の実装を統一したい
+    4. 複雑な結合クエリがある
+
+    このパターンを選択すべきでない条件:
+    1. 単純なGetById → Repositoryで十分
+    2. 1つのHandlerでしか使わない単純なクエリ → Handler内で直接実装
+    3. Command側の操作 → Repository
+
+relationship:
+  works_with:
+    - query-get-list (基本的なリスト取得)
+    - feature-search-entity (検索機能)
+
+  dependencies:
+    - DbContext
+    - EF Core
+
+design_principle: |
+  CQRS Query/Command 分離の原則:
+
+  | 側 | 責務 | 実装方法 | 最適化 |
+  |---|------|---------|--------|
+  | Command | 書き込み | Repository | 変更追跡あり |
+  | Query | 読み取り | QueryService | AsNoTracking |
+
+  なぜQueryServiceが必要か:
+
+  問題:
+  - Query HandlerでDbContextを直接使うと、AsNoTrackingの適用が不統一
+  - 同じクエリロジックが複数のHandlerに重複
+  - テスト時にDbContextのモックが困難
+
+  解決:
+  - QueryServiceでクエリロジックを集約
+  - AsNoTrackingをサービス内で統一適用
+  - インターフェース経由でテスト可能
+
+file_structure: |
+  src/Application/Shared/{BoundedContext}/
+  ├── Application/Queries/
+  │   └── I{BoundedContext}QueryService.cs   # インターフェース
+  └── Infrastructure/Persistence/
+      └── {BoundedContext}QueryService.cs    # 実装
+
+implementation:
+  # ===== Interface =====
+  interface:
+    file_path: "src/Application/Shared/{BoundedContext}/Application/Queries/I{BoundedContext}QueryService.cs"
+    template: |
+      using Domain.{BoundedContext}.{Aggregate}s;
+
+      namespace Application.Shared.{BoundedContext}.Application.Queries;
+
+      /// <summary>
+      /// {BoundedContext}のQueryサービスインターフェース
+      ///
+      /// 【パターン: Query Service Pattern】
+      ///
+      /// 責務:
+      /// - 読み取り専用クエリの提供
+      /// - AsNoTracking最適化の適用
+      /// - 複雑な結合クエリの集約
+      ///
+      /// AI実装時の注意:
+      /// - 戻り値はDTOまたはエンティティ（読み取り専用）
+      /// - 書き込み操作は含めない
+      /// - 複数のHandlerから呼び出される共通クエリを定義
+      /// </summary>
+      public interface I{BoundedContext}QueryService
+      {
+          /// <summary>
+          /// IDで{Aggregate}を取得（関連エンティティ含む）
+          /// </summary>
+          Task<{Aggregate}?> Get{Aggregate}WithDetailsAsync({Aggregate}Id id, CancellationToken ct = default);
+
+          /// <summary>
+          /// 条件に基づいて{Aggregate}一覧を取得
+          /// </summary>
+          Task<IReadOnlyList<{Aggregate}>> Get{Aggregate}sAsync(
+              {Aggregate}FilterCriteria? criteria = null,
+              CancellationToken ct = default);
+
+          /// <summary>
+          /// {Aggregate}の存在確認
+          /// </summary>
+          Task<bool> Exists{Aggregate}Async({Aggregate}Id id, CancellationToken ct = default);
+
+          // ドメイン固有のクエリを追加
+          // 例: Task<IReadOnlyList<Card>> GetCardsByColumnAsync(ColumnId columnId, CancellationToken ct);
+      }
+
+  # ===== Implementation =====
+  service:
+    file_path: "src/Application/Shared/{BoundedContext}/Infrastructure/Persistence/{BoundedContext}QueryService.cs"
+    template: |
+      using Application.Shared.{BoundedContext}.Application.Queries;
+      using Domain.{BoundedContext}.{Aggregate}s;
+      using Microsoft.EntityFrameworkCore;
+
+      namespace Application.Shared.{BoundedContext}.Infrastructure.Persistence;
+
+      /// <summary>
+      /// {BoundedContext}のQueryサービス実装
+      ///
+      /// 【パターン: Query Service Pattern】
+      ///
+      /// 責務:
+      /// - AsNoTracking最適化の適用
+      /// - 読み取り専用クエリの実装
+      ///
+      /// AI実装時の注意:
+      /// - すべてのクエリにAsNoTracking()を適用
+      /// - Include()で必要な関連を明示的に読み込む
+      /// - AsSplitQuery()で複雑な結合を最適化
+      /// </summary>
+      public class {BoundedContext}QueryService : I{BoundedContext}QueryService
+      {
+          private readonly ApplicationDbContext _dbContext;
+
+          public {BoundedContext}QueryService(ApplicationDbContext dbContext)
+          {
+              _dbContext = dbContext;
+          }
+
+          public async Task<{Aggregate}?> Get{Aggregate}WithDetailsAsync(
+              {Aggregate}Id id,
+              CancellationToken ct = default)
+          {
+              return await _dbContext.{Aggregate}s
+                  .AsNoTracking()  // ← 読み取り専用
+                  .Include(x => x.Items)  // 関連エンティティ
+                  .AsSplitQuery()  // 複雑な結合の最適化
+                  .FirstOrDefaultAsync(x => x.Id == id, ct);
+          }
+
+          public async Task<IReadOnlyList<{Aggregate}>> Get{Aggregate}sAsync(
+              {Aggregate}FilterCriteria? criteria = null,
+              CancellationToken ct = default)
+          {
+              var query = _dbContext.{Aggregate}s
+                  .AsNoTracking();
+
+              // フィルタ条件の適用
+              if (criteria?.Status != null)
+                  query = query.Where(x => x.Status == criteria.Status);
+
+              if (!string.IsNullOrEmpty(criteria?.SearchTerm))
+                  query = query.Where(x => x.Name.Contains(criteria.SearchTerm));
+
+              return await query
+                  .OrderByDescending(x => x.CreatedAt)
+                  .ToListAsync(ct);
+          }
+
+          public async Task<bool> Exists{Aggregate}Async(
+              {Aggregate}Id id,
+              CancellationToken ct = default)
+          {
+              return await _dbContext.{Aggregate}s
+                  .AsNoTracking()
+                  .AnyAsync(x => x.Id == id, ct);
+          }
+      }
+
+  # ===== Usage in Handler =====
+  usage_handler:
+    file_path: "src/Application/Features/{Feature}/Get{Aggregate}QueryHandler.cs"
+    template: |
+      using Application.Shared.{BoundedContext}.Application.Queries;
+      using Shared.Results;
+
+      namespace Application.Features.{Feature};
+
+      /// <summary>
+      /// QueryService使用例（Handler内）
+      ///
+      /// 【パターン: Query Service Pattern】
+      /// </summary>
+      public class Get{Aggregate}QueryHandler : IQueryHandler<Get{Aggregate}Query, Result<{Aggregate}Dto>>
+      {
+          private readonly I{BoundedContext}QueryService _queryService;
+
+          public Get{Aggregate}QueryHandler(I{BoundedContext}QueryService queryService)
+          {
+              _queryService = queryService;
+          }
+
+          public async Task<Result<{Aggregate}Dto>> Handle(
+              Get{Aggregate}Query request,
+              CancellationToken ct)
+          {
+              // QueryService経由でデータ取得（AsNoTracking適用済み）
+              var entity = await _queryService.Get{Aggregate}WithDetailsAsync(
+                  request.Id, ct);
+
+              if (entity is null)
+                  return Result.Fail<{Aggregate}Dto>("対象が見つかりません");
+
+              return Result.Success(MapToDto(entity));
+          }
+
+          private static {Aggregate}Dto MapToDto({Aggregate} entity)
+          {
+              // DTOへのマッピング
+              return new {Aggregate}Dto(
+                  entity.Id,
+                  entity.Name,
+                  // ...
+              );
+          }
+      }
+
+  # ===== Filter Criteria =====
+  filter_criteria:
+    file_path: "src/Application/Shared/{BoundedContext}/Application/Queries/{Aggregate}FilterCriteria.cs"
+    template: |
+      using Domain.{BoundedContext}.{Aggregate}s;
+
+      namespace Application.Shared.{BoundedContext}.Application.Queries;
+
+      /// <summary>
+      /// {Aggregate}フィルタ条件
+      ///
+      /// 【パターン: Query Service Pattern】
+      ///
+      /// 複数の検索条件をまとめるDTO
+      /// </summary>
+      public sealed record {Aggregate}FilterCriteria
+      {
+          public {Aggregate}Status? Status { get; init; }
+          public string? SearchTerm { get; init; }
+          public DateTime? FromDate { get; init; }
+          public DateTime? ToDate { get; init; }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "複数のQuery Handlerで同じクエリロジックを共有したい"
+    - "AsNoTracking最適化を確実に適用したい"
+    - "複雑な結合クエリがある"
+    - "Query側の実装を統一したい"
+
+  when_not_to_use:
+    - "単純なGetById → Repositoryで十分"
+    - "1つのHandlerでしか使わない単純なクエリ → Handler内で直接実装"
+    - "書き込み操作 → Repository"
+
+  implementation_steps:
+    - step: 1
+      description: "Application/Queries フォルダにインターフェースを作成"
+      files: ["I{BoundedContext}QueryService.cs"]
+    - step: 2
+      description: "Infrastructure/Persistence フォルダに実装を作成"
+      files: ["{BoundedContext}QueryService.cs"]
+    - step: 3
+      description: "必要に応じてFilterCriteriaを作成"
+      files: ["{Aggregate}FilterCriteria.cs"]
+    - step: 4
+      description: "DIに登録（Scoped）"
+      files: ["Program.cs"]
+    - step: 5
+      description: "Query Handlerで使用"
+      files: ["Get{Aggregate}QueryHandler.cs"]
+
+  common_mistakes:
+    - mistake: "QueryServiceでAsNoTrackingを忘れる"
+      solution: "すべてのクエリでAsNoTracking()を明示的に呼び出す。"
+    - mistake: "QueryServiceで書き込み操作を行う"
+      solution: "書き込みはRepository経由。QueryServiceは読み取り専用。"
+    - mistake: "単純なクエリまでQueryService経由にする"
+      solution: "再利用性がない単純なクエリはHandler内で直接実装。過度な抽象化を避ける。"
+    - mistake: "Value Objectの比較で.Valueを使う"
+      solution: "インスタンス同士で比較。query.Where(x => x.Id == entityId)"
+    - mistake: "N+1問題を放置"
+      solution: "Include()で必要な関連を明示。AsSplitQuery()で複雑な結合を最適化。"
+
+  key_patterns:
+    - pattern: "AsNoTracking()"
+      description: "変更追跡を無効化。読み取り専用クエリのパフォーマンス向上。"
+    - pattern: "AsSplitQuery()"
+      description: "複数のIncludeがある場合にクエリを分割。カーテシアン積を回避。"
+    - pattern: "FilterCriteria"
+      description: "複数の検索条件をまとめるDTO。クエリメソッドの引数をシンプルに。"
+
+  design_decision:
+    repository_vs_queryservice: |
+      RepositoryとQueryServiceの使い分け:
+
+      | 項目 | Repository | QueryService |
+      |-----|------------|--------------|
+      | 用途 | Command（書き込み） | Query（読み取り） |
+      | 追跡 | 変更追跡あり | AsNoTracking |
+      | 戻り値 | 集約ルート | エンティティ/DTO |
+      | 責務 | 集約の永続化 | 読み取り最適化 |
+
+    testing_strategy: |
+      テスト戦略:
+
+      1. QueryServiceの統合テスト:
+         - 実際のDbContextを使用
+         - AsNoTrackingが適用されていることを確認
+         - Include()が正しく動作することを確認
+
+      2. Handlerの単体テスト:
+         - QueryServiceをモック
+         - 結果のマッピングをテスト
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<I{BoundedContext}QueryService, {BoundedContext}QueryService>();"
+
+  dependencies:
+    nuget:
+      - Microsoft.EntityFrameworkCore
+    patterns:
+      - "query-get-list (基本的なリスト取得)"
+
+evidence:
+  notes: |
+    このパターンはカンバンシステム実装時のフィードバックから生まれました。
+    Query HandlerでDbContextを直接使用していたコードを統一し、
+    AsNoTracking最適化の適用を一貫させることで、
+    パフォーマンスと保守性を向上させます。
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-23
+    changes:
+      - "初版リリース"
+      - "カンバンシステム実装のフィードバックからパターン化"
+      - "CQRS Query側の実装一貫性を文書化"

@@ -1,0 +1,441 @@
+id: boundary-pattern
+version: 1.0.0
+name: Boundary Pattern (Intent-Boundary分離)
+category: domain-pattern
+intent: ユーザーとシステムの接点（操作可否判定）をドメイン層に配置し、UIから業務ルールを分離する
+description: |
+  Boundaryパターンにより、「誰が・何に対して・何をできるか」の判定ロジックをドメイン層に集約する。
+  UIは見た目と操作（プレゼンテーション）のみを担当し、Boundaryの判定結果を表示するだけの役割に徹する。
+
+  古典的DDDではBoundaryはApplication層またはInfrastructure層に配置されるが、
+  本パターンでは「操作可否判定」がビジネスルールであることを重視し、Domain層に配置する。
+
+scope: domain-pattern
+layers:
+  - domain
+
+ai_selection_hints:
+  trigger_phrases:
+    - "操作可否"
+    - "ボタン活性"
+    - "権限チェック"
+    - "できるかどうか"
+    - "boundary"
+    - "intent"
+
+  confidence_keywords:
+    high:    ["操作可否", "CanCreate", "CanUpdate", "CanDelete", "IsAllowed"]
+    medium:  ["権限", "活性", "非活性", "disabled"]
+    low:     ["ボタン", "表示制御"]
+
+  anti_patterns:
+    - "見た目の制御"    # CSSの話 → UI層
+    - "色・フォント"    # プレゼンテーション → UI層
+
+  typical_requests:
+    - "WIP制限に基づいてカード追加可否を判定したい"
+    - "承認権限がある人だけ承認ボタンを有効にしたい"
+    - "状態に応じて操作ボタンを制御したい"
+    - "ビジネスルールに基づいて操作可否を判定したい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. 操作の実行可否がビジネスルールに依存する
+    2. UIが「何ができるか」を知る必要がある
+    3. 権限・状態に基づくボタン活性/非活性制御
+    4. 同じ判定ロジックを複数のUIコンポーネントで使う
+
+    このパターンを選択すべきでない条件:
+    1. 見た目の制御（色・フォント・レイアウト）→ UI層
+    2. 単純なnullチェック → UIで直接判定
+    3. 認証（ログイン有無）→ ASP.NET Core Identity
+
+relationship:
+  works_with:
+    - domain-state-machine (状態遷移の判定に使用)
+    - feature-approval-workflow (承認権限の判定)
+
+  dependencies:
+    - Result<T> (Shared層のResultパターン)
+
+design_principle: |
+  UIの役割（2つに分離）:
+
+  1. 見た目・操作（プレゼンテーション）→ UI層
+     - 色、フォント、レイアウト
+     - ボタンのスタイル
+     - アニメーション
+
+  2. ユーザーとの接点（何ができるか）→ Domain層（Boundary）
+     - 「誰が・何に対して・何をできるか」の判定
+     - ビジネスルールに基づく実行可否
+     - WIP制限、承認権限、状態遷移の可否
+
+  責務分離の例:
+
+  | 判定内容 | 配置場所 | 理由 |
+  |---------|---------|------|
+  | 「重要タグは赤で表示」 | UI層（見た目） | プレゼンテーション |
+  | 「WIP制限でカード追加不可」 | Domain層（Boundary） | ビジネスルール |
+  | 「承認権限がない」 | Domain層（Boundary） | ビジネスルール |
+  | 「下書き状態なら編集可能」 | Domain層（Boundary） | ビジネスルール |
+
+file_structure: |
+  src/Domain/{BoundedContext}/{Aggregate}/
+  ├── {Aggregate}.cs                    # 集約ルート
+  └── Boundaries/
+      ├── {Aggregate}Intent.cs          # 操作の意図（enum）
+      ├── I{Aggregate}Boundary.cs       # Boundaryインターフェース
+      ├── BoundaryDecision.cs           # 判定結果
+      └── {Aggregate}BoundaryService.cs # Boundary実装
+
+implementation:
+  # ===== Intent (操作の意図) =====
+  intent:
+    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/{Aggregate}Intent.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+
+      /// <summary>
+      /// {Aggregate}に対する操作の意図
+      ///
+      /// 【パターン: Boundary Pattern】
+      ///
+      /// 責務:
+      /// - 操作の種類を列挙
+      /// - Boundaryが判定対象とするアクションを定義
+      ///
+      /// AI実装時の注意:
+      /// - 業務で必要な操作を網羅する
+      /// - CRUD + ドメイン固有の操作を含める
+      /// </summary>
+      public enum {Aggregate}Intent
+      {
+          /// <summary>作成</summary>
+          Create,
+
+          /// <summary>更新</summary>
+          Update,
+
+          /// <summary>削除</summary>
+          Delete,
+
+          /// <summary>アーカイブ</summary>
+          Archive,
+
+          // ドメイン固有の操作を追加
+          // 例: MoveCard, Approve, Reject, Submit
+      }
+
+  # ===== BoundaryDecision (判定結果) =====
+  decision:
+    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/BoundaryDecision.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+
+      /// <summary>
+      /// Boundary判定結果
+      ///
+      /// 【パターン: Boundary Pattern】
+      ///
+      /// 責務:
+      /// - 操作可否の結果を保持
+      /// - 不可の場合は理由を提供
+      ///
+      /// AI実装時の注意:
+      /// - 不変オブジェクト（record）として実装
+      /// - ファクトリメソッドで生成
+      /// </summary>
+      public sealed record BoundaryDecision
+      {
+          public bool IsAllowed { get; }
+          public string? Reason { get; }
+
+          private BoundaryDecision(bool isAllowed, string? reason = null)
+          {
+              IsAllowed = isAllowed;
+              Reason = reason;
+          }
+
+          /// <summary>操作を許可</summary>
+          public static BoundaryDecision Allow() => new(true);
+
+          /// <summary>操作を拒否（理由付き）</summary>
+          public static BoundaryDecision Deny(string reason) => new(false, reason);
+
+          /// <summary>暗黙のbool変換</summary>
+          public static implicit operator bool(BoundaryDecision decision) => decision.IsAllowed;
+      }
+
+  # ===== IBoundary (インターフェース) =====
+  interface:
+    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/I{Aggregate}Boundary.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+
+      /// <summary>
+      /// {Aggregate}のBoundaryインターフェース
+      ///
+      /// 【パターン: Boundary Pattern】
+      ///
+      /// 責務:
+      /// - 「誰が・何に対して・何をできるか」の判定
+      /// - ビジネスルールに基づく実行可否の判定
+      ///
+      /// AI実装時の注意:
+      /// - メソッド名は Can{Operation} の形式
+      /// - 戻り値は BoundaryDecision
+      /// - ドメイン固有の判定を追加
+      /// </summary>
+      public interface I{Aggregate}Boundary
+      {
+          /// <summary>
+          /// 作成可否を判定
+          /// </summary>
+          BoundaryDecision CanCreate({Aggregate} parent, /* 追加パラメータ */);
+
+          /// <summary>
+          /// 更新可否を判定
+          /// </summary>
+          BoundaryDecision CanUpdate({Aggregate} entity);
+
+          /// <summary>
+          /// 削除可否を判定
+          /// </summary>
+          BoundaryDecision CanDelete({Aggregate} entity);
+
+          // ドメイン固有の判定を追加
+          // 例: BoundaryDecision CanMoveCard(Board board, CardId cardId, ColumnId targetColumnId);
+      }
+
+  # ===== BoundaryService (実装) =====
+  service:
+    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/{Aggregate}BoundaryService.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+
+      /// <summary>
+      /// {Aggregate}のBoundary実装
+      ///
+      /// 【パターン: Boundary Pattern】
+      ///
+      /// 責務:
+      /// - ビジネスルールに基づく操作可否判定の実装
+      /// - 判定ロジックをドメイン層に集約
+      ///
+      /// AI実装時の注意:
+      /// - 判定ロジックは集約ルートの状態を参照
+      /// - 複雑な判定はStateMachineと連携
+      /// - 結果は必ずBoundaryDecisionで返す
+      /// </summary>
+      public class {Aggregate}BoundaryService : I{Aggregate}Boundary
+      {
+          public BoundaryDecision CanCreate({Aggregate} parent, /* 追加パラメータ */)
+          {
+              // 例: WIP制限のチェック
+              // if (parent.Items.Count >= parent.WipLimit)
+              //     return BoundaryDecision.Deny("WIP制限に達しています");
+
+              return BoundaryDecision.Allow();
+          }
+
+          public BoundaryDecision CanUpdate({Aggregate} entity)
+          {
+              // 例: 状態による制限
+              // if (entity.Status == {Aggregate}Status.Approved)
+              //     return BoundaryDecision.Deny("承認済みのため編集できません");
+
+              return BoundaryDecision.Allow();
+          }
+
+          public BoundaryDecision CanDelete({Aggregate} entity)
+          {
+              // 例: 参照チェック
+              // if (entity.HasChildren)
+              //     return BoundaryDecision.Deny("子要素が存在するため削除できません");
+
+              return BoundaryDecision.Allow();
+          }
+      }
+
+  # ===== Usage in Handler =====
+  usage_handler:
+    file_path: "src/Application/Features/{Feature}/{Feature}CommandHandler.cs"
+    template: |
+      using Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+
+      /// <summary>
+      /// Boundary使用例（Handler内）
+      ///
+      /// 【パターン: Boundary Pattern】
+      /// </summary>
+      public class {Feature}CommandHandler : ICommandHandler<{Feature}Command, Result<Guid>>
+      {
+          private readonly I{Aggregate}Boundary _{aggregate}Boundary;
+          private readonly I{Aggregate}Repository _repository;
+
+          public {Feature}CommandHandler(
+              I{Aggregate}Boundary {aggregate}Boundary,
+              I{Aggregate}Repository repository)
+          {
+              _{aggregate}Boundary = {aggregate}Boundary;
+              _repository = repository;
+          }
+
+          public async Task<Result<Guid>> Handle({Feature}Command request, CancellationToken ct)
+          {
+              var parent = await _repository.GetByIdAsync(request.ParentId, ct);
+              if (parent is null)
+                  return Result.Fail<Guid>("対象が見つかりません");
+
+              // Boundary経由で操作可否を判定
+              var decision = _{aggregate}Boundary.CanCreate(parent);
+              if (!decision.IsAllowed)
+                  return Result.Fail<Guid>(decision.Reason!);
+
+              // ビジネスロジックの実行
+              // ...
+
+              return Result.Success(newEntityId);
+          }
+      }
+
+  # ===== Usage in UI =====
+  usage_ui:
+    file_path: "src/Application/Features/{Feature}/UI/{Feature}Page.razor"
+    template: |
+      @*
+      Boundary使用例（UI）
+
+      【パターン: Boundary Pattern】
+
+      UIはBoundaryの判定結果を表示するだけ。
+      判定ロジックはUIに書かない。
+      *@
+
+      @inject I{Aggregate}Boundary {Aggregate}Boundary
+
+      <button disabled="@(!_canCreate.IsAllowed)"
+              title="@_canCreate.Reason">
+          追加
+      </button>
+
+      @code {
+          private BoundaryDecision _canCreate = BoundaryDecision.Deny("読み込み中");
+
+          protected override void OnParametersSet()
+          {
+              // Boundary経由で判定（UIにロジックを書かない）
+              _canCreate = {Aggregate}Boundary.CanCreate(_parent);
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "操作の実行可否がビジネスルールに依存する場合"
+    - "UIが「何ができるか」を知る必要がある場合"
+    - "権限・状態に基づくボタン活性/非活性制御"
+    - "同じ判定ロジックを複数のUIコンポーネントで使う場合"
+
+  when_not_to_use:
+    - "見た目の制御のみ（色・フォント・レイアウト）→ UI層で完結"
+    - "単純なnullチェック → UIで直接判定"
+    - "認証（ログイン有無）→ ASP.NET Core Identity"
+
+  implementation_steps:
+    - step: 1
+      description: "Domain層にBoundariesフォルダを作成"
+      files: ["src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/"]
+    - step: 2
+      description: "{Aggregate}Intentを定義（必要な操作を列挙）"
+      files: ["{Aggregate}Intent.cs"]
+    - step: 3
+      description: "BoundaryDecisionを実装（判定結果）"
+      files: ["BoundaryDecision.cs"]
+    - step: 4
+      description: "I{Aggregate}Boundaryインターフェースを定義"
+      files: ["I{Aggregate}Boundary.cs"]
+    - step: 5
+      description: "{Aggregate}BoundaryServiceを実装"
+      files: ["{Aggregate}BoundaryService.cs"]
+    - step: 6
+      description: "DIに登録（Scoped）"
+      files: ["Program.cs"]
+    - step: 7
+      description: "Handler/UIでBoundaryを使用"
+      files: ["{Feature}CommandHandler.cs", "{Feature}Page.razor"]
+
+  common_mistakes:
+    - mistake: "UIにビジネスロジックを書く"
+      solution: "判定ロジックはBoundaryServiceに集約。UIはBoundaryの結果を表示するだけ。"
+    - mistake: "BoundaryでDbContextを使う"
+      solution: "Boundaryはドメイン層。DBアクセスはRepository経由で取得したエンティティを受け取る。"
+    - mistake: "BoundaryDecisionの理由を省略"
+      solution: "Deny時は必ず理由を付ける。UIでツールチップ表示やエラーメッセージに使う。"
+    - mistake: "Boundaryを直接newする"
+      solution: "DIでI{Aggregate}Boundaryを注入。テスト時にモック可能。"
+    - mistake: "複数のBoundaryで判定ロジックが重複"
+      solution: "共通の判定はドメインサービスまたはStateMachineに委譲。"
+
+  key_patterns:
+    - pattern: "BoundaryDecision"
+      description: "操作可否の判定結果。IsAllowedとReasonを持つ。"
+    - pattern: "Can{Operation}"
+      description: "操作可否を判定するメソッド。BoundaryDecisionを返す。"
+    - pattern: "Intent enum"
+      description: "操作の種類を列挙。Boundaryが判定対象とするアクション。"
+
+  design_decision:
+    boundary_vs_authorization: |
+      BoundaryとAuthorizationの違い:
+
+      | 項目 | Boundary | Authorization |
+      |-----|----------|---------------|
+      | 判定対象 | ビジネスルール | ロール・権限 |
+      | 配置場所 | Domain層 | Pipeline Behavior |
+      | 例 | WIP制限、状態遷移 | Admin権限、Read権限 |
+      | 実行タイミング | Handler内/UI | Pipeline（自動） |
+
+      両方必要な場合:
+      1. AuthorizationBehavior: 「この操作を実行する権限があるか」
+      2. Boundary: 「この操作がビジネスルール上可能か」
+
+    testing_strategy: |
+      テスト戦略:
+
+      1. BoundaryServiceの単体テスト:
+         - 各判定条件が正しく動作すること
+         - Deny時に適切な理由が返されること
+
+      2. Handlerの統合テスト:
+         - Boundary拒否時にResult.Failが返されること
+         - Boundary許可時に処理が続行すること
+
+      3. UIのテスト:
+         - Boundary結果に応じてボタンが有効/無効になること
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<I{Aggregate}Boundary, {Aggregate}BoundaryService>();"
+
+  dependencies:
+    nuget: []
+    patterns:
+      - "domain-state-machine (状態遷移判定に使用する場合)"
+
+evidence:
+  # 実際の実装例があれば追加
+  domain_layer:
+    boundary_service: "未実装 - カンバンシステムでの実装を推奨"
+  notes: |
+    このパターンはカンバンシステム実装時のフィードバックから生まれました。
+    WIP制限やカード移動可否の判定をドメイン層に集約することで、
+    UIとビジネスロジックの責務を明確に分離できます。
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-23
+    changes:
+      - "初版リリース"
+      - "カンバンシステム実装のフィードバックからパターン化"
+      - "Intent-Boundary分離の設計思想を文書化"

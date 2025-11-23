@@ -1,6 +1,6 @@
 {
   "$schema": "../patterns.manifest.schema.json",
-  "version": "v2025.11.19",
+  "version": "v2025.11.23",
   "last_updated": "2025-11-23",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
@@ -16,27 +16,34 @@
       },
       {
         "order": 2,
+        "file": "catalog/COMMON_MISTAKES.md",
+        "purpose": "common_mistakes",
+        "description": "頻出する実装ミス（SaveChangesAsync、Value Object比較、Boundary判定）",
+        "required": true
+      },
+      {
+        "order": 3,
         "file": "catalog/AI_USAGE_GUIDE.md",
         "purpose": "implementation_guide",
         "description": "詳細な実装ガイド・アーキテクチャ全体像",
         "required": true
       },
       {
-        "order": 3,
+        "order": 4,
         "file": "catalog/index.json",
         "purpose": "pattern_index",
         "description": "パターン索引・意思決定マトリクス",
         "required": true
       },
       {
-        "order": 4,
+        "order": 5,
         "file": "patterns.manifest.json",
         "purpose": "enabled_patterns",
         "description": "有効なパターン一覧",
         "required": true
       },
       {
-        "order": 5,
+        "order": 6,
         "file": "catalog/DECISION_FLOWCHART.md",
         "purpose": "pattern_selection",
         "description": "パターン選択アルゴリズム",
@@ -332,6 +339,26 @@
       "file": "patterns/domain-approval-history.yaml",
       "intent": "承認履歴を記録・追跡（誰が・いつ・何を承認/却下したか）",
       "tags": ["approval-history", "audit", "tracking", "domain"],
+      "stability": "stable"
+    },
+    {
+      "id": "boundary-pattern",
+      "name": "Boundary Pattern (Intent-Boundary分離)",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/boundary-pattern.yaml",
+      "intent": "ユーザーとシステムの接点（操作可否判定）をドメイン層に配置し、UIから業務ルールを分離",
+      "tags": ["boundary", "intent", "domain", "ui-separation", "business-rule"],
+      "stability": "stable"
+    },
+    {
+      "id": "query-service-pattern",
+      "name": "Query Service Pattern (CQRS Query Side)",
+      "category": "query-pattern",
+      "version": "1.0.0",
+      "file": "patterns/query-service-pattern.yaml",
+      "intent": "Query HandlerからDbContext直接使用を排除し、Query側の実装を統一",
+      "tags": ["query", "cqrs", "as-no-tracking", "read-optimization"],
       "stability": "stable"
     }
   ],

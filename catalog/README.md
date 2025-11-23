@@ -1,6 +1,6 @@
 # Pattern Catalog
 
-**v2025.11.19 - 20パターン実装済み**
+**v2025.11.23 - 20パターン実装済み**
 
 このディレクトリは、業務アプリケーション開発で再利用可能なパターンのカタログです。
 
@@ -8,20 +8,31 @@ AIエージェント（Claude、ChatGPT等）が参照して、一貫性のあ�
 
 ---
 
+## 🚨 実装前に必ず読むこと
+
+> **⚠️ [COMMON_MISTAKES.md](COMMON_MISTAKES.md) を最初に読んでください**
+>
+> 以下のようなミスを防ぐための重要な注意事項がまとまっています：
+> - Handler内でSaveChangesAsync()を呼ばない（TransactionBehaviorが自動実行）
+> - EF Core + Value Objectの比較は `.Value` ではなくインスタンス同士で行う
+> - 操作可否判定はBoundary経由で行う（UIにビジネスロジックを書かない）
+
+---
+
 ## 📊 カタログ概要
 
-### パターン統計（v2025.11.19）
+### パターン統計（v2025.11.23）
 
 | カテゴリ | パターン数 | 説明 |
 |---------|----------|------|
 | **Pipeline Behaviors** | 7 | 横断的関心事（自動実行） |
 | **Feature Slices** | 8 | 垂直スライス（完全な機能） |
-| **Domain Patterns** | 2 | ドメインパターン |
-| **Query Patterns** | 1 | データ取得パターン |
+| **Domain Patterns** | 3 | ドメインパターン |
+| **Query Patterns** | 2 | データ取得パターン |
 | **Command Patterns** | 1 | データ変更パターン |
 | **Layer Elements** | 2 | レイヤー要素 |
 | **UI Patterns** | 1 | UI実装パターン |
-| **合計** | **20** | |
+| **合計** | **22** | |
 
 ### Phase別実装状況
 
@@ -71,12 +82,14 @@ AIエージェント（Claude、ChatGPT等）が参照して、一貫性のあ�
 |---|----------|------|-------|
 | `domain-state-machine` | State Machine Pattern | ステートマシンによる状態遷移管理（不正な遷移を防止） | stable |
 | `domain-approval-history` | Approval History Pattern | 承認履歴を記録・追跡（誰が・いつ・何を承認/却下したか） | stable |
+| `boundary-pattern` | Boundary Pattern | 操作可否判定をドメイン層に配置し、UIから業務ルールを分離 | stable |
 
 ### 🔍 Query Patterns（データ取得）
 
 | ID | パターン名 | 目的 | 安定性 |
 |---|----------|------|-------|
 | `query-get-list` | GetListQuery Pattern | 全件取得クエリ（キャッシュ対応） | stable |
+| `query-service-pattern` | Query Service Pattern | Query側の実装統一（AsNoTracking最適化） | stable |
 
 ### ✏️ Command Patterns（データ変更）
 
@@ -104,6 +117,7 @@ AIエージェント（Claude、ChatGPT等）が参照して、一貫性のあ�
 ```
 catalog/
 ├── README.md                         # このファイル
+├── COMMON_MISTAKES.md                # ⚠️ 実装前に必ず読む（頻出ミス集）
 ├── AI_USAGE_GUIDE.md                 # AI向けの利用ガイド
 ├── PATTERN_SELECTION_GUIDE.md        # パターン選択ガイド
 ├── DECISION_FLOWCHART.md             # 意思決定フローチャート
@@ -305,6 +319,6 @@ MIT License
 
 ---
 
-**最終更新: 2025-11-19**
-**カタログバージョン: v2025.11.19**
-**パターン総数: 20**
+**最終更新: 2025-11-23**
+**カタログバージョン: v2025.11.23**
+**パターン総数: 22**
