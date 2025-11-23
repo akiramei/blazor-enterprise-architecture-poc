@@ -288,6 +288,30 @@ dependencies:
 
 ---
 
+## 📁 UI配置ルール（要約）
+
+> **詳細は [AI_USAGE_GUIDE.md](AI_USAGE_GUIDE.md#-ui配置ルール) を参照**
+
+### 判断基準
+
+| 条件 | 配置場所 | 例 |
+|-----|---------|-----|
+| **単一機能専用ページ** | `Features/{Feature}/UI/` | Login.razor |
+| **複数機能で使う/基盤ページ** | `Components/Pages/` | Home.razor |
+| **BC横断の共有部品** | `Components/Shared/` | ErrorPage.razor |
+| **BC内で共有するStore/Actions** | `Shared/{BC}/UI/` | ProductsStore.cs |
+| **フレームワーク必須** | `Components/Layout/` | MainLayout.razor |
+
+### クイック判断フロー
+
+```
+その画面/コンポーネントは1つの機能でしか使わない？
+├─ Yes → Features/{Feature}/UI/
+└─ No  → Components/Pages/ または Shared/{BC}/UI/
+```
+
+---
+
 ## 🔄 パターンの組み合わせ
 
 複数のパターンを組み合わせることもあります:
@@ -304,5 +328,5 @@ dependencies:
 
 ---
 
-**最終更新: 2025-11-19**
-**カタログバージョン: v2025.11.19**
+**最終更新: 2025-11-24**
+**カタログバージョン: v2025.11.24**
