@@ -2,20 +2,24 @@
 
 このファイルは Claude Code および Claude AI エージェントが自動的に読み込む設定ファイルです。
 
+> **詳細版**: より詳しい情報は `AGENTS.md` を参照してください。
+
 ---
 
 ## 🚨 CRITICAL: 実装前に必ず読むこと
 
-**独自実装による手戻りを防ぐため、以下の順序でファイルを読んでください。**
+**このプロジェクトはカタログ駆動開発を採用しています。独自実装は禁止です。**
 
 ### 読み込み優先順位（必須）
 
 | 順序 | ファイル | 目的 | 必須度 |
 |:---:|----------|------|:------:|
-| 1 | `catalog/AI_USAGE_GUIDE.md` | 実装ルール・制約・アーキテクチャ全体像 | **必須** |
+| 1 | `catalog/AI_USAGE_GUIDE.md` | 実装ルール・制約・UI配置ルール | **必須** |
 | 2 | `catalog/index.json` | パターン索引・意思決定マトリクス | **必須** |
-| 3 | `patterns.manifest.json` | 有効なパターン一覧 | **必須** |
+| 3 | `catalog/COMMON_MISTAKES.md` | 頻出ミスと回避方法 | **必須** |
 | 4 | `catalog/DECISION_FLOWCHART.md` | パターン選択アルゴリズム | 推奨 |
+
+**これらを読まずに実装を開始してはいけません。**
 
 ---
 
@@ -36,6 +40,9 @@
 
 ❌ 例外をthrowしてエラーを伝播しない
    → Result<T> パターンを使用
+
+❌ カタログに存在するパターンを独自実装しない
+   → 必ず catalog/patterns/*.yaml を参照
 ```
 
 ---
@@ -89,17 +96,21 @@ services.AddScoped<IProductRepository, ProductRepository>();
 ## 📂 プロジェクト構造
 
 ```
-src/
-├── Application/                  # 単一Blazor Serverプロジェクト
-│   ├── Features/                 # 垂直スライス（19機能）
-│   │   └── {Feature}/
-│   │       ├── {Feature}Command.cs
-│   │       ├── {Feature}CommandHandler.cs
-│   │       └── UI/
-│   ├── Shared/{BC}/              # BC別共通コード
-│   └── Core/                     # Commands, Queries, Behaviors
-├── Domain/{BC}/                  # ドメインプロジェクト（分離）
-└── Shared/                       # グローバル共通
+src/Application/
+├── Components/                   # Blazorテンプレート由来（活用する）
+│   ├── Layout/                   # MainLayout（フレームワーク必須）
+│   ├── Pages/                    # 複数機能で使う/基盤ページ
+│   └── Shared/                   # BC横断の共有コンポーネント
+├── Features/{Feature}/           # VSA機能スライス
+│   ├── {Feature}Command.cs
+│   ├── {Feature}CommandHandler.cs
+│   └── UI/                       # ★ 単一機能専用UI
+├── Shared/{BC}/UI/               # ★ BC内で複数機能が共有するUI
+└── Core/                         # Commands, Queries, Behaviors
+
+src/Domain/{BC}/                  # ドメインプロジェクト（分離）
+├── Entities/, ValueObjects/
+└── Boundaries/                   # ★ バウンダリー（ドメインの一部）
 ```
 
 ---
@@ -112,8 +123,31 @@ src/
 3. 該当パターンの YAML を読む
 4. ai_guidance.common_mistakes を確認
 5. テンプレート変数を置換してコード生成
-6. evidence のファイルパスで実装例を確認
+6. UI配置ルールに従ってファイルを配置
+7. evidence のファイルパスで実装例を確認
 ```
+
+---
+
+## 📁 UI配置ルール（要約）
+
+> **詳細は `catalog/AI_USAGE_GUIDE.md` を参照**
+
+| 条件 | 配置場所 |
+|-----|---------|
+| 単一機能専用ページ | `Features/{Feature}/UI/` |
+| 複数機能で使う/基盤ページ | `Components/Pages/` |
+| BC内で共有するStore/Actions | `Shared/{BC}/UI/` |
+
+---
+
+## 🔲 バウンダリー（要約）
+
+> **詳細は `AGENTS.md` を参照**
+
+- バウンダリーは **UIではなく、ドメインモデルの一部**
+- ユーザーがシステムに「意図」を伝える境界
+- Command/Query がバウンダリーの実現形態
 
 ---
 
@@ -141,5 +175,5 @@ src/
 
 ---
 
-**カタログバージョン**: v2025.11.19
-**最終更新**: 2025-11-23
+**カタログバージョン**: v2025.11.24
+**最終更新**: 2025-11-24
