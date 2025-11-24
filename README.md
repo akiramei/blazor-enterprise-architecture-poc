@@ -23,6 +23,56 @@
 
 ---
 
+## 🆕 新規プロジェクトでこのカタログを使う
+
+このカタログを別のプロジェクトで利用する場合の手順です。
+
+### Step 1: 新規プロジェクトに CLAUDE.md を作成
+
+```markdown
+# AI Implementation Instructions
+
+このプロジェクトはパターンカタログに従って開発します。
+
+## 参照先カタログ
+
+https://github.com/akiramei/blazor-enterprise-architecture-poc
+
+## 実装前の必須手順
+
+1. カタログの `catalog/AI_USAGE_GUIDE.md` を読み込む
+2. `catalog/index.json` でパターンを検索
+3. `catalog/COMMON_MISTAKES.md` で禁止事項を確認
+
+## 禁止事項（カタログより）
+
+- Handler内で `SaveChangesAsync()` を呼ばない
+- Singleton で DbContext を注入しない
+- 例外を throw してエラーを伝播しない（Result<T> を使用）
+```
+
+### Step 2: AIへの指示
+
+```
+このプロジェクトは https://github.com/akiramei/blazor-enterprise-architecture-poc の
+パターンカタログに従います。実装前に以下を読み込んでください：
+1. catalog/AI_USAGE_GUIDE.md
+2. catalog/index.json
+3. catalog/COMMON_MISTAKES.md
+```
+
+### 推奨事項
+
+| ファイル | コピー推奨度 | 理由 |
+|---------|-------------|------|
+| `CLAUDE.md` | ✅ 必須 | AIが最初に読むファイル（上記テンプレート使用） |
+| `catalog/COMMON_MISTAKES.md` | 📋 推奨 | 頻出ミスの早見表 |
+| `catalog/` 全体 | ❌ 非推奨 | GitHub参照で最新版を使用 |
+
+詳細: [catalog/README.md](catalog/README.md#-新規プロジェクトでの利用方法)
+
+---
+
 このプロジェクトは、**Vertical Slice Architecture (VSA)** と **Pattern Catalog** を組み合わせ、AIエージェントと人間が協調して開発できる中規模業務アプリケーションの実装パターンを提供します。
 
 **バージョン情報:**
