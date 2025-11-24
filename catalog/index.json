@@ -381,8 +381,8 @@
       "category": "domain-pattern",
       "version": "1.0.0",
       "file": "patterns/domain-validation-service.yaml",
-      "intent": "複数エンティティをまたぐビジネスルール検証（予約重複チェック、在庫確認など）をドメインサービスとして実装",
-      "tags": ["domain-service", "validation", "business-rule", "overlap-check", "booking"],
+      "intent": "複数エンティティをまたぐビジネスルール検証をドメインサービスとして実装（重複チェック、在庫引当、残高確認、排他制御など）",
+      "tags": ["domain-service", "validation", "business-rule", "overlap-check", "inventory", "balance", "reservation"],
       "stability": "stable"
     },
     {
@@ -391,8 +391,8 @@
       "category": "infrastructure-pattern",
       "version": "1.0.0",
       "file": "patterns/concurrency-control.yaml",
-      "intent": "同時実行制御（楽観的ロック/悲観的ロック）でデータ整合性を保証",
-      "tags": ["concurrency", "optimistic-lock", "pessimistic-lock", "row-version", "for-update"],
+      "intent": "同時実行制御（楽観的ロック/悲観的ロック）でデータ整合性を保証（更新競合、ダブルブッキング防止、在庫引当など）",
+      "tags": ["concurrency", "optimistic-lock", "pessimistic-lock", "row-version", "for-update", "double-booking"],
       "stability": "stable"
     },
     {
@@ -401,8 +401,8 @@
       "category": "query-pattern",
       "version": "1.0.0",
       "file": "patterns/complex-query-service.yaml",
-      "intent": "複合条件クエリ（空き検索、NOT EXISTS、複数テーブル結合）を専用サービスとして実装",
-      "tags": ["query", "dapper", "complex-query", "available-search", "not-exists"],
+      "intent": "複合条件クエリを専用サービスとして実装（NOT EXISTS/空き検索、複数テーブル結合、未割当検索など）",
+      "tags": ["query", "dapper", "complex-query", "available-search", "not-exists", "unassigned", "vacancy"],
       "stability": "stable"
     }
   ],
@@ -447,21 +447,26 @@
       "重複チェック・競合チェック": {
         "pattern_category": "domain-pattern",
         "confidence": 0.95,
-        "trigger_keywords": ["重複", "競合", "チェック", "確認", "同時", "予約"],
+        "trigger_keywords": ["重複", "競合", "チェック", "確認", "同時", "排他", "ダブル", "衝突", "予約", "引当", "在庫", "残高", "割当"],
         "examples": [
           "予約の重複をチェックしてください → domain-validation-service",
           "ダブルブッキングを防いでください → domain-validation-service + concurrency-control",
-          "在庫の引当確認をしてください → domain-validation-service"
+          "在庫の引当確認をしてください → domain-validation-service",
+          "シフトの重複を検出してください → domain-validation-service",
+          "口座残高を確認してから引き落とし → domain-validation-service"
         ],
         "decision_rule": "複数エンティティをまたぐビジネスルール検証は domain-validation-service"
       },
       "空き検索・複合検索": {
         "pattern_category": "query-pattern",
         "confidence": 0.90,
-        "trigger_keywords": ["空き", "利用可能", "複合条件", "結合"],
+        "trigger_keywords": ["空き", "利用可能", "複合条件", "結合", "NOT EXISTS", "存在しない", "含まない", "除外", "未使用", "未割当", "空席", "空室"],
         "examples": [
           "空き会議室を検索してください → complex-query-service",
-          "利用可能な時間帯を取得してください → complex-query-service"
+          "利用可能な時間帯を取得してください → complex-query-service",
+          "在庫がある商品を検索してください → complex-query-service",
+          "担当者が割り当てられていないタスクを取得 → complex-query-service",
+          "予約が入っていない座席を検索 → complex-query-service"
         ],
         "decision_rule": "NOT EXISTS や複数テーブル結合を含むクエリは complex-query-service"
       },
