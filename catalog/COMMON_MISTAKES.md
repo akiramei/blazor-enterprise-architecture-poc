@@ -151,6 +151,148 @@ public async Task<Result<BoardDto>> Handle(GetBoardQuery request, CancellationTo
 
 ---
 
+## ⚠️ 複数エンティティをまたぐビジネスルール検証
+
+### 重複チェックなどの配置場所
+
+```csharp
+// ❌ 禁止: Handler内に直接ロジックを書く
+public async Task<Result<Guid>> Handle(CreateBookingCommand request, CancellationToken ct)
+{
+    var existing = await _dbContext.Bookings
+        .Where(b => b.RoomId == request.RoomId && ...)  // ← Handler内に検索ロジック
+        .ToListAsync();
+    if (existing.Any(b => b.StartTime < request.EndTime && ...))  // ← Handler内に判定ロジック
+        return Result.Fail("重複しています");
+}
+
+// ✅ 正しい: ドメインサービス（ValidationService）に委譲
+public async Task<Result<Guid>> Handle(CreateBookingCommand request, CancellationToken ct)
+{
+    var validation = await _bookingValidationService.ValidateNoOverlapAsync(
+        request.RoomId, request.StartTime, request.EndTime, ct);
+    if (!validation.IsValid)
+        return Result.Fail<Guid>(validation.ErrorMessage!);
+    // ...
+}
+```
+
+**理由**:
+- テスト容易性：ドメインサービスを単体でテスト可能
+- 再利用性：CreateBooking と UpdateBooking で同じ検証ロジックを使用
+- 関心の分離：Handler はオーケストレーション、検証ロジックはドメイン層
+
+**参照**: `catalog/patterns/domain-validation-service.yaml`
+
+---
+
+## ⚠️ 同時実行制御（ダブルブッキング防止）
+
+### 楽観的ロック vs 悲観的ロック
+
+```csharp
+// ケース1: 一般的な更新競合 → 楽観的ロック（RowVersion）
+public class Product
+{
+    public byte[] RowVersion { get; private set; } = null!;  // EF Coreが自動管理
+}
+
+// ケース2: 予約の重複防止 → 悲観的ロック（FOR UPDATE）
+public async Task<IReadOnlyList<Booking>> GetOverlappingBookingsWithLockAsync(...)
+{
+    var sql = @"SELECT * FROM ""Bookings"" WHERE ... FOR UPDATE";  // 排他ロック
+    return await _dbContext.Bookings.FromSqlRaw(sql, ...).ToListAsync();
+}
+```
+
+**選択基準**:
+| シナリオ | 推奨 |
+|---------|------|
+| 商品情報の更新 | 楽観的ロック |
+| ユーザープロフィール更新 | 楽観的ロック |
+| **予約の重複チェック** | **悲観的ロック** |
+| **在庫の引当** | **悲観的ロック** |
+
+**参照**: `catalog/patterns/concurrency-control.yaml`
+
+---
+
+## ⚠️ 複合条件クエリの配置
+
+### 空き検索などの実装場所
+
+```csharp
+// ❌ 禁止: Handler内に複雑なSQLを直接書く
+public async Task<Result<List<RoomDto>>> Handle(SearchAvailableRoomsQuery request, CancellationToken ct)
+{
+    var sql = @"SELECT ... FROM Rooms r WHERE NOT EXISTS (...)";  // ← Handler内にSQL
+    // ...
+}
+
+// ✅ 正しい: QueryServiceに委譲
+public async Task<Result<IReadOnlyList<AvailableRoomDto>>> Handle(SearchAvailableRoomsQuery request, CancellationToken ct)
+{
+    var rooms = await _roomQueryService.SearchAvailableRoomsAsync(
+        request.StartTime, request.EndTime, request.MinCapacity, ct);
+    return Result.Success(rooms);
+}
+```
+
+**QueryServiceを使うべきケース**:
+- NOT EXISTS（空き検索）
+- 複数テーブルの結合
+- 集計（GROUP BY, COUNT）
+- 動的な検索条件
+
+**参照**: `catalog/patterns/complex-query-service.yaml`
+
+---
+
+## ⚠️ FluentValidation（ValidationBehavior）の範囲
+
+### DBアクセスを伴う検証は ValidationBehavior でやらない
+
+```csharp
+// ❌ 禁止: Validator内でDBアクセス
+public class CreateBookingValidator : AbstractValidator<CreateBookingCommand>
+{
+    public CreateBookingValidator(IBookingRepository repo)
+    {
+        RuleFor(x => x.RoomId)
+            .MustAsync(async (roomId, ct) => await repo.ExistsAsync(roomId, ct))  // ← DBアクセス
+            .WithMessage("会議室が存在しません");
+    }
+}
+
+// ✅ 正しい: 形式検証のみ
+public class CreateBookingValidator : AbstractValidator<CreateBookingCommand>
+{
+    public CreateBookingValidator()
+    {
+        RuleFor(x => x.Title).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.StartTime).LessThan(x => x.EndTime);  // 形式検証
+    }
+}
+
+// 存在確認はHandler内で
+public async Task<Result<Guid>> Handle(CreateBookingCommand request, CancellationToken ct)
+{
+    var room = await _roomRepository.GetByIdAsync(request.RoomId, ct);
+    if (room is null)
+        return Result.Fail<Guid>("会議室が存在しません");
+    // ...
+}
+```
+
+**検証の分担**:
+| 検証内容 | 配置場所 |
+|---------|---------|
+| 入力値の形式（空文字、長さ、範囲） | ValidationBehavior（FluentValidation） |
+| データの存在確認 | Handler内 |
+| ビジネスルール（重複チェック等） | ドメインサービス |
+
+---
+
 ## 📋 実装前チェックリスト
 
 新しい機能を実装する前に、以下を確認してください：
@@ -163,6 +305,10 @@ public async Task<Result<BoardDto>> Handle(GetBoardQuery request, CancellationTo
 □ すべてのサービスはScopedで登録しているか？
 □ Value Objectの比較はインスタンス同士で行っているか？
 □ 操作可否判定はBoundary経由で行っているか？
+□ 複数エンティティをまたぐ検証はドメインサービスに委譲しているか？
+□ 同時実行制御（楽観的/悲観的ロック）は適切に選択したか？
+□ 複合条件クエリはQueryServiceに委譲しているか？
+□ FluentValidationはDBアクセスを伴わない形式検証のみにしているか？
 ```
 
 ---
@@ -175,5 +321,5 @@ public async Task<Result<BoardDto>> Handle(GetBoardQuery request, CancellationTo
 
 ---
 
-**最終更新: 2025-11-23**
-**カタログバージョン: v2025.11.23**
+**最終更新: 2025-11-24**
+**カタログバージョン: v2025.11.24**

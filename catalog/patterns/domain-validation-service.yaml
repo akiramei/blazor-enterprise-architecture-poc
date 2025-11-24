@@ -1,0 +1,252 @@
+id: domain-validation-service
+version: 1.0.0
+name: DomainValidationService
+category: domain-pattern
+intent: "複数エンティティをまたぐビジネスルール検証をドメインサービスとして実装するパターン"
+stability: stable
+
+description: |
+  単一エンティティ内で完結しないビジネスルール（例：予約の重複チェック、在庫の引当確認）を
+  ドメインサービスとして実装するパターン。
+
+  ## いつ使うか
+  - 複数のエンティティを参照してビジネスルールを検証する場合
+  - エンティティ単体では判断できない不変条件を検証する場合
+  - 例：予約の時間帯重複チェック、口座残高の確認、在庫数の確認
+
+  ## いつ使わないか
+  - 単一エンティティ内で完結する検証 → エンティティのメソッドで実装
+  - 入力値の形式検証 → FluentValidation（ValidationBehavior）
+  - データベースの存在確認のみ → Handler内で実装
+
+preconditions:
+  - "ドメイン層（src/Domain/{BC}/）が存在すること"
+  - "検証対象のエンティティが定義されていること"
+
+structure:
+  domain_service: "src/Domain/{BC}/Services/{Entity}ValidationService.cs"
+  interface: "src/Domain/{BC}/Services/I{Entity}ValidationService.cs"
+
+implementation:
+  interface:
+    file_path: "src/Domain/{BC}/Services/I{Entity}ValidationService.cs"
+    template: |
+      namespace {BoundedContext}.Domain.Services;
+
+      /// <summary>
+      /// {Entity}のビジネスルール検証サービス
+      /// </summary>
+      public interface I{Entity}ValidationService
+      {
+          /// <summary>
+          /// {検証内容の説明}
+          /// </summary>
+          /// <returns>検証結果（成功/失敗とエラーメッセージ）</returns>
+          Task<ValidationResult> Validate{Rule}Async(
+              {検証に必要なパラメータ},
+              CancellationToken cancellationToken = default);
+      }
+
+      /// <summary>
+      /// 検証結果
+      /// </summary>
+      public sealed record ValidationResult
+      {
+          public bool IsValid { get; init; }
+          public string? ErrorMessage { get; init; }
+
+          public static ValidationResult Success() => new() { IsValid = true };
+          public static ValidationResult Failure(string message) => new() { IsValid = false, ErrorMessage = message };
+      }
+
+  domain_service:
+    file_path: "src/Domain/{BC}/Services/{Entity}ValidationService.cs"
+    template: |
+      namespace {BoundedContext}.Domain.Services;
+
+      /// <summary>
+      /// {Entity}のビジネスルール検証サービス実装
+      /// </summary>
+      public sealed class {Entity}ValidationService : I{Entity}ValidationService
+      {
+          private readonly I{Entity}Repository _repository;
+
+          public {Entity}ValidationService(I{Entity}Repository repository)
+          {
+              _repository = repository;
+          }
+
+          /// <inheritdoc />
+          public async Task<ValidationResult> Validate{Rule}Async(
+              {検証に必要なパラメータ},
+              CancellationToken cancellationToken = default)
+          {
+              // 1. 検証に必要なデータを取得
+              var existingEntities = await _repository.Get{関連データ}Async(..., cancellationToken);
+
+              // 2. ビジネスルールを適用
+              var hasConflict = existingEntities.Any(e => /* 重複判定ロジック */);
+
+              // 3. 結果を返す
+              return hasConflict
+                  ? ValidationResult.Failure("ビジネスルール違反のメッセージ")
+                  : ValidationResult.Success();
+          }
+      }
+
+  handler_usage:
+    description: "Handler内でドメインサービスを呼び出す"
+    template: |
+      public sealed class Create{Entity}CommandHandler : ICommandHandler<Create{Entity}Command, Result<Guid>>
+      {
+          private readonly I{Entity}Repository _repository;
+          private readonly I{Entity}ValidationService _validationService;  // ← ドメインサービスを注入
+
+          public Create{Entity}CommandHandler(
+              I{Entity}Repository repository,
+              I{Entity}ValidationService validationService)
+          {
+              _repository = repository;
+              _validationService = validationService;
+          }
+
+          public async Task<Result<Guid>> Handle(Create{Entity}Command request, CancellationToken ct)
+          {
+              // 1. ドメインサービスでビジネスルールを検証
+              var validationResult = await _validationService.Validate{Rule}Async(..., ct);
+              if (!validationResult.IsValid)
+              {
+                  return Result.Fail<Guid>(validationResult.ErrorMessage!);
+              }
+
+              // 2. エンティティを作成
+              var entity = {Entity}.Create(...);
+
+              // 3. 永続化（SaveChangesAsyncは呼ばない）
+              await _repository.AddAsync(entity, ct);
+
+              return Result.Success(entity.Id);
+          }
+      }
+
+example_usage:
+  booking_overlap_check:
+    description: "予約の時間帯重複チェック"
+    interface: |
+      public interface IBookingValidationService
+      {
+          Task<ValidationResult> ValidateNoOverlapAsync(
+              Guid roomId,
+              DateTime startTime,
+              DateTime endTime,
+              Guid? excludeBookingId = null,  // 更新時は自分自身を除外
+              CancellationToken cancellationToken = default);
+      }
+
+    implementation: |
+      public sealed class BookingValidationService : IBookingValidationService
+      {
+          private readonly IBookingRepository _bookingRepository;
+
+          public BookingValidationService(IBookingRepository bookingRepository)
+          {
+              _bookingRepository = bookingRepository;
+          }
+
+          public async Task<ValidationResult> ValidateNoOverlapAsync(
+              Guid roomId,
+              DateTime startTime,
+              DateTime endTime,
+              Guid? excludeBookingId = null,
+              CancellationToken cancellationToken = default)
+          {
+              // 半開区間 [StartTime, EndTime) での重複判定
+              // 重複条件: A.Start < B.End && B.Start < A.End
+              var overlappingBookings = await _bookingRepository
+                  .GetOverlappingBookingsAsync(roomId, startTime, endTime, excludeBookingId, cancellationToken);
+
+              if (overlappingBookings.Any())
+              {
+                  var conflicting = overlappingBookings.First();
+                  return ValidationResult.Failure(
+                      $"指定された時間帯は既に予約されています（{conflicting.StartTime:HH:mm}〜{conflicting.EndTime:HH:mm}）");
+              }
+
+              return ValidationResult.Success();
+          }
+      }
+
+    repository_method: |
+      // IBookingRepository に追加するメソッド
+      Task<IReadOnlyList<Booking>> GetOverlappingBookingsAsync(
+          Guid roomId,
+          DateTime startTime,
+          DateTime endTime,
+          Guid? excludeBookingId = null,
+          CancellationToken cancellationToken = default);
+
+      // 実装例（EF Core）
+      public async Task<IReadOnlyList<Booking>> GetOverlappingBookingsAsync(
+          Guid roomId,
+          DateTime startTime,
+          DateTime endTime,
+          Guid? excludeBookingId = null,
+          CancellationToken cancellationToken = default)
+      {
+          return await _dbContext.Bookings
+              .Where(b => b.RoomId == roomId)
+              .Where(b => b.Status == BookingStatus.Confirmed)
+              .Where(b => excludeBookingId == null || b.Id != excludeBookingId)
+              .Where(b => b.StartTime < endTime && startTime < b.EndTime)  // 重複判定
+              .ToListAsync(cancellationToken);
+      }
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<IBookingValidationService, BookingValidationService>();"
+
+ai_guidance:
+  when_to_use:
+    - "予約の重複チェックなど、複数レコードを参照するビジネスルール"
+    - "在庫の引当確認など、集計が必要なビジネスルール"
+    - "口座残高の確認など、他エンティティとの整合性チェック"
+
+  when_not_to_use:
+    - "単一エンティティ内で完結する検証（例：StartTime < EndTime）"
+    - "入力値の形式検証（例：文字列の長さ、メールアドレス形式）"
+    - "存在確認のみ（Handler内で直接確認すればよい）"
+
+  common_mistakes:
+    - mistake: "FluentValidation（ValidationBehavior）内でDBアクセスする"
+      solution: "形式検証はValidationBehavior、ビジネスルール検証はドメインサービスで分離"
+
+    - mistake: "Handler内に重複チェックロジックを直接書く"
+      solution: "ドメインサービスに抽出してテスト可能にする"
+
+    - mistake: "エンティティ内で他エンティティを参照する"
+      solution: "複数エンティティをまたぐロジックはドメインサービスに配置"
+
+    - mistake: "ドメインサービスでSaveChangesAsyncを呼ぶ"
+      solution: "ドメインサービスは検証のみ。永続化はHandlerの責務"
+
+  implementation_order:
+    - step: 1
+      description: "ドメインサービスのインターフェースを定義"
+    - step: 2
+      description: "Repositoryに検索メソッドを追加"
+    - step: 3
+      description: "ドメインサービスの実装クラスを作成"
+    - step: 4
+      description: "DI登録"
+    - step: 5
+      description: "Handler内でドメインサービスを呼び出す"
+
+evidence:
+  note: "新規パターン - 実装例は今後追加"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-24
+    changes:
+      - "初版リリース"
+      - "予約重複チェックの具体例を追加"

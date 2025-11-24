@@ -1,7 +1,7 @@
 {
   "$schema": "../patterns.manifest.schema.json",
-  "version": "v2025.11.23",
-  "last_updated": "2025-11-23",
+  "version": "v2025.11.24",
+  "last_updated": "2025-11-24",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "ai_bootstrap": {
@@ -101,6 +101,10 @@
     "ui-pattern": {
       "name": "UI Patterns",
       "description": "Blazor UI の実装パターン（Store, PageActions, Component）"
+    },
+    "infrastructure-pattern": {
+      "name": "Infrastructure Patterns",
+      "description": "インフラストラクチャ層のパターン（同時実行制御、永続化など）"
     }
   },
   "patterns": [
@@ -370,6 +374,36 @@
       "intent": "Query HandlerからDbContext直接使用を排除し、Query側の実装を統一",
       "tags": ["query", "cqrs", "as-no-tracking", "read-optimization"],
       "stability": "stable"
+    },
+    {
+      "id": "domain-validation-service",
+      "name": "Domain Validation Service Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-validation-service.yaml",
+      "intent": "複数エンティティをまたぐビジネスルール検証（予約重複チェック、在庫確認など）をドメインサービスとして実装",
+      "tags": ["domain-service", "validation", "business-rule", "overlap-check", "booking"],
+      "stability": "stable"
+    },
+    {
+      "id": "concurrency-control",
+      "name": "Concurrency Control Pattern",
+      "category": "infrastructure-pattern",
+      "version": "1.0.0",
+      "file": "patterns/concurrency-control.yaml",
+      "intent": "同時実行制御（楽観的ロック/悲観的ロック）でデータ整合性を保証",
+      "tags": ["concurrency", "optimistic-lock", "pessimistic-lock", "row-version", "for-update"],
+      "stability": "stable"
+    },
+    {
+      "id": "complex-query-service",
+      "name": "Complex Query Service Pattern",
+      "category": "query-pattern",
+      "version": "1.0.0",
+      "file": "patterns/complex-query-service.yaml",
+      "intent": "複合条件クエリ（空き検索、NOT EXISTS、複数テーブル結合）を専用サービスとして実装",
+      "tags": ["query", "dapper", "complex-query", "available-search", "not-exists"],
+      "stability": "stable"
     }
   ],
   "recommended_combinations": [
@@ -409,6 +443,27 @@
           "顧客を編集できるようにしてください → feature-update-entity"
         ],
         "decision_rule": "ユーザーが「新しい機能」を求めている場合、まず feature-slice を検討する"
+      },
+      "重複チェック・競合チェック": {
+        "pattern_category": "domain-pattern",
+        "confidence": 0.95,
+        "trigger_keywords": ["重複", "競合", "チェック", "確認", "同時", "予約"],
+        "examples": [
+          "予約の重複をチェックしてください → domain-validation-service",
+          "ダブルブッキングを防いでください → domain-validation-service + concurrency-control",
+          "在庫の引当確認をしてください → domain-validation-service"
+        ],
+        "decision_rule": "複数エンティティをまたぐビジネスルール検証は domain-validation-service"
+      },
+      "空き検索・複合検索": {
+        "pattern_category": "query-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["空き", "利用可能", "複合条件", "結合"],
+        "examples": [
+          "空き会議室を検索してください → complex-query-service",
+          "利用可能な時間帯を取得してください → complex-query-service"
+        ],
+        "decision_rule": "NOT EXISTS や複数テーブル結合を含むクエリは complex-query-service"
       },
       "システム全体の機能追加": {
         "pattern_category": "pipeline-behavior",

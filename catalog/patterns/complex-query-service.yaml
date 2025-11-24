@@ -1,0 +1,310 @@
+id: complex-query-service
+version: 1.0.0
+name: ComplexQueryService
+category: query-pattern
+intent: "複合条件クエリ（空き検索、複数テーブル結合）を専用サービスとして実装するパターン"
+stability: stable
+
+description: |
+  単純なCRUD操作では対応できない複雑な検索ロジックを
+  専用のQueryServiceとして実装するパターン。
+
+  ## いつ使うか
+  - 複数テーブルを結合した検索
+  - 「〜が存在しない」という否定条件を含む検索（空き検索）
+  - 集計を伴う検索
+  - 動的な検索条件の組み合わせ
+
+  ## 配置場所
+  - `src/Application/Shared/{BC}/Application/Queries/` にインターフェース
+  - `src/Application/Shared/{BC}/Infrastructure/Persistence/` に実装
+
+preconditions:
+  - "Dapper または EF Core が使用可能であること"
+  - "IDbConnectionFactory が定義されていること（Dapper使用時）"
+
+structure:
+  interface: "src/Application/Shared/{BC}/Application/Queries/I{Entity}QueryService.cs"
+  implementation: "src/Application/Shared/{BC}/Infrastructure/Persistence/{Entity}QueryService.cs"
+  dto: "src/Application/Shared/{BC}/Application/DTOs/{Result}Dto.cs"
+
+implementation:
+  interface:
+    file_path: "src/Application/Shared/{BC}/Application/Queries/I{Entity}QueryService.cs"
+    template: |
+      namespace {BoundedContext}.Shared.Application.Queries;
+
+      /// <summary>
+      /// {Entity}の複合クエリサービス
+      /// </summary>
+      public interface I{Entity}QueryService
+      {
+          /// <summary>
+          /// {検索内容の説明}
+          /// </summary>
+          Task<IReadOnlyList<{Result}Dto>> Search{Criteria}Async(
+              {検索条件パラメータ},
+              CancellationToken cancellationToken = default);
+      }
+
+  dapper_implementation:
+    description: "Dapper を使用した実装（推奨：複雑なクエリ向け）"
+    file_path: "src/Application/Shared/{BC}/Infrastructure/Persistence/{Entity}QueryService.cs"
+    template: |
+      using Dapper;
+
+      namespace {BoundedContext}.Shared.Infrastructure.Persistence;
+
+      public sealed class {Entity}QueryService : I{Entity}QueryService
+      {
+          private readonly IDbConnectionFactory _connectionFactory;
+
+          public {Entity}QueryService(IDbConnectionFactory connectionFactory)
+          {
+              _connectionFactory = connectionFactory;
+          }
+
+          public async Task<IReadOnlyList<{Result}Dto>> Search{Criteria}Async(
+              {検索条件パラメータ},
+              CancellationToken cancellationToken = default)
+          {
+              using var connection = _connectionFactory.CreateConnection();
+
+              var sql = @"
+                  SELECT ...
+                  FROM ...
+                  WHERE ...
+                  ORDER BY ...";
+
+              var results = await connection.QueryAsync<{Result}Dto>(
+                  new CommandDefinition(sql, new { /* パラメータ */ }, cancellationToken: cancellationToken));
+
+              return results.ToList();
+          }
+      }
+
+  ef_core_implementation:
+    description: "EF Core を使用した実装"
+    template: |
+      namespace {BoundedContext}.Shared.Infrastructure.Persistence;
+
+      public sealed class {Entity}QueryService : I{Entity}QueryService
+      {
+          private readonly {BC}DbContext _dbContext;
+
+          public {Entity}QueryService({BC}DbContext dbContext)
+          {
+              _dbContext = dbContext;
+          }
+
+          public async Task<IReadOnlyList<{Result}Dto>> Search{Criteria}Async(
+              {検索条件パラメータ},
+              CancellationToken cancellationToken = default)
+          {
+              return await _dbContext.{Entities}
+                  .AsNoTracking()
+                  .Where(e => /* 条件 */)
+                  .Select(e => new {Result}Dto
+                  {
+                      // プロジェクション
+                  })
+                  .ToListAsync(cancellationToken);
+          }
+      }
+
+example_usage:
+  available_rooms_search:
+    description: "空き会議室検索（予約が入っていない会議室を検索）"
+    interface: |
+      public interface IRoomQueryService
+      {
+          /// <summary>
+          /// 指定期間に予約が入っていない会議室を検索
+          /// </summary>
+          Task<IReadOnlyList<AvailableRoomDto>> SearchAvailableRoomsAsync(
+              DateTime startTime,
+              DateTime endTime,
+              int? minCapacity = null,
+              CancellationToken cancellationToken = default);
+      }
+
+      public sealed record AvailableRoomDto(
+          Guid RoomId,
+          string Name,
+          int? Capacity,
+          string? Location);
+
+    dapper_implementation: |
+      public async Task<IReadOnlyList<AvailableRoomDto>> SearchAvailableRoomsAsync(
+          DateTime startTime,
+          DateTime endTime,
+          int? minCapacity = null,
+          CancellationToken cancellationToken = default)
+      {
+          using var connection = _connectionFactory.CreateConnection();
+
+          // 「予約が入っていない」= NOT EXISTS を使用
+          var sql = @"
+              SELECT
+                  r.""Id"" AS RoomId,
+                  r.""Name"",
+                  r.""Capacity"",
+                  r.""Location""
+              FROM ""Rooms"" r
+              WHERE r.""IsActive"" = true
+                AND (@MinCapacity IS NULL OR r.""Capacity"" >= @MinCapacity)
+                AND NOT EXISTS (
+                    SELECT 1 FROM ""Bookings"" b
+                    WHERE b.""RoomId"" = r.""Id""
+                      AND b.""Status"" = 'Confirmed'
+                      AND b.""StartTime"" < @EndTime
+                      AND @StartTime < b.""EndTime""
+                )
+              ORDER BY r.""Name""";
+
+          var results = await connection.QueryAsync<AvailableRoomDto>(
+              new CommandDefinition(
+                  sql,
+                  new { StartTime = startTime, EndTime = endTime, MinCapacity = minCapacity },
+                  cancellationToken: cancellationToken));
+
+          return results.ToList();
+      }
+
+  bookings_in_period:
+    description: "期間内の全予約取得（会議室情報を含む）"
+    interface: |
+      public interface IBookingQueryService
+      {
+          /// <summary>
+          /// 指定期間内の全予約を取得（会議室情報を含む）
+          /// </summary>
+          Task<IReadOnlyList<BookingWithRoomDto>> GetBookingsInPeriodAsync(
+              DateTime startDate,
+              DateTime endDate,
+              Guid? roomId = null,
+              CancellationToken cancellationToken = default);
+      }
+
+      public sealed record BookingWithRoomDto(
+          Guid BookingId,
+          Guid RoomId,
+          string RoomName,
+          string Title,
+          DateTime StartTime,
+          DateTime EndTime,
+          string? Organizer,
+          string Status);
+
+    dapper_implementation: |
+      public async Task<IReadOnlyList<BookingWithRoomDto>> GetBookingsInPeriodAsync(
+          DateTime startDate,
+          DateTime endDate,
+          Guid? roomId = null,
+          CancellationToken cancellationToken = default)
+      {
+          using var connection = _connectionFactory.CreateConnection();
+
+          var sql = @"
+              SELECT
+                  b.""Id"" AS BookingId,
+                  b.""RoomId"",
+                  r.""Name"" AS RoomName,
+                  b.""Title"",
+                  b.""StartTime"",
+                  b.""EndTime"",
+                  b.""Organizer"",
+                  b.""Status""
+              FROM ""Bookings"" b
+              INNER JOIN ""Rooms"" r ON b.""RoomId"" = r.""Id""
+              WHERE b.""StartTime"" < @EndDate
+                AND @StartDate < b.""EndTime""
+                AND (@RoomId IS NULL OR b.""RoomId"" = @RoomId)
+              ORDER BY b.""StartTime"", r.""Name""";
+
+          var results = await connection.QueryAsync<BookingWithRoomDto>(
+              new CommandDefinition(
+                  sql,
+                  new { StartDate = startDate, EndDate = endDate, RoomId = roomId },
+                  cancellationToken: cancellationToken));
+
+          return results.ToList();
+      }
+
+handler_integration:
+  description: "QueryHandler内でQueryServiceを使用"
+  template: |
+    public sealed class SearchAvailableRoomsQueryHandler
+        : IQueryHandler<SearchAvailableRoomsQuery, Result<IReadOnlyList<AvailableRoomDto>>>
+    {
+        private readonly IRoomQueryService _roomQueryService;
+
+        public SearchAvailableRoomsQueryHandler(IRoomQueryService roomQueryService)
+        {
+            _roomQueryService = roomQueryService;
+        }
+
+        public async Task<Result<IReadOnlyList<AvailableRoomDto>>> Handle(
+            SearchAvailableRoomsQuery request,
+            CancellationToken cancellationToken)
+        {
+            var rooms = await _roomQueryService.SearchAvailableRoomsAsync(
+                request.StartTime,
+                request.EndTime,
+                request.MinCapacity,
+                cancellationToken);
+
+            return Result.Success(rooms);
+        }
+    }
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<IRoomQueryService, RoomQueryService>();"
+    - "services.AddScoped<IBookingQueryService, BookingQueryService>();"
+
+ai_guidance:
+  when_to_use:
+    - "空き検索（NOT EXISTS）を含むクエリ"
+    - "複数テーブルを結合した検索"
+    - "集計（GROUP BY, COUNT, SUM）を含むクエリ"
+    - "動的な検索条件の組み合わせ"
+
+  when_not_to_use:
+    - "単純なID検索や一覧取得 → Repository で十分"
+    - "単一テーブルのフィルタリング → ReadRepository で十分"
+
+  dapper_vs_ef_core:
+    dapper:
+      - "複雑なクエリを直接SQLで書きたい場合"
+      - "パフォーマンスが重要な場合"
+      - "NOT EXISTS, UNION, 複雑な結合が必要な場合"
+    ef_core:
+      - "シンプルな結合やフィルタリング"
+      - "型安全性を重視する場合"
+      - "LINQで表現しやすいクエリ"
+
+  common_mistakes:
+    - mistake: "QueryServiceでデータを更新する"
+      solution: "QueryServiceは読み取り専用。更新はCommandHandler経由"
+
+    - mistake: "N+1クエリを発生させる"
+      solution: "JOINを使用して1回のクエリで必要なデータを取得"
+
+    - mistake: "全件取得してからメモリでフィルタリング"
+      solution: "WHERE句でデータベース側でフィルタリング"
+
+    - mistake: "トランザクション内でQueryServiceを呼ぶ"
+      solution: "読み取り専用クエリはトランザクション外で実行可能"
+
+evidence:
+  existing_implementation: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/DapperProductReadRepository.cs"
+  note: "既存のReadRepositoryをQueryServiceパターンとして拡張"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-24
+    changes:
+      - "初版リリース"
+      - "空き会議室検索の具体例を追加"
+      - "期間内予約取得の具体例を追加"

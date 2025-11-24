@@ -1,0 +1,262 @@
+id: concurrency-control
+version: 1.0.0
+name: ConcurrencyControl
+category: infrastructure-pattern
+intent: "同時実行制御（楽観的ロック/悲観的ロック）でデータ整合性を保証するパターン"
+stability: stable
+
+description: |
+  複数のユーザーやプロセスが同時に同じデータを更新しようとした場合の
+  データ整合性を保証するパターン。
+
+  ## 2つのアプローチ
+
+  ### 1. 楽観的ロック（Optimistic Locking）
+  - 競合は稀という前提
+  - 更新時にバージョンを確認し、変更されていたらエラー
+  - **推奨**: 一般的な業務アプリケーション向け
+
+  ### 2. 悲観的ロック（Pessimistic Locking）
+  - 競合が頻繁という前提
+  - 読み取り時にロックを取得し、他の更新をブロック
+  - **用途**: 予約の重複チェックなど、厳密な排他制御が必要な場合
+
+preconditions:
+  - "EF Core または Dapper を使用していること"
+  - "データベースがトランザクションをサポートしていること"
+
+# ===========================================
+# 楽観的ロック（推奨）
+# ===========================================
+optimistic_locking:
+  description: "バージョン列を使用した楽観的ロック"
+
+  entity:
+    file_path: "src/Domain/{BC}/{Entity}s/{Entity}.cs"
+    template: |
+      public class {Entity}
+      {
+          public Guid Id { get; private set; }
+
+          // ... 他のプロパティ ...
+
+          /// <summary>
+          /// 楽観的ロック用のバージョン（EF Core が自動管理）
+          /// </summary>
+          public byte[] RowVersion { get; private set; } = null!;
+
+          // または uint 型のバージョン
+          // public uint Version { get; private set; }
+      }
+
+  ef_configuration:
+    file_path: "src/Application/Shared/{BC}/Infrastructure/Persistence/Configurations/{Entity}Configuration.cs"
+    template: |
+      public class {Entity}Configuration : IEntityTypeConfiguration<{Entity}>
+      {
+          public void Configure(EntityTypeBuilder<{Entity}> builder)
+          {
+              // 楽観的ロック設定（SQL Server の場合）
+              builder.Property(e => e.RowVersion)
+                  .IsRowVersion();
+
+              // PostgreSQL の場合は xmin を使用
+              // builder.UseXminAsConcurrencyToken();
+          }
+      }
+
+  handler_usage:
+    template: |
+      public async Task<Result<Unit>> Handle(Update{Entity}Command request, CancellationToken ct)
+      {
+          var entity = await _repository.GetByIdAsync(request.Id, ct);
+          if (entity is null)
+              return Result.Fail<Unit>("エンティティが見つかりません");
+
+          // 更新処理
+          entity.Update(request.Name, ...);
+
+          try
+          {
+              // SaveChangesAsync は TransactionBehavior が呼ぶ
+              // 楽観的ロック違反は DbUpdateConcurrencyException として発生
+              return Result.Success(Unit.Value);
+          }
+          catch (DbUpdateConcurrencyException)
+          {
+              return Result.Fail<Unit>("他のユーザーによって更新されました。画面を再読み込みしてください。");
+          }
+      }
+
+  exception_handling:
+    description: "Pipeline Behavior で楽観的ロック例外をハンドリング"
+    template: |
+      // TransactionBehavior 内で例外をキャッチする場合
+      try
+      {
+          await _dbContext.SaveChangesAsync(cancellationToken);
+          await transaction.CommitAsync(cancellationToken);
+      }
+      catch (DbUpdateConcurrencyException ex)
+      {
+          await transaction.RollbackAsync(cancellationToken);
+          // ログ出力
+          _logger.LogWarning(ex, "楽観的ロック競合が発生しました");
+          throw; // Handler で Result.Fail に変換するため再スロー
+      }
+
+# ===========================================
+# 悲観的ロック（厳密な排他制御が必要な場合）
+# ===========================================
+pessimistic_locking:
+  description: "SELECT FOR UPDATE を使用した悲観的ロック"
+
+  when_to_use:
+    - "予約の重複チェックなど、読み取り〜書き込みの間に他の更新を許可したくない場合"
+    - "在庫の引当など、数量の整合性が重要な場合"
+    - "金融取引など、厳密な排他制御が必要な場合"
+
+  repository_method:
+    template: |
+      public interface I{Entity}Repository
+      {
+          /// <summary>
+          /// 排他ロック付きでエンティティを取得
+          /// </summary>
+          Task<{Entity}?> GetByIdWithLockAsync(Guid id, CancellationToken cancellationToken = default);
+      }
+
+  ef_core_implementation:
+    description: "EF Core での実装（Raw SQL 使用）"
+    template: |
+      public async Task<Booking?> GetByIdWithLockAsync(Guid id, CancellationToken cancellationToken = default)
+      {
+          // PostgreSQL の場合
+          return await _dbContext.Bookings
+              .FromSqlRaw("SELECT * FROM \"Bookings\" WHERE \"Id\" = {0} FOR UPDATE", id)
+              .FirstOrDefaultAsync(cancellationToken);
+
+          // SQL Server の場合
+          // return await _dbContext.Bookings
+          //     .FromSqlRaw("SELECT * FROM Bookings WITH (UPDLOCK, ROWLOCK) WHERE Id = {0}", id)
+          //     .FirstOrDefaultAsync(cancellationToken);
+      }
+
+  range_lock_for_overlap_check:
+    description: "予約重複チェック時の範囲ロック"
+    template: |
+      /// <summary>
+      /// 指定した会議室・時間帯の予約を排他ロック付きで取得
+      /// </summary>
+      public async Task<IReadOnlyList<Booking>> GetOverlappingBookingsWithLockAsync(
+          Guid roomId,
+          DateTime startTime,
+          DateTime endTime,
+          CancellationToken cancellationToken = default)
+      {
+          // PostgreSQL: FOR UPDATE で排他ロック
+          var sql = @"
+              SELECT * FROM ""Bookings""
+              WHERE ""RoomId"" = {0}
+                AND ""Status"" = 'Confirmed'
+                AND ""StartTime"" < {2}
+                AND {1} < ""EndTime""
+              FOR UPDATE";
+
+          return await _dbContext.Bookings
+              .FromSqlRaw(sql, roomId, startTime, endTime)
+              .ToListAsync(cancellationToken);
+      }
+
+  handler_usage:
+    template: |
+      public async Task<Result<Guid>> Handle(CreateBookingCommand request, CancellationToken ct)
+      {
+          // 1. 悲観的ロック付きで重複チェック
+          //    トランザクション内でロックが保持され、他のトランザクションはブロックされる
+          var overlapping = await _bookingRepository
+              .GetOverlappingBookingsWithLockAsync(request.RoomId, request.StartTime, request.EndTime, ct);
+
+          if (overlapping.Any())
+          {
+              return Result.Fail<Guid>("指定された時間帯は既に予約されています");
+          }
+
+          // 2. 予約を作成
+          var booking = Booking.Create(request.RoomId, request.Title, request.StartTime, request.EndTime);
+
+          // 3. 永続化（SaveChangesAsyncは呼ばない）
+          await _bookingRepository.AddAsync(booking, ct);
+
+          return Result.Success(booking.Id);
+      }
+
+# ===========================================
+# 選択ガイド
+# ===========================================
+selection_guide:
+  flowchart: |
+    同時実行制御が必要か？
+    │
+    ├─ 更新の競合を検出したい → 楽観的ロック（RowVersion）
+    │   例：商品情報の更新、ユーザープロフィール更新
+    │
+    └─ 読み取り〜書き込みの間に他の更新をブロックしたい → 悲観的ロック（FOR UPDATE）
+        例：予約の重複チェック、在庫引当、残高確認
+
+  comparison:
+    - aspect: "競合の頻度"
+      optimistic: "低い（稀に発生）"
+      pessimistic: "高い（頻繁に発生）"
+
+    - aspect: "パフォーマンス"
+      optimistic: "高い（ロック待ちなし）"
+      pessimistic: "低い（ロック待ち発生）"
+
+    - aspect: "ユーザー体験"
+      optimistic: "競合時にエラー表示"
+      pessimistic: "待機後に処理完了"
+
+    - aspect: "実装の複雑さ"
+      optimistic: "簡単（EF Core が自動管理）"
+      pessimistic: "やや複雑（Raw SQL 必要）"
+
+ai_guidance:
+  when_to_use:
+    - "複数ユーザーが同時に同じデータを更新する可能性がある場合"
+    - "予約の重複防止など、厳密なデータ整合性が必要な場合"
+    - "在庫管理、口座残高管理など、数量の整合性が重要な場合"
+
+  when_not_to_use:
+    - "単一ユーザーしかアクセスしないシステム"
+    - "データの競合が発生しても問題ない場合"
+    - "読み取り専用のデータ"
+
+  recommended_approach:
+    - "まず楽観的ロックを検討する"
+    - "予約システムなど厳密な排他制御が必要な場合のみ悲観的ロックを使用"
+    - "悲観的ロックはデッドロックのリスクがあるため、ロック取得順序を統一する"
+
+  common_mistakes:
+    - mistake: "楽観的ロック例外を握りつぶす"
+      solution: "ユーザーに競合を通知し、再読み込みを促す"
+
+    - mistake: "悲観的ロックのトランザクションを長時間保持する"
+      solution: "ロック範囲を最小限にし、速やかにコミット/ロールバック"
+
+    - mistake: "複数テーブルを異なる順序でロックしてデッドロック"
+      solution: "ロック取得順序をシステム全体で統一する"
+
+    - mistake: "RowVersionプロパティを更新処理で上書きする"
+      solution: "RowVersionはEF Coreが自動管理するため、手動で設定しない"
+
+evidence:
+  note: "新規パターン - 実装例は今後追加"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-24
+    changes:
+      - "初版リリース"
+      - "楽観的ロックと悲観的ロックの両方を定義"
+      - "予約重複チェックの具体例を追加"
