@@ -178,6 +178,95 @@ catalog/
 
 ---
 
+## 🆕 新規プロジェクトでの利用方法
+
+このカタログを新規プロジェクトで利用する場合の手順です。
+
+### Step 1: プロジェクト作成と参照設定
+
+新規プロジェクトのルートに `CLAUDE.md`（または `AGENTS.md`）を作成し、以下の内容を記述します：
+
+```markdown
+# AI Implementation Instructions
+
+このプロジェクトはパターンカタログに従って開発します。
+
+## 参照先カタログ
+
+**GitHub**: https://github.com/{your-org}/VSASample
+
+## 実装前の必須手順
+
+1. カタログの `catalog/AI_USAGE_GUIDE.md` を読み込む
+2. `catalog/index.json` でパターンを検索
+3. 該当パターンの YAML を読み込み
+4. `catalog/COMMON_MISTAKES.md` で禁止事項を確認
+
+## 禁止事項（カタログより抜粋）
+
+- Handler内で `SaveChangesAsync()` を呼ばない（TransactionBehaviorが自動実行）
+- Singleton で DbContext を注入しない
+- 例外を throw してエラーを伝播しない（Result<T> を使用）
+
+詳細は参照先カタログを確認してください。
+```
+
+### Step 2: カタログの参照方法
+
+AIエージェントへの指示方法：
+
+```
+このプロジェクトは https://github.com/{your-org}/VSASample のパターンカタログに従います。
+実装前に以下を読み込んでください：
+1. catalog/AI_USAGE_GUIDE.md
+2. catalog/index.json
+3. catalog/COMMON_MISTAKES.md
+
+新機能の実装はカタログのパターンに従ってください。
+```
+
+### Step 3: 必要に応じてファイルをコピー
+
+| ファイル | コピー推奨度 | 理由 |
+|---------|-------------|------|
+| `CLAUDE.md` | ✅ 必須 | AIが最初に読むファイル |
+| `catalog/COMMON_MISTAKES.md` | 📋 推奨 | 頻出ミスの早見表として |
+| `catalog/` 全体 | ❌ 非推奨 | GitHub参照で最新版を使用 |
+| `patterns.manifest.json` | ⚙️ 状況次第 | プロジェクト固有の選択がある場合 |
+
+### 推奨構成（新規プロジェクト）
+
+```
+my-new-project/
+├── CLAUDE.md                     # ← 必須：カタログ参照を指示
+├── patterns.manifest.json        # ← 任意：使用パターンを明示
+├── src/
+│   └── ...
+└── docs/
+    └── COMMON_MISTAKES.md        # ← 推奨：ローカルコピー
+```
+
+### カタログを直接参照する場合（推奨）
+
+カタログはGitHub上で管理されており、常に最新版を参照できます。
+新規プロジェクトでは **ファイルのコピーではなくGitHub参照** を推奨します。
+
+**メリット**:
+- カタログの更新が自動的に反映される
+- パターンの追加・改善が即座に利用可能
+- プロジェクト間で一貫性を保てる
+
+**AIへの指示例**:
+```
+このプロジェクトの実装は https://github.com/{your-org}/VSASample/catalog を参照してください。
+特に以下のファイルを必ず読み込んでから実装を開始してください：
+- catalog/AI_USAGE_GUIDE.md（実装ルール）
+- catalog/index.json（パターン索引）
+- catalog/COMMON_MISTAKES.md（禁止事項）
+```
+
+---
+
 ## 🤖 AIによる利用
 
 ### 推奨プロンプト
@@ -320,6 +409,6 @@ MIT License
 
 ---
 
-**最終更新: 2025-11-23**
-**カタログバージョン: v2025.11.23**
+**最終更新: 2025-11-24**
+**カタログバージョン: v2025.11.24**
 **パターン総数: 23**
