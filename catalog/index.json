@@ -180,6 +180,17 @@
       "stability": "beta"
     },
     {
+      "id": "caching-behavior",
+      "name": "CachingBehavior",
+      "category": "pipeline-behavior",
+      "version": "1.0.0",
+      "order_hint": 350,
+      "file": "patterns/caching-behavior.yaml",
+      "intent": "Query結果をメモリキャッシュし、パフォーマンスを向上",
+      "tags": ["caching", "performance", "query"],
+      "stability": "stable"
+    },
+    {
       "id": "transaction-behavior",
       "name": "TransactionBehavior",
       "category": "pipeline-behavior",
@@ -220,6 +231,16 @@
       "file": "patterns/query-get-list.yaml",
       "intent": "全件取得クエリのテンプレート（キャッシュ対応）",
       "tags": ["query", "cqrs", "cache", "dapper"],
+      "stability": "stable"
+    },
+    {
+      "id": "query-get-by-id",
+      "name": "GetByIdQuery Pattern",
+      "category": "query-pattern",
+      "version": "1.0.0",
+      "file": "patterns/query-get-by-id.yaml",
+      "intent": "IDによる単一エンティティ取得クエリのテンプレート（キャッシュ対応）",
+      "tags": ["query", "cqrs", "cache", "dapper", "single"],
       "stability": "stable"
     },
     {
@@ -359,6 +380,17 @@
       "file": "features/feature-approval-workflow.yaml",
       "intent": "稟議・申請の承認ワークフローを実装（マルチステップ承認）",
       "tags": ["approval", "workflow", "ringi", "multi-step", "domain-driven"],
+      "stability": "stable",
+      "scope": "vertical-slice"
+    },
+    {
+      "id": "feature-authentication",
+      "name": "Authentication Feature Slice",
+      "category": "feature-slice",
+      "version": "1.0.0",
+      "file": "features/feature-authentication.yaml",
+      "intent": "ログイン・2FA・トークン管理を含む認証機能の完全な垂直スライス",
+      "tags": ["authentication", "login", "jwt", "2fa", "security"],
       "stability": "stable",
       "scope": "vertical-slice"
     },
@@ -526,6 +558,50 @@
           "PageActionsの使い方を教えてください → layer-pageactions"
         ],
         "decision_rule": "学習目的の場合は layer-element を参照用として提示"
+      },
+      "認証・認可の実装": {
+        "pattern_category": "feature-slice",
+        "confidence": 0.95,
+        "trigger_keywords": ["認証", "ログイン", "2FA", "二要素", "JWT", "トークン", "セッション", "サインイン", "サインアウト"],
+        "examples": [
+          "ログイン機能を実装してください → feature-authentication",
+          "二要素認証を追加してください → feature-authentication",
+          "JWTトークンで認証してください → feature-authentication"
+        ],
+        "decision_rule": "認証・ログイン関連の要求は feature-authentication"
+      },
+      "バルク操作": {
+        "pattern_category": "feature-slice",
+        "confidence": 0.90,
+        "trigger_keywords": ["一括", "バルク", "大量", "まとめて", "複数", "バッチ"],
+        "examples": [
+          "商品を一括削除してください → feature-delete-entity (BulkDelete)",
+          "価格を一括更新してください → feature-update-entity (BulkUpdate)",
+          "CSVから一括インポートしてください → feature-import-csv"
+        ],
+        "decision_rule": "一括操作はCRUDの派生形として feature-slice を適用"
+      },
+      "キャッシュ・パフォーマンス最適化": {
+        "pattern_category": "pipeline-behavior",
+        "confidence": 0.85,
+        "trigger_keywords": ["キャッシュ", "高速化", "負荷軽減", "パフォーマンス", "レスポンス", "遅い"],
+        "examples": [
+          "検索結果をキャッシュしてください → caching-behavior",
+          "APIレスポンスを高速化してください → caching-behavior",
+          "DBアクセスを減らしてください → caching-behavior"
+        ],
+        "decision_rule": "キャッシュ・パフォーマンス改善は caching-behavior"
+      },
+      "単一エンティティ取得": {
+        "pattern_category": "query-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["詳細", "単一", "1件", "ById", "ID指定", "取得"],
+        "examples": [
+          "商品詳細を表示してください → query-get-by-id",
+          "IDで顧客情報を取得してください → query-get-by-id",
+          "注文の詳細画面を作成してください → query-get-by-id"
+        ],
+        "decision_rule": "ID指定の単一取得は query-get-by-id"
       }
     },
     "selection_algorithm": {

@@ -411,7 +411,7 @@ implementation:
 
   # ===== UI使用例 =====
   usage_ui:
-    file_path: "src/Application/Features/{Feature}/UI/{Feature}Page.razor"
+    file_path: "src/Application/Features/{Feature}/{Feature}Page.razor"
     template: |
       @* Undo/Redo使用例 *@
 

@@ -302,7 +302,7 @@ implementation:
 
   # ===== Usage in UI =====
   usage_ui:
-    file_path: "src/Application/Features/{Feature}/UI/{Feature}Page.razor"
+    file_path: "src/Application/Features/{Feature}/{Feature}Page.razor"
     template: |
       @*
       Boundary使用例（UI）

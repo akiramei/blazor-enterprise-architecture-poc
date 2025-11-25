@@ -279,7 +279,6 @@ ai_guidance:
 evidence:
   implementation: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsStore.cs"
   state: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsState.cs"
-  test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

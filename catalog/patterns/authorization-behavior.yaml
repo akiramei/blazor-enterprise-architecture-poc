@@ -226,6 +226,5 @@ changelog:
 
 evidence:
   implementation_file: "src/Shared/Infrastructure/Behaviors/AuthorizationBehavior.cs"
-  test_file: "未実装 - 今後の実装予定"
   example_command: "src/Application/Features/DeleteProduct/DeleteProductCommand.cs"
   attribute_definition: "src/Shared/Application/Attributes/AuthorizeAttribute.cs"

@@ -1,0 +1,263 @@
+id: caching-behavior
+version: 1.0.0
+name: CachingBehavior
+category: pipeline-behavior
+intent: Query結果をメモリキャッシュし、パフォーマンスを向上
+order_hint: 350
+description: |
+  ICacheableQuery を実装した Query の結果をメモリキャッシュします。
+  キャッシュキーにはテナントID・ユーザーIDを自動付与し、キャッシュ誤配信を防止。
+  テスト環境ではキャッシュを自動無効化し、テストの独立性を保証。
+
+wiring:
+  service_registrations:
+    - registration: "services.AddScoped(typeof(IPipelineBehavior<,>), typeof(CachingBehavior<,>))"
+      lifetime: "Scoped"
+      note: "MediatRパイプラインはScopedなので、BehaviorもScopedで登録"
+    - registration: "services.AddMemoryCache()"
+      lifetime: "Singleton"
+      note: "IMemoryCacheはSingletonで問題ない（スレッドセーフ）"
+  dependencies:
+    nuget:
+      - name: "Microsoft.Extensions.Caching.Memory"
+        version: "^8.0.0"
+        required: true
+      - name: "MediatR"
+        version: "^12.0.0"
+        required: true
+
+  lifetime_rules:
+    - rule: "CachingBehaviorはScopedで登録"
+      reason: "MediatRがScopedなので、依存するサービスもScopedにしないとDIエラー"
+    - rule: "IMemoryCacheはSingletonで自動登録される"
+      reason: "AddMemoryCache()はSingletonで登録するため"
+
+preconditions:
+  - "IMemoryCache がDIで利用可能"
+  - "ICurrentUserService がDIで利用可能（テナント/ユーザー情報取得）"
+  - "Query が ICacheableQuery を実装している"
+
+interface_definition:
+  file_path: "src/Shared/Application/Interfaces/ICacheableQuery.cs"
+  namespace: "Shared.Application.Interfaces"
+  template: |
+    namespace Shared.Application.Interfaces;
+
+    /// <summary>
+    /// キャッシュ可能なQueryを示すマーカーインターフェース
+    /// </summary>
+    public interface ICacheableQuery
+    {
+        /// <summary>
+        /// キャッシュキーを取得（ユーザー/テナント情報はBehaviorが自動付与）
+        /// </summary>
+        string GetCacheKey();
+
+        /// <summary>
+        /// キャッシュ期間（分）
+        /// </summary>
+        int CacheDurationMinutes { get; }
+    }
+
+implementation:
+  file_path: "src/Shared/Infrastructure/Behaviors/CachingBehavior.cs"
+  namespace: "Shared.Infrastructure.Behaviors"
+  template: |
+    using MediatR;
+    using Microsoft.Extensions.Caching.Memory;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Hosting;
+    using Shared.Application.Interfaces;
+
+    namespace Shared.Infrastructure.Behaviors;
+
+    /// <summary>
+    /// キャッシュのPipeline Behavior（Query専用）
+    /// </summary>
+    public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IQuery<TResponse>, ICacheableQuery
+    {
+        private readonly IMemoryCache _cache;
+        private readonly ICurrentUserService _currentUser;
+        private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
+        private readonly IHostEnvironment _environment;
+
+        public CachingBehavior(
+            IMemoryCache cache,
+            ICurrentUserService currentUser,
+            ILogger<CachingBehavior<TRequest, TResponse>> logger,
+            IHostEnvironment environment)
+        {
+            _cache = cache;
+            _currentUser = currentUser;
+            _logger = logger;
+            _environment = environment;
+        }
+
+        public async Task<TResponse> Handle(
+            TRequest request,
+            RequestHandlerDelegate<TResponse> next,
+            CancellationToken cancellationToken)
+        {
+            // テスト環境ではキャッシュを無効化（テストの独立性を保つため）
+            if (_environment.EnvironmentName == "Test")
+            {
+                _logger.LogDebug("キャッシュ無効（Test環境）: {RequestType}", typeof(TRequest).Name);
+                return await next();
+            }
+
+            // CRITICAL: キーに必ずユーザー/テナント情報を含める（キャッシュ誤配信防止）
+            var userSegment = _currentUser.UserId.ToString("N");
+            var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
+            var requestSegment = request.GetCacheKey();
+
+            var cacheKey = $"{typeof(TRequest).Name}:{tenantSegment}:{userSegment}:{requestSegment}";
+
+            // キャッシュから取得
+            if (_cache.TryGetValue(cacheKey, out TResponse? cached))
+            {
+                _logger.LogDebug("【キャッシュヒット】 Key={CacheKey}", cacheKey);
+                return cached!;
+            }
+
+            // キャッシュミス: Queryを実行
+            _logger.LogDebug("キャッシュミス: {CacheKey}", cacheKey);
+            var response = await next();
+
+            // キャッシュに保存
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(request.CacheDurationMinutes)
+            };
+
+            _cache.Set(cacheKey, response, cacheOptions);
+
+            _logger.LogDebug(
+                "キャッシュ保存: {CacheKey} (有効期限: {Minutes}分)",
+                cacheKey,
+                request.CacheDurationMinutes);
+
+            return response;
+        }
+    }
+
+example_usage: |
+  // 1. Query に ICacheableQuery を実装
+  public class GetProductsQuery : IQuery<Result<IEnumerable<ProductDto>>>, ICacheableQuery
+  {
+      // キャッシュキー（全商品一覧は固定キー）
+      public string GetCacheKey() => "products-all";
+
+      // キャッシュ期間: 5分
+      public int CacheDurationMinutes => 5;
+  }
+
+  // 2. パラメータ付きQueryの場合
+  public class SearchProductsQuery : IQuery<Result<SearchResult>>, ICacheableQuery
+  {
+      public string Keyword { get; init; } = "";
+      public int Page { get; init; } = 1;
+
+      // パラメータをキーに含める
+      public string GetCacheKey() => $"search:{Keyword}:page:{Page}";
+
+      public int CacheDurationMinutes => 3;
+  }
+
+cache_key_design:
+  description: |
+    キャッシュキーは以下の形式で自動生成される:
+    {QueryTypeName}:{TenantId}:{UserId}:{QuerySpecificKey}
+
+  components:
+    - name: "QueryTypeName"
+      source: "typeof(TRequest).Name"
+      purpose: "Query種別の識別"
+    - name: "TenantId"
+      source: "ICurrentUserService.TenantId"
+      purpose: "マルチテナント分離"
+    - name: "UserId"
+      source: "ICurrentUserService.UserId"
+      purpose: "ユーザー固有データの分離"
+    - name: "QuerySpecificKey"
+      source: "ICacheableQuery.GetCacheKey()"
+      purpose: "Query固有のパラメータ"
+
+  security_notes:
+    - "テナント情報を含めることで、他テナントのデータが漏洩しない"
+    - "ユーザー情報を含めることで、権限チェック結果がキャッシュされない"
+    - "キャッシュ誤配信はセキュリティ事故の原因となるため、必ずセグメント化すること"
+
+tests:
+  - name: "キャッシュヒット時にHandlerが呼ばれない"
+    given: "同じQueryが2回実行される"
+    when: "2回目のQuery実行"
+    then: "Handlerは1回しか呼ばれない（キャッシュから返却）"
+    expect: "キャッシュヒット"
+
+  - name: "テスト環境ではキャッシュ無効"
+    given: "Environment.EnvironmentName == 'Test'"
+    when: "Queryを実行"
+    then: "常にHandlerが呼ばれる"
+    expect: "キャッシュ無効"
+
+  - name: "異なるテナントはキャッシュが分離される"
+    given: "TenantA と TenantB が同じQueryを実行"
+    when: "それぞれのQuery実行"
+    then: "別々のキャッシュエントリが作成される"
+    expect: "テナント分離"
+
+metrics:
+  performance_impact: "高（キャッシュヒット時はDB/API呼び出しをスキップ）"
+  execution_order: 350
+  cache_hit_benefit: "ヒット時の応答時間: 1-5ms（DB呼び出し: 50-200ms）"
+
+ai_guidance:
+  when_to_use:
+    - "頻繁に呼び出される参照系Query"
+    - "結果がほとんど変わらないマスタデータ取得"
+    - "複雑な集計処理の結果をキャッシュしたい場合"
+
+  when_not_to_use:
+    - "更新頻度が高いデータ（リアルタイム性が求められる）"
+    - "ユーザー固有でない共有データ（全ユーザー共通）の場合は別途設計"
+    - "Command（書き込み処理）には適用しない"
+
+  common_mistakes:
+    - mistake: "キャッシュキーにユーザー/テナント情報を含めない"
+      solution: "CachingBehaviorが自動付与するので、GetCacheKey()にはQuery固有パラメータのみ"
+      severity: "critical"
+      security_impact: "キャッシュ誤配信によるデータ漏洩"
+
+    - mistake: "CacheDurationMinutesを長くしすぎる"
+      solution: "データの更新頻度に応じて適切な期間を設定（通常3-10分）"
+      severity: "medium"
+
+    - mistake: "更新系処理後にキャッシュを無効化しない"
+      solution: "Command実行後に関連するキャッシュをEvictする仕組みを検討"
+      severity: "high"
+
+    - mistake: "ICacheableQueryを実装し忘れる"
+      solution: "where TRequest : ICacheableQuery 制約があるため、実装しないとBehavior適用されない"
+      severity: "low"
+
+related_patterns:
+  - id: "query-get-list"
+    relationship: "uses"
+    description: "GetListQueryはCachingBehaviorと組み合わせて使用"
+  - id: "query-get-by-id"
+    relationship: "uses"
+    description: "GetByIdQueryもキャッシュ対象"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版リリース"
+      - "テナント/ユーザー分離のキャッシュキー設計"
+      - "テスト環境自動無効化"
+
+evidence:
+  implementation_file: "src/Shared/Infrastructure/Behaviors/CachingBehavior.cs"
+  interface_file: "src/Shared/Application/Interfaces/ICacheableQuery.cs"
+  example_query: "src/Application/Features/GetProducts/GetProductsQuery.cs"

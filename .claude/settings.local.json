@@ -50,7 +50,12 @@
       "Bash(else)",
       "Bash(dotnet restore:*)",
       "Bash(while read f)",
-      "Bash(do sed -i 's|src/Application/Shared/|src/Application/Infrastructure/|g' \"$f\")"
+      "Bash(do sed -i 's|src/Application/Shared/|src/Application/Infrastructure/|g' \"$f\")",
+      "Bash(do bname=\"$f%.cs\")",
+      "Bash(if grep -q \"\"\"id\"\": \"\"$bname,,\"\"\" catalog/index.json)",
+      "Bash(then echo \"✓ $bname\")",
+      "Bash(else echo \"✗ $bname\")",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

@@ -258,11 +258,11 @@ implementation:
 
   # ===== UI Layer (API DTO) =====
   api_dto:
-    file_path: "src/{BoundedContext}/Features/Create{Entity}/UI/Api/Dtos/Create{Entity}Request.cs"
+    file_path: "src/Application/Features/Create{Entity}/Api/Dtos/Create{Entity}Request.cs"
     template: |
       using System.ComponentModel.DataAnnotations;
 
-      namespace {BoundedContext}.Features.Api.V1.{Entity}s.Dtos;
+      namespace Application.Features.Create{Entity}.Api.Dtos;
 
       /// <summary>
       /// {Entity}作成リクエスト
@@ -292,9 +292,9 @@ implementation:
 
   # ===== UI Layer (Store) =====
   store_state:
-    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}EditState.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}EditState.cs"
     template: |
-      namespace {BoundedContext}.Shared.UI.Store;
+      namespace Application.Infrastructure.{BoundedContext}.UI.Store;
 
       /// <summary>
       /// {Entity}編集状態（作成・更新共通）
@@ -321,13 +321,13 @@ implementation:
       }
 
   store:
-    file_path: "src/{BoundedContext}/Shared/UI/Store/{Entity}EditStore.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}EditStore.cs"
     template: |
       using MediatR;
       using Microsoft.Extensions.DependencyInjection;
-      using Create{Entity}.Application;
+      using Application.Features.Create{Entity};
 
-      namespace {BoundedContext}.Shared.UI.Store;
+      namespace Application.Infrastructure.{BoundedContext}.UI.Store;
 
       /// <summary>
       /// {Entity}編集Store（作成・更新共通）
@@ -410,11 +410,11 @@ implementation:
 
   # ===== UI Layer (PageActions) =====
   page_actions:
-    file_path: "src/{BoundedContext}/Shared/UI/Actions/{Entity}EditActions.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Actions/{Entity}EditActions.cs"
     template: |
       using Microsoft.AspNetCore.Components;
 
-      namespace {BoundedContext}.Shared.UI.Actions;
+      namespace Application.Infrastructure.{BoundedContext}.UI.Actions;
 
       /// <summary>
       /// {Entity}編集Actions（UI手順のオーケストレーション）
@@ -586,7 +586,6 @@ evidence:
     store: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsStore.cs"
     page_actions: "src/Application/Infrastructure/ProductCatalog/UI/Actions/ProductListActions.cs"
   tests:
-    test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

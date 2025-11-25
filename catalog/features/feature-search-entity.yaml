@@ -372,7 +372,6 @@ evidence:
     store: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsStore.cs"
     page_actions: "src/Application/Infrastructure/ProductCatalog/UI/Actions/ProductListActions.cs"
   tests:
-    test_file: "未実装 - 今後の実装予定"
 
 changelog:
   - version: 1.0.0

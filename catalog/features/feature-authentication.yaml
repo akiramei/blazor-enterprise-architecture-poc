@@ -1,0 +1,319 @@
+id: feature-authentication
+version: 1.0.0
+name: Authentication Feature Slice
+category: feature-slice
+intent: ログイン・2FA・トークン管理を含む認証機能の完全な垂直スライス
+description: |
+  JWT認証と二要素認証（2FA/TOTP）を含む認証機能の実装パターン。
+  ASP.NET Core Identityと統合し、CQRS/MediatRパターンを適用。
+
+  主要機能:
+  - ログイン（Email/Password）
+  - 二要素認証（TOTP）
+  - リフレッシュトークン
+  - 2FA有効化/無効化
+
+scope: vertical-slice
+
+dependencies:
+  nuget:
+    - name: "Microsoft.AspNetCore.Identity.EntityFrameworkCore"
+      version: "^8.0.0"
+      required: true
+      note: "ユーザー管理基盤"
+    - name: "Microsoft.AspNetCore.Authentication.JwtBearer"
+      version: "^8.0.0"
+      required: true
+      note: "JWT認証"
+    - name: "MediatR"
+      version: "^12.0.0"
+      required: true
+      note: "CQRS実装"
+
+  external_services:
+    - name: "TOTP Library (Otp.NET等)"
+      purpose: "2FA用ワンタイムパスワード生成/検証"
+
+wiring:
+  service_registrations:
+    - registration: "services.AddIdentity<ApplicationUser, ApplicationRole>()"
+      note: "ASP.NET Core Identity設定"
+    - registration: "services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>()"
+      lifetime: "Scoped"
+    - registration: "services.AddScoped<ITotpService, TotpService>()"
+      lifetime: "Scoped"
+
+implementation:
+  # ===== Login Command =====
+  login_command:
+    file_path: "src/Application/Features/Login/LoginCommand.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Login;
+
+      /// <summary>
+      /// ログインコマンド
+      ///
+      /// 【責務】
+      /// - パスワード認証
+      /// - 2FA検証（TOTP/RecoveryCode）
+      /// - JWT Token生成
+      /// </summary>
+      public class LoginCommand : ICommand<Result<LoginResult>>
+      {
+          public string Email { get; init; } = string.Empty;
+          public string Password { get; init; } = string.Empty;
+          public string? TwoFactorCode { get; init; }
+          public bool IsRecoveryCode { get; init; }
+      }
+
+      /// <summary>
+      /// ログイン結果
+      /// </summary>
+      public record LoginResult
+      {
+          public string? AccessToken { get; init; }
+          public string? RefreshToken { get; init; }
+          public DateTime? ExpiresAt { get; init; }
+          public Guid? UserId { get; init; }
+          public string? Email { get; init; }
+          public List<string> Roles { get; init; } = new();
+          public bool Requires2FA { get; init; }
+
+          public static LoginResult Create2FARequired() => new() { Requires2FA = true };
+
+          public static LoginResult CreateSuccess(
+              string accessToken, string refreshToken, DateTime expiresAt,
+              Guid userId, string email, List<string> roles) =>
+              new()
+              {
+                  AccessToken = accessToken,
+                  RefreshToken = refreshToken,
+                  ExpiresAt = expiresAt,
+                  UserId = userId,
+                  Email = email,
+                  Roles = roles,
+                  Requires2FA = false
+              };
+      }
+
+  login_handler:
+    file_path: "src/Application/Features/Login/LoginCommandHandler.cs"
+    description: |
+      ログインコマンドハンドラー。
+      - ユーザー検索（Email）
+      - パスワード検証（SignInManager）
+      - 2FA検証（TOTP/RecoveryCode）
+      - JWT Token生成
+      - Refresh Token保存
+
+  # ===== Enable 2FA Command =====
+  enable_2fa_command:
+    file_path: "src/Application/Features/Enable2FA/Enable2FACommand.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Enable2FA;
+
+      /// <summary>
+      /// 2FA有効化コマンド
+      ///
+      /// 【フロー】
+      /// 1. シークレットキー生成
+      /// 2. QRコード用URIを返却
+      /// 3. ユーザーがAuthenticatorアプリで読み取り
+      /// 4. Verify2FAで検証後に有効化
+      /// </summary>
+      public class Enable2FACommand : ICommand<Result<Enable2FAResult>>
+      {
+          public Guid UserId { get; init; }
+      }
+
+      public record Enable2FAResult
+      {
+          public string SharedKey { get; init; } = string.Empty;
+          public string AuthenticatorUri { get; init; } = string.Empty;
+      }
+
+  # ===== Disable 2FA Command =====
+  disable_2fa_command:
+    file_path: "src/Application/Features/Disable2FA/Disable2FACommand.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Disable2FA;
+
+      /// <summary>
+      /// 2FA無効化コマンド
+      ///
+      /// 【注意】
+      /// - パスワード再確認を推奨
+      /// - 監査ログに記録
+      /// </summary>
+      public class Disable2FACommand : ICommand<Result>
+      {
+          public Guid UserId { get; init; }
+          public string CurrentPassword { get; init; } = string.Empty;
+      }
+
+  # ===== Verify 2FA Command =====
+  verify_2fa_command:
+    file_path: "src/Application/Features/Verify2FA/Verify2FACommand.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Verify2FA;
+
+      /// <summary>
+      /// 2FA検証コマンド（Enable2FA後の確認用）
+      ///
+      /// 【フロー】
+      /// 1. Enable2FAでシークレットキー取得
+      /// 2. Authenticatorアプリでコード生成
+      /// 3. このコマンドで検証
+      /// 4. 成功時に2FAを正式に有効化
+      /// </summary>
+      public class Verify2FACommand : ICommand<Result<Verify2FAResult>>
+      {
+          public Guid UserId { get; init; }
+          public string Code { get; init; } = string.Empty;
+      }
+
+      public record Verify2FAResult
+      {
+          public List<string> RecoveryCodes { get; init; } = new();
+      }
+
+authentication_flow:
+  login:
+    steps:
+      - "1. Email/Passwordを受け取る"
+      - "2. ユーザー検索（UserManager.FindByEmailAsync）"
+      - "3. パスワード検証（SignInManager.CheckPasswordSignInAsync）"
+      - "4. 2FA有効の場合: TwoFactorCodeが必要"
+      - "5. JWT Access Token生成"
+      - "6. Refresh Token生成・保存"
+      - "7. LoginResult返却"
+    diagram: |
+      Client          LoginCommand         UserManager      JwtGenerator
+         │                  │                   │                 │
+         │──Login Request──▶│                   │                 │
+         │                  │──FindByEmail─────▶│                 │
+         │                  │◀────User─────────│                 │
+         │                  │──CheckPassword───▶│                 │
+         │                  │◀────Result───────│                 │
+         │                  │         (if 2FA enabled)            │
+         │◀──2FA Required──│                   │                 │
+         │──2FA Code───────▶│──Verify TOTP────▶│                 │
+         │                  │◀────Result───────│                 │
+         │                  │──────GenerateToken────────────────▶│
+         │                  │◀─────AccessToken + RefreshToken───│
+         │◀──LoginResult───│                   │                 │
+
+  enable_2fa:
+    steps:
+      - "1. Enable2FACommand実行"
+      - "2. TOTPシークレットキー生成"
+      - "3. QRコード用URI生成（AuthenticatorUri）"
+      - "4. クライアントでQRコード表示"
+      - "5. ユーザーがAuthenticatorアプリで読み取り"
+      - "6. Verify2FACommandで検証"
+      - "7. 成功時にリカバリーコード生成・返却"
+
+tests:
+  - name: "正常なログイン"
+    given: "有効なEmail/Password"
+    when: "LoginCommandを実行"
+    then: "AccessToken, RefreshTokenが返却される"
+
+  - name: "2FA有効ユーザーのログイン（コードなし）"
+    given: "2FA有効ユーザー、TwoFactorCode未指定"
+    when: "LoginCommandを実行"
+    then: "Requires2FA=trueが返却される"
+
+  - name: "2FAコード検証成功"
+    given: "正しいTOTPコード"
+    when: "LoginCommand（with TwoFactorCode）を実行"
+    then: "AccessToken, RefreshTokenが返却される"
+
+  - name: "無効なパスワード"
+    given: "正しいEmail、間違ったPassword"
+    when: "LoginCommandを実行"
+    then: "Result.Fail（'Invalid email or password'）"
+
+  - name: "リカバリーコードでのログイン"
+    given: "有効なリカバリーコード、IsRecoveryCode=true"
+    when: "LoginCommandを実行"
+    then: "ログイン成功、リカバリーコードが使用済みになる"
+
+ai_guidance:
+  when_to_use:
+    - "ユーザー認証機能が必要な場合"
+    - "JWT認証を実装する場合"
+    - "二要素認証（2FA）を追加する場合"
+
+  when_not_to_use:
+    - "OAuth/OIDC外部認証のみの場合（IdentityServer/Auth0等を使用）"
+    - "Cookieベース認証の場合（ASP.NET標準を使用）"
+
+  common_mistakes:
+    - mistake: "パスワードを平文で保存/ログ出力"
+      solution: "ASP.NET Core Identityのハッシュ機能を使用、ログにはEmailのみ"
+      severity: "critical"
+
+    - mistake: "JWT秘密鍵をソースコードにハードコーディング"
+      solution: "appsettings.json（環境変数）またはAzure Key Vaultを使用"
+      severity: "critical"
+
+    - mistake: "Refresh Tokenを無期限に有効にする"
+      solution: "有効期限を設定（推奨: 7-30日）、使用時にローテーション"
+      severity: "high"
+
+    - mistake: "2FAシークレットキーをクライアントに返却"
+      solution: "シークレットキーはサーバー側でのみ保存、AuthenticatorUriのみ返却"
+      severity: "high"
+
+    - mistake: "ロックアウト機能を無効にする"
+      solution: "lockoutOnFailure: trueで総当たり攻撃を防止"
+      severity: "medium"
+
+security_considerations:
+  - item: "Rate Limiting"
+    description: "ログインエンドポイントにレートリミットを適用"
+    implementation: "AspNetCoreRateLimitパッケージ使用"
+
+  - item: "Account Lockout"
+    description: "一定回数のログイン失敗でアカウントをロック"
+    implementation: "SignInManager.CheckPasswordSignInAsync(lockoutOnFailure: true)"
+
+  - item: "Secure Token Storage"
+    description: "Refresh TokenはHTTPOnly Cookieまたはセキュアストレージに保存"
+
+  - item: "Token Revocation"
+    description: "ログアウト時・パスワード変更時にRefresh Tokenを無効化"
+
+related_patterns:
+  - id: "authorization-behavior"
+    relationship: "uses"
+    description: "認証後の認可チェックに使用"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版リリース"
+      - "JWT認証パターン"
+      - "二要素認証（TOTP）対応"
+      - "リフレッシュトークン管理"
+
+evidence:
+  login_command: "src/Application/Features/Login/LoginCommand.cs"
+  login_handler: "src/Application/Features/Login/LoginCommandHandler.cs"
+  enable_2fa: "src/Application/Features/Enable2FA/Enable2FACommand.cs"
+  disable_2fa: "src/Application/Features/Disable2FA/Disable2FACommand.cs"
+  verify_2fa: "src/Application/Features/Verify2FA/Verify2FACommand.cs"

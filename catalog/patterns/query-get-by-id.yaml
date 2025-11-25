@@ -1,0 +1,221 @@
+id: query-get-by-id
+version: 1.0.0
+name: GetByIdQuery Pattern
+category: query-pattern
+intent: IDによる単一エンティティ取得クエリのテンプレート（キャッシュ対応）
+description: |
+  指定されたIDでエンティティを1件取得するクエリパターン。
+  詳細画面や編集画面でのデータ取得に使用。
+  キャッシュを有効化して、同一IDへの頻繁なアクセスを高速化できます。
+
+dependencies:
+  patterns:
+    - caching-behavior
+  nuget:
+    - name: "MediatR"
+      version: "^12.0.0"
+      required: true
+      note: "IRequest<T>とIRequestHandler<,>を提供"
+    - name: "Dapper"
+      version: "^2.1.0"
+      required: true
+      note: "Read Modelの高速クエリ用"
+
+wiring:
+  service_registrations:
+    - registration: "services.AddScoped<I{Entity}ReadRepository, Dapper{Entity}ReadRepository>()"
+      lifetime: "Scoped"
+      note: "ReadRepositoryはScopedで登録"
+
+  blazor_wasm_notes:
+    - "Blazor WebAssemblyではScopedとSingletonは同じ動作だが、Scopedで統一すること"
+    - "MediatRに依存するサービスは必ずScopedで登録"
+
+  lifetime_rules:
+    - rule: "QueryHandler、ReadRepositoryはすべてScopedで登録"
+      reason: "MediatRがScopedなので、依存するサービスもScopedにしないとDIエラー"
+
+implementation:
+  query:
+    file_path: "src/Application/Features/Get{Entity}ById/Get{Entity}ByIdQuery.cs"
+    template: |
+      using {BoundedContext}.Shared.Application;
+      using {BoundedContext}.Shared.Application.DTOs;
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Get{Entity}ById;
+
+      /// <summary>
+      /// {Entity}単一取得Query
+      /// </summary>
+      public class Get{Entity}ByIdQuery : IQuery<Result<{Entity}DetailDto>>, ICacheableQuery
+      {
+          public Guid {Entity}Id { get; init; }
+
+          /// <summary>
+          /// キャッシュキー（IDを含める）
+          /// </summary>
+          public string GetCacheKey() => $"{entity}_{{{Entity}Id}}";
+
+          /// <summary>
+          /// キャッシュ期間: 10分
+          /// </summary>
+          public int CacheDurationMinutes => 10;
+      }
+
+  handler:
+    file_path: "src/Application/Features/Get{Entity}ById/Get{Entity}ByIdQueryHandler.cs"
+    template: |
+      using Application.Core.Queries;
+      using {BoundedContext}.Shared.Application;
+      using {BoundedContext}.Shared.Application.DTOs;
+      using Shared.Application;
+
+      namespace Application.Features.Get{Entity}ById;
+
+      /// <summary>
+      /// {Entity}単一取得クエリハンドラー (工業製品化版)
+      ///
+      /// 【処理フロー】
+      /// 1. Read Repositoryから{Entity}詳細DTOを取得
+      /// 2. 存在チェック
+      /// 3. 結果を返す
+      ///
+      /// 【実装ガイド】
+      /// - Read Model（Dapper）を使用して最適化
+      /// - 存在しない場合はResult.Failを返す
+      /// - キャッシュはCachingBehaviorが自動的に処理
+      /// </summary>
+      public class Get{Entity}ByIdQueryHandler
+          : QueryPipeline<Get{Entity}ByIdQuery, {Entity}DetailDto>
+      {
+          private readonly I{Entity}ReadRepository _readRepository;
+
+          public Get{Entity}ByIdQueryHandler(I{Entity}ReadRepository readRepository)
+          {
+              _readRepository = readRepository;
+          }
+
+          protected override async Task<Result<{Entity}DetailDto>> ExecuteAsync(
+              Get{Entity}ByIdQuery query,
+              CancellationToken ct)
+          {
+              // Read Repository経由でDTOを直接取得
+              var dto = await _readRepository.GetByIdAsync(query.{Entity}Id, ct);
+
+              if (dto is null)
+                  return Result.Fail<{Entity}DetailDto>("{Entity}が見つかりません");
+
+              return Result.Success(dto);
+          }
+      }
+
+example_usage: |
+  // 1. Blazor ページでの使用例
+  @code {
+      [Parameter] public Guid Id { get; set; }
+      private {Entity}DetailDto? entity;
+
+      protected override async Task OnInitializedAsync()
+      {
+          var result = await Mediator.Send(new Get{Entity}ByIdQuery { {Entity}Id = Id });
+          if (result.IsSuccess)
+          {
+              entity = result.Value;
+          }
+      }
+  }
+
+  // 2. Store経由での使用例
+  public async Task LoadAsync(Guid id, CancellationToken ct = default)
+  {
+      _state = _state with { IsLoading = true };
+      await NotifyStateChangedAsync();
+
+      using var scope = _scopeFactory.CreateScope();
+      var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+      var result = await mediator.Send(new Get{Entity}ByIdQuery { {Entity}Id = id }, ct);
+
+      _state = result.IsSuccess
+          ? _state with { Entity = result.Value, IsLoading = false }
+          : _state with { ErrorMessage = result.ErrorMessage, IsLoading = false };
+
+      await NotifyStateChangedAsync();
+  }
+
+tests:
+  - name: "存在するIDで正常に取得できる"
+    given: "有効なIDが指定される"
+    when: "Get{Entity}ByIdQueryを実行"
+    then: "Result.IsSuccess == true かつ Value に詳細DTOが含まれる"
+    expect: "正常取得"
+
+  - name: "存在しないIDでエラーが返される"
+    given: "存在しないIDが指定される"
+    when: "Get{Entity}ByIdQueryを実行"
+    then: "Result.IsSuccess == false かつ エラーメッセージが設定される"
+    expect: "NotFound"
+
+  - name: "キャッシュが有効に動作する"
+    given: "同じIDで2回クエリを実行"
+    when: "2回目のQuery実行"
+    then: "キャッシュからデータが返却される（DBアクセスなし）"
+    expect: "キャッシュヒット"
+
+metrics:
+  performance_impact: "低〜中（単一レコード取得）"
+  cache_benefit: "同一IDへの繰り返しアクセス時に効果大"
+
+ai_guidance:
+  when_to_use:
+    - "詳細画面でのエンティティ取得"
+    - "編集画面での初期データ取得"
+    - "関連データ取得時のエンティティ解決"
+
+  when_not_to_use:
+    - "複数エンティティの一括取得（GetListQueryを使用）"
+    - "検索条件付き取得（SearchQueryを使用）"
+    - "集計・統計データの取得（別パターンを使用）"
+
+  common_mistakes:
+    - mistake: "存在チェックを忘れる"
+      solution: "必ずnullチェックを行い、Result.Failを返す"
+      severity: "high"
+
+    - mistake: "Write Model（EF Core）を使用する"
+      solution: "Read専用なのでDapperのReadRepositoryを使用"
+      severity: "medium"
+
+    - mistake: "キャッシュキーにIDを含めない"
+      solution: "GetCacheKey()でIDを含めて一意性を確保"
+      severity: "high"
+
+    - mistake: "DTO変換をHandler内で行う"
+      solution: "ReadRepositoryのSQLクエリで直接DTOにマッピング"
+      severity: "low"
+
+related_patterns:
+  - id: "query-get-list"
+    relationship: "sibling"
+    description: "全件取得が必要な場合はこちら"
+  - id: "feature-update-entity"
+    relationship: "used-by"
+    description: "編集機能の初期データ取得で使用"
+  - id: "caching-behavior"
+    relationship: "uses"
+    description: "キャッシュ機能を提供"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版リリース"
+      - "キャッシュ対応"
+      - "QueryPipeline基盤に対応"
+
+evidence:
+  query_file: "src/Application/Features/GetProductById/GetProductByIdQuery.cs"
+  handler_file: "src/Application/Features/GetProductById/GetProductByIdQueryHandler.cs"
+  ui_file: "src/Application/Features/GetProductById/ProductDetail.razor"
