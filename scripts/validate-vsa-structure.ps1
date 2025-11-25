@@ -105,6 +105,74 @@ Write-Host "[Check 5] Cross-feature dependency check..." -ForegroundColor White
 Write-Host "ℹ️  TODO: Implement cross-feature dependency detection" -ForegroundColor Yellow
 Write-Host ""
 
+# Check 6: UI Placement Validation
+Write-Host "[Check 6] UI Placement Validation..." -ForegroundColor White
+
+# 6a. Features/配下の.razorが他のFeatureを参照していないかチェック
+$FeatureRazors = Get-ChildItem -Path "src\*\Features" -Recurse -Filter "*.razor" -ErrorAction SilentlyContinue
+
+if ($FeatureRazors) {
+    Write-Host "Found .razor files in Features/:" -ForegroundColor Gray
+    foreach ($Razor in $FeatureRazors) {
+        $FeatureName = $Razor.Directory.Name
+        $Content = Get-Content $Razor.FullName -Raw -ErrorAction SilentlyContinue
+
+        if ($Content) {
+            # 他のFeatureを参照しているかチェック
+            $OtherFeatures = Get-ChildItem -Path "src\*\Features" -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ne $FeatureName }
+
+            foreach ($Other in $OtherFeatures) {
+                if ($Content -match "Features\.$($Other.Name)") {
+                    Write-Host "⚠️  WARNING: $($Razor.Name) in $FeatureName references $($Other.Name)" -ForegroundColor Yellow
+                    Write-Host "    Consider moving to Components/Pages/ (multi-feature page)"
+                    $Warnings++
+                }
+            }
+        }
+        Write-Host "  ✅ $($Razor.Directory.Name)/$($Razor.Name)" -ForegroundColor Green
+    }
+} else {
+    Write-Host "ℹ️  No .razor files found in Features/ (this may be expected)" -ForegroundColor Gray
+}
+Write-Host ""
+
+# 6b. Components/Pages/に機能固有ページがないかチェック
+Write-Host "[Check 6b] Checking Components/Pages/ for feature-specific pages..." -ForegroundColor White
+
+$CommonPages = @("Home.razor", "Error.razor", "Dashboard.razor", "_Host.razor", "App.razor", "Routes.razor", "NotFound.razor", "Login.razor", "Weather.razor", "Counter.razor")
+$PageRazors = Get-ChildItem -Path "src\*\Components\Pages" -Filter "*.razor" -ErrorAction SilentlyContinue
+
+if ($PageRazors) {
+    foreach ($Page in $PageRazors) {
+        if ($Page.Name -notin $CommonPages) {
+            $Content = Get-Content $Page.FullName -Raw -ErrorAction SilentlyContinue
+
+            if ($Content) {
+                # 参照しているFeatureをカウント
+                $ReferencedFeatures = [regex]::Matches($Content, 'Features\.(\w+)') |
+                    ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
+
+                if ($ReferencedFeatures.Count -eq 1) {
+                    Write-Host "⚠️  WARNING: $($Page.Name) references only '$($ReferencedFeatures[0])'" -ForegroundColor Yellow
+                    Write-Host "    Should be in Features/$($ReferencedFeatures[0])/ (single-feature page)"
+                    $Warnings++
+                } elseif ($ReferencedFeatures.Count -eq 0) {
+                    # Featureを参照していない場合は問題ない（ナビゲーションページなど）
+                    Write-Host "  ✅ $($Page.Name) (no Feature references)" -ForegroundColor Green
+                } else {
+                    Write-Host "  ✅ $($Page.Name) (multi-feature: $($ReferencedFeatures -join ', '))" -ForegroundColor Green
+                }
+            }
+        } else {
+            Write-Host "  ✅ $($Page.Name) (common page)" -ForegroundColor Green
+        }
+    }
+} else {
+    Write-Host "ℹ️  No Pages found in Components/Pages/" -ForegroundColor Gray
+}
+Write-Host ""
+
 # Summary
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Validation Summary" -ForegroundColor Cyan

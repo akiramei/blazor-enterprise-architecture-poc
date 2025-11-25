@@ -4,13 +4,11 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'patterns.manifest.json'
       - 'catalog/**'
       - '.github/workflows/validate-patterns.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'patterns.manifest.json'
       - 'catalog/**'
 
 jobs:
@@ -27,17 +25,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Validate manifest
+      - name: Validate example manifest
         shell: pwsh
         run: |
-          Write-Host "パターンマニフェストを検証中..." -ForegroundColor Cyan
-          ./scripts/pattern-scaffolder.ps1 -Command validate
+          Write-Host "サンプルマニフェストを検証中..." -ForegroundColor Cyan
+          ./scripts/pattern-scaffolder.ps1 -Command validate -ManifestPath "./catalog/consumer-example/patterns.manifest.json"
 
-      - name: List patterns
+      - name: List example patterns
         shell: pwsh
         run: |
           Write-Host "選択されたパターンを一覧表示..." -ForegroundColor Cyan
-          ./scripts/pattern-scaffolder.ps1 -Command list
+          ./scripts/pattern-scaffolder.ps1 -Command list -ManifestPath "./catalog/consumer-example/patterns.manifest.json"
 
       - name: Validate catalog index
         shell: pwsh
@@ -72,5 +70,5 @@ jobs:
       - name: Validate JSON schema
         uses: cardinalby/schema-validator-action@v3
         with:
-          file: 'patterns.manifest.json'
-          schema: 'patterns.manifest.schema.json'
+          file: 'catalog/consumer-example/patterns.manifest.json'
+          schema: 'catalog/consumer-example/patterns.manifest.schema.json'

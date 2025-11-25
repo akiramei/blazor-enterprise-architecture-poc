@@ -169,15 +169,42 @@ dependency_rules:
 # ============================================================================
 
 ui_placement:
+  # -------------------------------------------------------------------------
+  # 優先順位: カタログ > フレームワーク慣習
+  # -------------------------------------------------------------------------
+  priority_note: |
+    Blazorの一般的な慣習では Pages/ にすべてのページを配置するが、
+    本アーキテクチャでは **カタログのルールを優先** する。
+
+    ❌ Blazor慣習: Components/Pages/ProductList.razor
+    ✅ カタログ規則: Features/ListProducts/ProductList.razor
+
   rules:
     - condition: "機能固有UI（1つのFeatureでのみ使用）"
       location: "Features/{Feature}/"
       extension: ".razor を .cs と同列配置"
       example: "Features/CreateBooking/CreateBooking.razor"
+      criteria:
+        - "単一機能のCRUD画面"
+        - "その機能のCommand/Queryのみ使用"
+        - "他のFeatureを参照しない"
+      concrete_examples:
+        - "Products.razor → Features/ListProducts/"
+        - "ProductDetail.razor → Features/GetProductById/"
+        - "OrderDetail.razor → Features/GetOrderById/"
+        - "CartPage.razor → Features/ViewCart/"
 
     - condition: "複数機能で使う基盤ページ"
       location: "Components/Pages/"
       example: "Components/Pages/Home.razor"
+      criteria:
+        - "複数のFeatureを横断するダッシュボード"
+        - "アプリケーション共通ページ（Home, Error, About）"
+        - "2つ以上のFeatureを参照する"
+      concrete_examples:
+        - "Home.razor（商品・カート・注文へのナビゲーション）"
+        - "Dashboard.razor（売上・在庫・注文の集約表示）"
+        - "Error.razor（全機能共通のエラーページ）"
 
     - condition: "BC横断の共有コンポーネント"
       location: "Components/Shared/"
@@ -189,8 +216,13 @@ ui_placement:
 
   decision_flow: |
     Q1: この.razorは特定の1機能でのみ使うか？
-        YES → Features/{Feature}/ に同列配置
-        NO  → Q2へ
+        │
+        ├─ YES → この.razorは他のFeatureのCommand/Queryを使用するか？
+        │        │
+        │        ├─ YES → Components/Pages/ に配置
+        │        └─ NO  → Features/{Feature}/ に同列配置 ★推奨★
+        │
+        └─ NO  → Q2へ
 
     Q2: @page ディレクティブがあるか？
         YES → Components/Pages/
@@ -199,6 +231,22 @@ ui_placement:
     Q3: 特定のBCに属するか？
         YES → Infrastructure/{BC}/Components/（稀なケース）
         NO  → Components/Shared/
+
+  # -------------------------------------------------------------------------
+  # 典型的なミスと修正方法
+  # -------------------------------------------------------------------------
+  common_mistakes:
+    - mistake: "全ページを Components/Pages/ に配置"
+      symptom: "Pages/ProductList.razor, Pages/OrderDetail.razor など"
+      correction: "単一機能のページは Features/{Feature}/ へ移動"
+
+    - mistake: "Blazorテンプレートの構造をそのまま踏襲"
+      symptom: "バックエンド完成後にUIを追加 → Pages/ に置いてしまう"
+      correction: "機能スライス単位で実装し、UIも同時に Features/ に配置"
+
+    - mistake: "Features/{Feature}/UI/ サブフォルダを作成"
+      symptom: "Features/Products/UI/ProductList.razor"
+      correction: "Features/Products/ProductList.razor に同列配置"
 
 # ============================================================================
 # 命名規則

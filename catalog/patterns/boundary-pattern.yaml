@@ -1,5 +1,5 @@
 id: boundary-pattern
-version: 1.0.0
+version: 2.0.0
 name: Boundary Pattern (Intent-Boundary分離)
 category: domain-pattern
 intent: ユーザーとシステムの接点（操作可否判定）をドメイン層に配置し、UIから業務ルールを分離する
@@ -10,9 +10,33 @@ description: |
   古典的DDDではBoundaryはApplication層またはInfrastructure層に配置されるが、
   本パターンでは「操作可否判定」がビジネスルールであることを重視し、Domain層に配置する。
 
+  【重要】業務ロジックはEntityが持つ
+  BoundaryServiceは「データ取得」と「Entityへの委譲」のみを行う。
+  業務ルールの判定（if文による状態チェック等）はEntity.CanXxx()メソッドに実装する。
+
 scope: domain-pattern
 layers:
   - domain
+
+# ============================================================================
+# Robustness Analysis との対応
+# ============================================================================
+robustness_mapping:
+  description: |
+    Robustness Analysis（堅牢性分析）の成果物と実装先の対応表
+
+  table: |
+    | 分析モデル | 実装先 | 責務 |
+    |-----------|--------|------|
+    | Boundary | IBoundary (Domain) | 画面契約の定義 |
+    | Boundary | BoundaryService (Application/Infrastructure) | データ取得・ViewModel構築 |
+    | Control | Entity.CanXxx() | 業務ルール判定（状態ベース） |
+    | Control | Domain Service | 複数集約にまたがる判定 |
+    | Entity | Entity | 状態と振る舞い |
+
+  critical_rule: |
+    ⚠️ 重要: Control の業務ロジックは Entity または Domain Service に実装する。
+    BoundaryService は Control ではない。BoundaryService に業務ロジックを書いてはならない。
 
 ai_selection_hints:
   trigger_phrases:
@@ -82,14 +106,171 @@ design_principle: |
 
 file_structure: |
   src/Domain/{BoundedContext}/{Aggregate}/
-  ├── {Aggregate}.cs                    # 集約ルート
+  ├── {Aggregate}.cs                    # 集約ルート ★CanXxx()メソッドを含む
   └── Boundaries/
       ├── {Aggregate}Intent.cs          # 操作の意図（enum）
       ├── I{Aggregate}Boundary.cs       # Boundaryインターフェース
       ├── BoundaryDecision.cs           # 判定結果
-      └── {Aggregate}BoundaryService.cs # Boundary実装
+      └── {Aggregate}BoundaryService.cs # Boundary実装（Entityに委譲のみ）
+
+# ============================================================================
+# 開発フロー（推奨順序）
+# ============================================================================
+development_flow:
+  description: |
+    Boundary実装の推奨フロー。この順序で実装することで、
+    業務ロジックが正しくEntityに配置される。
+
+  steps:
+    - step: 1
+      name: "画面設計"
+      action: "Intent（ユーザーができる操作）を特定"
+      output: "{Aggregate}Intent.cs"
+      example: "注文画面 → 支払い、キャンセル、詳細表示"
+
+    - step: 2
+      name: "Entity設計"
+      action: "各Intentに対応する CanXxx() メソッドを定義"
+      output: "{Aggregate}.cs に CanPay(), CanCancel() 等を追加"
+      critical: "★ 業務ルールはここに実装する"
+
+    - step: 3
+      name: "IBoundary定義"
+      action: "ViewModel と Validate メソッドのシグネチャを定義"
+      output: "I{Aggregate}Boundary.cs"
+
+    - step: 4
+      name: "BoundaryService実装"
+      action: "Entity.CanXxx() に委譲するコードを書く"
+      output: "{Aggregate}BoundaryService.cs"
+      critical: "★ 業務ロジック(if文)を書かない"
+
+  checklist:
+    - "[ ] 業務ルールの if 文が BoundaryService にないか？"
+    - "[ ] Entity に CanXxx() メソッドがあるか？"
+    - "[ ] CanXxx() は BoundaryDecision を返すか？"
+    - "[ ] BoundaryService は Entity に委譲しているか？"
+
+# ============================================================================
+# BoundaryService の責務定義（厳密）
+# ============================================================================
+boundary_service_responsibilities:
+  do:
+    - "Repository からデータを取得する"
+    - "Entity のメソッドを呼び出して判定結果を得る"
+    - "ViewModel を構築して返す"
+    - "存在チェック（null判定）のみ許可"
+
+  do_not:
+    - "業務ルールの判定（if文で状態をチェック等）"
+    - "ドメインロジックの実装"
+    - "Entity の状態を直接参照して判定"
+
+  pattern: |
+    ```csharp
+    // ✅ 正しいパターン: Entity に委譲
+    public async Task<BoundaryDecision> ValidatePayAsync(OrderId orderId, CancellationToken ct)
+    {
+        var order = await _repository.GetByIdAsync(orderId, ct);
+        if (order == null)
+            return BoundaryDecision.Deny("注文が見つかりません");  // 存在チェックのみ許可
+
+        return order.CanPay();  // ★ 業務ロジックは Entity に委譲
+    }
+
+    // ❌ 悪いパターン: BoundaryService に業務ロジック
+    public async Task<BoundaryDecision> ValidatePayAsync(OrderId orderId, CancellationToken ct)
+    {
+        var order = await _repository.GetByIdAsync(orderId, ct);
+        if (order.Status == OrderStatus.Paid)  // ← 業務ロジックが漏れている！
+            return BoundaryDecision.Deny("既に支払い済みです");
+        return BoundaryDecision.Allow();
+    }
+    ```
 
 implementation:
+  # ===== Entity の CanXxx() メソッド（最重要） =====
+  entity_can_methods:
+    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/{Aggregate}.cs"
+    description: |
+      Entity に業務ルール判定メソッドを追加する。
+      これが Boundary パターンの核心。BoundaryService はこのメソッドに委譲する。
+    template: |
+      namespace Domain.{BoundedContext}.{Aggregate}s;
+
+      using Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+
+      /// <summary>
+      /// {Aggregate} 集約ルート
+      ///
+      /// 【パターン: Boundary Pattern - Entity側】
+      ///
+      /// Entity は業務ルールを CanXxx() メソッドとして公開する。
+      /// BoundaryService はこれらのメソッドに委譲する。
+      /// </summary>
+      public class {Aggregate} : AggregateRoot<{Aggregate}Id>
+      {
+          public {Aggregate}Status Status { get; private set; }
+
+          // ... 他のプロパティ ...
+
+          // ================================================================
+          // 業務ルール判定メソッド（BoundaryDecision を返す）
+          // ================================================================
+
+          /// <summary>
+          /// 支払い可否を判定
+          /// </summary>
+          public BoundaryDecision CanPay()
+          {
+              return Status switch
+              {
+                  {Aggregate}Status.Pending => BoundaryDecision.Allow(),
+                  {Aggregate}Status.Paid => BoundaryDecision.Deny("既に支払い済みです"),
+                  {Aggregate}Status.Cancelled => BoundaryDecision.Deny("キャンセル済みの注文は支払いできません"),
+                  _ => BoundaryDecision.Deny("この状態では支払いできません")
+              };
+          }
+
+          /// <summary>
+          /// キャンセル可否を判定
+          /// </summary>
+          public BoundaryDecision CanCancel()
+          {
+              return Status switch
+              {
+                  {Aggregate}Status.Pending => BoundaryDecision.Allow(),
+                  {Aggregate}Status.Paid => BoundaryDecision.Deny("支払い済みの注文はキャンセルできません"),
+                  {Aggregate}Status.Cancelled => BoundaryDecision.Deny("既にキャンセル済みです"),
+                  _ => BoundaryDecision.Deny("この状態ではキャンセルできません")
+              };
+          }
+
+          /// <summary>
+          /// 編集可否を判定
+          /// </summary>
+          public BoundaryDecision CanUpdate()
+          {
+              if (Status == {Aggregate}Status.Completed)
+                  return BoundaryDecision.Deny("完了した{Aggregate}は編集できません");
+
+              return BoundaryDecision.Allow();
+          }
+      }
+
+    anti_pattern: |
+      // ❌ 悪い例: BoundaryService が業務ロジックを持つ
+      public class {Aggregate}BoundaryService
+      {
+          public BoundaryDecision ValidatePay({Aggregate} entity)
+          {
+              // ↓ この if 文は Entity.CanPay() に移動すべき
+              if (entity.Status == {Aggregate}Status.Paid)
+                  return BoundaryDecision.Deny("既に支払い済みです");
+              return BoundaryDecision.Allow();
+          }
+      }
+
   # ===== Intent (操作の意図) =====
   intent:
     file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/{Aggregate}Intent.cs"
@@ -210,49 +391,102 @@ implementation:
 
   # ===== BoundaryService (実装) =====
   service:
-    file_path: "src/Domain/{BoundedContext}/{Aggregate}s/Boundaries/{Aggregate}BoundaryService.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/Boundaries/{Aggregate}BoundaryService.cs"
+    description: |
+      BoundaryService は「データ取得」と「Entityへの委譲」のみを行う。
+      業務ロジック（if文による状態チェック等）を書いてはならない。
     template: |
-      namespace Domain.{BoundedContext}.{Aggregate}s.Boundaries;
+      namespace Application.Infrastructure.{BoundedContext}.Boundaries;
+
+      using Domain.{BoundedContext}.{Aggregate}s;
+      using Domain.{BoundedContext}.{Aggregate}s.Boundaries;
 
       /// <summary>
       /// {Aggregate}のBoundary実装
       ///
-      /// 【パターン: Boundary Pattern】
+      /// 【パターン: Boundary Pattern - BoundaryService側】
       ///
-      /// 責務:
-      /// - ビジネスルールに基づく操作可否判定の実装
-      /// - 判定ロジックをドメイン層に集約
+      /// ★★★ 重要: このクラスに業務ロジックを書いてはならない ★★★
       ///
-      /// AI実装時の注意:
-      /// - 判定ロジックは集約ルートの状態を参照
-      /// - 複雑な判定はStateMachineと連携
-      /// - 結果は必ずBoundaryDecisionで返す
+      /// やること:
+      /// - Repository からデータを取得する
+      /// - Entity のメソッドを呼び出して判定結果を得る
+      /// - ViewModel を構築して返す
+      ///
+      /// やらないこと:
+      /// - 業務ルールの判定（if文で状態をチェック等）
+      /// - ドメインロジックの実装
       /// </summary>
       public class {Aggregate}BoundaryService : I{Aggregate}Boundary
       {
-          public BoundaryDecision CanCreate({Aggregate} parent, /* 追加パラメータ */)
-          {
-              // 例: WIP制限のチェック
-              // if (parent.Items.Count >= parent.WipLimit)
-              //     return BoundaryDecision.Deny("WIP制限に達しています");
+          private readonly I{Aggregate}Repository _repository;
 
-              return BoundaryDecision.Allow();
+          public {Aggregate}BoundaryService(I{Aggregate}Repository repository)
+          {
+              _repository = repository;
           }
 
-          public BoundaryDecision CanUpdate({Aggregate} entity)
+          /// <summary>
+          /// 支払い可否を検証
+          /// </summary>
+          public async Task<BoundaryDecision> ValidatePayAsync(
+              {Aggregate}Id id,
+              CancellationToken ct = default)
           {
-              // 例: 状態による制限
-              // if (entity.Status == {Aggregate}Status.Approved)
-              //     return BoundaryDecision.Deny("承認済みのため編集できません");
+              var entity = await _repository.GetByIdAsync(id, ct);
+              if (entity == null)
+                  return BoundaryDecision.Deny("{Aggregate}が見つかりません");  // 存在チェックのみ許可
 
-              return BoundaryDecision.Allow();
+              // ★ 業務ロジックは Entity に委譲
+              return entity.CanPay();
           }
 
-          public BoundaryDecision CanDelete({Aggregate} entity)
+          /// <summary>
+          /// キャンセル可否を検証
+          /// </summary>
+          public async Task<BoundaryDecision> ValidateCancelAsync(
+              {Aggregate}Id id,
+              CancellationToken ct = default)
           {
-              // 例: 参照チェック
-              // if (entity.HasChildren)
-              //     return BoundaryDecision.Deny("子要素が存在するため削除できません");
+              var entity = await _repository.GetByIdAsync(id, ct);
+              if (entity == null)
+                  return BoundaryDecision.Deny("{Aggregate}が見つかりません");
+
+              // ★ 業務ロジックは Entity に委譲
+              return entity.CanCancel();
+          }
+
+          /// <summary>
+          /// 更新可否を検証
+          /// </summary>
+          public async Task<BoundaryDecision> ValidateUpdateAsync(
+              {Aggregate}Id id,
+              CancellationToken ct = default)
+          {
+              var entity = await _repository.GetByIdAsync(id, ct);
+              if (entity == null)
+                  return BoundaryDecision.Deny("{Aggregate}が見つかりません");
+
+              // ★ 業務ロジックは Entity に委譲
+              return entity.CanUpdate();
+          }
+      }
+
+    anti_pattern: |
+      // ❌ 絶対にやってはいけないパターン
+      public class {Aggregate}BoundaryService
+      {
+          public async Task<BoundaryDecision> ValidatePayAsync({Aggregate}Id id, CancellationToken ct)
+          {
+              var entity = await _repository.GetByIdAsync(id, ct);
+
+              // ↓ これは業務ロジック！Entity.CanPay() に移動すべき
+              if (entity.Status == {Aggregate}Status.Paid)
+                  return BoundaryDecision.Deny("既に支払い済みです");
+
+              // ↓ これも業務ロジック！
+              if (entity.TotalAmount <= 0)
+                  return BoundaryDecision.Deny("金額が不正です");
 
               return BoundaryDecision.Allow();
           }
@@ -366,16 +600,42 @@ ai_guidance:
       files: ["{Feature}CommandHandler.cs", "{Feature}Page.razor"]
 
   common_mistakes:
+    - mistake: "BoundaryServiceに業務ロジック（if文）を書く"
+      severity: "critical"
+      symptom: "BoundaryService内でentity.Statusをチェックするif文がある"
+      solution: "Entity.CanXxx()メソッドを作成し、BoundaryServiceはそれに委譲する。"
+      example: |
+        ❌ 悪い例:
+        if (entity.Status == OrderStatus.Paid)
+            return BoundaryDecision.Deny("支払い済み");
+
+        ✅ 良い例:
+        return entity.CanPay();
+
+    - mistake: "Entityに CanXxx() メソッドがない"
+      severity: "critical"
+      symptom: "Entityがデータの入れ物になっている（Anemic Domain Model）"
+      solution: "Entityに業務ルールを判定するCanXxx()メソッドを追加する。"
+
     - mistake: "UIにビジネスロジックを書く"
-      solution: "判定ロジックはBoundaryServiceに集約。UIはBoundaryの結果を表示するだけ。"
+      severity: "high"
+      solution: "判定ロジックはEntity.CanXxx()に集約。UIはBoundaryの結果を表示するだけ。"
+
     - mistake: "BoundaryでDbContextを使う"
-      solution: "Boundaryはドメイン層。DBアクセスはRepository経由で取得したエンティティを受け取る。"
+      severity: "high"
+      solution: "Boundaryはドメイン層。DBアクセスはRepository経由。BoundaryServiceはApplication層。"
+
     - mistake: "BoundaryDecisionの理由を省略"
+      severity: "medium"
       solution: "Deny時は必ず理由を付ける。UIでツールチップ表示やエラーメッセージに使う。"
+
     - mistake: "Boundaryを直接newする"
+      severity: "medium"
       solution: "DIでI{Aggregate}Boundaryを注入。テスト時にモック可能。"
+
     - mistake: "複数のBoundaryで判定ロジックが重複"
-      solution: "共通の判定はドメインサービスまたはStateMachineに委譲。"
+      severity: "medium"
+      solution: "共通の判定はEntity.CanXxx()に実装。複数集約にまたがる場合はDomainServiceに委譲。"
 
   key_patterns:
     - pattern: "BoundaryDecision"
@@ -433,6 +693,17 @@ evidence:
     UIとビジネスロジックの責務を明確に分離できます。
 
 changelog:
+  - version: 2.0.0
+    date: 2025-11-26
+    changes:
+      - "【Breaking】業務ロジックの配置を明確化: Entity.CanXxx() に集約"
+      - "Robustness Analysis との対応表を追加"
+      - "開発フロー（推奨順序）とチェックリストを追加"
+      - "BoundaryService の責務定義を厳密化（委譲のみ）"
+      - "Entity の CanXxx() メソッドテンプレートを追加"
+      - "common_mistakes に severity を追加"
+      - "アンチパターンの例を強化"
+
   - version: 1.0.0
     date: 2025-11-23
     changes:

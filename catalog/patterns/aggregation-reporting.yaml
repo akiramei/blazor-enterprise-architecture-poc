@@ -1,0 +1,541 @@
+# Aggregation & Reporting Pattern
+# =================================
+# 集計・レポート系クエリの実装パターン
+
+id: aggregation-reporting
+version: 1.0.0
+name: "Aggregation & Reporting Pattern"
+category: query-pattern
+intent: リアルタイム集計、ダッシュボード表示、複雑な検索条件での絞り込みを効率的に実装する
+description: |
+  業務アプリケーションで頻繁に必要となる高度なクエリパターンを提供する。
+
+  【主な用途】
+  - 商品売上レポート
+  - 在庫回転率分析
+  - 売れ筋ランキング
+  - ダッシュボード表示
+  - KPIモニタリング
+
+  【採用技術】
+  - Dapper + Raw SQL: 複雑な結合・集計クエリの最適化
+  - PostgreSQL Materialized View: 事前集計による高速化
+  - Dynamic Query Builder: 柔軟な検索条件の組み立て
+  - Specification Pattern: 再利用可能なクエリ条件
+
+scope: query-pattern
+layers:
+  - application
+  - infrastructure
+
+# ============================================================================
+# AI選択ヒント
+# ============================================================================
+ai_selection_hints:
+  trigger_phrases:
+    - "集計"
+    - "レポート"
+    - "ランキング"
+    - "ダッシュボード"
+    - "売上分析"
+    - "KPI"
+    - "複雑なクエリ"
+    - "動的検索"
+
+  confidence_keywords:
+    high: ["集計クエリ", "売上レポート", "ランキング", "Materialized View", "Dapper"]
+    medium: ["ダッシュボード", "分析", "GROUP BY", "SUM", "COUNT"]
+    low: ["検索", "フィルタ", "期間"]
+
+  typical_requests:
+    - "商品の売上レポートを作成したい"
+    - "売れ筋ランキングを表示したい"
+    - "期間を指定して集計したい"
+    - "複数条件で動的に検索したい"
+    - "ダッシュボードにKPIを表示したい"
+
+# ============================================================================
+# ファイル構造
+# ============================================================================
+file_structure: |
+  src/Application/Features/
+  ├── GetProductSalesReport/           # 商品売上レポート
+  │   ├── GetProductSalesReportQuery.cs
+  │   ├── GetProductSalesReportQueryHandler.cs
+  │   ├── ProductSalesReportDto.cs
+  │   └── ProductSalesReport.razor     # ★ 同列配置
+  │
+  ├── GetTopSellingProducts/           # 売れ筋ランキング
+  │   ├── GetTopSellingProductsQuery.cs
+  │   ├── GetTopSellingProductsQueryHandler.cs
+  │   ├── TopSellingProductDto.cs
+  │   └── TopSellingProducts.razor     # ★ 同列配置
+  │
+  └── SearchProductsAdvanced/          # 高度な商品検索
+      ├── SearchProductsAdvancedQuery.cs
+      ├── SearchProductsAdvancedQueryHandler.cs
+      └── AdvancedProductSearch.razor  # ★ 同列配置
+
+  src/Shared/Infrastructure/Querying/  # 共通クエリ基盤
+  ├── IQueryBuilder.cs                 # クエリビルダーインターフェース
+  ├── PostgreSqlQueryBuilder.cs        # PostgreSQL実装
+  └── Specifications/
+      ├── Specification.cs             # 仕様パターン基底
+      ├── AndSpecification.cs
+      ├── OrSpecification.cs
+      └── NotSpecification.cs
+
+# ============================================================================
+# 実装テンプレート
+# ============================================================================
+implementation:
+  # ===== Query（集計クエリ） =====
+  aggregation_query:
+    file_path: "src/Application/Features/Get{Entity}SalesReport/Get{Entity}SalesReportQuery.cs"
+    template: |
+      namespace Application.Features.Get{Entity}SalesReport;
+
+      /// <summary>
+      /// {Entity}売上レポート取得クエリ
+      ///
+      /// 【パターン: Aggregation & Reporting】
+      /// </summary>
+      public sealed record Get{Entity}SalesReportQuery : IQuery<Result<{Entity}SalesReportDto>>, ICacheableQuery
+      {
+          public required DateTime StartDate { get; init; }
+          public required DateTime EndDate { get; init; }
+          public Guid? CategoryId { get; init; }
+          public string? NameFilter { get; init; }
+          public int Page { get; init; } = 1;
+          public int PageSize { get; init; } = 50;
+          public string SortBy { get; init; } = "TotalSales";
+          public bool IsDescending { get; init; } = true;
+
+          public string GetCacheKey() =>
+              $"{Entity.ToLower()}-sales-report:{StartDate:yyyyMMdd}:{EndDate:yyyyMMdd}:{CategoryId}:{NameFilter}:{Page}:{PageSize}";
+
+          public int CacheDurationMinutes => 30;
+      }
+
+  # ===== DTO =====
+  report_dto:
+    file_path: "src/Application/Features/Get{Entity}SalesReport/{Entity}SalesReportDto.cs"
+    template: |
+      namespace Application.Features.Get{Entity}SalesReport;
+
+      public sealed record {Entity}SalesReportDto
+      {
+          public required PagedResult<{Entity}SalesItemDto> Items { get; init; }
+          public required SalesSummaryDto Summary { get; init; }
+          public DateTime GeneratedAt { get; init; } = DateTime.UtcNow;
+      }
+
+      public sealed record {Entity}SalesItemDto
+      {
+          public Guid {Entity}Id { get; init; }
+          public string {Entity}Name { get; init; } = string.Empty;
+          public string CategoryName { get; init; } = string.Empty;
+          public decimal TotalSales { get; init; }
+          public int TotalQuantity { get; init; }
+          public decimal AverageUnitPrice { get; init; }
+          public int OrderCount { get; init; }
+      }
+
+      public sealed record SalesSummaryDto
+      {
+          public decimal TotalRevenue { get; init; }
+          public int TotalOrders { get; init; }
+          public int TotalItems { get; init; }
+          public decimal AverageOrderValue { get; init; }
+      }
+
+  # ===== Handler（Dapper使用） =====
+  aggregation_handler:
+    file_path: "src/Application/Features/Get{Entity}SalesReport/Get{Entity}SalesReportQueryHandler.cs"
+    template: |
+      namespace Application.Features.Get{Entity}SalesReport;
+
+      using System.Data;
+      using Dapper;
+
+      /// <summary>
+      /// {Entity}売上レポート取得ハンドラー
+      ///
+      /// 【パターン: Aggregation & Reporting】
+      ///
+      /// Dapper + Raw SQLで複雑な集計クエリを最適化
+      /// </summary>
+      public sealed class Get{Entity}SalesReportQueryHandler
+          : IQueryHandler<Get{Entity}SalesReportQuery, Result<{Entity}SalesReportDto>>
+      {
+          private readonly IDbConnection _connection;
+          private readonly ILogger<Get{Entity}SalesReportQueryHandler> _logger;
+
+          public Get{Entity}SalesReportQueryHandler(
+              IDbConnection connection,
+              ILogger<Get{Entity}SalesReportQueryHandler> logger)
+          {
+              _connection = connection;
+              _logger = logger;
+          }
+
+          public async Task<Result<{Entity}SalesReportDto>> Handle(
+              Get{Entity}SalesReportQuery query,
+              CancellationToken ct)
+          {
+              try
+              {
+                  // 1. 動的クエリ構築
+                  var queryBuilder = new PostgreSqlQueryBuilder()
+                      .Select(@"
+                          p.Id AS {Entity}Id,
+                          p.Name AS {Entity}Name,
+                          c.Name AS CategoryName,
+                          COALESCE(SUM(oi.Quantity * oi.UnitPrice), 0) AS TotalSales,
+                          COALESCE(SUM(oi.Quantity), 0) AS TotalQuantity,
+                          COALESCE(AVG(oi.UnitPrice), 0) AS AverageUnitPrice,
+                          COUNT(DISTINCT o.Id) AS OrderCount")
+                      .From("{Entity}s p")
+                      .LeftJoin("Categories c", "p.CategoryId = c.Id")
+                      .LeftJoin("OrderItems oi", "p.Id = oi.{Entity}Id")
+                      .LeftJoin("Orders o", "oi.OrderId = o.Id AND o.OrderDate BETWEEN @StartDate AND @EndDate")
+                      .Where("p.IsDeleted = false")
+                      .WhereIf(query.CategoryId.HasValue, "p.CategoryId = @CategoryId")
+                      .WhereIf(!string.IsNullOrEmpty(query.NameFilter), "p.Name ILIKE @NameFilter")
+                      .GroupBy("p.Id, p.Name, c.Name")
+                      .OrderBy(query.SortBy, query.IsDescending)
+                      .Paginate(query.Page, query.PageSize)
+                      .AddParameter("StartDate", query.StartDate)
+                      .AddParameter("EndDate", query.EndDate);
+
+                  if (query.CategoryId.HasValue)
+                      queryBuilder.AddParameter("CategoryId", query.CategoryId.Value);
+
+                  if (!string.IsNullOrEmpty(query.NameFilter))
+                      queryBuilder.AddParameter("NameFilter", $"%{query.NameFilter}%");
+
+                  var (sql, parameters) = queryBuilder.Build();
+
+                  // 2. データ取得
+                  var items = (await _connection.QueryAsync<{Entity}SalesItemDto>(sql, parameters)).ToList();
+
+                  // 3. サマリー計算
+                  var summary = new SalesSummaryDto
+                  {
+                      TotalRevenue = items.Sum(i => i.TotalSales),
+                      TotalOrders = items.Sum(i => i.OrderCount),
+                      TotalItems = items.Count,
+                      AverageOrderValue = items.Any() && items.Sum(i => i.OrderCount) > 0
+                          ? items.Sum(i => i.TotalSales) / items.Sum(i => i.OrderCount)
+                          : 0
+                  };
+
+                  // 4. ページング結果作成
+                  var pagedResult = new PagedResult<{Entity}SalesItemDto>(
+                      items,
+                      items.Count, // 総件数は別クエリで取得することを推奨
+                      query.Page,
+                      query.PageSize
+                  );
+
+                  var report = new {Entity}SalesReportDto
+                  {
+                      Items = pagedResult,
+                      Summary = summary
+                  };
+
+                  return Result.Success(report);
+              }
+              catch (Exception ex)
+              {
+                  _logger.LogError(ex, "Failed to generate {Entity} sales report");
+                  return Result.Failure<{Entity}SalesReportDto>("レポート生成に失敗しました");
+              }
+          }
+      }
+
+  # ===== QueryBuilder =====
+  query_builder:
+    file_path: "src/Shared/Infrastructure/Querying/PostgreSqlQueryBuilder.cs"
+    template: |
+      namespace Shared.Infrastructure.Querying;
+
+      using System.Text;
+      using Dapper;
+
+      /// <summary>
+      /// PostgreSQL用動的クエリビルダー
+      ///
+      /// 【パターン: Aggregation & Reporting】
+      ///
+      /// 責務:
+      /// - SQL Injection対策（パラメータ化）
+      /// - 動的WHERE句の構築
+      /// - ページング処理
+      /// </summary>
+      public sealed class PostgreSqlQueryBuilder : IQueryBuilder
+      {
+          private readonly StringBuilder _select = new();
+          private readonly StringBuilder _from = new();
+          private readonly List<string> _joins = new();
+          private readonly List<string> _wheres = new();
+          private readonly StringBuilder _groupBy = new();
+          private readonly List<string> _orderBy = new();
+          private int? _limit;
+          private int? _offset;
+          private readonly DynamicParameters _parameters = new();
+
+          // ソート可能なカラムのホワイトリスト（SQL Injection対策）
+          private static readonly HashSet<string> AllowedSortColumns = new(StringComparer.OrdinalIgnoreCase)
+          {
+              "Name", "Price", "Stock", "CreatedAt", "TotalSales", "TotalQuantity", "OrderCount"
+          };
+
+          public IQueryBuilder Select(string columns)
+          {
+              _select.Append(columns);
+              return this;
+          }
+
+          public IQueryBuilder From(string table)
+          {
+              _from.Append(table);
+              return this;
+          }
+
+          public IQueryBuilder LeftJoin(string table, string condition)
+          {
+              _joins.Add($"LEFT JOIN {table} ON {condition}");
+              return this;
+          }
+
+          public IQueryBuilder Where(string condition)
+          {
+              _wheres.Add(condition);
+              return this;
+          }
+
+          public IQueryBuilder WhereIf(bool condition, string whereClause)
+          {
+              if (condition) _wheres.Add(whereClause);
+              return this;
+          }
+
+          public IQueryBuilder GroupBy(string columns)
+          {
+              _groupBy.Append(columns);
+              return this;
+          }
+
+          public IQueryBuilder OrderBy(string column, bool descending = false)
+          {
+              if (!AllowedSortColumns.Contains(column))
+                  throw new ArgumentException($"Invalid sort column: {column}");
+
+              _orderBy.Add($"{column} {(descending ? "DESC" : "ASC")}");
+              return this;
+          }
+
+          public IQueryBuilder Paginate(int page, int pageSize)
+          {
+              if (page < 1) page = 1;
+              if (pageSize < 1) pageSize = 20;
+              if (pageSize > 1000) pageSize = 1000;
+
+              _limit = pageSize;
+              _offset = (page - 1) * pageSize;
+              return this;
+          }
+
+          public IQueryBuilder AddParameter(string name, object value)
+          {
+              _parameters.Add(name, value);
+              return this;
+          }
+
+          public (string Sql, DynamicParameters Parameters) Build()
+          {
+              var sql = new StringBuilder();
+
+              sql.Append("SELECT ").Append(_select.Length > 0 ? _select : "*");
+              sql.Append(" FROM ").Append(_from);
+
+              foreach (var join in _joins)
+                  sql.Append(' ').Append(join);
+
+              if (_wheres.Count > 0)
+                  sql.Append(" WHERE ").Append(string.Join(" AND ", _wheres));
+
+              if (_groupBy.Length > 0)
+                  sql.Append(" GROUP BY ").Append(_groupBy);
+
+              if (_orderBy.Count > 0)
+                  sql.Append(" ORDER BY ").Append(string.Join(", ", _orderBy));
+
+              if (_limit.HasValue)
+                  sql.Append(" LIMIT ").Append(_limit.Value);
+
+              if (_offset.HasValue)
+                  sql.Append(" OFFSET ").Append(_offset.Value);
+
+              return (sql.ToString(), _parameters);
+          }
+      }
+
+  # ===== Specification Pattern =====
+  specification_base:
+    file_path: "src/Shared/Infrastructure/Querying/Specifications/Specification.cs"
+    template: |
+      namespace Shared.Infrastructure.Querying.Specifications;
+
+      using System.Linq.Expressions;
+
+      /// <summary>
+      /// 仕様パターン基底クラス
+      ///
+      /// 【パターン: Aggregation & Reporting】
+      ///
+      /// 再利用可能なクエリ条件を表現する
+      /// </summary>
+      public abstract class Specification<T>
+      {
+          public abstract Expression<Func<T, bool>> ToExpression();
+
+          public Func<T, bool> ToFunc() => ToExpression().Compile();
+
+          public bool IsSatisfiedBy(T entity) => ToFunc()(entity);
+
+          public Specification<T> And(Specification<T> other)
+              => new AndSpecification<T>(this, other);
+
+          public Specification<T> Or(Specification<T> other)
+              => new OrSpecification<T>(this, other);
+
+          public Specification<T> Not()
+              => new NotSpecification<T>(this);
+      }
+
+# ============================================================================
+# Materialized View（PostgreSQL）
+# ============================================================================
+materialized_view:
+  description: |
+    事前集計による高速化が必要な場合、Materialized Viewを使用する。
+    夜間バッチでREFRESHすることで、リアルタイム性と速度のバランスを取る。
+
+  sql_template: |
+    -- 商品売上サマリー（日次集計）
+    CREATE MATERIALIZED VIEW product_sales_summary AS
+    SELECT
+        p.id AS product_id,
+        p.name AS product_name,
+        c.id AS category_id,
+        c.name AS category_name,
+        DATE_TRUNC('day', o.order_date) AS order_date,
+        SUM(oi.quantity * oi.unit_price) AS daily_sales,
+        SUM(oi.quantity) AS daily_quantity,
+        COUNT(DISTINCT o.id) AS daily_orders
+    FROM
+        products p
+        INNER JOIN categories c ON p.category_id = c.id
+        INNER JOIN order_items oi ON p.id = oi.product_id
+        INNER JOIN orders o ON oi.order_id = o.id
+    WHERE
+        o.order_date >= CURRENT_DATE - INTERVAL '90 days'
+        AND p.is_deleted = false
+    GROUP BY
+        p.id, p.name, c.id, c.name, DATE_TRUNC('day', o.order_date);
+
+    -- インデックス作成
+    CREATE INDEX idx_product_sales_summary_date ON product_sales_summary(order_date);
+    CREATE INDEX idx_product_sales_summary_product ON product_sales_summary(product_id);
+
+    -- 定期更新（夜間バッチで実行）
+    REFRESH MATERIALIZED VIEW CONCURRENTLY product_sales_summary;
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+ai_guidance:
+  when_to_use:
+    - "売上レポート、在庫分析などの集計が必要"
+    - "複数テーブルを結合した複雑なクエリが必要"
+    - "動的な検索条件（フィルタ、ソート、ページング）が必要"
+    - "ダッシュボードにKPIを表示する"
+    - "パフォーマンスが重要な大量データの集計"
+
+  when_not_to_use:
+    - "単純なCRUD操作 → 標準のQueryHandler"
+    - "単一エンティティの取得 → query-get-by-id"
+    - "リアルタイム性が最優先 → Materialized Viewは不適"
+
+  implementation_steps:
+    - step: 1
+      description: "Queryを定義（期間、フィルタ、ページング）"
+      files: ["Features/Get{Entity}SalesReport/Get{Entity}SalesReportQuery.cs"]
+    - step: 2
+      description: "DTOを定義（集計結果、サマリー）"
+      files: ["Features/Get{Entity}SalesReport/{Entity}SalesReportDto.cs"]
+    - step: 3
+      description: "Handlerを実装（Dapper + Raw SQL）"
+      files: ["Features/Get{Entity}SalesReport/Get{Entity}SalesReportQueryHandler.cs"]
+    - step: 4
+      description: "QueryBuilderを使用（動的クエリ構築）"
+      files: ["Shared/Infrastructure/Querying/PostgreSqlQueryBuilder.cs"]
+    - step: 5
+      description: "UIを同列配置"
+      files: ["Features/Get{Entity}SalesReport/{Entity}SalesReport.razor"]
+
+  common_mistakes:
+    - mistake: "EF Core LINQで全件取得してメモリ上で集計"
+      severity: "high"
+      symptom: "N+1問題、メモリ不足、パフォーマンス悪化"
+      solution: "Dapper + Raw SQLでDB側で集計"
+
+    - mistake: "動的ソートカラムを直接SQLに埋め込む"
+      severity: "critical"
+      symptom: "SQL Injection脆弱性"
+      solution: "ホワイトリストでカラム名を検証"
+
+    - mistake: "ページングなしで大量データを返す"
+      severity: "high"
+      symptom: "メモリ不足、レスポンス遅延"
+      solution: "Paginate()でLIMIT/OFFSETを設定"
+
+    - mistake: "UIをUI/サブフォルダに配置"
+      severity: "medium"
+      symptom: "カタログのUI配置ルールに違反"
+      solution: "Features/{Feature}/ に .cs と .razor を同列配置"
+
+  checklist:
+    - "[ ] Dapper + Raw SQLを使用しているか？"
+    - "[ ] ソートカラムはホワイトリストで検証しているか？"
+    - "[ ] ページングが実装されているか？"
+    - "[ ] ICacheableQueryでキャッシュを有効化したか？"
+    - "[ ] UIは同列配置しているか？"
+
+# ============================================================================
+# DI登録
+# ============================================================================
+wiring:
+  service_registrations:
+    - "services.AddScoped<IDbConnection>(sp => new NpgsqlConnection(connectionString));"
+    - "services.AddScoped<IQueryBuilder, PostgreSqlQueryBuilder>();"
+
+  dependencies:
+    nuget:
+      - "Dapper"
+      - "Npgsql"
+    patterns:
+      - "caching-behavior"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+changelog:
+  - version: 1.0.0
+    date: 2025-11-26
+    changes:
+      - "初版作成"
+      - "docs/patterns/02_AGGREGATION_REPORTING_PATTERN.md からカタログ形式に変換"
+      - "UI配置ルールを同列配置に修正"

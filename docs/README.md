@@ -2,6 +2,9 @@
 
 このフォルダには、プロジェクトのアーキテクチャドキュメントが体系的に整理されています。
 
+> **AIエージェントへ**: 実装時は `catalog/` を優先参照してください。
+> このフォルダは人間の開発者向けの解説・補足資料です。
+
 ---
 
 ## 📂 フォルダ構造
@@ -10,28 +13,53 @@
 docs/
 ├── README.md                      # このファイル（ドキュメント構成ガイド）
 │
-├── blazor-guide-package/          # 🎯 メインドキュメント
-│   ├── BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md  # 完全版（全章統合）
+├── blazor-guide-package/          # 人間向けアーキテクチャガイド
+│   ├── BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md  # 完全版（全章統合・自動生成）
+│   ├── build-complete.ps1         # 統合版生成スクリプト（PowerShell）
+│   ├── build-complete.sh          # 統合版生成スクリプト（Bash）
+│   ├── README.md                  # パッケージ説明
 │   └── docs/                      # 章別ドキュメント（00-19章）
 │       ├── 00_README.md           # 目次と推奨される読み方
-│       ├── 01-19_*.md             # 各章（アーキテクチャ、パターン、実装ガイド）
+│       ├── 01-19_*.md             # 各章
 │       └── CHANGELOG.md           # ドキュメント変更履歴
 │
-├── architecture/                  # 📐 アーキテクチャ設計文書
-│   ├── cross-cutting-concerns.md  # 横断的関心事の詳細設計
-│   ├── STATE-MANAGEMENT-LAYERS.md # 状態管理の2層モデル
-│   ├── OUTBOX_PATTERN.md          # Outboxパターンの実装
-│   ├── SHARED-VS-KERNEL-DISTINCTION.md  # SharedとKernelの使い分け
-│   └── UI-POLICY-PUSH-DESIGNER-BENEFITS.md  # UI設計ポリシー
+├── architecture/                  # アーキテクチャ設計文書
+│   ├── UI-POLICY-PUSH-DESIGNER-BENEFITS.md  # UI設計ポリシー
+│   └── decisions/                 # ADR（Architecture Decision Records）
+│       └── ADR-001-ef-core-mapping-strategy.md
 │
-└── patterns/                      # 📋 設計パターン集
-    ├── TWO_FACTOR_AUTHENTICATION.md  # 二要素認証（2FA）実装ガイド
-    ├── REST-API-DESIGN-GUIDE.md   # REST API設計ガイド
-    ├── API-CLIENT-CONTRACT.md     # APIクライアント契約
-    ├── 01_APPROVAL_WORKFLOW_PATTERN.md  # 承認ワークフローパターン
-    ├── 02_AGGREGATION_REPORTING_PATTERN.md  # 集計レポートパターン
-    ├── BUSINESS_PATTERNS_ROADMAP.md  # ビジネスパターンロードマップ
-    └── README.md                  # パターン集の概要
+└── patterns/                      # 外部向けパターン
+    └── API-CLIENT-CONTRACT.md     # APIクライアント契約書
+```
+
+---
+
+## 🎯 ドキュメントの役割分担
+
+| フォルダ | 対象読者 | 目的 |
+|---------|---------|------|
+| **catalog/** | AIエージェント | パターン定義、実装テンプレート、意思決定ルール |
+| **docs/** | 人間の開発者 | 設計思想の理解、学習、背景説明 |
+
+### AIエージェントが参照すべき場所
+
+```
+catalog/
+├── index.json              # パターン索引・意思決定マトリクス
+├── AI_USAGE_GUIDE.md       # 実装ルール
+├── COMMON_MISTAKES.md      # 頻出ミス
+├── patterns/*.yaml         # パターン定義
+├── features/*.yaml         # 機能スライス定義
+└── scaffolds/*.yaml        # プロジェクト構造定義
+```
+
+### 人間の開発者が読むべき場所
+
+```
+docs/
+├── blazor-guide-package/   # アーキテクチャ全体の理解
+├── architecture/           # 設計判断の背景
+└── patterns/               # 外部連携の契約
 ```
 
 ---
@@ -47,38 +75,39 @@ docs/
 2. 既知の概念から新しいパターンへ段階的に学習
 
 ### アーキテクチャ設計者
-1. **[architecture/cross-cutting-concerns.md](architecture/cross-cutting-concerns.md)** - 横断的関心事
-2. **[architecture/STATE-MANAGEMENT-LAYERS.md](architecture/STATE-MANAGEMENT-LAYERS.md)** - 状態管理
-3. **[03_アーキテクチャ概要](blazor-guide-package/docs/03_アーキテクチャ概要.md)** - 設計原則
+1. **[03_アーキテクチャ概要](blazor-guide-package/docs/03_アーキテクチャ概要.md)** - 設計原則
+2. **[architecture/decisions/](architecture/decisions/)** - ADR（設計判断記録）
 
 ---
 
 ## 📚 各フォルダの役割
 
 ### 1. blazor-guide-package/
-**役割**: プロジェクトのメインドキュメント（完全なアーキテクチャガイド）
+
+**役割**: プロジェクトのメインドキュメント（人間向けアーキテクチャガイド）
 
 **対象読者**:
-- 開発者全員（必読）
+- 開発者全員（設計思想の理解）
 - 3層アーキテクチャ経験者
 - Blazor初心者
 
 **内容**:
-- アーキテクチャ設計原則（モノリシックVSA）
+- アーキテクチャ設計原則（VSA）
 - 各層の詳細設計（UI/Application/Domain/Infrastructure）
-- 実装パターンカタログ
+- パターンの概要説明
 - テスト戦略
 - ベストプラクティス
 
 **更新ポリシー**:
-- ✅ プロジェクトの標準的な実装パターンを追加した場合は更新
-- ✅ アーキテクチャ変更時は必ず更新
-- ❌ 実験的な機能は記載しない
+- ✅ 設計思想の変更時は更新
+- ✅ 人間向け解説の改善時は更新
+- ❌ AIが参照する実装詳細は `catalog/` に記載
 
 ---
 
 ### 2. architecture/
-**役割**: アーキテクチャ設計の詳細仕様書
+
+**役割**: 設計判断の記録と背景説明
 
 **対象読者**:
 - アーキテクト
@@ -86,45 +115,29 @@ docs/
 - コードレビュアー
 
 **内容**:
-- 横断的関心事の実装詳細
-- 状態管理の設計パターン
-- Outboxパターンの実装
-- SharedとKernelの使い分け
-- UI設計ポリシー
+- `UI-POLICY-PUSH-DESIGNER-BENEFITS.md` - UI設計ポリシーの背景
+- `decisions/` - ADR（Architecture Decision Records）
 
 **更新ポリシー**:
-- ✅ アーキテクチャの基本方針変更時に更新
-- ✅ 新しい横断的関心事を追加した場合に更新
-- ❌ 実装詳細のみの変更では更新不要
-
-**参照関係**:
-- `cross-cutting-concerns.md` は Blazorガイド20章として参照される
-- Blazorガイドから分離して管理（長大なため）
+- ✅ 新しい設計判断時にADRを追加
+- ❌ 実装詳細は `catalog/patterns/` に記載
 
 ---
 
 ### 3. patterns/
-**役割**: プロジェクト横断の設計パターン集
+
+**役割**: 外部連携向けの契約書
 
 **対象読者**:
-- APIを公開する場合の開発者
+- APIを利用する外部開発者
 - フロントエンド/バックエンド連携担当者
-- ビジネスロジック設計者
-- セキュリティエンジニア
 
 **内容**:
-- 二要素認証（2FA）実装ガイド
-- REST API設計ガイドライン
-- APIクライアント契約パターン
-- 承認ワークフローパターン
-- 集計レポートパターン
-- ビジネスパターンロードマップ
+- `API-CLIENT-CONTRACT.md` - REST APIクライアント契約
 
 **更新ポリシー**:
-- ✅ セキュリティ機能追加時に参照・更新
-- ✅ REST API公開時に参照・更新
-- ✅ 新しいビジネスパターン実装時に追加
-- ❌ 使用しない場合は更新不要
+- ✅ API公開時に参照・更新
+- ❌ 内部実装パターンは `catalog/` に記載
 
 ---
 
@@ -133,159 +146,83 @@ docs/
 ### ✅ 追加してよいドキュメント
 
 1. **永続的な設計文書**
-   - アーキテクチャ原則
-   - 実装パターン
-   - 設計ガイドライン
+   - 設計思想の説明
+   - ADR（設計判断記録）
+   - 外部向け契約書
 
-2. **適切なフォルダに分類可能なもの**
-   - blazor-guide-package/ の新しい章
-   - architecture/ の新しい設計仕様
-   - patterns/ の新しいパターン
-
-3. **複数の開発者が参照するもの**
-   - チーム全体の共通知識
-   - プロジェクト標準
+2. **人間の学習に役立つもの**
+   - チュートリアル
+   - 概念の解説
+   - 比較表
 
 ### ❌ 追加してはいけないドキュメント
 
 1. **一時的な作業記録**
    - 移行計画・進捗記録 → コミットメッセージで管理
    - 作業サマリー → CHANGELOG.mdに統合
-   - タスクリスト → GitHubのIssue/Project管理
+   - 改善計画 → GitHubのIssue/Project管理
 
-2. **個人的なメモ**
-   - 調査メモ → 個人のローカル環境で管理
-   - TODOリスト → コード内のコメントまたはIssue
+2. **AIが参照すべき実装詳細**
+   - パターン定義 → `catalog/patterns/`
+   - 実装テンプレート → `catalog/` 内のYAML
+   - 意思決定ルール → `catalog/index.json`
 
 3. **バージョン管理不要なもの**
    - 自動生成されるドキュメント（例外: BLAZOR_ARCHITECTURE_GUIDE_COMPLETE.md）
    - ビルド成果物
 
-4. **フォルダ分類が不明確なもの**
-   - 新しいカテゴリのドキュメントは、まずREADME.mdに分類方針を追記
-
 ---
 
-## 📝 ドキュメント作成ガイドライン
+## 🔄 catalogとdocsの使い分け
 
-### 新しいドキュメントを追加する前のチェックリスト
-
-- [ ] このドキュメントは永続的に必要か？（一時的なメモではないか）
-- [ ] 既存のドキュメントに統合できないか？
-- [ ] 適切なフォルダに分類できるか？
-- [ ] 複数の開発者が参照するか？
-- [ ] docs/README.mdの分類に従っているか？
-
-### 既存ドキュメントの更新基準
-
-**Blazorガイド（blazor-guide-package/）:**
-- アーキテクチャ変更時は必須
-- 新パターン追加時は推奨
-- バグ修正・typo修正は随時
-
-**アーキテクチャ文書（architecture/）:**
-- 基本方針変更時は必須
-- 実装詳細の変更では不要
-
-**パターン集（patterns/）:**
-- 該当機能の実装時に更新
-- 未使用の場合は更新不要
-
----
-
-## 🔄 ドキュメントのライフサイクル
-
-### 作成 → 運用 → 削除の基準
-
-**作成**:
-1. 新機能・新パターン追加時
-2. アーキテクチャ変更時
-3. 複数の開発者が同じ質問をした時
-
-**運用（更新）**:
-1. 内容が古くなった時
-2. 誤りを発見した時
-3. より良い説明方法を発見した時
-
-**削除**:
-1. 一時的な作業記録（移行計画等）が完了した時
-2. 他のドキュメントに統合された時
-3. 該当機能が削除された時
-
-### 削除判断のタイミング
-
-**移行・リファクタリング完了時**:
-- ✅ 移行計画・進捗文書 → 削除
-- ✅ 作業サマリー → CHANGELOGに統合後削除
-
-**機能削除時**:
-- ✅ その機能固有のドキュメント → 削除
-- ⚠️ アーキテクチャガイド → 「削除済み機能」として記録保持
-
----
-
-## 📌 よくある質問
-
-### Q1: 実装中のメモはどこに置くべきか？
-**A**: docs/には置かない。ローカル環境またはコード内コメントで管理。
-
-### Q2: 新しいアーキテクチャパターンを追加したい
-**A**: まず`blazor-guide-package/docs/05_パターンカタログ一覧.md`に追加。必要に応じて新しい章を作成。
-
-### Q3: このフォルダ構造を変更したい
-**A**: まず`docs/README.md`（このファイル）の変更をレビューし、合意を得てから実施。
-
-### Q4: Blazorガイドとarchitecture/の使い分けは？
-**A**:
-- **Blazorガイド**: 開発者向けの実装ガイド（How）
-- **architecture/**: アーキテクトが定めた設計原則（Why/What）
-
----
-
-## 📖 参考リンク
-
-- **プロジェクトメインREADME**: [/README.md](../README.md)
-- **Blazorガイド目次**: [blazor-guide-package/docs/00_README.md](blazor-guide-package/docs/00_README.md)
-- **横断的関心事**: [architecture/cross-cutting-concerns.md](architecture/cross-cutting-concerns.md)
-- **状態管理**: [architecture/STATE-MANAGEMENT-LAYERS.md](architecture/STATE-MANAGEMENT-LAYERS.md)
+| 内容 | 配置場所 | 理由 |
+|-----|---------|------|
+| パターンの定義・テンプレート | `catalog/` | AIが正確に参照 |
+| パターンの解説・背景 | `docs/` | 人間が理解を深める |
+| 実装ルール・禁止事項 | `catalog/` | AIが厳守 |
+| 設計思想・Why | `docs/` | 人間が判断に活用 |
+| 意思決定マトリクス | `catalog/index.json` | AIが自動選択 |
+| ADR | `docs/architecture/decisions/` | 人間が背景を理解 |
 
 ---
 
 ## 🏗️ 現在のアーキテクチャ概要
 
-このプロジェクトは **モノリシックVSA (Vertical Slice Architecture)** を採用しています。
+このプロジェクトは **Vertical Slice Architecture (VSA)** を採用しています。
 
 ### プロジェクト構造
 
 ```
 src/
 ├── Application/              # 単一Blazorプロジェクト
-│   ├── Application.csproj    # すべての機能を含む
-│   ├── Program.cs
-│   ├── Core/                 # Commands, Queries, Behaviors
-│   ├── Features/             # 19機能 (UIを含む垂直スライス)
-│   ├── Infrastructure/
-│   ├── Shared/
-│   └── ...
-├── Domain/                   # 分離されたドメインプロジェクト
-│   ├── ProductCatalog/
-│   └── PurchaseManagement/
+│   ├── Features/             # 機能スライス（垂直統合）
+│   ├── Infrastructure/       # BC固有インフラ
+│   └── Components/           # Blazor共通コンポーネント
+│
+├── Domain/                   # ドメインプロジェクト（分離）
+│   └── {BoundedContext}/     # BC別ドメインモデル
+│
 └── Shared/                   # 共通ライブラリ
-    ├── Kernel/
-    ├── Domain/
-    ├── Application/
-    ├── Infrastructure/
-    └── ...
+    ├── Kernel/               # DDD基盤
+    ├── Application/          # ICommand, IQuery, Result<T>
+    └── Infrastructure/       # Pipeline Behaviors
 ```
 
 ### 設計原則
 
-- **YAGNI (You Aren't Gonna Need It)**: シンプルから始め、必要に応じて複雑化
-- **単一プロジェクト**: Domainのみ分離、それ以外は単一Applicationプロジェクト
-- **垂直スライス**: 機能ごとにUI + Application + Infrastructure を含む
-- **モノリシック**: 将来的にマイクロサービス化が必要になった場合のみ分割
+- **Vertical Slice Architecture**: 機能単位で垂直統合
+- **Catalog-Driven Development**: パターンカタログに基づく実装
+- **UI同列配置**: `Features/{Feature}/` に .cs と .razor を並べる
 
 ---
 
-**最終更新**: 2025-11-16
-**バージョン**: 2.0.0 (モノリシック統合完了)
+## 📖 参考リンク
+
+- **プロジェクトメインREADME**: [/README.md](../README.md)
+- **カタログ（AI向け）**: [/catalog/](../catalog/)
+- **Blazorガイド目次**: [blazor-guide-package/docs/00_README.md](blazor-guide-package/docs/00_README.md)
+
+---
+
+**最終更新**: 2025-11-26
+**バージョン**: 3.0.0 (catalog統合対応)

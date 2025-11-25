@@ -1,7 +1,7 @@
 {
-  "$schema": "../patterns.manifest.schema.json",
-  "version": "v2025.11.25b",
-  "last_updated": "2025-11-25",
+  "$schema": "consumer-example/patterns.manifest.schema.json",
+  "version": "v2025.11.26",
+  "last_updated": "2025-11-26",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "ai_bootstrap": {
@@ -332,14 +332,13 @@
     },
     {
       "id": "layer-store",
-      "name": "Store Pattern (State Management + I/O)",
-      "category": "layer-element",
+      "name": "Layer Store Pattern (Flux-based State Management)",
+      "category": "ui-pattern",
       "version": "1.0.0",
-      "file": "layers/layer-store.yaml",
-      "intent": "UI層の状態管理とI/Oを担当するStoreパターン",
-      "tags": ["ui", "state-management", "store", "blazor"],
-      "stability": "stable",
-      "layer": "UI"
+      "file": "patterns/layer-store.yaml",
+      "intent": "フロントエンド状態をシステムレベルとドメイン固有の2層に分離し、再利用性と保守性を高める",
+      "tags": ["ui", "state-management", "store", "blazor", "flux", "session", "theme"],
+      "stability": "stable"
     },
     {
       "id": "layer-pageactions",
@@ -455,6 +454,16 @@
       "stability": "stable"
     },
     {
+      "id": "outbox-pattern",
+      "name": "Transactional Outbox Pattern",
+      "category": "infrastructure-pattern",
+      "version": "1.0.0",
+      "file": "patterns/outbox-pattern.yaml",
+      "intent": "ドメインイベントとビジネスエンティティを同一トランザクションで保存し、マイクロサービス間の結果整合性を保証",
+      "tags": ["outbox", "event-delivery", "eventual-consistency", "transaction", "microservices", "domain-event"],
+      "stability": "stable"
+    },
+    {
       "id": "complex-query-service",
       "name": "Complex Query Service Pattern",
       "category": "query-pattern",
@@ -462,6 +471,16 @@
       "file": "patterns/complex-query-service.yaml",
       "intent": "複合条件クエリを専用サービスとして実装（NOT EXISTS/空き検索、複数テーブル結合、未割当検索など）",
       "tags": ["query", "dapper", "complex-query", "available-search", "not-exists", "unassigned", "vacancy"],
+      "stability": "stable"
+    },
+    {
+      "id": "aggregation-reporting",
+      "name": "Aggregation & Reporting Pattern",
+      "category": "query-pattern",
+      "version": "1.0.0",
+      "file": "patterns/aggregation-reporting.yaml",
+      "intent": "リアルタイム集計、ダッシュボード表示、売上レポート、ランキングなどの高度な集計クエリを実装",
+      "tags": ["query", "dapper", "aggregation", "reporting", "dashboard", "kpi", "ranking", "materialized-view"],
       "stability": "stable"
     },
     {
@@ -666,6 +685,41 @@
           "型安全なIDを作成してください → domain-typed-id"
         ],
         "decision_rule": "集約ごとに専用のID型が必要な場合は domain-typed-id"
+      },
+      "イベント配信・結果整合性": {
+        "pattern_category": "infrastructure-pattern",
+        "confidence": 0.95,
+        "trigger_keywords": ["イベント配信", "結果整合性", "Outbox", "ドメインイベント", "マイクロサービス連携", "非同期メッセージング", "トランザクション保証"],
+        "examples": [
+          "ドメインイベントを確実に配信してください → outbox-pattern",
+          "データベース更新とイベント発行を原子的に行いたい → outbox-pattern",
+          "マイクロサービス間でイベントを連携したい → outbox-pattern"
+        ],
+        "decision_rule": "ドメインイベントの確実な配信・結果整合性が必要な場合は outbox-pattern"
+      },
+      "状態管理・Store": {
+        "pattern_category": "ui-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["状態管理", "Store", "Flux", "セッション", "テーマ", "通知", "トースト", "サイドバー"],
+        "examples": [
+          "商品一覧の状態を管理したい → layer-store",
+          "ログイン状態を画面間で共有したい → layer-store",
+          "ダークモード切り替えを実装したい → layer-store",
+          "トースト通知を表示したい → layer-store"
+        ],
+        "decision_rule": "UIの状態管理（システムレベル/ドメイン固有）は layer-store"
+      },
+      "集計・レポート": {
+        "pattern_category": "query-pattern",
+        "confidence": 0.95,
+        "trigger_keywords": ["集計", "レポート", "ランキング", "ダッシュボード", "売上分析", "KPI", "GROUP BY", "SUM", "COUNT", "Materialized View"],
+        "examples": [
+          "商品の売上レポートを作成したい → aggregation-reporting",
+          "売れ筋ランキングを表示したい → aggregation-reporting",
+          "ダッシュボードにKPIを表示したい → aggregation-reporting",
+          "期間を指定して集計したい → aggregation-reporting"
+        ],
+        "decision_rule": "集計クエリ（GROUP BY、SUM、ランキング、ダッシュボード）は aggregation-reporting"
       }
     },
     "selection_algorithm": {

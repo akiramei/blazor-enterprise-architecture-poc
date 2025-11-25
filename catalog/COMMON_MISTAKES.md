@@ -127,6 +127,69 @@ if (!decision.IsAllowed)
 
 ---
 
+## ⚠️ BoundaryServiceの責務違反（重要）
+
+**BoundaryService に業務ロジック（if文で状態をチェック）を書いてはいけません。**
+
+業務ロジックは **Entity.CanXxx()** メソッドに実装し、BoundaryService はそれに委譲します。
+
+```csharp
+// ✅ 正しい: Entity に業務ロジック、BoundaryService は委譲のみ
+
+// Entity側（業務ロジックを持つ）
+public class Order : AggregateRoot<OrderId>
+{
+    public BoundaryDecision CanPay()
+    {
+        return Status switch
+        {
+            OrderStatus.Pending => BoundaryDecision.Allow(),
+            OrderStatus.Paid => BoundaryDecision.Deny("既に支払い済みです"),
+            _ => BoundaryDecision.Deny("この状態では支払いできません")
+        };
+    }
+}
+
+// BoundaryService側（委譲のみ）
+public class OrderBoundaryService : IOrderBoundary
+{
+    public async Task<BoundaryDecision> ValidatePayAsync(OrderId id, CancellationToken ct)
+    {
+        var order = await _repository.GetByIdAsync(id, ct);
+        if (order == null)
+            return BoundaryDecision.Deny("注文が見つかりません");  // 存在チェックのみ許可
+
+        return order.CanPay();  // ★ 業務ロジックは Entity に委譲
+    }
+}
+
+// ❌ 禁止: BoundaryService に業務ロジックを書く
+public class OrderBoundaryService : IOrderBoundary
+{
+    public async Task<BoundaryDecision> ValidatePayAsync(OrderId id, CancellationToken ct)
+    {
+        var order = await _repository.GetByIdAsync(id, ct);
+
+        // ↓ これは業務ロジック！Entity.CanPay() に移動すべき
+        if (order.Status == OrderStatus.Paid)
+            return BoundaryDecision.Deny("既に支払い済みです");
+
+        return BoundaryDecision.Allow();
+    }
+}
+```
+
+**チェックリスト**:
+
+- [ ] 業務ルールの if 文が BoundaryService にないか？
+- [ ] Entity に CanXxx() メソッドがあるか？
+- [ ] CanXxx() は BoundaryDecision を返すか？
+- [ ] BoundaryService は Entity に委譲しているか？
+
+**理由**: Robustness Analysis における Control（業務ロジック）は Entity または Domain Service に配置します。BoundaryService は Control ではありません。
+
+---
+
 ## ⚠️ Query側の実装一貫性
 
 ### Command側とQuery側で実装を統一する

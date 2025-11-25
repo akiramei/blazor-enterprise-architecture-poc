@@ -1,0 +1,374 @@
+# Layer Store Pattern (Flux-based State Management)
+# =================================================
+# Blazor Serverにおける2層状態管理パターン
+
+id: layer-store
+version: 1.0.0
+name: "Layer Store Pattern"
+category: ui-pattern
+intent: フロントエンド状態をシステムレベルとドメイン固有に分離し、再利用性と保守性を高める
+description: |
+  Blazor Serverアプリケーションにおける状態管理を2つのレイヤーに分離する。
+
+  1. **システムレベル（共通）**: 認証、テーマ、通知など全プロジェクトで共通
+  2. **ドメイン固有**: ProductsStore、OrdersStoreなど業務画面固有の状態
+
+  【設計原則】
+  - システムレベルはテンプレート化し、毎回書かない
+  - ドメイン固有のStoreのみプロジェクトごとに作成
+
+scope: ui-pattern
+layers:
+  - ui
+
+# ============================================================================
+# AI選択ヒント
+# ============================================================================
+ai_selection_hints:
+  trigger_phrases:
+    - "状態管理"
+    - "Store"
+    - "Flux"
+    - "SessionProvider"
+    - "テーマ切り替え"
+    - "通知管理"
+
+  confidence_keywords:
+    high: ["Store", "状態管理", "Flux", "CascadingValue"]
+    medium: ["Provider", "Session", "Theme"]
+    low: ["グローバル状態", "共有状態"]
+
+  typical_requests:
+    - "商品一覧の状態を管理したい"
+    - "ログイン状態を画面間で共有したい"
+    - "ダークモード切り替えを実装したい"
+    - "トースト通知を表示したい"
+
+# ============================================================================
+# 2層モデル
+# ============================================================================
+layer_model:
+  system_level:
+    description: "全プロジェクトで共通の状態（テンプレート化すべき）"
+    examples:
+      - name: "SessionProvider"
+        purpose: "認証状態・ユーザー情報"
+        data: ["isAuthenticated", "userId", "userName", "roles"]
+      - name: "ThemeProvider"
+        purpose: "ダークモード切り替え"
+        data: ["theme", "fontSize"]
+      - name: "NotificationStore"
+        purpose: "トースト・モーダル管理"
+        data: ["toasts", "modals"]
+      - name: "LayoutStore"
+        purpose: "サイドバー・ナビゲーション状態"
+        data: ["sidebarOpen", "headerCollapsed"]
+      - name: "PreferencesStore"
+        purpose: "言語・タイムゾーン・日付フォーマット"
+        data: ["language", "timeZone", "dateFormat"]
+
+  domain_specific:
+    description: "プロジェクト固有の状態（毎回新規作成）"
+    examples:
+      - name: "ProductsStore"
+        purpose: "商品一覧・フィルタ・選択状態"
+      - name: "OrdersStore"
+        purpose: "注文一覧・ステータスフィルタ"
+      - name: "CartStore"
+        purpose: "カート内容・合計金額"
+
+# ============================================================================
+# ファイル構造
+# ============================================================================
+file_structure: |
+  src/Application/
+  ├── Infrastructure/              # システムレベル（共通）
+  │   ├── Providers/
+  │   │   ├── SessionProvider.razor
+  │   │   └── ThemeProvider.razor
+  │   ├── Stores/
+  │   │   ├── NotificationStore.cs
+  │   │   ├── LayoutStore.cs
+  │   │   └── PreferencesStore.cs
+  │   ├── Models/
+  │   │   ├── SessionState.cs
+  │   │   └── ThemeState.cs
+  │   └── Services/
+  │       └── LocalStorageService.cs
+  │
+  └── Features/{Feature}/          # ドメイン固有
+      └── Store/
+          ├── {Feature}Store.cs
+          └── {Feature}Actions.cs
+
+# ============================================================================
+# 実装テンプレート
+# ============================================================================
+implementation:
+  # ===== SessionProvider（システムレベル） =====
+  session_provider:
+    file_path: "src/Application/Infrastructure/Providers/SessionProvider.razor"
+    template: |
+      @using Application.Infrastructure.Models
+      @using Shared.Application.Interfaces
+
+      <CascadingValue Value="@State">
+          @ChildContent
+      </CascadingValue>
+
+      @code {
+          [Inject] private IAppContext AppContext { get; set; } = default!;
+          [Parameter] public RenderFragment ChildContent { get; set; } = default!;
+
+          public SessionState State { get; private set; } = new();
+
+          protected override void OnInitialized()
+          {
+              State = new SessionState
+              {
+                  UserId = AppContext.UserId,
+                  UserName = AppContext.UserName,
+                  IsAuthenticated = AppContext.IsAuthenticated
+              };
+          }
+      }
+
+  # ===== SessionState（システムレベル） =====
+  session_state:
+    file_path: "src/Application/Infrastructure/Models/SessionState.cs"
+    template: |
+      namespace Application.Infrastructure.Models;
+
+      /// <summary>
+      /// セッション状態（認証・ユーザー情報）
+      ///
+      /// 【パターン: Layer Store - System Level】
+      /// </summary>
+      public sealed record SessionState
+      {
+          public Guid UserId { get; init; }
+          public string UserName { get; init; } = string.Empty;
+          public bool IsAuthenticated { get; init; }
+          public IReadOnlyList<string> Roles { get; init; } = Array.Empty<string>();
+
+          public bool IsInRole(string role) => Roles.Contains(role);
+          public bool IsInAnyRole(params string[] roles) => roles.Any(IsInRole);
+      }
+
+  # ===== NotificationStore（システムレベル） =====
+  notification_store:
+    file_path: "src/Application/Infrastructure/Stores/NotificationStore.cs"
+    template: |
+      namespace Application.Infrastructure.Stores;
+
+      /// <summary>
+      /// 通知Store（トースト・モーダル管理）
+      ///
+      /// 【パターン: Layer Store - System Level】
+      /// </summary>
+      public sealed class NotificationStore
+      {
+          private readonly List<ToastMessage> _toasts = new();
+
+          public IReadOnlyList<ToastMessage> Toasts => _toasts.AsReadOnly();
+          public event Action? OnChange;
+
+          public void ShowToast(string message, ToastType type = ToastType.Info)
+          {
+              var toast = new ToastMessage(Guid.NewGuid(), message, type, DateTime.UtcNow);
+              _toasts.Add(toast);
+              OnChange?.Invoke();
+
+              // 3秒後に自動削除
+              Task.Delay(3000).ContinueWith(_ => RemoveToast(toast.Id));
+          }
+
+          public void RemoveToast(Guid id)
+          {
+              _toasts.RemoveAll(t => t.Id == id);
+              OnChange?.Invoke();
+          }
+      }
+
+      public sealed record ToastMessage(Guid Id, string Message, ToastType Type, DateTime CreatedAt);
+      public enum ToastType { Info, Success, Warning, Error }
+
+  # ===== ドメイン固有Store =====
+  domain_store:
+    file_path: "src/Application/Features/{Feature}/Store/{Feature}Store.cs"
+    template: |
+      namespace Application.Features.{Feature}.Store;
+
+      /// <summary>
+      /// {Feature}の状態管理Store
+      ///
+      /// 【パターン: Layer Store - Domain Specific】
+      ///
+      /// 責務:
+      /// - {Entity}一覧の保持
+      /// - 読み込み状態の管理
+      /// - フィルタ条件の保持
+      /// </summary>
+      public sealed class {Feature}Store
+      {
+          private readonly IMediator _mediator;
+
+          public {Feature}Store(IMediator mediator)
+          {
+              _mediator = mediator;
+          }
+
+          // ========== State ==========
+          public IReadOnlyList<{Entity}Dto> Items { get; private set; } = Array.Empty<{Entity}Dto>();
+          public bool IsLoading { get; private set; }
+          public string? ErrorMessage { get; private set; }
+
+          public event Action? OnChange;
+
+          // ========== Actions ==========
+          public async Task LoadAsync(CancellationToken ct = default)
+          {
+              IsLoading = true;
+              ErrorMessage = null;
+              NotifyStateChanged();
+
+              var result = await _mediator.Send(new Get{Entity}ListQuery(), ct);
+
+              if (result.IsSuccess)
+              {
+                  Items = result.Value;
+              }
+              else
+              {
+                  ErrorMessage = result.Error;
+              }
+
+              IsLoading = false;
+              NotifyStateChanged();
+          }
+
+          private void NotifyStateChanged() => OnChange?.Invoke();
+      }
+
+# ============================================================================
+# 使用例
+# ============================================================================
+usage:
+  app_razor: |
+    <!-- App.razor または Routes.razor -->
+    <SessionProvider>
+        <ThemeProvider>
+            <Router AppAssembly="typeof(Program).Assembly">
+                <!-- アプリケーションコンテンツ -->
+            </Router>
+        </ThemeProvider>
+    </SessionProvider>
+
+  component_usage: |
+    @page "/products"
+    @inject ProductsStore Store
+
+    <h3>商品一覧</h3>
+
+    <!-- セッション情報の表示 -->
+    <p>ログイン中: @Session.UserName</p>
+
+    <!-- ロールベース表示 -->
+    @if (Session.IsInRole("Admin"))
+    {
+        <button @onclick="DeleteProduct">削除</button>
+    }
+
+    <!-- Store状態の使用 -->
+    @if (Store.IsLoading)
+    {
+        <p>読み込み中...</p>
+    }
+    else
+    {
+        @foreach (var product in Store.Items)
+        {
+            <ProductCard Product="@product" />
+        }
+    }
+
+    @code {
+        [CascadingParameter] public SessionState Session { get; set; } = default!;
+
+        protected override async Task OnInitializedAsync()
+        {
+            await Store.LoadAsync();
+        }
+    }
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+ai_guidance:
+  when_to_use:
+    - "画面間で状態を共有する必要がある"
+    - "認証状態をコンポーネントで参照したい"
+    - "トースト通知を表示したい"
+    - "商品一覧などのドメインデータを管理したい"
+
+  when_not_to_use:
+    - "単一コンポーネント内で完結する状態 → ローカルステートで十分"
+    - "フォーム入力の一時的な状態 → @bind で十分"
+    - "URLパラメータで表現できる状態 → NavigationManager を使用"
+
+  implementation_steps:
+    - step: 1
+      description: "状態がシステムレベルかドメイン固有か判断"
+      criteria: ["認証・テーマ・通知 → システムレベル", "業務データ → ドメイン固有"]
+    - step: 2
+      description: "システムレベルならInfrastructure/に配置"
+      files: ["Infrastructure/Stores/", "Infrastructure/Providers/"]
+    - step: 3
+      description: "ドメイン固有ならFeatures/{Feature}/Store/に配置"
+      files: ["Features/{Feature}/Store/{Feature}Store.cs"]
+    - step: 4
+      description: "DIコンテナに登録（Scoped）"
+      files: ["Program.cs"]
+
+  common_mistakes:
+    - mistake: "ドメイン固有StoreをInfrastructure/に配置"
+      solution: "Features/{Feature}/Store/に配置する（機能スライス単位）"
+
+    - mistake: "システムレベルの状態を毎回実装"
+      solution: "SessionProvider, NotificationStoreはテンプレートからコピー"
+
+    - mistake: "Storeを画面ごとに新規インスタンス化"
+      solution: "DIでScopedに登録し、画面間で同一インスタンスを共有"
+
+  do_not_implement:
+    description: "以下はシステムレベルとして提供済み。毎回実装してはいけない"
+    list:
+      - "SessionProvider（認証状態）"
+      - "ThemeProvider（ダークモード）"
+      - "NotificationStore（トースト）"
+      - "LayoutStore（サイドバー）"
+      - "PreferencesStore（言語・タイムゾーン）"
+
+# ============================================================================
+# DI登録
+# ============================================================================
+wiring:
+  service_registrations:
+    - "// システムレベル（共通）"
+    - "services.AddScoped<NotificationStore>();"
+    - "services.AddScoped<LayoutStore>();"
+    - "services.AddScoped<PreferencesStore>();"
+    - ""
+    - "// ドメイン固有（Featureごと）"
+    - "services.AddScoped<ProductsStore>();"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+changelog:
+  - version: 1.0.0
+    date: 2025-11-26
+    changes:
+      - "初版作成"
+      - "docs/architecture/STATE-MANAGEMENT-LAYERS.md からカタログ形式に変換"
+      - "2層モデル（システムレベル/ドメイン固有）を明確化"

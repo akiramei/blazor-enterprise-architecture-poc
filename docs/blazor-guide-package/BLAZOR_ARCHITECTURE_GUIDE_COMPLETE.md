@@ -1,13 +1,12 @@
-# Blazor Enterprise Architecture Guide - 完全版
+﻿# Blazor Enterprise Architecture Guide - 完全版
 
 **Version**: 2.1.2 (自動生成版)
-**生成日**: 2025年11月05日 15:20:16
+**生成日**: 2025年11月26日 08:24:10
 **章数**: 19章
 
 ---
 
 ## 📋 目次
-
 - 1. イントロダクション
 - 2. このプロジェクトについて
 - 3. アーキテクチャ概要
@@ -35,6 +34,7 @@
 ---
 
 # 1. イントロダクション
+
 
 
 ---
@@ -271,6 +271,7 @@ Blazor未経験の方は、以下の順序で学習することを推奨しま�
 # 2. このプロジェクトについて
 
 
+
 ---
 
 ## 🤖 AI駆動開発のための実装パターンカタログ
@@ -370,31 +371,22 @@ graph TD
 
 ### フォルダ構造の意図
 
-**Vertical Slice Architecture: 機能ごとに全層を包含**
+**Vertical Slice Architecture: 機能ごとに垂直スライス（モノリシック）**
 
 ```
 src/Application/
-  └── Features/
-      ├── CreateProduct/              ← 【作成パターン】
-      │   ├── Application/
-      │   │   ├── CreateProductCommand.cs
-      │   │   ├── CreateProductHandler.cs
-      │   │   └── CreateProductValidator.cs
-      │   ├── Domain/
-      │   │   └── Product.cs
-      │   ├── Infrastructure/
-      │   │   └── EfProductRepository.cs
-      │   └── UI/
-      │       └── CreateProductPage.razor
-      │
-      ├── UpdateProduct/              ← 【更新パターン】
-      │   ├── Application/
-      │   │   ├── UpdateProductCommand.cs
-      │   │   ├── UpdateProductHandler.cs
-      │   │   └── UpdateProductValidator.cs
-      │   ├── Domain/
-      │   ├── Infrastructure/
-      │   └── UI/
+  ├── Features/
+  │   ├── CreateProduct/              ← 【作成パターン】
+  │   │   ├── CreateProductCommand.cs
+  │   │   ├── CreateProductCommandHandler.cs
+  │   │   └── UI/
+  │   │       └── Api/
+  │   │           └── Dtos/
+  │   │
+  │   ├── UpdateProduct/              ← 【更新パターン】
+  │   │   ├── UpdateProductCommand.cs
+  │   │   ├── UpdateProductCommandHandler.cs
+  │   │   └── UI/
       │
       ├── DeleteProduct/              ← 【削除パターン】
       ├── BulkDeleteProducts/         ← 【一括削除パターン】
@@ -426,7 +418,7 @@ VSAでは各機能スライス内に層が配置されています。機能を�
 
 1. **Domain層から** - ビジネスロジックの中核を理解
    - [11_Domain層の詳細設計](11_Domain層の詳細設計.md)
-   - `src/Application/Features/CreateProduct/Domain/Product.cs` を読む
+   - `src/Application/Shared/ProductCatalog/Domain/Products/Product.cs` を読む（共通ドメインモデル）
 
 2. **Application層** - ユースケース実装パターンを理解
    - [10_Application層の詳細設計](10_Application層の詳細設計.md) (CQRS、Command/Query実装)
@@ -603,6 +595,7 @@ public sealed record UpdateProductCommand(...) : ICommand<Result>
 # 3. アーキテクチャ概要
 
 
+
 ---
 
 ## 3. アーキテクチャ概要
@@ -673,41 +666,71 @@ Component内でDB直接アクセス、API呼び出し、ファイル操作等が
 このプロジェクトは、**機能(Feature)を最上位とした垂直スライスアーキテクチャ**として設計されています。
 従来のレイヤー分離アーキテクチャとは異なり、**機能ごとに全層を包含**し、機能追加時の変更範囲を最小化します。
 
-**フォルダ構成:**
+**フォルダ構成（このプロジェクトの実装 - モノリシックVSA）:**
 
 ```
 src/
-└── ProductCatalog/                        # Bounded Context
-    ├── Features/
-    │   ├── CreateProduct/                 # 機能スライス1
-    │   │   ├── Application/
-    │   │   │   ├── CreateProductCommand.cs
-    │   │   │   ├── CreateProductHandler.cs
-    │   │   │   └── CreateProductValidator.cs
-    │   │   ├── Domain/
-    │   │   │   └── Product.cs
-    │   │   ├── Infrastructure/
-    │   │   │   └── EfProductRepository.cs
-    │   │   └── UI/
-    │   │       └── CreateProductPage.razor
-    │   │
-    │   ├── UpdateProduct/                 # 機能スライス2
-    │   │   ├── Application/
-    │   │   ├── Domain/
-    │   │   ├── Infrastructure/
-    │   │   └── UI/
-    │   │
-    │   ├── DeleteProduct/                 # 機能スライス3
-    │   ├── GetProducts/
-    │   ├── GetProductById/
-    │   ├── SearchProducts/
-    │   └── BulkDeleteProducts/
-    │
-    └── Shared/                            # 機能間で共有する要素
-        ├── Application/
-        ├── Domain/
-        └── Infrastructure/
+├── Application/                           # 単一Blazorプロジェクト
+│   ├── Features/                          # 機能スライス（19機能）
+│   │   ├── CreateProduct/                 # 機能スライス1
+│   │   │   ├── CreateProductCommand.cs
+│   │   │   ├── CreateProductCommandHandler.cs
+│   │   │   # (Validationは共通のValidationBehaviorで実行)
+│   │   │   └── UI/
+│   │   │       └── Api/
+│   │   │           └── Dtos/
+│   │   │
+│   │   ├── GetProducts/                   # 機能スライス2
+│   │   │   ├── GetProductsQuery.cs
+│   │   │   ├── GetProductsQueryHandler.cs
+│   │   │   └── UI/
+│   │   │       ├── Api/
+│   │   │       ├── Components/
+│   │   │       └── ProductList.razor
+│   │   │
+│   │   ├── UpdateProduct/                 # 機能スライス3
+│   │   ├── DeleteProduct/                 # 機能スライス4
+│   │   ├── GetProductById/                # 機能スライス5
+│   │   ├── SearchProducts/                # 機能スライス6
+│   │   ├── BulkDeleteProducts/            # 機能スライス7
+│   │   ├── BulkUpdateProductPrices/       # 機能スライス8
+│   │   ├── ExportProductsToCsv/           # 機能スライス9
+│   │   ├── ImportProductsFromCsv/         # 機能スライス10
+│   │   ├── SubmitPurchaseRequest/         # 機能スライス11
+│   │   └── ... (全19機能)
+│   │
+│   └── Shared/                            # BC別共通コード
+│       ├── ProductCatalog/                # ProductCatalogBC共通
+│       │   ├── Application/
+│       │   │   └── DTOs/                  # ProductDto等
+│       │   ├── Infrastructure/
+│       │   │   └── Persistence/
+│       │   │       ├── ProductCatalogDbContext.cs
+│       │   │       ├── Configurations/    # EF Core設定
+│       │   │       └── Repositories/      # Repository実装
+│       │   └── UI/
+│       │       ├── Actions/               # ProductListActions等
+│       │       └── Store/                 # ProductsStore等
+│       └── PurchaseManagement/            # PurchaseManagementBC共通
+│
+├── Domain/                                # ドメインプロジェクト（分離）
+│   ├── ProductCatalog/
+│   │   └── Products/                      # Product集約
+│   │       ├── Product.cs
+│   │       └── IProductRepository.cs
+│   └── PurchaseManagement/
+│
+└── Shared/                                # グローバル共通（全BC共有）
+    ├── Kernel/                            # AggregateRoot, Entity等
+    ├── Application/                       # ICommand, IQuery等
+    └── Infrastructure/                    # Pipeline Behaviors等
 ```
+
+**重要:**
+- **各機能（CreateProduct, GetProducts等）はCommand/Query/Handler + UIのみを持つ**
+- **Domain層はプロジェクトとして分離**（純粋なビジネスロジックを保護）
+- **Application/Shared/{BC}/に各BCの共通コード**（DbContext, Repository, Store等）
+- これは「モノリシックVSA」と呼ばれるYAGNI原則に基づいた実用的なパターンです
 
 **なぜVSAなのか？**
 
@@ -1087,6 +1110,7 @@ SetState(_state with {
 # 4. 採用技術とパターン
 
 
+
 ---
 
 ## 4. 採用技術とパターン
@@ -1318,26 +1342,13 @@ public record ProductDeletedEvent(ProductId ProductId) : DomainEvent;
 public abstract class AggregateRoot
 {
     private readonly List<DomainEvent> _domainEvents = new();
-
-    /// <summary>
-    /// ドメインイベント一覧（読み取り専用）
-    /// </summary>
-    public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
-
-    /// <summary>
-    /// ドメインイベントを取得
-    /// </summary>
-    public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents.AsReadOnly();
-
+    
     protected void RaiseDomainEvent(DomainEvent @event)
     {
         _domainEvents.Add(@event);
     }
-
-    public void ClearDomainEvents()
-    {
-        _domainEvents.Clear();
-    }
+    
+    public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents;
 }
 ```
 
@@ -1400,25 +1411,8 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
 
 ##### **11. Outbox パターン**
 
-> **⚠️ DEPRECATED - Learning Example Only**
-> **This simplified implementation is provided for educational purposes to understand the basic concept.**
-> **For production use, see the [recommended v2.0 implementation](#1111-outbox-dispatcher-の信頼性向上-v20改善) which includes:**
-> - **Exponential backoff** for retry logic
-> - **State machine** with proper state transitions (Pending → Publishing → Published/Failed)
-> - **Dead-letter handling** for messages that exceed retry limits
-> - **Batch processing** and optimized polling
-> - **Comprehensive error handling** and logging
->
-> **Migration Note:** If you're using this simple implementation, migrate to v2.0 by:
-> 1. Update database schema to include Status, AttemptCount, NextAttemptAt, LastError columns
-> 2. Create DeadLetterMessages table for failed messages
-> 3. Replace OutboxDispatcher with the v2.0 implementation
-> 4. Update OutboxMessage entity to match v2.0 schema
-
-**Simplified Concept (For Learning Only):**
-
 ```csharp
-// トランザクション内で統合イベントを記録 - 簡略版（学習用）
+// トランザクション内で統合イベントを記録
 public class OutboxMessage
 {
     public Guid Id { get; set; }
@@ -1426,15 +1420,9 @@ public class OutboxMessage
     public string PayloadJson { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? PublishedAt { get; set; }
-    // ⚠️ 本番環境では v2.0 の完全な実装を使用してください
 }
 
-// バックグラウンドジョブで配信 - 簡略版（学習用）
-// ⚠️ この実装には以下が欠けています：
-// - リトライロジック（指数バックオフ）
-// - エラーハンドリング
-// - Dead Letter 処理
-// - 状態管理
+// バックグラウンドジョブで配信
 public class OutboxDispatcher : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -1442,13 +1430,13 @@ public class OutboxDispatcher : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             var messages = await _repository.GetUnpublishedAsync();
-
+            
             foreach (var message in messages)
             {
                 await _eventBus.PublishAsync(message);
                 await _repository.MarkAsPublishedAsync(message.Id);
             }
-
+            
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
     }
@@ -1537,11 +1525,27 @@ public class OrderProcessSaga
 # 5. パターンカタログ一覧
 
 
+
+---
+
+> ## 🚨 AIエージェントへの重要な注意
+>
+> **パターン選択は `catalog/index.json` を参照してください。**
+>
+> このドキュメントは人間向けの解説です。カタログには最新のパターン定義、
+> AI選択ヒント、実装テンプレートが含まれています。
+>
+> | 目的 | 参照先 |
+> |-----|-------|
+> | パターン索引・選択 | `catalog/index.json` |
+> | パターン詳細 | `catalog/patterns/*.yaml`, `catalog/features/*.yaml` |
+> | 意思決定フロー | `catalog/DECISION_FLOWCHART.md` |
+
 ---
 
 ## 📚 このプロジェクトで提供されるパターン
 
-このドキュメントは、AI駆動開発で参照すべきパターンの完全なインデックスです。
+このドキュメントは、人間の開発者がパターンの概要を理解するための解説です。
 
 ---
 
@@ -2340,6 +2344,31 @@ graph TD
 
 ---
 
+## ⚠️ 注意: PurchaseManagement BCについて
+
+**PurchaseManagement BC**には承認ワークフロー、ダッシュボード、ファイルアップロード等の実装が含まれていますが、現在以下の**重大な問題**があるため、参照カタログとしては**使用しないでください**：
+
+### 確認された問題
+
+1. **SQL/スキーマの不整合**
+   - 存在しないテーブル名・列名を参照（`pm_PurchaseRequests`, `TotalAmount`, `IsPending`）
+   - 計算プロパティをDB列として扱っている
+
+2. **マルチテナント制御の欠如**
+   - `GetPurchaseRequestById` でTenantIdチェックを迂回
+   - 他テナントのデータが閲覧可能（セキュリティ脆弱性）
+
+3. **認可制御の欠如**
+   - 承認者かどうかの確認なし
+   - 誰でも任意の申請を承認・却下可能（セキュリティ脆弱性）
+
+4. **入力検証の欠如**
+   - 商品ID入力で`Guid.Parse()`を直接実行（クラッシュリスク）
+
+これらの問題が修正されるまで、**ProductCatalog BCのパターンのみを参照**してください。
+
+---
+
 **🤖 パターンを選択したら、該当するフォルダのコードを直接参照してください**
 
 
@@ -2347,6 +2376,7 @@ graph TD
 ---
 
 # 6. 全体アーキテクチャ図
+
 
 
 ---
@@ -2515,81 +2545,84 @@ graph TD
 # 7. VSA構成と責務
 
 
+
 ---
 
 ## 7. VSA構成と責務
 
 ### 7.1 フォルダ構造
 
-**Vertical Slice Architecture: 機能ごとに垂直分割**
+**Vertical Slice Architecture: モノリシック単一プロジェクト**
 
 ```
 /src
-└── ProductCatalog/                    # Bounded Context
-    ├── Features/
-    │   ├── CreateProduct/             # 機能スライス1
-    │   │   ├── Application/
-    │   │   │   ├── CreateProductCommand.cs
-    │   │   │   ├── CreateProductHandler.cs
-    │   │   │   └── CreateProductValidator.cs
-    │   │   ├── Domain/
-    │   │   │   └── Product.cs         # 集約ルート
-    │   │   ├── Infrastructure/
-    │   │   │   └── EfProductRepository.cs
-    │   │   └── UI/
-    │   │       ├── CreateProductPage.razor
-    │   │       ├── CreateProductStore.cs
-    │   │       └── CreateProductActions.cs
-    │   │
-    │   ├── UpdateProduct/             # 機能スライス2
-    │   │   ├── Application/
-    │   │   ├── Domain/
-    │   │   ├── Infrastructure/
-    │   │   └── UI/
-    │   │
-    │   ├── DeleteProduct/             # 機能スライス3
-    │   ├── GetProducts/
-    │   ├── GetProductById/
-    │   ├── SearchProducts/
-    │   └── BulkDeleteProducts/
-    │
-    ├── Shared/                        # 機能間で共有する要素
-    │   ├── Application/
-    │   │   ├── Behaviors/             # MediatR Behaviors
-    │   │   │   ├── LoggingBehavior.cs
-    │   │   │   ├── ValidationBehavior.cs
-    │   │   │   ├── AuthorizationBehavior.cs
-    │   │   │   ├── IdempotencyBehavior.cs
-    │   │   │   ├── CachingBehavior.cs
-    │   │   │   └── TransactionBehavior.cs
-    │   │   └── Interfaces/
-    │   │       ├── ICommand.cs
-    │   │       └── IQuery.cs
-    │   ├── Domain/
-    │   │   ├── AggregateRoot.cs
-    │   │   ├── Entity.cs
-    │   │   ├── ValueObject.cs
-    │   │   └── DomainEvent.cs
-    │   └── Infrastructure/
-    │       ├── Persistence/
-    │       │   └── AppDbContext.cs
-    │       ├── Outbox/
-    │       │   ├── OutboxMessage.cs
-    │       │   └── OutboxDispatcher.cs
-    │       ├── Idempotency/
-    │       │   ├── IdempotencyRecord.cs
-    │       │   └── EfIdempotencyStore.cs
-    │       └── Inbox/
-    │           ├── InboxMessage.cs
-    │           └── EfInboxStore.cs
-    │
-    └── Host/                          # エントリーポイント
-        ├── Program.cs
-        ├── Hubs/
-        │   └── ProductsHub.cs         # SignalR
-        └── Components/
-            └── Layout/
+├── Application/                       # 単一Blazorプロジェクト
+│   ├── Program.cs                     # エントリーポイント
+│   ├── Features/                      # 機能スライス（19機能）
+│   │   ├── CreateProduct/             # 機能スライス1
+│   │   │   ├── CreateProductCommand.cs
+│   │   │   ├── CreateProductCommandHandler.cs
+│   │   │   └── UI/
+│   │   │       └── Api/
+│   │   │           └── Dtos/
+│   │   │
+│   │   ├── GetProducts/               # 機能スライス2
+│   │   │   ├── GetProductsQuery.cs
+│   │   │   ├── GetProductsQueryHandler.cs
+│   │   │   └── UI/
+│   │   │       ├── Api/
+│   │   │       ├── Components/
+│   │   │       └── ProductList.razor
+│   │   │
+│   │   ├── UpdateProduct/             # 機能スライス3
+│   │   ├── DeleteProduct/             # 機能スライス4
+│   │   ├── GetProductById/            # 機能スライス5
+│   │   ├── SearchProducts/            # 機能スライス6
+│   │   ├── BulkDeleteProducts/        # 機能スライス7
+│   │   ├── BulkUpdateProductPrices/   # 機能スライス8
+│   │   ├── ExportProductsToCsv/       # 機能スライス9
+│   │   ├── ImportProductsFromCsv/     # 機能スライス10
+│   │   └── ... (全19機能)
+│   │
+│   ├── Shared/                        # BC別共通コード
+│   │   ├── ProductCatalog/            # ProductCatalogBC共通
+│   │   │   ├── Application/
+│   │   │   │   └── DTOs/              # ProductDto等
+│   │   │   ├── Infrastructure/
+│   │   │   │   └── Persistence/
+│   │   │   │       ├── ProductCatalogDbContext.cs
+│   │   │   │       ├── Configurations/
+│   │   │   │       └── Repositories/
+│   │   │   └── UI/
+│   │   │       ├── Actions/           # ProductListActions等
+│   │   │       └── Store/             # ProductsStore等
+│   │   └── PurchaseManagement/        # PurchaseManagementBC共通
+│   │
+│   ├── Components/                    # Blazor共通コンポーネント
+│   │   ├── Layout/
+│   │   └── Pages/
+│   ├── Hubs/                          # SignalR Hubs
+│   └── Infrastructure/                # アプリケーション基盤
+│
+├── Domain/                            # ドメインプロジェクト（分離）
+│   ├── ProductCatalog/
+│   │   └── Products/                  # Product集約
+│   │       ├── Product.cs
+│   │       └── IProductRepository.cs
+│   └── PurchaseManagement/
+│
+└── Shared/                            # グローバル共通（全BC共有）
+    ├── Kernel/                        # AggregateRoot, Entity等
+    ├── Application/                   # ICommand, IQuery等
+    └── Infrastructure/                # Pipeline Behaviors等
 ```
+
+**重要な構造の違い:**
+- **単一Applicationプロジェクト**: すべての機能とインフラを1つのプロジェクトに集約
+- **各機能（CreateProduct, GetProducts等）はCommand/Query/Handler + UIのみ**
+- **Domain層はプロジェクトとして分離**（純粋なビジネスロジックを保護）
+- **Application/Shared/{BC}/に各BCの共通コード**（DbContext, Repository, Store等）
+- この構造は「共通ドメインパターン」と呼ばれ、VSAの実用的な変形です
 
 ### 7.2 各層の責務詳細（機能スライス内）
 
@@ -2673,6 +2706,7 @@ UI → Application → Domain ← Infrastructure
 ---
 
 # 8. 具体例: 商品管理機能
+
 
 
 ---
@@ -2893,6 +2927,7 @@ sequenceDiagram
 ---
 
 # 9. UI層の詳細設計
+
 
 
 ---
@@ -3285,7 +3320,6 @@ builder.Services.AddScoped<PreferencesStore>();
 
 ```razor
 @inject PreferencesStore PreferencesStore
-@implements IDisposable
 
 @code {
     protected override async Task OnInitializedAsync()
@@ -3294,7 +3328,7 @@ builder.Services.AddScoped<PreferencesStore>();
         await PreferencesStore.InitializeAsync();
 
         // 状態変更を購読
-        PreferencesStore.OnChangeAsync += HandleStateChangeAsync;
+        PreferencesStore.OnChangeAsync += StateHasChanged;
     }
 
     private async Task ChangeCulture(string culture)
@@ -3308,17 +3342,6 @@ builder.Services.AddScoped<PreferencesStore>();
     }
 
     private PreferencesState Prefs => PreferencesStore.GetState();
-
-    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
-    private Task HandleStateChangeAsync()
-    {
-        return InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        PreferencesStore.OnChangeAsync -= HandleStateChangeAsync;
-    }
 }
 ```
 
@@ -3334,13 +3357,12 @@ builder.Services.AddScoped<LayoutStore>();
 
 ```razor
 @inject LayoutStore LayoutStore
-@implements IDisposable
 
 @code {
     protected override async Task OnInitializedAsync()
     {
         await LayoutStore.InitializeAsync();
-        LayoutStore.OnChangeAsync += HandleStateChangeAsync;
+        LayoutStore.OnChangeAsync += StateHasChanged;
     }
 
     private async Task ToggleSidebar()
@@ -3354,17 +3376,6 @@ builder.Services.AddScoped<LayoutStore>();
     }
 
     private LayoutState Layout => LayoutStore.GetState();
-
-    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
-    private Task HandleStateChangeAsync()
-    {
-        return InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        LayoutStore.OnChangeAsync -= HandleStateChangeAsync;
-    }
 }
 ```
 
@@ -3583,10 +3594,10 @@ public sealed class ProductListActions
     protected override async Task OnInitializedAsync()
     {
         // ドメイン固有Store購読
-        Store.OnChangeAsync += HandleStateChangeAsync;
+        Store.OnChangeAsync += StateHasChanged;
 
         // システムレベルStore購読
-        NotificationStore.OnChangeAsync += HandleStateChangeAsync;
+        NotificationStore.OnChangeAsync += StateHasChanged;
 
         // データロード
         await Actions.LoadAsync();
@@ -3594,16 +3605,10 @@ public sealed class ProductListActions
 
     private bool CanDelete => SessionProvider.State.IsInRole("Admin");
 
-    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
-    private Task HandleStateChangeAsync()
-    {
-        return InvokeAsync(StateHasChanged);
-    }
-
     public void Dispose()
     {
-        Store.OnChangeAsync -= HandleStateChangeAsync;
-        NotificationStore.OnChangeAsync -= HandleStateChangeAsync;
+        Store.OnChangeAsync -= StateHasChanged;
+        NotificationStore.OnChangeAsync -= StateHasChanged;
     }
 }
 ```
@@ -3683,25 +3688,18 @@ public sealed class ProductListActions
 // ✅ GOOD
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += HandleStateChangeAsync;
-}
-
-// OnChangeAsync (Func<Task>) との互換性のためのラッパー
-private Task HandleStateChangeAsync()
-{
-    return InvokeAsync(StateHasChanged);
+    Store.OnChangeAsync += StateHasChanged;
 }
 
 public void Dispose()
 {
-    Store.OnChangeAsync -= HandleStateChangeAsync;  // 必ず解除
+    Store.OnChangeAsync -= StateHasChanged;  // 必ず解除
 }
 
 // ❌ BAD: Disposeしない（メモリリーク）
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += HandleStateChangeAsync;
-    // Disposeで解除し忘れ → メモリリーク
+    Store.OnChangeAsync += StateHasChanged;
 }
 ```
 
@@ -4180,7 +4178,7 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始
-            await SetStateAsync(_state with { IsLoading = true, ErrorMessage = null });
+            SetState(_state with { IsLoading = true, ErrorMessage = null });
             
             // 2. 新しいスコープでMediatorを取得(DbContextリーク防止)
             using var scope = _scopeFactory.CreateScope();
@@ -4194,7 +4192,7 @@ public sealed class ProductsStore : IDisposable
             // 4. 結果を状態に反映
             if (result.IsSuccess)
             {
-                await SetStateAsync(_state with
+                SetState(_state with
                 {
                     IsLoading = false,
                     Products = result.Value.Items.ToImmutableList(),
@@ -4204,7 +4202,7 @@ public sealed class ProductsStore : IDisposable
             }
             else
             {
-                await SetStateAsync(_state with
+                SetState(_state with
                 {
                     IsLoading = false,
                     ErrorMessage = result.Error
@@ -4214,12 +4212,12 @@ public sealed class ProductsStore : IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogDebug("LoadAsyncがキャンセルされました");
-            await SetStateAsync(_state with { IsLoading = false });
+            SetState(_state with { IsLoading = false });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品一覧の読み込みに失敗しました");
-            await SetStateAsync(_state with
+            SetState(_state with
             {
                 IsLoading = false,
                 ErrorMessage = "データの読み込みに失敗しました"
@@ -4238,8 +4236,8 @@ public sealed class ProductsStore : IDisposable
     {
         if (pageNumber < 1 || pageNumber > _state.TotalPages)
             return;
-
-        await SetStateAsync(_state with { CurrentPage = pageNumber });
+        
+        SetState(_state with { CurrentPage = pageNumber });
         await LoadAsync(ct);
     }
     
@@ -4251,21 +4249,21 @@ public sealed class ProductsStore : IDisposable
         try
         {
             // 1. ローディング開始(部分的)
-            await SetStateAsync(_state with { ErrorMessage = null });
-
+            SetState(_state with { ErrorMessage = null });
+            
             // 2. 新しいスコープでCommandを実行
             using var scope = _scopeFactory.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-
+            
             var command = new DeleteProductCommand(productId);
             var result = await mediator.Send(command, ct);
-
+            
             if (!result.IsSuccess)
             {
-                await SetStateAsync(_state with { ErrorMessage = result.Error });
+                SetState(_state with { ErrorMessage = result.Error });
                 return false;
             }
-
+            
             // 3. 成功したら一覧を再読み込み
             await LoadAsync(ct);
             return true;
@@ -4273,7 +4271,7 @@ public sealed class ProductsStore : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "商品削除に失敗しました: {ProductId}", productId);
-            await SetStateAsync(_state with { ErrorMessage = "削除処理に失敗しました" });
+            SetState(_state with { ErrorMessage = "削除処理に失敗しました" });
             return false;
         }
     }
@@ -4288,8 +4286,8 @@ public sealed class ProductsStore : IDisposable
         var ids = productIds.ToList();
         var successCount = 0;
         var failureCount = 0;
-
-        await SetStateAsync(_state with { IsLoading = true, ErrorMessage = null });
+        
+        SetState(_state with { IsLoading = true, ErrorMessage = null });
         
         foreach (var id in ids)
         {
@@ -4315,20 +4313,24 @@ public sealed class ProductsStore : IDisposable
     
     /// <summary>
     /// 状態を更新し、購読者に通知
-    /// 例外は呼び出し元に伝播させる
     /// </summary>
-    private async Task SetStateAsync(ProductsState newState)
+    private async void SetState(ProductsState newState)
     {
         _state = newState;
-
+        
         if (OnChangeAsync is null) return;
-
+        
         // すべての購読者に通知
-        // 例外はキャッチせず呼び出し元に伝播させることで、
-        // 呼び出し側で適切なエラーハンドリングを可能にする
         foreach (var handler in OnChangeAsync.GetInvocationList().Cast<Func<Task>>())
         {
-            await handler();
+            try
+            {
+                await handler();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "状態変更通知中にエラーが発生しました");
+            }
         }
     }
     
@@ -4819,7 +4821,7 @@ public class ProductList : ComponentBase
 
 ```csharp
 // ✅ GOOD: Storeから直接読む
-public class ProductList : ComponentBase, IDisposable
+public class ProductList : ComponentBase
 {
     [Inject] private ProductsStore Store { get; set; }
 
@@ -4828,18 +4830,7 @@ public class ProductList : ComponentBase, IDisposable
 
     protected override void OnInitialized()
     {
-        Store.OnChangeAsync += HandleStateChangeAsync;  // 変更通知を購読
-    }
-
-    // OnChangeAsync (Func<Task>) との互換性のためのラッパー
-    private Task HandleStateChangeAsync()
-    {
-        return InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        Store.OnChangeAsync -= HandleStateChangeAsync;
+        Store.OnChangeAsync += StateHasChanged;  // 変更通知を購読
     }
 }
 ```
@@ -4959,13 +4950,8 @@ public sealed record ProductEditState
 // ❌ BAD: 購読解除忘れでメモリリーク
 protected override void OnInitialized()
 {
-    Store.OnChangeAsync += HandleStateChangeAsync;
+    Store.OnChangeAsync += StateHasChanged;
     // Disposeで解除し忘れ → メモリリーク
-}
-
-private Task HandleStateChangeAsync()
-{
-    return InvokeAsync(StateHasChanged);
 }
 
 // Disposeが実装されていない or 解除忘れ
@@ -5078,7 +5064,7 @@ private async void SetState(ProductsState newState)
 **改善版:**
 
 ```csharp
-// ✅ GOOD: Task を返す（例外は呼び出し元に伝播）
+// ✅ GOOD: Task を返す
 private async Task SetStateAsync(ProductsState newState)
 {
     // 差分がない場合はスキップ（パフォーマンス最適化）
@@ -5092,13 +5078,24 @@ private async Task SetStateAsync(ProductsState newState)
 
     if (OnChangeAsync is null) return;
 
-    // 全ての購読者に順次通知
-    // 例外はキャッチせず呼び出し元に伝播させる
-    // これにより呼び出し側で適切なエラーハンドリングが可能になる
-    foreach (var handler in OnChangeAsync.GetInvocationList().Cast<Func<Task>>())
-    {
-        await handler();
-    }
+    // 全ての購読者に通知（並列実行）
+    var tasks = OnChangeAsync
+        .GetInvocationList()
+        .Cast<Func<Task>>()
+        .Select(async handler =>
+        {
+            try
+            {
+                await handler();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "State change notification failed");
+                // 1つの購読者のエラーが他に影響しないようにキャッチ
+            }
+        });
+
+    await Task.WhenAll(tasks);
 }
 ```
 
@@ -5126,23 +5123,6 @@ public async Task LoadAsync(CancellationToken ct = default)
     }
 }
 ```
-
-**重要ポイント:**
-
-1. **例外を伝播させる**: `SetStateAsync` 内部で例外をキャッチしない
-   - 呼び出し側が適切にエラーハンドリングできる
-   - デバッグ時にスタックトレースが保持される
-   - エラーを隠蔽せず、問題を早期発見できる
-
-2. **呼び出し側の責任**: 各メソッド（LoadAsync、DeleteAsync等）が適切に try-catch を配置
-   - ビジネスロジックに応じたエラーメッセージを表示
-   - 必要に応じてリトライや代替処理を実装
-   - ログ記録とユーザー通知を適切に分離
-
-3. **Task を返す利点**:
-   - `await` による完了待機が可能
-   - 例外が適切に伝播する
-   - テストが容易（完了を検証できる）
 
 ---
 
@@ -5609,6 +5589,7 @@ app.MapRazorComponents<App>()
 ---
 
 # 10. Application層の詳細設計
+
 
 
 ---
@@ -6085,89 +6066,52 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TransactionBe
 
 #### **1. LoggingBehavior**
 
-> **⚠️ セキュリティ警告: PII漏洩のリスク**
->
-> **絶対に行わないこと:**
-> - `{@Request}` でリクエスト全体をログに記録しない
-> - パスワード、トークン、メールアドレス、SSN、クレジットカード番号などの機密情報をログに出力しない
->
-> **必須対応:**
-> - **本番環境では必ず Request Sanitizer を実装すること**
-> - ログには CorrelationId やメタデータのみを記録すること
-> - どうしてもリクエスト内容が必要な場合は、後述の `IRequestSanitizer` を使用してPIIをマスキングすること
-
 ```csharp
 public sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
-    private readonly IRequestSanitizer _sanitizer;  // オプション: PIIマスキングが必要な場合
-
-    public LoggingBehavior(
-        ILogger<LoggingBehavior<TRequest, TResponse>> logger,
-        IRequestSanitizer sanitizer = null)  // nullの場合はリクエスト内容をログに出力しない
-    {
-        _logger = logger;
-        _sanitizer = sanitizer;
-    }
-
+    
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
         var requestName = typeof(TRequest).Name;
-        var correlationId = Guid.NewGuid().ToString();
-
-        // ログスコープにCorrelationIdを設定（全ての子ログに自動的に含まれる）
-        using var scope = _logger.BeginScope(new Dictionary<string, object>
-        {
-            ["CorrelationId"] = correlationId,
-            ["RequestName"] = requestName
-        });
-
-        // ⭕ 安全: メタデータのみをログに記録
+        var requestId = Guid.NewGuid();
+        
         _logger.LogInformation(
-            "処理開始: {RequestName} [CorrelationId: {CorrelationId}]",
+            "処理開始: {RequestName} {@Request} [RequestId: {RequestId}]",
             requestName,
-            correlationId);
-
-        // オプション: サニタイズされたリクエスト内容をログに記録（開発環境のみ推奨）
-        if (_sanitizer != null)
-        {
-            var sanitizedRequest = _sanitizer.Sanitize(request);
-            _logger.LogDebug(
-                "リクエスト詳細(サニタイズ済): {RequestName} {@SanitizedRequest}",
-                requestName,
-                sanitizedRequest);
-        }
-
+            request,
+            requestId);
+        
         var stopwatch = Stopwatch.StartNew();
-
+        
         try
         {
             var response = await next();
-
+            
             stopwatch.Stop();
-
+            
             _logger.LogInformation(
-                "処理完了: {RequestName} [CorrelationId: {CorrelationId}] 実行時間: {ElapsedMs}ms",
+                "処理完了: {RequestName} [RequestId: {RequestId}] 実行時間: {ElapsedMs}ms",
                 requestName,
-                correlationId,
+                requestId,
                 stopwatch.ElapsedMilliseconds);
-
+            
             return response;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-
+            
             _logger.LogError(ex,
-                "処理失敗: {RequestName} [CorrelationId: {CorrelationId}] 実行時間: {ElapsedMs}ms",
+                "処理失敗: {RequestName} [RequestId: {RequestId}] 実行時間: {ElapsedMs}ms",
                 requestName,
-                correlationId,
+                requestId,
                 stopwatch.ElapsedMilliseconds);
-
+            
             throw;
         }
     }
@@ -6291,76 +6235,54 @@ public sealed class IdempotencyBehavior<TRequest, TResponse> : IPipelineBehavior
     where TResponse : Result
 {
     private readonly IIdempotencyStore _store;
-    private readonly ICurrentUserService _currentUser;  // ✅ ユーザー/テナント分離のため必須
     private readonly ILogger<IdempotencyBehavior<TRequest, TResponse>> _logger;
-
-    public IdempotencyBehavior(
-        IIdempotencyStore store,
-        ICurrentUserService currentUser,
-        ILogger<IdempotencyBehavior<TRequest, TResponse>> logger)
-    {
-        _store = store;
-        _currentUser = currentUser;
-        _logger = logger;
-    }
-
+    
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
         // Commandからキーを取得
-        var requestKey = GetIdempotencyKey(request);
-
-        if (string.IsNullOrEmpty(requestKey))
+        var idempotencyKey = GetIdempotencyKey(request);
+        
+        if (string.IsNullOrEmpty(idempotencyKey))
         {
             return await next();  // キーがない場合はスキップ
         }
-
-        // ✅ CRITICAL: キーに必ずユーザー/テナント情報を含める
-        var userSegment = _currentUser.UserId.ToString("N");
-        var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
+        
         var commandType = typeof(TRequest).Name;
-
-        var idempotencyKey = $"{commandType}:{tenantSegment}:{userSegment}:{requestKey}";
-        //                                    ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^
-        //                                    テナント分離      ユーザー分離
-
+        
         // 既に処理済みかチェック
         var existingRecord = await _store.GetAsync(idempotencyKey, cancellationToken);
-
+        
         if (existingRecord != null)
         {
             _logger.LogInformation(
-                "冪等性により既存の結果を返します: {CommandType} [Key: {IdempotencyKey}, User: {UserId}, Tenant: {TenantId}]",
+                "冪等性により既存の結果を返します: {CommandType} [Key: {IdempotencyKey}]",
                 commandType,
-                idempotencyKey,
-                userSegment,
-                tenantSegment);
-
+                idempotencyKey);
+            
             return existingRecord.GetResult<TResponse>();
         }
-
+        
         // 新規処理を実行
         var response = await next();
-
+        
         // 成功した場合のみ記録
         if (response.IsSuccess)
         {
             var record = IdempotencyRecord.Create(idempotencyKey, commandType, response);
             await _store.SaveAsync(record, cancellationToken);
-
+            
             _logger.LogInformation(
-                "冪等性レコードを保存しました: {CommandType} [Key: {IdempotencyKey}, User: {UserId}, Tenant: {TenantId}]",
+                "冪等性レコードを保存しました: {CommandType} [Key: {IdempotencyKey}]",
                 commandType,
-                idempotencyKey,
-                userSegment,
-                tenantSegment);
+                idempotencyKey);
         }
-
+        
         return response;
     }
-
+    
     private string? GetIdempotencyKey(TRequest request)
     {
         var property = typeof(TRequest).GetProperty("IdempotencyKey");
@@ -6371,56 +6293,45 @@ public sealed class IdempotencyBehavior<TRequest, TResponse> : IPipelineBehavior
 
 #### **5. CachingBehavior(Query専用)**
 
-> **⚠️ ANTI-PATTERN WARNING**
-> The example below is **UNSAFE** because it uses cache keys without user/tenant separation, allowing data leakage across users.
-> **See section 10.4.2 for the SAFE implementation** with proper user/tenant isolation in cache keys.
-
 ```csharp
-// ❌ ANTI-PATTERN: キャッシュキーにユーザー/テナント情報が含まれていない
-// このコードは使用しないでください！
-
 public sealed class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IQuery<TResponse>, ICacheableQuery
 {
     private readonly IDistributedCache _cache;
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
-
+    
     public async Task<TResponse> Handle(
         TRequest request,
         RequestHandlerDelegate<TResponse> next,
         CancellationToken cancellationToken)
     {
-        // ❌ UNSAFE: request.CacheKeyにユーザー/テナント情報が含まれていない
-        // → 異なるユーザー間でキャッシュが共有され、データ漏洩の危険性
         var cacheKey = request.CacheKey;
-
+        
         // キャッシュから取得
         var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
-
+        
         if (!string.IsNullOrEmpty(cachedData))
         {
             _logger.LogDebug("キャッシュヒット: {CacheKey}", cacheKey);
             return JsonSerializer.Deserialize<TResponse>(cachedData)!;
         }
-
+        
         // キャッシュミス: Queryを実行
         _logger.LogDebug("キャッシュミス: {CacheKey}", cacheKey);
         var response = await next();
-
+        
         // キャッシュに保存
         var serialized = JsonSerializer.Serialize(response);
         var options = new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = request.CacheDuration
         };
-
+        
         await _cache.SetStringAsync(cacheKey, serialized, options, cancellationToken);
-
+        
         return response;
     }
 }
-
-// ✅ 正しい実装は section 10.4.2「キャッシュキーの安全性規約」を参照してください
 ```
 
 #### **6. TransactionBehavior(Command専用)**
@@ -6503,361 +6414,6 @@ public sealed class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior
 }
 ```
 
-### 10.3 Request Sanitization (PII保護) - 必須セキュリティ対策
-
-> **⚠️ 本番環境での必須要件**
->
-> ログに機密情報(PII/Secrets)が漏洩することは重大なセキュリティインシデントです。
-> 以下の対策を**必ず実装**してください:
->
-> 1. **Request Sanitizer の実装と登録**
-> 2. **本番環境では LogLevel.Debug を無効化**
-> 3. **定期的なログ監査によるPII検出**
-
-#### **10.3.1 IRequestSanitizer インターフェース**
-
-リクエストオブジェクトから機密情報をマスキング・除外するための共通インターフェース:
-
-```csharp
-/// <summary>
-/// リクエストオブジェクトから PII/Secrets をマスキングするサニタイザー
-/// 実装場所: Application/Common/Logging/IRequestSanitizer.cs
-/// </summary>
-public interface IRequestSanitizer
-{
-    /// <summary>
-    /// リクエストオブジェクトをサニタイズ(PII除去)
-    /// </summary>
-    object Sanitize<TRequest>(TRequest request);
-}
-```
-
-#### **10.3.2 RequestSanitizer 実装例(フィールドレベルマスキング)**
-
-```csharp
-/// <summary>
-/// デフォルトのリクエストサニタイザー実装
-/// 実装場所: Infrastructure/Logging/RequestSanitizer.cs
-/// </summary>
-public sealed class RequestSanitizer : IRequestSanitizer
-{
-    private readonly ILogger<RequestSanitizer> _logger;
-    private readonly SanitizationPolicy _policy;
-
-    public RequestSanitizer(
-        ILogger<RequestSanitizer> logger,
-        IOptions<SanitizationPolicy> policy)
-    {
-        _logger = logger;
-        _policy = policy.Value;
-    }
-
-    public object Sanitize<TRequest>(TRequest request)
-    {
-        if (request == null)
-            return null;
-
-        try
-        {
-            // リクエストをJSONにシリアライズ
-            var json = JsonSerializer.Serialize(request);
-            var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            // サニタイズされたディクショナリを構築
-            var sanitized = new Dictionary<string, object>();
-
-            foreach (var property in root.EnumerateObject())
-            {
-                var propertyName = property.Name;
-                var propertyValue = property.Value;
-
-                // Denylistチェック: 機密フィールドをマスク
-                if (_policy.SensitiveFieldPatterns.Any(pattern =>
-                    Regex.IsMatch(propertyName, pattern, RegexOptions.IgnoreCase)))
-                {
-                    sanitized[propertyName] = "***REDACTED***";
-                    continue;
-                }
-
-                // Allowlistチェック: 許可されたフィールドのみ記録
-                if (_policy.UseAllowlist &&
-                    !_policy.AllowedFields.Contains(propertyName, StringComparer.OrdinalIgnoreCase))
-                {
-                    sanitized[propertyName] = "***NOT_ALLOWED***";
-                    continue;
-                }
-
-                // 値のパターンチェック(email, token, SSNなど)
-                var valueString = propertyValue.ToString();
-                if (ContainsSensitivePattern(valueString))
-                {
-                    sanitized[propertyName] = "***MASKED***";
-                    continue;
-                }
-
-                // 安全な値として記録
-                sanitized[propertyName] = GetSafeValue(propertyValue);
-            }
-
-            return sanitized;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "リクエストのサニタイズ中にエラーが発生しました");
-            return new { Error = "Sanitization failed" };
-        }
-    }
-
-    private bool ContainsSensitivePattern(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return false;
-
-        // Email pattern
-        if (Regex.IsMatch(value, @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"))
-            return true;
-
-        // JWT Token pattern (Bearer token)
-        if (Regex.IsMatch(value, @"^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$"))
-            return true;
-
-        // API Key pattern (長い英数字文字列)
-        if (Regex.IsMatch(value, @"^[A-Za-z0-9]{32,}$"))
-            return true;
-
-        // SSN pattern (XXX-XX-XXXX)
-        if (Regex.IsMatch(value, @"\b\d{3}-\d{2}-\d{4}\b"))
-            return true;
-
-        // Credit Card pattern (XXXX-XXXX-XXXX-XXXX)
-        if (Regex.IsMatch(value, @"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b"))
-            return true;
-
-        return false;
-    }
-
-    private object GetSafeValue(JsonElement element)
-    {
-        return element.ValueKind switch
-        {
-            JsonValueKind.String => element.GetString(),
-            JsonValueKind.Number => element.GetRawText(),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            _ => element.GetRawText()
-        };
-    }
-}
-```
-
-#### **10.3.3 Sanitization Policy 設定**
-
-```csharp
-/// <summary>
-/// サニタイゼーションポリシー設定
-/// 設定場所: appsettings.json → SanitizationPolicy セクション
-/// </summary>
-public sealed class SanitizationPolicy
-{
-    /// <summary>
-    /// Allowlist モードを使用するか(true: Allowlistのみ許可, false: Denylistのみ拒否)
-    /// </summary>
-    public bool UseAllowlist { get; set; } = false;
-
-    /// <summary>
-    /// 許可するフィールド名のリスト(Allowlist モード時)
-    /// </summary>
-    public HashSet<string> AllowedFields { get; set; } = new()
-    {
-        "ProductId",
-        "ProductName",
-        "CategoryId",
-        "Page",
-        "PageSize",
-        "OrderId",
-        "Quantity"
-        // 安全なフィールドのみ追加
-    };
-
-    /// <summary>
-    /// マスキングするフィールド名の正規表現パターン(Denylist)
-    /// </summary>
-    public List<string> SensitiveFieldPatterns { get; set; } = new()
-    {
-        "password",
-        "passwd",
-        "pwd",
-        "secret",
-        "token",
-        "auth",
-        "authorization",
-        "bearer",
-        "apikey",
-        "api_key",
-        "creditcard",
-        "credit_card",
-        "cardnumber",
-        "cvv",
-        "ssn",
-        "socialsecurity",
-        "email",
-        "mail",
-        "phone",
-        "tel",
-        "address",
-        "dob",
-        "dateofbirth",
-        "salary",
-        "income"
-    };
-}
-```
-
-#### **10.3.4 appsettings.json 設定例**
-
-```json
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      // ⚠️ 本番環境ではDebugを無効化
-      "Application": "Information",
-      "Microsoft": "Warning"
-    }
-  },
-
-  "SanitizationPolicy": {
-    "UseAllowlist": true,
-    "AllowedFields": [
-      "ProductId",
-      "ProductName",
-      "CategoryId",
-      "Page",
-      "PageSize",
-      "OrderId",
-      "Quantity",
-      "RequestId",
-      "CorrelationId"
-    ],
-    "SensitiveFieldPatterns": [
-      "password",
-      "passwd",
-      "pwd",
-      "secret",
-      "token",
-      "auth",
-      "authorization",
-      "bearer",
-      "apikey",
-      "api_key",
-      "creditcard",
-      "credit_card",
-      "cardnumber",
-      "cvv",
-      "ssn",
-      "email",
-      "phone"
-    ]
-  }
-}
-```
-
-#### **10.3.5 DI 登録 (Program.cs)**
-
-```csharp
-// Program.cs
-
-// Sanitization Policy の登録
-builder.Services.Configure<SanitizationPolicy>(
-    builder.Configuration.GetSection("SanitizationPolicy"));
-
-// Request Sanitizer の登録
-builder.Services.AddSingleton<IRequestSanitizer, RequestSanitizer>();
-
-// LoggingBehavior に Sanitizer を注入
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-```
-
-#### **10.3.6 本番環境での運用ガイドライン**
-
-**必須対応項目:**
-
-| 項目 | 対応内容 | 実装場所 |
-|------|---------|---------|
-| **1. Sanitizer実装** | `IRequestSanitizer` を実装し DI 登録 | Infrastructure/Logging |
-| **2. LogLevel設定** | 本番環境で `LogLevel.Debug` を無効化 | appsettings.Production.json |
-| **3. Policy設定** | Allowlist または Denylist を設定 | appsettings.json |
-| **4. ログ監査** | 定期的にログをスキャンしてPII漏洩をチェック | CI/CD Pipeline |
-| **5. 暗号化** | ログストレージを暗号化 | Infrastructure設定 |
-| **6. アクセス制御** | ログへのアクセスを最小限に制限 | IAM/RBAC |
-
-**環境別設定例:**
-
-```json
-// appsettings.Development.json (開発環境)
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Debug",  // ✅ 開発環境はDebug許可(Sanitizer使用前提)
-      "Application": "Debug"
-    }
-  },
-  "SanitizationPolicy": {
-    "UseAllowlist": false  // 開発環境はDenylistのみ
-  }
-}
-
-// appsettings.Production.json (本番環境)
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",  // ⚠️ Debugを無効化
-      "Application": "Information",
-      "Microsoft": "Warning"
-    }
-  },
-  "SanitizationPolicy": {
-    "UseAllowlist": true  // ⚠️ 本番環境は厳格なAllowlist
-  }
-}
-```
-
-**ログ監査スクリプト例 (CI/CD統合):**
-
-```bash
-#!/bin/bash
-# scripts/audit-logs-for-pii.sh
-# 本番ログにPIIパターンが含まれていないかチェック
-
-SENSITIVE_PATTERNS=(
-  "password.*:.*[^*]"
-  "token.*:.*[^*]"
-  "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-  "\b\d{3}-\d{2}-\d{4}\b"
-  "\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b"
-)
-
-LOG_FILE="/var/log/app/production.log"
-VIOLATIONS=0
-
-for pattern in "${SENSITIVE_PATTERNS[@]}"; do
-  if grep -E "$pattern" "$LOG_FILE" > /dev/null; then
-    echo "⚠️  WARNING: PII pattern detected: $pattern"
-    VIOLATIONS=$((VIOLATIONS + 1))
-  fi
-done
-
-if [ $VIOLATIONS -gt 0 ]; then
-  echo "❌ FAILED: $VIOLATIONS PII violations found in logs!"
-  exit 1
-else
-  echo "✅ PASSED: No PII detected in logs"
-  exit 0
-fi
-```
-
 ### 10.4 Pipeline登録とBehavior順序規約 (v2.1改善)
 
 #### 10.4.1 Query Pipeline順序とキャッシュ安全性
@@ -6915,24 +6471,19 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Authorization
 
 #### 10.4.2 キャッシュキーの安全性規約
 
-> **✅ SAFE PATTERN: この実装を使用してください**
-> Authorization後にキャッシュし、キーにユーザー/テナント情報を含めることで誤配信を防ぎます。
-
 **CRITICAL**: キーに必ずユーザー/テナント情報を含めて誤配信を防ぐ
 
 ```csharp
 /// <summary>
-/// ✅ 推奨: キャッシュ誤配信を防ぐ安全なCachingBehavior
-/// - Pipeline順序: Authorization → Caching (section 10.4.1参照)
-/// - キーにユーザー/テナント情報を含める
+/// キャッシュ誤配信を防ぐ改善版CachingBehavior
 /// </summary>
 public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TRequest : IQuery<TResponse>, ICacheableQuery
+    where TRequest : IQuery<TResponse>, ICacheable
 {
     private readonly IMemoryCache _cache;
     private readonly ICurrentUserService _currentUser;  // ✅ 必須依存
     private readonly ILogger<CachingBehavior<TRequest, TResponse>> _logger;
-
+    
     public CachingBehavior(
         IMemoryCache cache,
         ICurrentUserService currentUser,
@@ -6942,54 +6493,46 @@ public class CachingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         _currentUser = currentUser;
         _logger = logger;
     }
-
+    
     public async Task<TResponse> Handle(
-        TRequest request,
-        RequestHandlerDelegate<TResponse> next,
+        TRequest request, 
+        RequestHandlerDelegate<TResponse> next, 
         CancellationToken ct)
     {
         // ✅ CRITICAL: キーに必ずユーザー/テナント情報を含める
         var userSegment = _currentUser.UserId.ToString("N");
         var tenantSegment = _currentUser.TenantId?.ToString("N") ?? "default";
-        var requestSegment = request.CacheKey;
-
+        var requestSegment = request.GetCacheKey();
+        
         var cacheKey = $"{typeof(TRequest).Name}:{tenantSegment}:{userSegment}:{requestSegment}";
         //                                        ^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^
         //                                        テナント分離      ユーザー分離
-
+        
         if (_cache.TryGetValue(cacheKey, out TResponse? cached))
         {
-            _logger.LogDebug(
-                "Cache hit: {Key} [User: {UserId}, Tenant: {TenantId}]",
-                cacheKey,
-                userSegment,
-                tenantSegment);
+            _logger.LogDebug("Cache hit: {Key}", cacheKey);
             return cached!;
         }
-
-        _logger.LogDebug(
-            "Cache miss: {Key} [User: {UserId}, Tenant: {TenantId}]",
-            cacheKey,
-            userSegment,
-            tenantSegment);
+        
+        _logger.LogDebug("Cache miss: {Key}", cacheKey);
         var response = await next();
         
         _cache.Set(
-            cacheKey,
-            response,
-            request.CacheDuration);
+            cacheKey, 
+            response, 
+            TimeSpan.FromMinutes(request.CacheDuration));
         
         return response;
     }
 }
 
 // ✅ 使用例(正しいキー設計)
-public record GetProductQuery(Guid Id) : IQuery<ProductDto>, ICacheableQuery
+public record GetProductQuery(Guid Id) : IQuery<ProductDto>, ICacheable
 {
     // ❌ 悪い例: "Product:123" → 全ユーザーで共有される
     // ✅ 良い例: Behaviorが自動的に "GetProductQuery:tenant456:user789:Product:123" に拡張
-    public string CacheKey => $"Product:{Id}";
-    public TimeSpan CacheDuration => TimeSpan.FromMinutes(5);
+    public string GetCacheKey() => $"Product:{Id}";
+    public int CacheDuration => 5;  // 分
 }
 ```
 
@@ -7163,12 +6706,49 @@ public class RedisIdempotencyStore : IIdempotencyStore
 
 ---
 
+## ⚠️ 注意: PurchaseManagement BCの実装例について
+
+**PurchaseManagement BC**には承認ワークフロー、ダッシュボード、ファイルアップロード等の実装が含まれていますが、現在以下の**重大な問題**があるため、参照カタログとしては**使用しないでください**：
+
+### 確認された問題
+
+1. **SQL/スキーマの不整合**
+   - `GetPendingApprovals`, `GetDashboardStatistics` が存在しないテーブル名・列名を参照
+   - `pm_PurchaseRequests`, `TotalAmount`, `IsPending` 等は実際のスキーマに存在しない
+   - 計算プロパティをDB列として扱っている
+
+2. **マルチテナント制御の欠如**
+   - `GetPurchaseRequestById` でGlobal Query Filterを迂回
+   - 任意のGUIDで他テナントのデータが閲覧可能（**セキュリティ脆弱性**）
+
+3. **認可制御の欠如**
+   - `PurchaseRequestDetail.razor` で承認者かどうかの確認なし
+   - 誰でも任意の申請を承認・却下可能（**セキュリティ脆弱性**）
+
+4. **入力検証の欠如**
+   - `PurchaseRequestSubmit.razor` で`Guid.Parse()`を直接実行（クラッシュリスク）
+
+### 修正が必要な箇所
+
+| ファイル | 問題 | 修正内容 |
+|---------|------|---------|
+| `GetPendingApprovalsHandler.cs:63-88` | 存在しないテーブル・列参照 | 実際のスキーマに合わせる |
+| `GetDashboardStatisticsHandler.cs` | 同上 + Task.WhenAll誤用 | スキーマ修正、順次実行に変更 |
+| `GetPurchaseRequestByIdHandler.cs:90-125` | TenantIdチェック迂回 | EF Coreリポジトリ経由に変更 |
+| `PurchaseRequestDetail.razor:220-384` | 承認者確認なし | `ICurrentUserService.UserId`と突き合わせ |
+| `PurchaseRequestSubmit.razor` | 入力検証なし | `Guid.TryParse()`に変更 |
+
+これらの問題が修正されるまで、**ProductCatalog BCのパターンのみを参照**してください。
+
+---
+
 
 
 
 ---
 
 # 11. Domain層の詳細設計
+
 
 
 ---
@@ -7549,36 +7129,29 @@ public sealed record StockReservedEvent(
 ) : DomainEvent;
 ```
 
-### 9.5 Entity & Aggregate Root基底クラス
+### 9.5 Aggregate Root基底クラス
 
 ```csharp
 /// <summary>
-/// エンティティの基底クラス
-/// 識別子による同一性を持つ
+/// 集約ルート基底クラス
 /// </summary>
-public abstract class Entity
+public abstract class AggregateRoot<TId> : Entity<TId>
 {
     private readonly List<DomainEvent> _domainEvents = new();
-
+    
     /// <summary>
-    /// ドメインイベント一覧（読み取り専用）
-    /// EF Coreで永続化する場合は Ignore(p => p.DomainEvents) で無視する
-    /// </summary>
-    public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
-
-    /// <summary>
-    /// ドメインイベントを取得
+    /// ドメインイベント一覧を取得
     /// </summary>
     public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents.AsReadOnly();
-
+    
     /// <summary>
-    /// ドメインイベントを追加
+    /// ドメインイベントを発行
     /// </summary>
     protected void RaiseDomainEvent(DomainEvent domainEvent)
     {
         _domainEvents.Add(domainEvent);
     }
-
+    
     /// <summary>
     /// ドメインイベントをクリア
     /// </summary>
@@ -7589,93 +7162,45 @@ public abstract class Entity
 }
 
 /// <summary>
-/// 集約ルート基底クラス
-/// Entity を継承し、型付きID、バージョン管理、等価性比較を提供
+/// エンティティ基底クラス
 /// </summary>
-/// <typeparam name="TId">集約ルートの識別子の型（ProductId, OrderIdなど）</typeparam>
-public abstract class AggregateRoot<TId> : Entity
+public abstract class Entity<TId>
 {
-    private TId _id = default!;
-
-    /// <summary>
-    /// 集約ルートの識別子
-    /// </summary>
-    public TId Id
-    {
-        get => _id;
-        protected set => _id = value;
-    }
-
-    /// <summary>
-    /// 楽観的排他制御用のバージョン番号
-    /// EF Coreの RowVersion と連携して使用
-    /// </summary>
-    public long Version { get; protected set; }
-
-    /// <summary>
-    /// EF Core用のパラメータレスコンストラクタ
-    /// </summary>
-    protected AggregateRoot()
-    {
-    }
-
-    /// <summary>
-    /// 識別子を指定してインスタンスを生成
-    /// </summary>
-    /// <param name="id">集約ルートの識別子</param>
-    protected AggregateRoot(TId id)
-    {
-        _id = id ?? throw new ArgumentNullException(nameof(id));
-    }
-
-    /// <summary>
-    /// 等価性比較（IDベース）
-    /// </summary>
+    public TId Id { get; protected set; } = default!;
+    
     public override bool Equals(object? obj)
     {
-        if (obj is not AggregateRoot<TId> other)
+        if (obj is not Entity<TId> other)
             return false;
-
+        
         if (ReferenceEquals(this, other))
             return true;
-
+        
         if (GetType() != other.GetType())
             return false;
-
-        if (_id == null || other._id == null)
-            return false;
-
-        return _id.Equals(other._id);
+        
+        return Id?.Equals(other.Id) ?? false;
     }
-
-    /// <summary>
-    /// ハッシュコード生成
-    /// </summary>
+    
     public override int GetHashCode()
     {
-        return (_id?.GetHashCode() ?? 0) ^ GetType().GetHashCode();
+        return (GetType().ToString() + Id).GetHashCode();
     }
-
-    /// <summary>
-    /// 等価演算子
-    /// </summary>
-    public static bool operator ==(AggregateRoot<TId>? left, AggregateRoot<TId>? right)
+    
+    public static bool operator ==(Entity<TId>? a, Entity<TId>? b)
     {
-        if (left is null && right is null)
+        if (a is null && b is null)
             return true;
-
-        if (left is null || right is null)
+        
+        if (a is null || b is null)
             return false;
-
-        return left.Equals(right);
+        
+        return a.Equals(b);
     }
-
-    /// <summary>
-    /// 不等価演算子
-    /// </summary>
-    public static bool operator !=(AggregateRoot<TId>? left, AggregateRoot<TId>? right)
+    
+    public static bool operator !=(Entity<TId>? a, Entity<TId>? b)
     {
-        return !(left == right);
+        return !(a == b);
     }
 }
 ```
@@ -7707,6 +7232,7 @@ public sealed class DomainException : Exception
 ---
 
 # 12. Infrastructure層の詳細設計
+
 
 
 ---
@@ -8286,6 +7812,7 @@ public sealed class ProductsHub : Hub
 # 13. 信頼性パターン
 
 
+
 ---
 
 ## 13. 信頼性パターン
@@ -8834,6 +8361,7 @@ public class SagaCompensationException : Exception
 ---
 
 # 14. パフォーマンス最適化
+
 
 
 ---
@@ -9393,6 +8921,7 @@ exceptions
 # 15. テスト戦略
 
 
+
 ---
 
 ## 15. テスト戦略
@@ -9904,6 +9433,7 @@ private async Task SaveScreenshotOnFailureAsync(string testName)
 # 16. ベストプラクティス
 
 
+
 ---
 
 ## 16. ベストプラクティス
@@ -10123,9 +9653,7 @@ public sealed class ProductsStore
 }
 
 // UI側の防御(ボタン無効化)
-// 注: @onclick はSignalRイベントであり、HTTPリクエストではありません
-// そのためアンチフォージェリトークンは適用されません（詳細は14.6.3参照）
-<button class="btn btn-danger"
+<button class="btn btn-danger" 
         @onclick="() => Actions.DeleteAsync(product.Id)"
         disabled="@_isDeleting">
     @if (_isDeleting)
@@ -10158,16 +9686,10 @@ public sealed class ProductsStore
 }
 ```
 
-#### 14.6.3 CSRF対策: HTTPフォームとSignalRイベントの違い
-
-> **重要**: `IAntiforgery` はHTTPフォームポスト（POST/PUT/DELETE）に対するCSRF保護を提供します。
-> Blazor ServerのSignalR接続を介したコンポーネントイベント（`@onclick`、`@onchange`など）には
-> アンチフォージェリトークンは**適用されません**。それぞれ異なる保護戦略が必要です。
-
-##### ケース1: HTTPフォーム送信（EditFormなど）
+#### 14.6.3 アンチフォージェリトークン
 
 ```csharp
-// Program.cs - .NET 8+
+// Program.cs
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -10176,113 +9698,28 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
-// Razorページ または Minimal API エンドポイント
-// .NET 8+では[RequireAntiforgeryToken]を使用
-app.MapPost("/api/products",
-    [RequireAntiforgeryToken] async (CreateProductCommand cmd, IMediator mediator) =>
-    {
-        var result = await mediator.Send(cmd);
-        return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
-    });
+// _Host.cshtml または App.razor
+<component type="typeof(App)" render-mode="ServerPrerendered" />
+<script src="_framework/blazor.server.js" 
+        asp-append-version="true"
+        data-antiforgery-token="@Html.GetAntiforgeryToken()"></script>
 
-// EditFormでのトークン送信（.NET 8+）
-<EditForm Model="@Model" FormName="ProductForm" OnValidSubmit="HandleValidSubmit">
-    <AntiforgeryToken />  @* ✅ .NET 8+で自動トークン送信 *@
-
-    <InputText @bind-Value="Model.Name" />
-    <button type="submit">送信</button>
-</EditForm>
+// Blazor Component での利用
+@inject IAntiforgery Antiforgery
 
 @code {
-    [SupplyParameterFromForm]
-    private ProductModel? Model { get; set; }
-
-    private async Task HandleValidSubmit()
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+    
+    private async Task SubmitFormAsync()
     {
-        // ✅ [RequireAntiforgeryToken]により自動検証される
-        // 手動でAntiforgery.ValidateRequestAsync()を呼ぶ必要なし
+        // ✅ トークン検証
+        await Antiforgery.ValidateRequestAsync(HttpContext!);
+        
+        // ... フォーム送信処理
     }
 }
 ```
-
-##### ケース2: SignalRベースのコンポーネントイベント（@onclick等）
-
-**IAntiforgeryは適用されません** - 代わりに以下の多層防御を実施:
-
-```csharp
-// ❌ 誤解: 以下のボタンにはアンチフォージェリトークンは使えません
-// @onclick はSignalR接続を介したイベントであり、HTTPリクエストではありません
-<button class="btn btn-danger"
-        @onclick="() => Actions.DeleteAsync(product.Id)"
-        disabled="@_isDeleting">
-    削除
-</button>
-
-// ✅ SignalRイベントの保護戦略:
-// 1. 接続時の認証強制（Program.cs）
-builder.Services.AddServerSideBlazor(options =>
-{
-    options.MaximumReceiveMessageSize = 32 * 1024; // 32KB制限
-});
-
-app.UseAuthentication();  // ✅ SignalR接続前に認証を要求
-app.UseAuthorization();
-app.MapBlazorHub().RequireAuthorization();  // ✅ 認証済みユーザーのみ許可
-
-// 2. CORS制限（または明示的な許可）
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("StrictOrigin", policy =>
-    {
-        policy.WithOrigins("https://yourdomain.com")
-              .AllowCredentials();  // SignalRに必要
-    });
-});
-// または特定のエンドポイントで無効化
-// [DisableCors] を使用する場合は慎重に検討
-
-// 3. サーバー側での厳格な検証（Handler層）
-public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand, Result>
-{
-    private readonly ICurrentUserService _currentUser;
-    private readonly AppDbContext _context;
-
-    public async Task<Result> Handle(DeleteProductCommand request, CancellationToken ct)
-    {
-        // ✅ 認証確認
-        if (!_currentUser.IsAuthenticated)
-            return Result.Fail("認証が必要です");
-
-        // ✅ 権限確認
-        if (!_currentUser.HasPermission("Products.Delete"))
-            return Result.Fail("削除権限がありません");
-
-        var product = await _context.Products.FindAsync(request.Id);
-        if (product == null)
-            return Result.Fail("製品が見つかりません");
-
-        // ✅ 所有者確認（必要な場合）
-        if (product.CreatedBy != _currentUser.UserId && !_currentUser.IsAdmin())
-            return Result.Fail("他ユーザーの製品は削除できません");
-
-        _context.Products.Remove(product);
-        await _context.SaveChangesAsync(ct);
-
-        return Result.Ok();
-    }
-}
-```
-
-**SignalRイベントの保護まとめ**:
-
-| 保護層 | 実装方法 | 目的 |
-|--------|---------|------|
-| **接続認証** | `MapBlazorHub().RequireAuthorization()` | 未認証ユーザーの接続拒否 |
-| **CORS制限** | `AddCors()` または `[DisableCors]` | クロスオリジンリクエストの制御 |
-| **入力検証** | FluentValidation | 不正データの拒否 |
-| **認可チェック** | Handler内で`ICurrentUserService` | 権限のない操作の拒否 |
-| **所有権確認** | リソース所有者と現在ユーザーの照合 | 他ユーザーデータの保護 |
-| **二重実行防止** | `SemaphoreSlim` + `_isProcessing` | 重複実行の防止 |
 
 #### 14.6.4 サーキットごとのIServiceScope作法
 
@@ -10343,7 +9780,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
 | **2. イベント購読解除** | Dispose時に購読解除しているか | IDisposable実装 |
 | **3. 再接続処理** | 再接続時の初期化ロジックがあるか | EnsureInitializedAsync実装 |
 | **4. 二重実行防止** | 処理中フラグとセマフォがあるか | SemaphoreSlim + _isProcessing |
-| **5. CSRF対策** | HTTPフォーム: アンチフォージェリトークン使用<br>SignalRイベント: 接続認証+認可チェック | EditForm: AntiforgeryToken+[RequireAntiforgeryToken]<br>@onclick等: MapBlazorHub().RequireAuthorization() |
+| **5. CSRF対策** | アンチフォージェリトークン使用 | IAntiforgery設定 |
 | **6. Circuit制限** | 切断Circuit保持数を設定 | appsettings.json設定 |
 | **7. タイムアウト設定** | JSInterop/SignalRタイムアウト | CircuitOptions設定 |
 | **8. エラーログ** | Circuit切断/再接続をログ | ILogger使用 |
@@ -10675,6 +10112,7 @@ builder.Services.AddMediatR(cfg =>
 ---
 
 # 17. まとめ
+
 
 
 ---
@@ -11498,26 +10936,6 @@ Success
 
 ## 11.1.1 Outbox Dispatcher の信頼性向上 (v2.0改善)
 
-> **✅ RECOMMENDED PRODUCTION IMPLEMENTATION**
->
-> This is the **recommended approach** for implementing the Outbox pattern in production environments.
-> The simple version shown earlier in this guide is for educational purposes only.
->
-> **Key Features of v2.0:**
-> - **Exponential Backoff**: Automatic retry with increasing delays (2^attemptCount minutes)
-> - **State Transitions**: Proper state machine (Pending → Publishing → Published/Failed)
-> - **Dead-Letter Queue**: Failed messages moved to separate table after max retry attempts
-> - **Batch Processing**: Processes messages in configurable batches (default: 100)
-> - **Resilient Error Handling**: Comprehensive logging and error recovery
-> - **Optimized Queries**: Indexed queries for efficient message retrieval
->
-> **Why v2.0 over Simple Implementation:**
-> - Prevents message loss during transient failures
-> - Automatically handles temporary service outages
-> - Provides visibility into failed messages for manual intervention
-> - Scales to handle high message volumes
-> - Production-ready with proper monitoring and observability
-
 ### Outbox テーブル DDL
 
 ```sql
@@ -11628,31 +11046,29 @@ public class OutboxDispatcher : BackgroundService
     }
     
     private async Task ProcessMessageAsync(
-        OutboxMessage message,
+        OutboxMessage message, 
         AppDbContext dbContext,
         IEventBus eventBus,
         CancellationToken ct)
     {
         try
         {
-            // ⭐ State Transition: Pending → Publishing
-            // 配信中であることを明示的にマーク（重複処理防止）
+            // 状態を Publishing に変更
             message.Status = OutboxStatus.Publishing;
             await dbContext.SaveChangesAsync(ct);
-
-            _logger.LogDebug("メッセージ配信開始: {EventType}, Id: {MessageId}",
+            
+            _logger.LogDebug("メッセージ配信開始: {EventType}, Id: {MessageId}", 
                 message.EventType, message.Id);
-
+            
             // イベント配信
             await eventBus.PublishAsync(message.EventType, message.PayloadJson, ct);
-
-            // ⭐ State Transition: Publishing → Published
-            // 配信成功を記録
+            
+            // 成功: Published 状態に変更
             message.Status = OutboxStatus.Published;
             message.PublishedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(ct);
-
-            _logger.LogInformation("メッセージ配信完了: {EventType}, Id: {MessageId}",
+            
+            _logger.LogInformation("メッセージ配信完了: {EventType}, Id: {MessageId}", 
                 message.EventType, message.Id);
         }
         catch (Exception ex)
@@ -11666,25 +11082,21 @@ public class OutboxDispatcher : BackgroundService
             
             if (message.AttemptCount >= MaxAttempts)
             {
-                // ⭐ Dead-Letter Handling: 最大試行回数超過
-                // 配信不可能なメッセージを Dead Letter キューへ移動
-                // これにより、問題のあるメッセージが処理をブロックすることを防ぎます
+                // 最大試行回数超過: Dead Letter へ移動
                 await MoveToDeadLetterAsync(message, dbContext, ct);
-
-                _logger.LogWarning("メッセージを Dead Letter へ移動: {EventType}, Id: {MessageId}",
+                
+                _logger.LogWarning("メッセージを Dead Letter へ移動: {EventType}, Id: {MessageId}", 
                     message.EventType, message.Id);
             }
             else
             {
                 // リトライ: 指数バックオフで次回実行時刻を設定
-                // ⭐ Exponential Backoff: 2^attemptCount 分後にリトライ
-                // 例: 1回目失敗 → 2分後, 2回目失敗 → 4分後, 3回目失敗 → 8分後
                 message.Status = OutboxStatus.Pending;
                 message.NextAttemptAt = DateTime.UtcNow.AddMinutes(Math.Pow(2, message.AttemptCount));
-
+                
                 await dbContext.SaveChangesAsync(ct);
-
-                _logger.LogInformation("メッセージをリトライ予約: {EventType}, Id: {MessageId}, NextAttempt: {NextAttemptAt}",
+                
+                _logger.LogInformation("メッセージをリトライ予約: {EventType}, Id: {MessageId}, NextAttempt: {NextAttemptAt}", 
                     message.EventType, message.Id, message.NextAttemptAt);
             }
         }
@@ -12185,6 +11597,7 @@ public class ProductsStore : IDisposable
 ---
 
 # 18. 3層アーキテクチャからの移行ガイド
+
 
 
 ---
@@ -12831,11 +12244,31 @@ Blazor特有の概念（SignalR、Circuit等）は段階的に学べます。
 # 19. AIへの実装ガイド
 
 
+
+---
+
+> ## 🚨 AIエージェントへの重要な注意
+>
+> **このドキュメントは人間の開発者向けの解説です。**
+>
+> AIエージェントは以下のカタログを**優先して参照**してください：
+>
+> | 目的 | 参照先 |
+> |-----|-------|
+> | パターン選択 | `catalog/index.json` |
+> | 実装ルール | `catalog/AI_USAGE_GUIDE.md` |
+> | 頻出ミス | `catalog/COMMON_MISTAKES.md` |
+> | UI配置ルール | `catalog/scaffolds/project-structure.yaml` |
+>
+> **カタログとこのドキュメントの内容が異なる場合、カタログが正です。**
+>
+> このドキュメントは設計思想の理解を助けるための補足資料として参照してください。
+
 ---
 
 ## 🤖 このドキュメントの目的
 
-このガイドは、AIがこのプロジェクトを参照して**正しく実装を生成する**ための実践的な指針です。
+このガイドは、人間の開発者がAI実装の流れを理解するための解説です。
 
 ---
 
@@ -13382,6 +12815,43 @@ public sealed class ProductDeletedEventHandler : INotificationHandler<ProductDel
 3. [10_Application層の詳細設計](10_Application層の詳細設計.md) でQuery/Command実装を学習
 4. [11_Domain層の詳細設計](11_Domain層の詳細設計.md) でドメインモデルを学習
 5. 実際のコードを読んで理解を深める
+
+---
+
+## ⚠️ 重要: 複雑な業務プロセスの実装について
+
+### PurchaseManagement BCは現在参照不可
+
+**PurchaseManagement BC**には承認ワークフロー、ダッシュボード、ファイルアップロード等の実装が含まれていますが、現在以下の**重大な問題**があるため、**参照しないでください**：
+
+#### 確認された問題
+
+1. **SQL/スキーマの不整合** - 存在しないテーブル・列を参照
+2. **マルチテナント制御の欠如** - 他テナントのデータが閲覧可能（セキュリティ脆弱性）
+3. **認可制御の欠如** - 誰でも任意の申請を承認・却下可能（セキュリティ脆弱性）
+4. **入力検証の欠如** - `Guid.Parse()`直接実行でクラッシュリスク
+
+詳細は [10_Application層の詳細設計](10_Application層の詳細設計.md) の末尾を参照してください。
+
+### AI実装時の代替アプローチ
+
+複雑な業務プロセスを実装する必要がある場合：
+
+```mermaid
+graph TD
+    A[機能要求を受け取る] --> B{実装パターンは?}
+    B -->|CRUD| C[ProductCatalogを参照]
+    B -->|承認フロー| D[ProductCatalogの基本パターン<br/>+ ドメインモデルで状態遷移を実装]
+    B -->|集計・レポート| E[SearchProducts/ExportToCsv<br/>のDapperパターンを応用]
+    B -->|ファイル処理| F[基本パターン + Stream処理<br/>+ セキュリティ検証を追加]
+
+    C --> G[実装開始]
+    D --> G
+    E --> G
+    F --> G
+```
+
+**重要**: 複雑な機能でも、**ProductCatalog BCの基本パターン**を組み合わせて実装してください。PurchaseManagement BCのコードは参照しないでください。
 
 ---
 

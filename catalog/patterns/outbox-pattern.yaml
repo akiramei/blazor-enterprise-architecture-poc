@@ -1,0 +1,388 @@
+# Transactional Outbox Pattern
+# ==============================
+# マイクロサービス間の結果整合性を保証するパターン
+
+id: outbox-pattern
+version: 1.0.0
+name: "Transactional Outbox Pattern"
+category: infrastructure-pattern
+intent: ドメインイベントとビジネスエンティティを同一トランザクションで保存し、結果整合性を保証する
+description: |
+  トランザクショナルOutboxパターンにより、ドメインイベントの発行とビジネスエンティティの永続化を
+  原子的に実行できる。これにより、マイクロサービス間の結果整合性が保証される。
+
+  【重要な原則】
+  - Outboxテーブルは各BCのDbContextに含める（BC固有のテーブル）
+  - 書き込みはTransactionBehaviorで行う（同一トランザクション）
+  - 読み取り・配信はBackgroundServiceで行う（別プロセス）
+
+scope: infrastructure-pattern
+layers:
+  - infrastructure
+  - application
+
+# ============================================================================
+# AI選択ヒント
+# ============================================================================
+ai_selection_hints:
+  trigger_phrases:
+    - "イベント配信"
+    - "結果整合性"
+    - "マイクロサービス連携"
+    - "ドメインイベント"
+    - "非同期メッセージング"
+    - "outbox"
+
+  confidence_keywords:
+    high: ["Outbox", "結果整合性", "イベント配信", "トランザクション保証"]
+    medium: ["ドメインイベント", "メッセージブローカー", "非同期"]
+    low: ["通知", "連携"]
+
+  typical_requests:
+    - "ドメインイベントを確実に配信したい"
+    - "データベース更新とイベント発行を原子的に行いたい"
+    - "マイクロサービス間でイベントを連携したい"
+
+# ============================================================================
+# アーキテクチャ図
+# ============================================================================
+architecture: |
+  ┌─────────────────────────────────────────────────────────────┐
+  │ ProductCatalog BC (Bounded Context)                         │
+  ├─────────────────────────────────────────────────────────────┤
+  │                                                              │
+  │  ┌──────────────────────────────────────────┐               │
+  │  │ TransactionBehavior (書き込み側)        │               │
+  │  ├──────────────────────────────────────────┤               │
+  │  │ 1. ドメインイベントを収集                │               │
+  │  │ 2. {BC}DbContext.OutboxMessages に書込み │               │
+  │  │ 3. 単一トランザクションでコミット        │               │
+  │  └──────────────────────────────────────────┘               │
+  │                     ↓                                        │
+  │  ┌──────────────────────────────────────────┐               │
+  │  │ {BC}DbContext                            │               │
+  │  ├──────────────────────────────────────────┤               │
+  │  │ - Products (ドメインテーブル)            │               │
+  │  │ - OutboxMessages (Outboxテーブル)        │               │
+  │  │                                           │               │
+  │  │ ★ 同一データベース → トランザクション保証│               │
+  │  └──────────────────────────────────────────┘               │
+  │                     ↑                                        │
+  │  ┌──────────────────────────────────────────┐               │
+  │  │ {BC}OutboxReader (読み取り側)           │               │
+  │  ├──────────────────────────────────────────┤               │
+  │  │ 1. OutboxMessages から未処理メッセージ取得│              │
+  │  │ 2. Platform DTOに変換                    │               │
+  │  │ 3. 配信完了後、ステータス更新            │               │
+  │  └──────────────────────────────────────────┘               │
+  │                                                              │
+  └─────────────────────────────────────────────────────────────┘
+                       ↑
+  ┌────────────────────┴─────────────────────────────┐
+  │ Platform Layer (グローバルインフラ)              │
+  ├──────────────────────────────────────────────────┤
+  │                                                   │
+  │  ┌────────────────────────────────────┐          │
+  │  │ OutboxBackgroundService            │          │
+  │  ├────────────────────────────────────┤          │
+  │  │ - IEnumerable<IOutboxReader> を巡回│          │
+  │  │ - 各BCのOutboxをポーリング          │          │
+  │  │ - メッセージブローカーに配信        │          │
+  │  └────────────────────────────────────┘          │
+  │                                                   │
+  └───────────────────────────────────────────────────┘
+
+# ============================================================================
+# ファイル構造
+# ============================================================================
+file_structure: |
+  src/
+  ├── Domain/{BC}/
+  │   └── Events/
+  │       └── {Entity}CreatedDomainEvent.cs    # ドメインイベント
+  │
+  ├── Shared/Infrastructure/
+  │   └── Outbox/
+  │       ├── OutboxMessage.cs                 # Outboxメッセージエンティティ
+  │       ├── IOutboxReader.cs                 # 読み取りインターフェース
+  │       └── OutboxBackgroundService.cs       # 配信サービス
+  │
+  └── Application/
+      └── Infrastructure/{BC}/
+          ├── Persistence/
+          │   ├── {BC}DbContext.cs             # OutboxMessages DbSet含む
+          │   └── Configurations/
+          │       └── OutboxMessageConfiguration.cs
+          ├── {BC}OutboxReader.cs              # BC固有のOutbox読み取り
+          └── Behaviors/
+              └── TransactionBehavior.cs       # Outbox書き込み含む
+
+# ============================================================================
+# 実装テンプレート
+# ============================================================================
+implementation:
+  # ===== OutboxMessage エンティティ =====
+  outbox_message:
+    file_path: "src/Shared/Infrastructure/Outbox/OutboxMessage.cs"
+    template: |
+      namespace Shared.Infrastructure.Outbox;
+
+      /// <summary>
+      /// Outboxメッセージエンティティ
+      ///
+      /// 【パターン: Transactional Outbox】
+      ///
+      /// 責務:
+      /// - ドメインイベントをシリアライズして保存
+      /// - 処理状態（未処理/成功/失敗）を管理
+      /// </summary>
+      public sealed class OutboxMessage
+      {
+          public Guid Id { get; private set; }
+          public string Type { get; private set; } = default!;
+          public string Content { get; private set; } = default!;
+          public DateTime OccurredOnUtc { get; private set; }
+          public DateTime? ProcessedOnUtc { get; private set; }
+          public string? Error { get; private set; }
+          public int RetryCount { get; private set; }
+
+          private OutboxMessage() { }
+
+          public static OutboxMessage Create(string eventType, string eventContent)
+          {
+              return new OutboxMessage
+              {
+                  Id = Guid.NewGuid(),
+                  Type = eventType,
+                  Content = eventContent,
+                  OccurredOnUtc = DateTime.UtcNow
+              };
+          }
+
+          public void MarkAsProcessed()
+          {
+              ProcessedOnUtc = DateTime.UtcNow;
+          }
+
+          public void MarkAsFailed(string error)
+          {
+              Error = error;
+              RetryCount++;
+          }
+      }
+
+  # ===== IOutboxReader インターフェース =====
+  outbox_reader_interface:
+    file_path: "src/Shared/Infrastructure/Outbox/IOutboxReader.cs"
+    template: |
+      namespace Shared.Infrastructure.Outbox;
+
+      /// <summary>
+      /// Outbox読み取りインターフェース
+      ///
+      /// 【パターン: Transactional Outbox】
+      ///
+      /// 各BCがこのインターフェースを実装し、
+      /// OutboxBackgroundServiceが全BCのReaderを巡回する。
+      /// </summary>
+      public interface IOutboxReader
+      {
+          /// <summary>未処理メッセージを取得</summary>
+          Task<IReadOnlyList<OutboxMessage>> DequeueAsync(int take, CancellationToken ct);
+
+          /// <summary>処理成功をマーク</summary>
+          Task MarkSucceededAsync(Guid messageId, CancellationToken ct);
+
+          /// <summary>処理失敗をマーク</summary>
+          Task MarkFailedAsync(Guid messageId, string error, CancellationToken ct);
+      }
+
+  # ===== BC固有のOutboxReader =====
+  bc_outbox_reader:
+    file_path: "src/Application/Infrastructure/{BC}/{BC}OutboxReader.cs"
+    template: |
+      namespace Application.Infrastructure.{BC};
+
+      using Shared.Infrastructure.Outbox;
+
+      /// <summary>
+      /// {BC}のOutbox読み取り実装
+      ///
+      /// 【パターン: Transactional Outbox】
+      ///
+      /// 責務:
+      /// - {BC}DbContext.OutboxMessagesから未処理メッセージを取得
+      /// - 処理ステータスの更新
+      /// </summary>
+      public sealed class {BC}OutboxReader : IOutboxReader
+      {
+          private readonly {BC}DbContext _context;
+
+          public {BC}OutboxReader({BC}DbContext context)
+          {
+              _context = context;
+          }
+
+          public async Task<IReadOnlyList<OutboxMessage>> DequeueAsync(
+              int take,
+              CancellationToken ct)
+          {
+              return await _context.OutboxMessages
+                  .Where(m => m.ProcessedOnUtc == null)
+                  .OrderBy(m => m.OccurredOnUtc)
+                  .Take(take)
+                  .ToListAsync(ct);
+          }
+
+          public async Task MarkSucceededAsync(Guid messageId, CancellationToken ct)
+          {
+              var message = await _context.OutboxMessages.FindAsync(messageId, ct);
+              if (message != null)
+              {
+                  message.MarkAsProcessed();
+                  await _context.SaveChangesAsync(ct);
+              }
+          }
+
+          public async Task MarkFailedAsync(Guid messageId, string error, CancellationToken ct)
+          {
+              var message = await _context.OutboxMessages.FindAsync(messageId, ct);
+              if (message != null)
+              {
+                  message.MarkAsFailed(error);
+                  await _context.SaveChangesAsync(ct);
+              }
+          }
+      }
+
+  # ===== TransactionBehavior（Outbox書き込み部分） =====
+  transaction_behavior_outbox:
+    file_path: "src/Application/Infrastructure/{BC}/Behaviors/TransactionBehavior.cs"
+    description: |
+      TransactionBehavior内でOutboxへの書き込みを行う。
+      重要: IOutboxStoreを使わず、直接DbContext.OutboxMessagesに書き込む。
+    template: |
+      // TransactionBehavior内のドメインイベントディスパッチ部分
+
+      private async Task DispatchDomainEventsAsync(CancellationToken ct)
+      {
+          var aggregatesWithEvents = _context.ChangeTracker
+              .Entries<AggregateRoot>()
+              .Where(e => e.Entity.DomainEvents.Any())
+              .Select(e => e.Entity)
+              .ToList();
+
+          foreach (var aggregate in aggregatesWithEvents)
+          {
+              foreach (var domainEvent in aggregate.DomainEvents)
+              {
+                  // ドメインイベントをOutboxに保存
+                  var eventType = domainEvent.GetType().FullName!;
+                  var eventContent = JsonSerializer.Serialize(domainEvent);
+
+                  var outboxMessage = OutboxMessage.Create(eventType, eventContent);
+
+                  // ★ 直接DbContextに書き込む（同一トランザクション）
+                  await _context.OutboxMessages.AddAsync(outboxMessage, ct);
+              }
+
+              aggregate.ClearDomainEvents();
+          }
+      }
+
+    anti_pattern: |
+      // ❌ 絶対にやってはいけないパターン
+      // IOutboxStoreを使うと別トランザクションになる
+
+      await _outboxStore.AddAsync(outboxMessage, ct);  // ← 別のDbContext！
+
+      // 問題:
+      // - ProductはProductCatalogDbContextで保存
+      // - OutboxはPlatformDbContext（IOutboxStore内部）で保存
+      // → トランザクションが分離され、原子性が保証されない
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+ai_guidance:
+  when_to_use:
+    - "ドメインイベントを外部システムに配信する必要がある"
+    - "データベース更新とイベント発行を原子的に行いたい"
+    - "マイクロサービス間で結果整合性を保証したい"
+    - "メッセージブローカー（RabbitMQ, Kafka等）と連携する"
+
+  when_not_to_use:
+    - "単一モノリス内でのイベント処理 → MediatR Notificationで十分"
+    - "同期的な処理で完結する → 通常のトランザクションで十分"
+    - "リアルタイム性が必要 → SignalRなど別パターンを検討"
+
+  implementation_steps:
+    - step: 1
+      description: "OutboxMessageエンティティを作成"
+      files: ["src/Shared/Infrastructure/Outbox/OutboxMessage.cs"]
+    - step: 2
+      description: "IOutboxReaderインターフェースを作成"
+      files: ["src/Shared/Infrastructure/Outbox/IOutboxReader.cs"]
+    - step: 3
+      description: "{BC}DbContextにOutboxMessages DbSetを追加"
+      files: ["src/Application/Infrastructure/{BC}/Persistence/{BC}DbContext.cs"]
+    - step: 4
+      description: "TransactionBehaviorにOutbox書き込みを追加"
+      files: ["src/Application/Infrastructure/{BC}/Behaviors/TransactionBehavior.cs"]
+    - step: 5
+      description: "{BC}OutboxReaderを実装"
+      files: ["src/Application/Infrastructure/{BC}/{BC}OutboxReader.cs"]
+    - step: 6
+      description: "OutboxBackgroundServiceを実装"
+      files: ["src/Shared/Infrastructure/Outbox/OutboxBackgroundService.cs"]
+    - step: 7
+      description: "DIコンテナに登録"
+      files: ["Program.cs"]
+
+  common_mistakes:
+    - mistake: "IOutboxStoreを使ってOutboxに書き込む"
+      severity: "critical"
+      symptom: "ProductとOutboxが別トランザクションになる"
+      solution: "BC固有のDbContext.OutboxMessagesに直接書き込む"
+
+    - mistake: "Outboxテーブルを共通のPlatformDbContextに配置"
+      severity: "critical"
+      symptom: "トランザクション保証が破綻する"
+      solution: "各BCのDbContextにOutboxMessagesを含める"
+
+    - mistake: "ドメインイベントを即座にメッセージブローカーに送信"
+      severity: "high"
+      symptom: "DBコミット前にイベントが配信される可能性"
+      solution: "Outboxに保存し、BackgroundServiceで配信"
+
+  checklist:
+    - "[ ] OutboxMessageエンティティがあるか？"
+    - "[ ] 各BCのDbContextにOutboxMessages DbSetがあるか？"
+    - "[ ] TransactionBehaviorでOutboxに書き込んでいるか？"
+    - "[ ] IOutboxStoreを使っていないか？（使ってはいけない）"
+    - "[ ] OutboxBackgroundServiceが登録されているか？"
+
+# ============================================================================
+# DI登録
+# ============================================================================
+wiring:
+  service_registrations:
+    - "services.AddScoped<IOutboxReader, {BC}OutboxReader>();"
+    - "services.AddHostedService<OutboxBackgroundService>();"
+
+  dependencies:
+    nuget:
+      - "Microsoft.EntityFrameworkCore"
+    patterns:
+      - "TransactionBehavior"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+changelog:
+  - version: 1.0.0
+    date: 2025-11-26
+    changes:
+      - "初版作成"
+      - "docs/architecture/OUTBOX_PATTERN.md からカタログ形式に変換"
+      - "IOutboxStore使用禁止を明記"
