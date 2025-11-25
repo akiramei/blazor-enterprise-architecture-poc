@@ -1,0 +1,337 @@
+# Project Structure Pattern
+# ==========================
+# 新規プロジェクト作成時の標準構造を定義する
+# このパターンに従うことで、プロジェクト間の一貫性が保証される
+
+id: project-structure
+version: 1.0.0
+name: "Project Structure (VSA Standard)"
+category: scaffold
+intent: "新規プロジェクトの標準構造を定義し、一貫性のあるソリューションを生成する"
+
+# ============================================================================
+# プロジェクト構成（5プロジェクト構成）
+# ============================================================================
+
+projects:
+  - name: "{SolutionName}.Kernel"
+    path: "src/Kernel"
+    type: "ddd-foundation"
+    purpose: "ドメインの存在論的基盤（全プロジェクトから参照される）"
+    references: []
+    contents:
+      - Entity.cs
+      - AggregateRoot.cs
+      - ValueObject.cs
+      - IDomainEvent.cs
+      - IRepository.cs
+      - DomainException.cs
+    nuget_packages:
+      - MediatR  # IDomainEvent 用
+
+  - name: "{SolutionName}.Domain.{BC}"
+    path: "src/Domain/{BC}"
+    type: "domain"
+    purpose: "BC固有のドメインモデル（ビジネスルール）"
+    references:
+      - "{SolutionName}.Kernel"
+    structure:
+      - "{Aggregate}/           # Aggregate単位でフォルダ分け"
+      - "{Aggregate}/{Entity}.cs"
+      - "{Aggregate}/{ValueObject}.cs"
+      - "{Aggregate}/I{Entity}Repository.cs"
+      - "{Aggregate}/Events/"
+      - "Boundaries/            # バウンダリーサービス"
+    nuget_packages: []
+
+  - name: "{SolutionName}.Shared.Application"
+    path: "src/Shared/Application"
+    type: "shared-application"
+    purpose: "ソフトウェアパターン（BC非依存のアプリケーション層基盤）"
+    references:
+      - "{SolutionName}.Kernel"
+    contents:
+      - "Interfaces/ICommand.cs"
+      - "Interfaces/IQuery.cs"
+      - "Interfaces/IUnitOfWork.cs"
+      - "Result.cs"
+    nuget_packages:
+      - MediatR
+      - FluentValidation
+
+  - name: "{SolutionName}.Shared.Infrastructure"
+    path: "src/Shared/Infrastructure"
+    type: "shared-infrastructure"
+    purpose: "ソフトウェアパターン（BC非依存のインフラ層基盤）"
+    references:
+      - "{SolutionName}.Shared.Application"
+      - "{SolutionName}.Kernel"
+    contents:
+      - "Behaviors/ValidationBehavior.cs"
+      - "Behaviors/TransactionBehavior.cs"
+      - "Behaviors/LoggingBehavior.cs"
+      - "DependencyInjection.cs"
+    nuget_packages:
+      - MediatR
+      - FluentValidation
+      - Microsoft.EntityFrameworkCore
+      - Dapper
+
+  - name: "{SolutionName}.Application"
+    path: "src/Application"
+    type: "web-host"
+    purpose: "Blazor Webホスト + 機能スライス + BC固有インフラ"
+    references:
+      - "{SolutionName}.Domain.{BC}"
+      - "{SolutionName}.Kernel"
+      - "{SolutionName}.Shared.Application"
+      - "{SolutionName}.Shared.Infrastructure"
+    structure:
+      features: "Features/{Feature}/"
+      bc_infrastructure: "Infrastructure/{BC}/"
+      components: "Components/"
+
+# ============================================================================
+# ディレクトリ構造（完全版）
+# ============================================================================
+
+directory_structure: |
+  {SolutionName}.sln
+  │
+  ├── src/
+  │   │
+  │   ├── Kernel/
+  │   │   └── {SolutionName}.Kernel.csproj
+  │   │
+  │   ├── Domain/{BC}/
+  │   │   └── {SolutionName}.Domain.{BC}.csproj
+  │   │
+  │   ├── Shared/
+  │   │   ├── Application/
+  │   │   │   └── {SolutionName}.Shared.Application.csproj
+  │   │   └── Infrastructure/
+  │   │       └── {SolutionName}.Shared.Infrastructure.csproj
+  │   │
+  │   └── Application/
+  │       └── {SolutionName}.Application.csproj
+  │           │
+  │           ├── Features/{Feature}/
+  │           │   ├── {Feature}Command.cs
+  │           │   ├── {Feature}CommandHandler.cs
+  │           │   ├── {Feature}CommandValidator.cs
+  │           │   └── {Feature}.razor           # 機能固有UI（同列配置）
+  │           │
+  │           ├── Infrastructure/{BC}/
+  │           │   ├── Persistence/
+  │           │   │   ├── {BC}DbContext.cs
+  │           │   │   ├── {Entity}Repository.cs
+  │           │   │   └── Migrations/
+  │           │   └── DependencyInjection.cs
+  │           │
+  │           └── Components/
+  │               ├── Layout/
+  │               │   └── MainLayout.razor
+  │               ├── Pages/
+  │               │   └── Home.razor            # 複数機能で使う基盤ページ
+  │               └── Shared/
+  │                   └── ErrorDisplay.razor    # BC横断コンポーネント
+
+# ============================================================================
+# 依存関係ルール
+# ============================================================================
+
+dependency_rules:
+  allowed:
+    - from: "Application"
+      to: ["Domain.{BC}", "Kernel", "Shared.Application", "Shared.Infrastructure"]
+    - from: "Shared.Infrastructure"
+      to: ["Shared.Application", "Kernel"]
+    - from: "Shared.Application"
+      to: ["Kernel"]
+    - from: "Domain.{BC}"
+      to: ["Kernel"]
+    - from: "Kernel"
+      to: []
+
+  forbidden:
+    - from: "Kernel"
+      to: ["*"]
+      reason: "Kernelは依存のルート。何にも依存してはならない"
+    - from: "Domain.{BC}"
+      to: ["Shared.*", "Application"]
+      reason: "ドメインはソフトウェアパターンやアプリケーションに依存しない"
+    - from: "Shared.*"
+      to: ["Domain.{BC}"]
+      reason: "SharedはBC非依存。ドメインを知ってはならない"
+
+# ============================================================================
+# UI配置ルール
+# ============================================================================
+
+ui_placement:
+  rules:
+    - condition: "機能固有UI（1つのFeatureでのみ使用）"
+      location: "Features/{Feature}/"
+      extension: ".razor を .cs と同列配置"
+      example: "Features/CreateBooking/CreateBooking.razor"
+
+    - condition: "複数機能で使う基盤ページ"
+      location: "Components/Pages/"
+      example: "Components/Pages/Home.razor"
+
+    - condition: "BC横断の共有コンポーネント"
+      location: "Components/Shared/"
+      example: "Components/Shared/ErrorDisplay.razor"
+
+    - condition: "レイアウト（フレームワーク必須）"
+      location: "Components/Layout/"
+      example: "Components/Layout/MainLayout.razor"
+
+  decision_flow: |
+    Q1: この.razorは特定の1機能でのみ使うか？
+        YES → Features/{Feature}/ に同列配置
+        NO  → Q2へ
+
+    Q2: @page ディレクティブがあるか？
+        YES → Components/Pages/
+        NO  → Q3へ
+
+    Q3: 特定のBCに属するか？
+        YES → Infrastructure/{BC}/Components/（稀なケース）
+        NO  → Components/Shared/
+
+# ============================================================================
+# 命名規則
+# ============================================================================
+
+naming_conventions:
+  solution: "{SolutionName}.sln"
+
+  projects:
+    kernel: "{SolutionName}.Kernel"
+    domain: "{SolutionName}.Domain.{BC}"
+    shared_application: "{SolutionName}.Shared.Application"
+    shared_infrastructure: "{SolutionName}.Shared.Infrastructure"
+    application: "{SolutionName}.Application"
+
+  folders:
+    features: "Features/{FeaturePascalCase}/"
+    bc_infrastructure: "Infrastructure/{BCPascalCase}/"
+    aggregate: "{AggregatePascalCase}/"
+
+  files:
+    command: "{Feature}Command.cs"
+    command_handler: "{Feature}CommandHandler.cs"
+    command_validator: "{Feature}CommandValidator.cs"
+    query: "{Feature}Query.cs"
+    query_handler: "{Feature}QueryHandler.cs"
+    entity: "{EntityPascalCase}.cs"
+    value_object: "{ValueObjectPascalCase}.cs"
+    repository_interface: "I{Entity}Repository.cs"
+    repository_impl: "{Entity}Repository.cs"
+    db_context: "{BC}DbContext.cs"
+
+# ============================================================================
+# 禁止事項
+# ============================================================================
+
+forbidden:
+  - pattern: "Shared/{BC}/"
+    reason: "SharedプロジェクトにBCを混入させない。BC固有はApplication/Infrastructure/{BC}/へ"
+
+  - pattern: "Domain/{BC}/Infrastructure/"
+    reason: "ドメインにインフラを配置しない。Application/Infrastructure/{BC}/へ"
+
+  - pattern: "src/Common/"
+    reason: "Commonという曖昧な名前は禁止。目的に応じてKernel/Shared/を使用"
+
+  - pattern: "Features/{Feature}/UI/"
+    reason: "UIサブフォルダは不要。.razorは.csと同列配置"
+
+# ============================================================================
+# ソリューションファイルテンプレート
+# ============================================================================
+
+solution_template:
+  solution_folders:
+    - name: "src"
+      nested:
+        - name: "Application"
+          projects: ["{SolutionName}.Application"]
+        - name: "Domain"
+          projects: ["{SolutionName}.Kernel", "{SolutionName}.Domain.{BC}"]
+        - name: "Shared"
+          projects: ["{SolutionName}.Shared.Application", "{SolutionName}.Shared.Infrastructure"]
+
+  nesting_note: |
+    Kernelは物理的には src/Kernel/ だが、
+    ソリューションフォルダとしては Domain/ 配下に配置する。
+    これはKernelが「ドメインの基盤」であることを示す。
+
+# ============================================================================
+# 検証チェックリスト
+# ============================================================================
+
+validation_checklist:
+  projects:
+    - "[ ] {SolutionName}.Kernel.csproj が存在する"
+    - "[ ] {SolutionName}.Domain.{BC}.csproj が存在する（BCごとに1つ）"
+    - "[ ] {SolutionName}.Shared.Application.csproj が存在する"
+    - "[ ] {SolutionName}.Shared.Infrastructure.csproj が存在する"
+    - "[ ] {SolutionName}.Application.csproj が存在する"
+
+  dependencies:
+    - "[ ] Kernel は何も参照していない"
+    - "[ ] Domain.{BC} は Kernel のみ参照"
+    - "[ ] Shared.Application は Kernel のみ参照"
+    - "[ ] Shared.Infrastructure は Shared.Application と Kernel を参照"
+    - "[ ] Application は全プロジェクトを参照"
+
+  structure:
+    - "[ ] Features/ 配下に機能スライスがある"
+    - "[ ] Infrastructure/{BC}/ 配下にBC固有インフラがある"
+    - "[ ] Components/Pages/ に基盤ページがある"
+    - "[ ] Shared/ プロジェクトにBCフォルダがない"
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_use:
+    - "新規プロジェクトを作成するとき"
+    - "既存プロジェクトの構造を検証するとき"
+    - "プロジェクト構造についてユーザーに説明するとき"
+
+  critical_rules:
+    - "Shared/ はソフトウェアパターンのみ。BCを混入させない"
+    - "BC固有インフラは Application/Infrastructure/{BC}/ に配置"
+    - "機能固有UIは Features/{Feature}/ に .cs と同列配置"
+    - "Kernelは依存のルート。何にも依存してはならない"
+
+  common_mistakes:
+    - mistake: "Shared/{BC}/ フォルダを作成する"
+      solution: "Application/Infrastructure/{BC}/ に配置する"
+
+    - mistake: "Features/{Feature}/UI/ サブフォルダを作成する"
+      solution: ".razor は .cs と同じ Features/{Feature}/ に配置する"
+
+    - mistake: "Domain/{BC}/ に Repository 実装を配置する"
+      solution: "インターフェースは Domain に、実装は Application/Infrastructure/{BC}/ に"
+
+# ============================================================================
+# エビデンス
+# ============================================================================
+
+evidence:
+  reference_implementation: "https://github.com/example/Reserve"
+  description: "会議室予約システム（フィードバック反映後の改善版）"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版作成"
+      - "Kanban vs Reserve の差異分析に基づく標準構造を定義"
+      - "BC固有インフラの配置を Application/Infrastructure/{BC}/ に決定"
+      - "UI配置ルールを明確化（Features/ に同列配置）"

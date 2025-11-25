@@ -95,22 +95,26 @@ services.AddScoped<IProductRepository, ProductRepository>();
 
 ## 📂 プロジェクト構造
 
-```
-src/Application/
-├── Components/                   # Blazorテンプレート由来（活用する）
-│   ├── Layout/                   # MainLayout（フレームワーク必須）
-│   ├── Pages/                    # 複数機能で使う/基盤ページ
-│   └── Shared/                   # BC横断の共有コンポーネント
-├── Features/{Feature}/           # VSA機能スライス
-│   ├── {Feature}Command.cs
-│   ├── {Feature}CommandHandler.cs
-│   └── UI/                       # ★ 単一機能専用UI
-├── Shared/{BC}/UI/               # ★ BC内で複数機能が共有するUI
-└── Core/                         # Commands, Queries, Behaviors
+> **詳細は `catalog/scaffolds/project-structure.yaml` を参照**
 
-src/Domain/{BC}/                  # ドメインプロジェクト（分離）
-├── Entities/, ValueObjects/
-└── Boundaries/                   # ★ バウンダリー（ドメインの一部）
+```
+src/
+├── Kernel/                           # DDD基盤（Entity, ValueObject, AggregateRoot）
+├── Domain/{BC}/                      # BC固有ドメイン（Aggregate単位でフォルダ分け）
+│   ├── {Aggregate}/
+│   └── Boundaries/
+├── Shared/
+│   ├── Application/                  # ICommand, IQuery, Result<T>（BC非依存）
+│   └── Infrastructure/               # Behaviors（BC非依存）
+└── Application/
+    ├── Features/{Feature}/           # VSA機能スライス
+    │   ├── {Feature}Command.cs
+    │   ├── {Feature}CommandHandler.cs
+    │   └── {Feature}.razor           # ★ 機能固有UI（同列配置）
+    ├── Infrastructure/{BC}/          # ★ BC固有インフラ（DbContext, Repository実装）
+    └── Components/                   # Blazorテンプレート由来
+        ├── Pages/                    # 複数機能で使う基盤ページ
+        └── Shared/                   # BC横断の共有コンポーネント
 ```
 
 ---
@@ -131,13 +135,13 @@ src/Domain/{BC}/                  # ドメインプロジェクト（分離）
 
 ## 📁 UI配置ルール（要約）
 
-> **詳細は `catalog/AI_USAGE_GUIDE.md` を参照**
+> **詳細は `catalog/scaffolds/project-structure.yaml` を参照**
 
 | 条件 | 配置場所 |
 |-----|---------|
-| 単一機能専用ページ | `Features/{Feature}/UI/` |
-| 複数機能で使う/基盤ページ | `Components/Pages/` |
-| BC内で共有するStore/Actions | `Shared/{BC}/UI/` |
+| 機能固有UI | `Features/{Feature}/` に .cs と同列配置 |
+| 複数機能で使う基盤ページ | `Components/Pages/` |
+| BC横断の共有コンポーネント | `Components/Shared/` |
 
 ---
 

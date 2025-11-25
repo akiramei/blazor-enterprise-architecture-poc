@@ -1,7 +1,7 @@
 {
   "$schema": "../patterns.manifest.schema.json",
-  "version": "v2025.11.24",
-  "last_updated": "2025-11-24",
+  "version": "v2025.11.25",
+  "last_updated": "2025-11-25",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "ai_bootstrap": {
@@ -9,41 +9,48 @@
     "priority_reading_order": [
       {
         "order": 1,
+        "file": "catalog/scaffolds/project-structure.yaml",
+        "purpose": "project_structure",
+        "description": "標準プロジェクト構造（5プロジェクト構成、依存関係、UI配置ルール）",
+        "required": true
+      },
+      {
+        "order": 2,
         "file": "CLAUDE.md",
         "purpose": "critical_constraints",
         "description": "実装ルール・禁止事項・クイックリファレンス",
         "required": true
       },
       {
-        "order": 2,
+        "order": 3,
         "file": "catalog/COMMON_MISTAKES.md",
         "purpose": "common_mistakes",
         "description": "頻出する実装ミス（SaveChangesAsync、Value Object比較、Boundary判定）",
         "required": true
       },
       {
-        "order": 3,
+        "order": 4,
         "file": "catalog/AI_USAGE_GUIDE.md",
         "purpose": "implementation_guide",
         "description": "詳細な実装ガイド・アーキテクチャ全体像",
         "required": true
       },
       {
-        "order": 4,
+        "order": 5,
         "file": "catalog/index.json",
         "purpose": "pattern_index",
         "description": "パターン索引・意思決定マトリクス",
         "required": true
       },
       {
-        "order": 5,
+        "order": 6,
         "file": "patterns.manifest.json",
         "purpose": "enabled_patterns",
         "description": "有効なパターン一覧",
-        "required": true
+        "required": false
       },
       {
-        "order": 6,
+        "order": 7,
         "file": "catalog/DECISION_FLOWCHART.md",
         "purpose": "pattern_selection",
         "description": "パターン選択アルゴリズム",
@@ -60,17 +67,26 @@
         "SingletonでDbContextやScopedサービスを注入しない",
         "MediatRのHandleメソッド名をHandleAsyncにしない",
         "独自のCQRS基盤を作らない（MediatRを使用）",
-        "例外をthrowしてエラーを伝播しない（Result<T>を使用）"
+        "例外をthrowしてエラーを伝播しない（Result<T>を使用）",
+        "Features/{Feature}/UI/ サブフォルダを作らない（同列配置）",
+        "Shared/{BC}/ フォルダを作らない（SharedプロジェクトにBC混入禁止）"
       ],
       "always_do": [
         "CommandはResult<T>を返す",
         "サービスはScopedで登録",
-        "パターンのYAMLを読んでから実装"
+        "パターンのYAMLを読んでから実装",
+        "機能固有UIは Features/{Feature}/ に .cs と同列配置",
+        "BC固有インフラは Application/Infrastructure/{BC}/ に配置"
       ]
     },
     "default_pattern_on_uncertainty": "feature-slice"
   },
   "categories": {
+    "scaffold": {
+      "name": "Scaffolds",
+      "description": "新規プロジェクト作成時の標準構造・テンプレート",
+      "scope": "プロジェクト全体"
+    },
     "pipeline-behavior": {
       "name": "Pipeline Behaviors",
       "description": "MediatR パイプラインで実行される横断的関心事",
@@ -108,6 +124,17 @@
     }
   },
   "patterns": [
+    {
+      "id": "project-structure",
+      "name": "Project Structure (VSA Standard)",
+      "category": "scaffold",
+      "version": "1.0.0",
+      "file": "scaffolds/project-structure.yaml",
+      "intent": "新規プロジェクトの標準構造を定義し、一貫性のあるソリューションを生成する",
+      "tags": ["scaffold", "project-structure", "vsa", "standard"],
+      "stability": "stable",
+      "scope": "project-wide"
+    },
     {
       "id": "metrics-behavior",
       "name": "MetricsBehavior",

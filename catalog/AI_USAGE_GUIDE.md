@@ -102,136 +102,69 @@
 
 ## 📁 UI配置ルール
 
-VSA では機能フォルダに UI も Command も Handler もまとめて見通しを良くしますが、
-**複数機能で共有する画面やコンポーネント**はその限りではありません。
+> **詳細は `catalog/scaffolds/project-structure.yaml` を参照**
 
-### フォルダ構造の全体像
-
-```
-src/Application/
-├── Components/                      # Blazorテンプレート由来（活用する）
-│   ├── Layout/                      # MainLayout, NavMenu（フレームワーク必須）
-│   ├── Pages/                       # 複数機能で使う/アプリ基盤ページ
-│   │   ├── Home.razor
-│   │   ├── Error.razor
-│   │   └── Account/                 # 認証系ページ
-│   ├── Shared/                      # BC横断の共有コンポーネント
-│   │   └── ErrorPage.razor
-│   ├── App.razor                    # エントリーポイント
-│   └── Routes.razor                 # ルーティング
-│
-├── Features/                        # VSA機能スライス
-│   └── {Feature}/
-│       ├── {Feature}Command.cs
-│       ├── {Feature}CommandHandler.cs
-│       └── UI/                      # ★ 単一機能専用のページ/コンポーネント
-│           └── {Feature}.razor
-│
-└── Shared/{BC}/                     # BC内共有
-    ├── Application/                 # DTOs, Interfaces
-    ├── Infrastructure/              # DbContext, Repository
-    └── UI/                          # ★ BC内で複数機能が共有するUI
-        ├── Store/                   # 状態管理
-        ├── Actions/                 # PageActions
-        └── Components/              # 共有コンポーネント
-```
+VSA では機能フォルダに UI も Command も Handler も**同列に**まとめて見通しを良くします。
 
 ### 配置判断フローチャート
 
 ```
-Q1: そのページ/コンポーネントは特定の1機能でしか使わないか？
+Q1: この.razorは特定の1機能でのみ使うか？
     │
-    ├─ Yes → Features/{Feature}/UI/ に配置
-    │        例: Login.razor → Features/Login/UI/
-    │            ProductEdit.razor → Features/UpdateProduct/UI/
+    ├─ Yes → Features/{Feature}/ に .cs と同列配置
+    │        例: Features/CreateBooking/CreateBooking.razor
     │
     └─ No → Q2へ
          │
-         Q2: ページか？コンポーネントか？
+         Q2: @page ディレクティブがあるか？
          │
-         ├─ ページ（@page属性あり）→ Components/Pages/
-         │   例: Home.razor, Dashboard.razor
+         ├─ Yes → Components/Pages/
+         │        例: Home.razor, Dashboard.razor
          │
-         └─ コンポーネント → Q3へ
-              │
-              Q3: 特定のBounded Contextに属するか？
-              │
-              ├─ Yes → Shared/{BC}/UI/Components/
-              │        例: PurchaseManagement の StatusBadge
-              │
-              └─ No → Components/Shared/
-                      例: ErrorPage.razor（全BC共通）
+         └─ No → Components/Shared/
+                 例: ErrorDisplay.razor
 ```
 
 ### 配置ルール早見表
 
 | 条件 | 配置場所 | 例 |
 |-----|---------|-----|
-| **単一機能専用ページ** | `Features/{Feature}/UI/` | Login.razor, ProductDetail.razor |
-| **複数機能で使う/基盤ページ** | `Components/Pages/` | Home.razor, Error.razor |
-| **BC横断の共有部品** | `Components/Shared/` | ErrorPage.razor |
-| **BC内で共有するStore/Actions** | `Shared/{BC}/UI/Store/`, `Actions/` | ProductsStore.cs |
-| **BC内で共有するコンポーネント** | `Shared/{BC}/UI/Components/` | StatusBadge.razor |
-| **フレームワーク必須** | `Components/Layout/` | MainLayout.razor, NavMenu.razor |
+| **機能固有UI** | `Features/{Feature}/` に同列配置 | CreateBooking.razor |
+| **複数機能で使う基盤ページ** | `Components/Pages/` | Home.razor |
+| **BC横断の共有コンポーネント** | `Components/Shared/` | ErrorDisplay.razor |
+| **フレームワーク必須** | `Components/Layout/` | MainLayout.razor |
 
 ### 具体例
 
-#### 例1: ログイン機能
+#### 例1: 予約作成機能
 
-ログイン画面はログイン機能でしか使わない → **Features 内に配置**
-
-```
-Features/
-└── Login/
-    ├── LoginCommand.cs
-    ├── LoginCommandHandler.cs
-    └── UI/
-        └── Login.razor          # ← ここ
-```
-
-#### 例2: 商品編集機能
-
-商品編集画面は UpdateProduct 機能専用 → **Features 内に配置**
+予約作成画面は CreateBooking 機能専用 → **Features 内に同列配置**
 
 ```
 Features/
-└── UpdateProduct/
-    ├── UpdateProductCommand.cs
-    ├── UpdateProductCommandHandler.cs
-    └── UI/
-        └── ProductEdit.razor    # ← ここ
+└── CreateBooking/
+    ├── CreateBookingCommand.cs
+    ├── CreateBookingCommandHandler.cs
+    ├── CreateBookingCommandValidator.cs
+    └── CreateBooking.razor      # ★ 同列配置（UI/サブフォルダは作らない）
 ```
 
-#### 例3: 商品一覧Store
-
-商品一覧の状態管理は、一覧表示・検索・削除など複数機能で共有 → **Shared 内に配置**
-
-```
-Shared/
-└── ProductCatalog/
-    └── UI/
-        └── Store/
-            ├── ProductsState.cs   # ← ここ
-            └── ProductsStore.cs   # ← ここ
-```
-
-#### 例4: ホーム画面
+#### 例2: ホーム画面
 
 ホーム画面は特定機能に属さない → **Components/Pages に配置**
 
 ```
 Components/
 └── Pages/
-    └── Home.razor               # ← ここ
+    └── Home.razor
 ```
 
-### よくある間違い
+### 禁止事項
 
-| 間違い | 正しい配置 | 理由 |
-|-------|-----------|------|
-| Login.razor を Components/Pages に置く | Features/Login/UI/ | 単一機能専用のため |
-| ProductsStore を Features/GetProducts に置く | Shared/ProductCatalog/UI/Store/ | 複数機能で共有するため |
-| MainLayout を Features に置く | Components/Layout/ | フレームワーク必須のため |
+| 禁止パターン | 理由 |
+|-------------|------|
+| `Features/{Feature}/UI/` サブフォルダ | 不要な階層。同列配置が正しい |
+| `Shared/{BC}/` フォルダ | SharedプロジェクトにBC混入禁止 |
 
 ---
 

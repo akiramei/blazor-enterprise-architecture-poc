@@ -55,80 +55,75 @@
 
 ### プロジェクト構造
 
-```
-src/Application/                     # 単一Blazor Serverプロジェクト
-├── Components/                      # Blazorテンプレート由来（活用する）
-│   ├── Layout/                      # MainLayout, NavMenu（フレームワーク必須）
-│   ├── Pages/                       # 複数機能で使う/アプリ基盤ページ
-│   ├── Shared/                      # BC横断の共有コンポーネント
-│   ├── App.razor                    # エントリーポイント
-│   └── Routes.razor                 # ルーティング
-│
-├── Features/                        # VSA機能スライス
-│   └── {Feature}/
-│       ├── {Feature}Command.cs      # コマンド定義
-│       ├── {Feature}CommandHandler.cs
-│       ├── {Feature}Validator.cs    # FluentValidation
-│       └── UI/                      # ★ 単一機能専用のページ/コンポーネント
-│           └── {Feature}.razor
-│
-├── Shared/{BC}/                     # BC（Bounded Context）内共有
-│   ├── Application/                 # DTOs, Interfaces, ReadRepository
-│   ├── Infrastructure/              # DbContext, Repository, Behaviors
-│   └── UI/                          # ★ BC内で複数機能が共有するUI
-│       ├── Store/                   # 状態管理（State + Store）
-│       ├── Actions/                 # PageActions（UI手順）
-│       └── Components/              # 共有コンポーネント
-│
-└── Core/                            # Commands, Queries, Behaviors基盤
+> **詳細は `catalog/scaffolds/project-structure.yaml` を参照**
 
-src/Domain/{BC}/                     # ドメインプロジェクト（分離）
-├── Entities/                        # Product, PurchaseRequest
-├── ValueObjects/                    # Money, ProductId
-├── Enums/                           # ProductStatus, ApprovalStatus
-├── DomainEvents/                    # ProductCreatedEvent
-└── Boundaries/                      # ★ バウンダリー（ドメインモデルの一部）
+```
+src/
+├── Kernel/                              # DDD基盤（Entity, ValueObject, AggregateRoot）
+│
+├── Domain/{BC}/                         # BC固有ドメイン
+│   ├── {Aggregate}/                     # Aggregate単位でフォルダ分け
+│   │   ├── {Entity}.cs
+│   │   ├── {ValueObject}.cs
+│   │   ├── I{Entity}Repository.cs
+│   │   └── Events/
+│   └── Boundaries/                      # バウンダリーサービス
+│
+├── Shared/                              # ソフトウェアパターン（BC非依存）
+│   ├── Application/                     # ICommand, IQuery, Result<T>
+│   └── Infrastructure/                  # Behaviors, DI
+│
+└── Application/                         # Blazor Webホスト
+    ├── Features/{Feature}/              # VSA機能スライス
+    │   ├── {Feature}Command.cs
+    │   ├── {Feature}CommandHandler.cs
+    │   ├── {Feature}Validator.cs
+    │   └── {Feature}.razor              # ★ 機能固有UI（同列配置）
+    │
+    ├── Infrastructure/{BC}/             # ★ BC固有インフラ
+    │   ├── Persistence/
+    │   │   ├── {BC}DbContext.cs
+    │   │   └── {Entity}Repository.cs
+    │   └── DependencyInjection.cs
+    │
+    └── Components/                      # Blazorテンプレート由来
+        ├── Layout/                      # MainLayout, NavMenu
+        ├── Pages/                       # 複数機能で使う基盤ページ
+        └── Shared/                      # BC横断の共有コンポーネント
 ```
 
 ---
 
 ## 📁 UI配置ルール
 
+> **詳細は `catalog/scaffolds/project-structure.yaml` を参照**
+
 ### 判断フローチャート
 
 ```
-Q1: そのページ/コンポーネントは特定の1機能でしか使わないか？
+Q1: この.razorは特定の1機能でのみ使うか？
     │
-    ├─ Yes → Features/{Feature}/UI/ に配置
-    │        例: Login.razor, ProductEdit.razor
+    ├─ Yes → Features/{Feature}/ に .cs と同列配置
+    │        例: Features/CreateBooking/CreateBooking.razor
     │
     └─ No → Q2へ
          │
-         Q2: ページか？コンポーネントか？
+         Q2: @page ディレクティブがあるか？
          │
-         ├─ ページ（@page属性あり）→ Components/Pages/
-         │   例: Home.razor, Dashboard.razor
+         ├─ Yes → Components/Pages/
+         │        例: Home.razor, Dashboard.razor
          │
-         └─ コンポーネント → Q3へ
-              │
-              Q3: 特定のBounded Contextに属するか？
-              │
-              ├─ Yes → Shared/{BC}/UI/Components/
-              │        例: StatusBadge.razor
-              │
-              └─ No → Components/Shared/
-                      例: ErrorPage.razor
+         └─ No → Components/Shared/
+                 例: ErrorDisplay.razor
 ```
 
 ### 配置ルール早見表
 
 | 条件 | 配置場所 | 例 |
 |-----|---------|-----|
-| **単一機能専用ページ** | `Features/{Feature}/UI/` | Login.razor, ProductDetail.razor |
-| **複数機能で使う/基盤ページ** | `Components/Pages/` | Home.razor, Error.razor |
-| **BC横断の共有部品** | `Components/Shared/` | ErrorPage.razor |
-| **BC内で共有するStore/Actions** | `Shared/{BC}/UI/Store/`, `Actions/` | ProductsStore.cs |
-| **BC内で共有するコンポーネント** | `Shared/{BC}/UI/Components/` | StatusBadge.razor |
+| **機能固有UI** | `Features/{Feature}/` に同列配置 | CreateBooking.razor |
+| **複数機能で使う基盤ページ** | `Components/Pages/` | Home.razor |
+| **BC横断の共有コンポーネント** | `Components/Shared/` | ErrorDisplay.razor |
 | **フレームワーク必須** | `Components/Layout/` | MainLayout.razor |
 
 ---
