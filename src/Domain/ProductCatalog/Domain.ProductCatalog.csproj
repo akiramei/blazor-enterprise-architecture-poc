@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- ✅ Domain は Shared.Kernel のみに依存 -->
-    <ProjectReference Include="..\..\Shared\Kernel\Shared.Kernel.csproj" />
+    <!-- ✅ Domain は Kernel のみに依存 -->
+    <ProjectReference Include="..\..\Kernel\Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

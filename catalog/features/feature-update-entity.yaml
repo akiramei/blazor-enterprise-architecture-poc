@@ -1,4 +1,4 @@
-id: feature-update-entity
+﻿id: feature-update-entity
 version: 1.0.0
 name: Update Entity Feature Slice
 category: feature-slice
@@ -76,7 +76,7 @@ file_structure: |
   ├── Update{Entity}CommandHandler.cs       # Handler実装
   └── Update{Entity}Validator.cs            # FluentValidation検証ルール（オプション）
 
-  src/Application/Shared/{BoundedContext}/UI/
+  src/Application/Infrastructure/{BoundedContext}/UI/
   ├── Store/{Entity}EditStore.cs            # 状態管理 + I/O
   ├── Actions/{Entity}EditActions.cs        # UI手順のオーケストレーション
   └── Store/{Entity}EditState.cs            # 状態クラス
@@ -243,7 +243,7 @@ implementation:
 
   # ===== UI Layer =====
   store:
-    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}EditStore.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}EditStore.cs"
     template: |
       using MediatR;
       using Microsoft.Extensions.DependencyInjection;
@@ -403,7 +403,7 @@ implementation:
       }
 
   actions:
-    file_path: "src/Application/Shared/{BoundedContext}/UI/Actions/{Entity}EditActions.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Actions/{Entity}EditActions.cs"
     template: |
       using Microsoft.Extensions.Logging;
       using {BoundedContext}.Shared.UI.Store;
@@ -500,8 +500,8 @@ evidence:
     command: "src/Application/Features/UpdateProduct/UpdateProductCommand.cs"
     handler: "src/Application/Features/UpdateProduct/UpdateProductCommandHandler.cs"
   ui_layer:
-    store: "src/Application/Shared/ProductCatalog/UI/Store/ProductEditStore.cs"
-    actions: "src/Application/Shared/ProductCatalog/UI/Actions/ProductEditActions.cs"
+    store: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductEditStore.cs"
+    actions: "src/Application/Infrastructure/ProductCatalog/UI/Actions/ProductEditActions.cs"
 
 changelog:
   - version: 1.0.0

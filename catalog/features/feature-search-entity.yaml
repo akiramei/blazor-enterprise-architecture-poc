@@ -1,4 +1,4 @@
-id: feature-search-entity
+﻿id: feature-search-entity
 version: 1.0.0
 name: Search Entity Feature Slice
 category: feature-slice
@@ -88,10 +88,10 @@ file_structure: |
   ├── Search{Entity}sQuery.cs              # Query定義
   └── Search{Entity}sQueryHandler.cs       # Handler実装
 
-  src/Application/Shared/{BoundedContext}/Application/DTOs/
+  src/Application/Infrastructure/{BoundedContext}/Application/DTOs/
   └── {Entity}Dto.cs                       # DTO定義
 
-  src/Application/Shared/{BoundedContext}/UI/
+  src/Application/Infrastructure/{BoundedContext}/UI/
   ├── Store/
   │   ├── {Entity}sState.cs                # 一覧状態（検索結果含む）
   │   └── {Entity}sStore.cs                # 状態管理+I/O
@@ -368,9 +368,9 @@ evidence:
     query: "src/Application/Features/SearchProducts/SearchProductsQuery.cs"
     handler: "src/Application/Features/SearchProducts/SearchProductsQueryHandler.cs"
   ui_layer:
-    store_state: "src/Application/Shared/ProductCatalog/UI/Store/ProductsState.cs"
-    store: "src/Application/Shared/ProductCatalog/UI/Store/ProductsStore.cs"
-    page_actions: "src/Application/Shared/ProductCatalog/UI/Actions/ProductListActions.cs"
+    store_state: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsState.cs"
+    store: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsStore.cs"
+    page_actions: "src/Application/Infrastructure/ProductCatalog/UI/Actions/ProductListActions.cs"
   tests:
     test_file: "未実装 - 今後の実装予定"
 

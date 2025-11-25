@@ -1,4 +1,4 @@
-id: concurrency-control
+﻿id: concurrency-control
 version: 1.0.0
 name: ConcurrencyControl
 category: infrastructure-pattern
@@ -50,7 +50,7 @@ optimistic_locking:
       }
 
   ef_configuration:
-    file_path: "src/Application/Shared/{BC}/Infrastructure/Persistence/Configurations/{Entity}Configuration.cs"
+    file_path: "src/Application/Infrastructure/{BC}/Infrastructure/Persistence/Configurations/{Entity}Configuration.cs"
     template: |
       public class {Entity}Configuration : IEntityTypeConfiguration<{Entity}>
       {

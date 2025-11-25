@@ -1,4 +1,4 @@
-id: feature-delete-entity
+﻿id: feature-delete-entity
 version: 1.0.0
 name: Delete Entity Feature Slice
 category: feature-slice
@@ -79,7 +79,7 @@ file_structure: |
   src/Domain/{BoundedContext}/{Entity}s/
   └── {Entity}.cs                            # Delete() メソッドを追加
 
-  src/Application/Shared/{BoundedContext}/UI/
+  src/Application/Infrastructure/{BoundedContext}/UI/
   ├── Store/{Entity}ListStore.cs            # 削除アクション追加
   └── Actions/{Entity}ListActions.cs        # 削除手順追加
 
@@ -227,7 +227,7 @@ implementation:
 
   # ===== UI Layer =====
   store:
-    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}ListStore.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}ListStore.cs"
     template: |
       using MediatR;
       using Microsoft.Extensions.DependencyInjection;
@@ -284,7 +284,7 @@ implementation:
       }
 
   actions:
-    file_path: "src/Application/Shared/{BoundedContext}/UI/Actions/{Entity}ListActions.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Actions/{Entity}ListActions.cs"
     template: |
       using Microsoft.Extensions.Logging;
       using {BoundedContext}.Shared.UI.Store;

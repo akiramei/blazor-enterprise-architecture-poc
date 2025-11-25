@@ -1,4 +1,4 @@
-id: complex-query-service
+﻿id: complex-query-service
 version: 1.0.0
 name: ComplexQueryService
 category: query-pattern
@@ -16,21 +16,21 @@ description: |
   - 動的な検索条件の組み合わせ
 
   ## 配置場所
-  - `src/Application/Shared/{BC}/Application/Queries/` にインターフェース
-  - `src/Application/Shared/{BC}/Infrastructure/Persistence/` に実装
+  - `src/Application/Infrastructure/{BC}/Application/Queries/` にインターフェース
+  - `src/Application/Infrastructure/{BC}/Infrastructure/Persistence/` に実装
 
 preconditions:
   - "Dapper または EF Core が使用可能であること"
   - "IDbConnectionFactory が定義されていること（Dapper使用時）"
 
 structure:
-  interface: "src/Application/Shared/{BC}/Application/Queries/I{Entity}QueryService.cs"
-  implementation: "src/Application/Shared/{BC}/Infrastructure/Persistence/{Entity}QueryService.cs"
-  dto: "src/Application/Shared/{BC}/Application/DTOs/{Result}Dto.cs"
+  interface: "src/Application/Infrastructure/{BC}/Application/Queries/I{Entity}QueryService.cs"
+  implementation: "src/Application/Infrastructure/{BC}/Infrastructure/Persistence/{Entity}QueryService.cs"
+  dto: "src/Application/Infrastructure/{BC}/Application/DTOs/{Result}Dto.cs"
 
 implementation:
   interface:
-    file_path: "src/Application/Shared/{BC}/Application/Queries/I{Entity}QueryService.cs"
+    file_path: "src/Application/Infrastructure/{BC}/Application/Queries/I{Entity}QueryService.cs"
     template: |
       namespace {BoundedContext}.Shared.Application.Queries;
 
@@ -49,7 +49,7 @@ implementation:
 
   dapper_implementation:
     description: "Dapper を使用した実装（推奨：複雑なクエリ向け）"
-    file_path: "src/Application/Shared/{BC}/Infrastructure/Persistence/{Entity}QueryService.cs"
+    file_path: "src/Application/Infrastructure/{BC}/Infrastructure/Persistence/{Entity}QueryService.cs"
     template: |
       using Dapper;
 
@@ -298,7 +298,7 @@ ai_guidance:
       solution: "読み取り専用クエリはトランザクション外で実行可能"
 
 evidence:
-  existing_implementation: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/DapperProductReadRepository.cs"
+  existing_implementation: "src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Repositories/DapperProductReadRepository.cs"
   note: "既存のReadRepositoryをQueryServiceパターンとして拡張"
 
 changelog:

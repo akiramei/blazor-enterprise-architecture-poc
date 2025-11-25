@@ -1,4 +1,4 @@
-id: query-service-pattern
+﻿id: query-service-pattern
 version: 1.0.0
 name: Query Service Pattern (CQRS Query Side)
 category: query-pattern
@@ -82,7 +82,7 @@ design_principle: |
   - インターフェース経由でテスト可能
 
 file_structure: |
-  src/Application/Shared/{BoundedContext}/
+  src/Application/Infrastructure/{BoundedContext}/
   ├── Application/Queries/
   │   └── I{BoundedContext}QueryService.cs   # インターフェース
   └── Infrastructure/Persistence/
@@ -91,7 +91,7 @@ file_structure: |
 implementation:
   # ===== Interface =====
   interface:
-    file_path: "src/Application/Shared/{BoundedContext}/Application/Queries/I{BoundedContext}QueryService.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/Application/Queries/I{BoundedContext}QueryService.cs"
     template: |
       using Domain.{BoundedContext}.{Aggregate}s;
 
@@ -137,7 +137,7 @@ implementation:
 
   # ===== Implementation =====
   service:
-    file_path: "src/Application/Shared/{BoundedContext}/Infrastructure/Persistence/{BoundedContext}QueryService.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/Infrastructure/Persistence/{BoundedContext}QueryService.cs"
     template: |
       using Application.Shared.{BoundedContext}.Application.Queries;
       using Domain.{BoundedContext}.{Aggregate}s;
@@ -258,7 +258,7 @@ implementation:
 
   # ===== Filter Criteria =====
   filter_criteria:
-    file_path: "src/Application/Shared/{BoundedContext}/Application/Queries/{Aggregate}FilterCriteria.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/Application/Queries/{Aggregate}FilterCriteria.cs"
     template: |
       using Domain.{BoundedContext}.{Aggregate}s;
 

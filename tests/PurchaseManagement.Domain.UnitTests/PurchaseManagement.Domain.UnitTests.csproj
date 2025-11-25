@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PurchaseManagement\Shared\Domain\PurchaseManagement.Shared.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Shared\Kernel\Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Kernel\Kernel.csproj" />
   </ItemGroup>
 
   <ItemGroup>

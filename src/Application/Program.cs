@@ -241,14 +241,14 @@ builder.Services.AddScoped<ProductsStore>();
 builder.Services.AddScoped<ProductDetailStore>();
 builder.Services.AddScoped<ProductEditStore>();
 builder.Services.AddScoped<ProductSearchStore>();
-builder.Services.AddScoped<Application.Shared.Account.UI.Store.SecuritySettingsStore>();
+builder.Services.AddScoped<Application.Infrastructure.Account.UI.Store.SecuritySettingsStore>();
 
 // Actions (Scoped for Blazor Server circuits)
 builder.Services.AddScoped<ProductListActions>();
 builder.Services.AddScoped<ProductDetailActions>();
 builder.Services.AddScoped<ProductEditActions>();
 builder.Services.AddScoped<ProductSearchActions>();
-builder.Services.AddScoped<Application.Shared.Account.UI.Actions.SecuritySettingsActions>();
+builder.Services.AddScoped<Application.Infrastructure.Account.UI.Actions.SecuritySettingsActions>();
 
 // Outbox Background Service (Outbox Patternによる統合イベント配信)
 builder.Services.AddHostedService<Shared.Infrastructure.Platform.OutboxBackgroundService>();

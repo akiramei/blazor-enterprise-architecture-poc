@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shared.Infrastructure.Services;
 
-namespace Application.Shared.Account.UI.Store;
+namespace Application.Infrastructure.Account.UI.Store;
 
 /// <summary>
 /// セキュリティ設定（2FA）の状態管理とI/O実行

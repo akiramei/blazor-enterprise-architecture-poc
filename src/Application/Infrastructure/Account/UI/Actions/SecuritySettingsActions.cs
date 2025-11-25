@@ -1,12 +1,12 @@
 using Application.Features.Disable2FA;
 using Application.Features.Enable2FA;
 using Application.Features.Verify2FA;
-using Application.Shared.Account.UI.Store;
+using Application.Infrastructure.Account.UI.Store;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Application.Shared.Account.UI.Actions;
+namespace Application.Infrastructure.Account.UI.Actions;
 
 /// <summary>
 /// セキュリティ設定（2FA）画面のUI手順を管理

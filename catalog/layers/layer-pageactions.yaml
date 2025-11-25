@@ -1,4 +1,4 @@
-id: layer-pageactions
+﻿id: layer-pageactions
 version: 1.0.0
 name: PageActions Pattern (UI Procedures Orchestration)
 category: layer-element
@@ -22,7 +22,7 @@ comparison:
   redux: "Action Creators"
 
 implementation:
-  file_path: "src/Application/Shared/{BoundedContext}/UI/Actions/{Entity}{Operation}Actions.cs"
+  file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Actions/{Entity}{Operation}Actions.cs"
   template: |
     using Microsoft.Extensions.Logging;
     using MediatR;
@@ -186,7 +186,7 @@ ai_guidance:
       solution: "確認ダイアログはPageActionsで表示。StoreはI/Oのみ"
 
 evidence:
-  implementation: "src/Application/Shared/ProductCatalog/UI/Actions/ProductListActions.cs"
+  implementation: "src/Application/Infrastructure/ProductCatalog/UI/Actions/ProductListActions.cs"
   test_file: "未実装 - 今後の実装予定"
 
 changelog:

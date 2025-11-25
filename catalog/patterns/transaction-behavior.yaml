@@ -1,4 +1,4 @@
-id: transaction-behavior
+﻿id: transaction-behavior
 version: 2.0.0
 name: TransactionBehavior
 category: pipeline-behavior
@@ -47,7 +47,7 @@ preconditions:
   - "OutboxMessages DbSet が定義されている"
 
 implementation:
-  file_path: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
+  file_path: "src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
   namespace: "ProductCatalog.Shared.Infrastructure.Persistence.Behaviors"
   template: |
     using System.Text.Json;
@@ -286,7 +286,7 @@ ai_guidance:
     このBehaviorはBounded Context固有の実装です。
 
     現在の実装:
-    - ProductCatalog: src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs
+    - ProductCatalog: src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs
     - PurchaseManagement: 同様の実装が存在（各Bounded Contextが独立）
 
     各Bounded Contextは独自のDbContextとOutbox実装を持ち、
@@ -310,6 +310,6 @@ changelog:
       - "初版リリース"
 
 evidence:
-  implementation_file: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
+  implementation_file: "src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
   test_file: "未実装 - 今後の実装予定"
   outbox_entity: "src/Shared/Domain/Outbox/OutboxMessage.cs"

@@ -1,4 +1,4 @@
-id: command-create
+﻿id: command-create
 version: 1.0.0
 name: CreateCommand Pattern
 category: command-pattern
@@ -290,4 +290,4 @@ evidence:
   validator: "未実装 - FluentValidationは使用していない"
   domain_entity: "src/Domain/ProductCatalog/Products/Product.cs"
   repository_interface: "src/Domain/ProductCatalog/Products/IProductRepository.cs"
-  repository_implementation: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Repositories/EfProductRepository.cs"
+  repository_implementation: "src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Repositories/EfProductRepository.cs"

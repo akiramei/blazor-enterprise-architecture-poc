@@ -1,4 +1,4 @@
-id: query-get-list
+﻿id: query-get-list
 version: 1.0.0
 name: GetListQuery Pattern
 category: query-pattern
@@ -126,7 +126,7 @@ file_structure: |
   src/Application/Features/Get{Entity}s/
   ├── Get{Entity}sQuery.cs           # Query定義 + Handler実装
 
-  src/Application/Shared/{BoundedContext}/Application/DTOs/
+  src/Application/Infrastructure/{BoundedContext}/Application/DTOs/
   └── {Entity}Dto.cs                 # DTO定義
 
   src/Application/Core/Queries/
@@ -215,6 +215,6 @@ changelog:
 evidence:
   query: "src/Application/Features/GetProducts/GetProductsQuery.cs"
   handler: "src/Application/Features/GetProducts/GetProductsQueryHandler.cs"
-  dto: "src/Application/Shared/ProductCatalog/Application/DTOs/ProductDto.cs"
-  read_repository_interface: "src/Application/Shared/ProductCatalog/Application/IProductReadRepository.cs"
-  read_repository_implementation: "src/Application/Shared/ProductCatalog/Infrastructure/Persistence/Repositories/DapperProductReadRepository.cs"
+  dto: "src/Application/Infrastructure/ProductCatalog/Application/DTOs/ProductDto.cs"
+  read_repository_interface: "src/Application/Infrastructure/ProductCatalog/Application/IProductReadRepository.cs"
+  read_repository_implementation: "src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Repositories/DapperProductReadRepository.cs"

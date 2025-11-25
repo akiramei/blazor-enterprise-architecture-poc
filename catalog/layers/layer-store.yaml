@@ -1,4 +1,4 @@
-id: layer-store
+﻿id: layer-store
 version: 1.0.0
 name: Store Pattern (State Management + I/O)
 category: layer-element
@@ -23,7 +23,7 @@ comparison:
 
 implementation:
   state:
-    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}{Operation}State.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}{Operation}State.cs"
     template: |
       using System.Collections.Immutable;
 
@@ -49,7 +49,7 @@ implementation:
       }
 
   store:
-    file_path: "src/Application/Shared/{BoundedContext}/UI/Store/{Entity}{Operation}Store.cs"
+    file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}{Operation}Store.cs"
     template: |
       using System.Collections.Concurrent;
       using System.Collections.Immutable;
@@ -277,8 +277,8 @@ ai_guidance:
       solution: "IServiceScopeFactoryを使ってスコープ管理"
 
 evidence:
-  implementation: "src/Application/Shared/ProductCatalog/UI/Store/ProductsStore.cs"
-  state: "src/Application/Shared/ProductCatalog/UI/Store/ProductsState.cs"
+  implementation: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsStore.cs"
+  state: "src/Application/Infrastructure/ProductCatalog/UI/Store/ProductsState.cs"
   test_file: "未実装 - 今後の実装予定"
 
 changelog:
