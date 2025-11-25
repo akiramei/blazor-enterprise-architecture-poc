@@ -15,7 +15,7 @@ if (-not (Test-Path "./catalog/index.json")) {
     exit 1
 }
 
-$catalogIndex = Get-Content "./catalog/index.json" -Raw | ConvertFrom-Json
+$catalogIndex = Get-Content "./catalog/index.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 Write-Host "✓ catalog/index.json を読み込みました" -ForegroundColor Green
 
 # バージョンチェック

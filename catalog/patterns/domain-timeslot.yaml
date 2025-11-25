@@ -1,0 +1,248 @@
+id: domain-timeslot
+version: 1.0.0
+name: TimeSlot Value Object Pattern
+category: domain-pattern
+intent: 時間枠（半開区間）を値オブジェクトとして抽象化し、重複判定を統一
+description: |
+  予約システム、シフト管理、イベントスケジュールなどで使用する
+  時間枠（開始時刻〜終了時刻）を値オブジェクトとして実装。
+
+  半開区間 [StartTime, EndTime) として扱うことで、
+  連続した時間枠が重複しない（10:00-11:00 と 11:00-12:00 は重複しない）。
+
+use_cases:
+  - "会議室予約システム"
+  - "シフト管理"
+  - "イベントスケジューラー"
+  - "貸出管理"
+  - "施設利用予約"
+  - "診察予約"
+
+implementation:
+  file_path: "src/Domain/{BoundedContext}/{Aggregate}/TimeSlot.cs"
+  template: |
+    using {Kernel.Namespace};
+
+    namespace {BoundedContext}.Domain.{Aggregate};
+
+    /// <summary>
+    /// 時間枠（値オブジェクト）
+    /// 半開区間 [StartTime, EndTime) として扱う
+    /// </summary>
+    public sealed class TimeSlot : ValueObject
+    {
+        /// <summary>
+        /// 開始時刻
+        /// </summary>
+        public DateTime StartTime { get; }
+
+        /// <summary>
+        /// 終了時刻
+        /// </summary>
+        public DateTime EndTime { get; }
+
+        /// <summary>
+        /// 時間の長さ
+        /// </summary>
+        public TimeSpan Duration => EndTime - StartTime;
+
+        private TimeSlot(DateTime startTime, DateTime endTime)
+        {
+            StartTime = startTime;
+            EndTime = endTime;
+        }
+
+        /// <summary>
+        /// TimeSlotを作成（ビジネスルール検証付き）
+        /// </summary>
+        public static TimeSlot Create(DateTime startTime, DateTime endTime)
+        {
+            if (startTime >= endTime)
+                throw new DomainException("TIMESLOT_INVALID",
+                    "開始時刻は終了時刻より前である必要があります");
+
+            var duration = endTime - startTime;
+
+            // 最大時間のチェック（ドメインに応じて調整）
+            if (duration.TotalHours > 8)
+                throw new DomainException("TIMESLOT_TOO_LONG",
+                    "予約時間は最大8時間までです");
+
+            // 最小時間のチェック（ドメインに応じて調整）
+            if (duration.TotalMinutes < 15)
+                throw new DomainException("TIMESLOT_TOO_SHORT",
+                    "予約時間は最低15分必要です");
+
+            return new TimeSlot(startTime, endTime);
+        }
+
+        /// <summary>
+        /// 他の時間枠と重複するかどうかを判定
+        /// 半開区間 [StartTime, EndTime) として判定
+        ///
+        /// 【重複条件】
+        /// A.Start < B.End && B.Start < A.End
+        ///
+        /// 【例】
+        /// [10:00, 11:00) と [10:30, 11:30) → 重複する（true）
+        /// [10:00, 11:00) と [11:00, 12:00) → 重複しない（false）
+        /// </summary>
+        public bool OverlapsWith(TimeSlot other)
+        {
+            return StartTime < other.EndTime && other.StartTime < EndTime;
+        }
+
+        /// <summary>
+        /// 指定した期間内に完全に含まれるかどうか
+        /// </summary>
+        public bool IsWithinPeriod(DateTime from, DateTime to)
+        {
+            return StartTime >= from && EndTime <= to;
+        }
+
+        /// <summary>
+        /// 指定した期間と重なるかどうか（部分的な重複を含む）
+        /// </summary>
+        public bool IntersectsPeriod(DateTime from, DateTime to)
+        {
+            return StartTime < to && from < EndTime;
+        }
+
+        protected override IEnumerable<object?> GetEqualityComponents()
+        {
+            yield return StartTime;
+            yield return EndTime;
+        }
+
+        public override string ToString() =>
+            $"{StartTime:yyyy/MM/dd HH:mm} - {EndTime:HH:mm}";
+    }
+
+overlap_algorithm:
+  description: |
+    半開区間での重複判定アルゴリズム
+
+    2つの区間 A=[a1, a2) と B=[b1, b2) が重複する条件:
+    a1 < b2 && b1 < a2
+
+    これは以下の「重複しない条件」の否定:
+    - A が B の完全に前: a2 <= b1
+    - A が B の完全に後: b2 <= a1
+    → 重複しない: a2 <= b1 || b2 <= a1
+    → 重複する: !(a2 <= b1 || b2 <= a1) = a2 > b1 && b2 > a1 = a1 < b2 && b1 < a2
+
+  examples:
+    - case: "[10:00, 11:00) と [10:30, 11:30)"
+      a1: "10:00"
+      a2: "11:00"
+      b1: "10:30"
+      b2: "11:30"
+      check: "10:00 < 11:30 && 10:30 < 11:00 = true && true = true（重複）"
+
+    - case: "[10:00, 11:00) と [11:00, 12:00)"
+      a1: "10:00"
+      a2: "11:00"
+      b1: "11:00"
+      b2: "12:00"
+      check: "10:00 < 12:00 && 11:00 < 11:00 = true && false = false（重複なし）"
+
+example_usage: |
+  // 予約エンティティでの使用例
+  public sealed class Booking : AggregateRoot<BookingId>
+  {
+      public RoomId RoomId { get; private set; }
+      public TimeSlot TimeSlot { get; private set; }
+      public BookingStatus Status { get; private set; }
+
+      /// <summary>
+      /// 他の予約と競合するかどうかを判定
+      /// </summary>
+      public bool ConflictsWith(Booking other)
+      {
+          // キャンセル済みは競合しない
+          if (Status != BookingStatus.Confirmed ||
+              other.Status != BookingStatus.Confirmed)
+              return false;
+
+          // 異なる会議室は競合しない
+          if (RoomId != other.RoomId)
+              return false;
+
+          // 同じ予約は競合しない
+          if (Id == other.Id)
+              return false;
+
+          // 時間枠の重複チェック
+          return TimeSlot.OverlapsWith(other.TimeSlot);
+      }
+  }
+
+  // Repositoryでの重複チェック
+  public interface IBookingRepository
+  {
+      Task<bool> HasOverlappingBookingAsync(
+          RoomId roomId,
+          TimeSlot timeSlot,
+          BookingId? excludeBookingId = null,
+          CancellationToken ct = default);
+  }
+
+  // Boundary Serviceでの使用
+  public async Task<BoundaryDecision> CanCreateBookingAsync(
+      RoomId roomId, TimeSlot timeSlot, CancellationToken ct)
+  {
+      var hasOverlap = await _bookingRepository
+          .HasOverlappingBookingAsync(roomId, timeSlot, null, ct);
+
+      if (hasOverlap)
+          return BoundaryDecision.Denied("BOOKING_OVERLAP",
+              "指定した時間帯には既に予約があります");
+
+      return BoundaryDecision.Allowed();
+  }
+
+ai_guidance:
+  when_to_use:
+    - "予約システムで時間帯の重複チェックが必要な場合"
+    - "シフト管理で勤務時間の重複を防ぐ場合"
+    - "イベントスケジュールで時間帯を扱う場合"
+    - "貸出管理で期間の重複を判定する場合"
+
+  when_not_to_use:
+    - "日付のみ（時刻なし）で十分な場合"
+    - "開始/終了が不要な瞬間的なイベント"
+
+  common_mistakes:
+    - mistake: "閉区間 [StartTime, EndTime] として実装"
+      solution: "半開区間 [StartTime, EndTime) を使用。連続する時間枠が重複しない"
+      severity: "high"
+
+    - mistake: "DateTime の比較で等号を含める"
+      solution: "< のみを使用（StartTime < other.EndTime && other.StartTime < EndTime）"
+      severity: "high"
+
+    - mistake: "タイムゾーンを考慮しない"
+      solution: "DateTime.Kind を統一するか、DateTimeOffset を使用"
+      severity: "medium"
+
+related_patterns:
+  - id: "domain-validation-service"
+    relationship: "used-by"
+    description: "重複チェックはドメインサービスで実行"
+  - id: "boundary-pattern"
+    relationship: "used-by"
+    description: "予約可否判定でTimeSlotを使用"
+  - id: "concurrency-control"
+    relationship: "complements"
+    description: "DBレベルでの重複防止と組み合わせ"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版リリース"
+      - "Reserve（会議室予約システム）からパターン抽出"
+
+evidence:
+  reference_implementation: "Reserve: src/Domain/RoomReservation/Bookings/TimeSlot.cs"
+  usage_example: "Reserve: src/Domain/RoomReservation/Bookings/Booking.cs"

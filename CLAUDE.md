@@ -77,17 +77,45 @@ services.AddScoped<IProductRepository, ProductRepository>();
 
 ## 🎯 パターン選択の早見表
 
-| ユーザーの要求 | 選択パターン | カテゴリ |
-|---------------|-------------|---------|
-| 「〇〇を作成する機能」 | `feature-create-entity` | feature-slice |
-| 「〇〇を検索する画面」 | `feature-search-entity` | feature-slice |
-| 「〇〇を編集できるように」 | `feature-update-entity` | feature-slice |
-| 「〇〇を削除する」 | `feature-delete-entity` | feature-slice |
-| 「CSVインポート」 | `feature-import-csv` | feature-slice |
-| 「CSVエクスポート」 | `feature-export-csv` | feature-slice |
-| 「承認ワークフロー」 | `feature-approval-workflow` | feature-slice |
-| 「すべてのCommandに〇〇」 | pipeline-behavior | pipeline-behavior |
-| 「状態管理」 | `layer-store` | layer-element |
+### 機能スライス（Feature Slices）
+
+| ユーザーの要求 | 選択パターン |
+|---------------|-------------|
+| 「〇〇を作成する機能」 | `feature-create-entity` |
+| 「〇〇を検索する画面」 | `feature-search-entity` |
+| 「〇〇を編集できるように」 | `feature-update-entity` |
+| 「〇〇を削除する」 | `feature-delete-entity` |
+| 「CSVインポート」 | `feature-import-csv` |
+| 「CSVエクスポート」 | `feature-export-csv` |
+| 「承認ワークフロー」 | `feature-approval-workflow` |
+| 「ログイン・認証」 | `feature-authentication` |
+
+### クエリパターン（Query Patterns）
+
+| ユーザーの要求 | 選択パターン |
+|---------------|-------------|
+| 「一覧を取得」 | `query-get-list` |
+| 「IDで詳細を取得」 | `query-get-by-id` |
+| 「今日/今週/期間で取得」 | `query-get-by-period` |
+| 「空き検索・NOT EXISTS」 | `complex-query-service` |
+
+### ドメインパターン（Domain Patterns）
+
+| ユーザーの要求 | 選択パターン |
+|---------------|-------------|
+| 「時間枠・予約時間の管理」 | `domain-timeslot` |
+| 「型安全ID（BookingId等）」 | `domain-typed-id` |
+| 「重複チェック・在庫確認」 | `domain-validation-service` |
+| 「状態遷移の管理」 | `domain-state-machine` |
+| 「操作可否の判定」 | `boundary-pattern` |
+
+### 横断的関心事（Pipeline Behaviors）
+
+| ユーザーの要求 | 選択パターン |
+|---------------|-------------|
+| 「すべてのCommandに〇〇」 | 各 `*-behavior` |
+| 「キャッシュで高速化」 | `caching-behavior` |
+| 「状態管理」 | `layer-store` |
 
 **判断に迷った場合**: `feature-slice` をデフォルトで選択
 
@@ -163,6 +191,7 @@ src/
 | 100 | ValidationBehavior | 入力検証（FluentValidation） |
 | 200 | AuthorizationBehavior | 認可チェック |
 | 300 | IdempotencyBehavior | 冪等性保証（beta） |
+| 350 | CachingBehavior | Query結果キャッシュ |
 | 400 | TransactionBehavior | トランザクション + SaveChangesAsync |
 | 550 | AuditLogBehavior | 監査ログ |
 | 600 | LoggingBehavior | リクエストログ |
@@ -179,5 +208,5 @@ src/
 
 ---
 
-**カタログバージョン**: v2025.11.24
-**最終更新**: 2025-11-24
+**カタログバージョン**: v2025.11.25b
+**最終更新**: 2025-11-25

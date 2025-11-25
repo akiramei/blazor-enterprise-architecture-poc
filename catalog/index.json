@@ -1,6 +1,6 @@
 {
   "$schema": "../patterns.manifest.schema.json",
-  "version": "v2025.11.25",
+  "version": "v2025.11.25b",
   "last_updated": "2025-11-25",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
@@ -463,6 +463,36 @@
       "intent": "複合条件クエリを専用サービスとして実装（NOT EXISTS/空き検索、複数テーブル結合、未割当検索など）",
       "tags": ["query", "dapper", "complex-query", "available-search", "not-exists", "unassigned", "vacancy"],
       "stability": "stable"
+    },
+    {
+      "id": "domain-timeslot",
+      "name": "TimeSlot Value Object Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-timeslot.yaml",
+      "intent": "時間枠（半開区間）を値オブジェクトとして抽象化し、重複判定を統一",
+      "tags": ["value-object", "time-slot", "booking", "reservation", "overlap", "half-open-interval"],
+      "stability": "stable"
+    },
+    {
+      "id": "domain-typed-id",
+      "name": "Typed ID Value Object Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-typed-id.yaml",
+      "intent": "集約固有の強型付けIDで型安全性を確保し、ID取り違えを防止",
+      "tags": ["value-object", "typed-id", "aggregate-id", "type-safety", "guid"],
+      "stability": "stable"
+    },
+    {
+      "id": "query-get-by-period",
+      "name": "GetByPeriodQuery Pattern",
+      "category": "query-pattern",
+      "version": "1.0.0",
+      "file": "patterns/query-get-by-period.yaml",
+      "intent": "期間（日付範囲）を指定してエンティティを取得するクエリパターン",
+      "tags": ["query", "cqrs", "period", "date-range", "calendar", "schedule", "booking"],
+      "stability": "stable"
     }
   ],
   "recommended_combinations": [
@@ -602,6 +632,40 @@
           "注文の詳細画面を作成してください → query-get-by-id"
         ],
         "decision_rule": "ID指定の単一取得は query-get-by-id"
+      },
+      "期間検索・日付範囲取得": {
+        "pattern_category": "query-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["期間", "日付範囲", "今日", "今週", "今月", "From〜To", "カレンダー", "スケジュール", "履歴"],
+        "examples": [
+          "今日の予約一覧を表示してください → query-get-by-period",
+          "今週のシフトを取得してください → query-get-by-period",
+          "日付範囲で売上履歴を検索してください → query-get-by-period",
+          "カレンダー表示用にイベントを取得してください → query-get-by-period"
+        ],
+        "decision_rule": "日付/期間を指定してデータを取得する場合は query-get-by-period"
+      },
+      "時間枠・予約時間管理": {
+        "pattern_category": "domain-pattern",
+        "confidence": 0.95,
+        "trigger_keywords": ["時間枠", "タイムスロット", "時間帯", "開始時刻", "終了時刻", "重複チェック", "ダブルブッキング", "予約時間"],
+        "examples": [
+          "予約の時間枠を管理してください → domain-timeslot",
+          "時間帯の重複をチェックしてください → domain-timeslot + domain-validation-service",
+          "シフトの時間枠を定義してください → domain-timeslot"
+        ],
+        "decision_rule": "開始/終了時刻を持つ時間枠の抽象化は domain-timeslot"
+      },
+      "型安全ID・集約ID": {
+        "pattern_category": "domain-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["ID型", "強型付け", "型安全", "GuidをラップしてID", "取り違え防止", "集約ID"],
+        "examples": [
+          "BookingIdとRoomIdを区別してください → domain-typed-id",
+          "IDの取り違えを防止してください → domain-typed-id",
+          "型安全なIDを作成してください → domain-typed-id"
+        ],
+        "decision_rule": "集約ごとに専用のID型が必要な場合は domain-typed-id"
       }
     },
     "selection_algorithm": {
@@ -621,9 +685,31 @@
       "3. catalog/index.json から該当パターンを検索",
       "4. パターンの YAML ファイルを読み込み",
       "5. ai_selection_hints で最終確認",
-      "6. テンプレートを実際のエンティティ名で置換",
-      "7. 生成されたコードを提示"
+      "6. ★ domain_hints でドメイン固有の推奨パターンを確認",
+      "7. テンプレートを実際のエンティティ名で置換",
+      "8. 生成されたコードを提示"
     ],
+    "domain_hints_usage": {
+      "description": "Feature Sliceにはdomain_hintsが含まれ、ドメインに応じた追加パターンを自動推奨します",
+      "flow": [
+        "1. Feature Sliceを選択（例: feature-create-entity）",
+        "2. ユーザーの要求からドメインキーワードを抽出（例: 予約、会議室）",
+        "3. domain_hints.trigger_keywords でマッチするドメインを特定",
+        "4. recommended_patterns の各パターンも合わせて適用"
+      ],
+      "example": {
+        "user_request": "会議室予約の作成機能を実装して",
+        "primary_pattern": "feature-create-entity",
+        "detected_domain": "予約・スケジュール系",
+        "additional_patterns": [
+          "domain-timeslot（時間枠の抽象化）",
+          "domain-typed-id（BookingId, RoomIdの型安全性）",
+          "domain-validation-service（重複チェック）",
+          "query-get-by-period（期間での検索）",
+          "concurrency-control（同時予約防止）"
+        ]
+      }
+    },
     "template_variables": {
       "EntityPascalCase": "エンティティ名（PascalCase）例: Product, Order, Customer",
       "EntityCamelCase": "エンティティ名（camelCase）例: product, order, customer",

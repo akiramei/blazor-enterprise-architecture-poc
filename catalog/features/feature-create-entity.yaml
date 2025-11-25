@@ -574,6 +574,88 @@ ai_guidance:
     - mistake: "IdempotencyKeyを毎回新しく生成する"
       solution: "画面表示時に1回だけ生成し、再試行時は同じ値を使う"
 
+  # ===== ドメイン別推奨パターン =====
+  # AIがスライス選択時に、ドメインに応じて関連パターンを自動で引き連れる
+  domain_hints:
+    予約・スケジュール系:
+      description: "会議室予約、シフト管理、イベント予約など時間枠を扱うドメイン"
+      trigger_keywords:
+        - "予約"
+        - "会議室"
+        - "シフト"
+        - "スケジュール"
+        - "カレンダー"
+        - "イベント"
+        - "アポイント"
+        - "診察"
+        - "貸出"
+      recommended_patterns:
+        - id: domain-timeslot
+          reason: "開始/終了時刻を持つ時間枠の抽象化"
+        - id: domain-typed-id
+          reason: "BookingId, RoomId など集約IDの型安全性"
+        - id: domain-validation-service
+          reason: "時間枠の重複チェック（ダブルブッキング防止）"
+        - id: query-get-by-period
+          reason: "今日/今週/今月の予約一覧取得"
+        - id: concurrency-control
+          reason: "同時予約時の競合防止"
+
+    在庫・引当系:
+      description: "商品在庫、座席割当、リソース確保など数量管理を扱うドメイン"
+      trigger_keywords:
+        - "在庫"
+        - "引当"
+        - "残高"
+        - "割当"
+        - "確保"
+        - "予約数"
+        - "残数"
+        - "定員"
+      recommended_patterns:
+        - id: domain-validation-service
+          reason: "在庫確認・引当可否チェック"
+        - id: concurrency-control
+          reason: "同時引当時の競合防止（楽観的/悲観的ロック）"
+        - id: domain-typed-id
+          reason: "ProductId, WarehouseId など集約IDの型安全性"
+
+    承認・ワークフロー系:
+      description: "稟議、申請承認、レビューなど状態遷移を伴うドメイン"
+      trigger_keywords:
+        - "承認"
+        - "稟議"
+        - "申請"
+        - "ワークフロー"
+        - "レビュー"
+        - "却下"
+        - "差戻"
+      recommended_patterns:
+        - id: domain-state-machine
+          reason: "承認状態の遷移管理（不正遷移防止）"
+        - id: domain-approval-history
+          reason: "承認履歴の記録・追跡"
+        - id: boundary-pattern
+          reason: "承認可否の判定ロジック"
+        - id: domain-typed-id
+          reason: "RequestId, ApproverId など集約IDの型安全性"
+
+    マスタ・カタログ系:
+      description: "商品マスタ、顧客マスタなど基本的なCRUDドメイン"
+      trigger_keywords:
+        - "マスタ"
+        - "カタログ"
+        - "商品"
+        - "顧客"
+        - "ユーザー"
+        - "カテゴリ"
+        - "設定"
+      recommended_patterns:
+        - id: domain-typed-id
+          reason: "ProductId, CustomerId など集約IDの型安全性"
+        - id: caching-behavior
+          reason: "マスタデータのキャッシュによる高速化"
+
 evidence:
   application_layer:
     command: "src/Application/Features/CreateProduct/CreateProductCommand.cs"

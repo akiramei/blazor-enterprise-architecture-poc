@@ -363,6 +363,53 @@ ai_guidance:
     - mistake: "キャッシュキーが適切でない"
       solution: "すべての検索条件をキャッシュキーに含める"
 
+  # ===== ドメイン別推奨パターン =====
+  domain_hints:
+    予約・スケジュール系:
+      description: "予約一覧、カレンダー表示、シフト検索など"
+      trigger_keywords:
+        - "予約"
+        - "カレンダー"
+        - "スケジュール"
+        - "シフト"
+        - "今日"
+        - "今週"
+        - "今月"
+      recommended_patterns:
+        - id: query-get-by-period
+          reason: "日付範囲での検索（今日/今週/今月）"
+        - id: domain-timeslot
+          reason: "検索結果の時間枠表示・判定"
+        - id: complex-query-service
+          reason: "空き時間検索（NOT EXISTS）"
+
+    在庫・引当系:
+      description: "在庫一覧、空き検索、利用可能リソース検索"
+      trigger_keywords:
+        - "在庫"
+        - "空き"
+        - "利用可能"
+        - "残数"
+        - "未割当"
+      recommended_patterns:
+        - id: complex-query-service
+          reason: "在庫あり/なし検索、空き検索"
+        - id: caching-behavior
+          reason: "検索結果のキャッシュ（頻繁にアクセスされるため）"
+
+    マスタ・カタログ系:
+      description: "商品検索、顧客検索、マスタ一覧"
+      trigger_keywords:
+        - "商品"
+        - "顧客"
+        - "マスタ"
+        - "カタログ"
+      recommended_patterns:
+        - id: caching-behavior
+          reason: "マスタデータの検索結果キャッシュ"
+        - id: query-get-list
+          reason: "シンプルな全件取得（フィルタ不要時）"
+
 evidence:
   application_layer:
     query: "src/Application/Features/SearchProducts/SearchProductsQuery.cs"

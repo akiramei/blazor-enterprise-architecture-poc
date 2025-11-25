@@ -378,6 +378,51 @@ ai_guidance:
       - ストレージコスト削減が必要
       - テストデータのクリーンアップ
 
+  # ===== ドメイン別推奨パターン =====
+  domain_hints:
+    予約・スケジュール系:
+      description: "予約キャンセル、シフト削除など"
+      trigger_keywords:
+        - "予約"
+        - "キャンセル"
+        - "シフト"
+        - "取消"
+      recommended_patterns:
+        - id: domain-state-machine
+          reason: "キャンセル可能な状態かどうかの判定"
+        - id: boundary-pattern
+          reason: "キャンセル可否のビジネスルール判定"
+        - id: domain-validation-service
+          reason: "キャンセル時の関連データ整合性チェック"
+
+    承認・ワークフロー系:
+      description: "申請取下げ、承認フロー中断"
+      trigger_keywords:
+        - "申請"
+        - "取下げ"
+        - "却下"
+        - "中断"
+      recommended_patterns:
+        - id: domain-state-machine
+          reason: "削除可能な状態かの判定（承認済みは削除不可等）"
+        - id: domain-approval-history
+          reason: "削除/取下げ履歴の記録"
+        - id: boundary-pattern
+          reason: "削除可否の判定ロジック"
+
+    マスタ・カタログ系:
+      description: "商品削除、顧客削除、マスタデータ削除"
+      trigger_keywords:
+        - "商品"
+        - "顧客"
+        - "マスタ"
+        - "削除"
+      recommended_patterns:
+        - id: domain-validation-service
+          reason: "関連データの存在チェック（参照整合性）"
+        - id: caching-behavior
+          reason: "削除後のキャッシュ無効化"
+
 evidence:
   application_layer:
     command: "src/Application/Features/DeleteProduct/DeleteProductCommand.cs"

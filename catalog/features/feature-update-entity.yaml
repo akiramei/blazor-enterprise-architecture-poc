@@ -495,6 +495,52 @@ ai_guidance:
     - pattern: "CommandPipeline継承"
       description: "ValidationBehavior、TransactionBehavior等が自動適用される"
 
+  # ===== ドメイン別推奨パターン =====
+  domain_hints:
+    予約・スケジュール系:
+      description: "予約時間の変更、シフト変更など時間枠の更新"
+      trigger_keywords:
+        - "予約"
+        - "会議室"
+        - "シフト"
+        - "スケジュール"
+        - "日時変更"
+      recommended_patterns:
+        - id: domain-timeslot
+          reason: "変更後の時間枠の妥当性検証"
+        - id: domain-validation-service
+          reason: "変更後の重複チェック（ダブルブッキング防止）"
+        - id: concurrency-control
+          reason: "同時更新時の競合防止（楽観的ロック必須）"
+
+    在庫・引当系:
+      description: "在庫数の変更、引当数の調整"
+      trigger_keywords:
+        - "在庫"
+        - "数量変更"
+        - "引当"
+        - "調整"
+      recommended_patterns:
+        - id: domain-validation-service
+          reason: "変更後の在庫整合性チェック"
+        - id: concurrency-control
+          reason: "同時更新による在庫不整合防止"
+
+    承認・ワークフロー系:
+      description: "申請内容の修正、承認ステータスの変更"
+      trigger_keywords:
+        - "承認"
+        - "申請修正"
+        - "ステータス変更"
+        - "差戻"
+      recommended_patterns:
+        - id: domain-state-machine
+          reason: "状態遷移の妥当性検証"
+        - id: boundary-pattern
+          reason: "変更可能かどうかの判定"
+        - id: domain-approval-history
+          reason: "変更履歴の記録"
+
 evidence:
   application_layer:
     command: "src/Application/Features/UpdateProduct/UpdateProductCommand.cs"

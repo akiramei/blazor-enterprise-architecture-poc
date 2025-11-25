@@ -1,0 +1,217 @@
+id: query-get-by-period
+version: 1.0.0
+name: GetByPeriodQuery Pattern
+category: query-pattern
+intent: 期間（日付範囲）を指定してエンティティを取得するクエリパターン
+description: |
+  開始日時と終了日時を指定して、その期間内のエンティティを取得。
+  予約、イベント、ログ、履歴など時系列データの取得に使用。
+
+  オプショナルなフィルタ条件を組み合わせることで、
+  柔軟な絞り込みが可能。
+
+use_cases:
+  - "予約一覧（今日/今週/今月の予約）"
+  - "売上履歴（期間指定）"
+  - "ログ検索（日付範囲）"
+  - "イベントカレンダー"
+  - "シフト表示（週次/月次）"
+
+implementation:
+  query:
+    file_path: "src/Application/Features/Get{Entity}sInPeriod/Get{Entity}sInPeriodQuery.cs"
+    template: |
+      using Shared.Application;
+      using Shared.Application.Interfaces;
+
+      namespace Application.Features.Get{Entity}sInPeriod;
+
+      /// <summary>
+      /// 期間内の{Entity}一覧取得Query
+      /// </summary>
+      public sealed record Get{Entity}sInPeriodQuery(
+          DateTime From,
+          DateTime To,
+          Guid? {ParentEntity}Id = null  // オプショナルフィルタ
+      ) : IQuery<Result<IReadOnlyList<{Entity}Dto>>>;
+
+  handler:
+    file_path: "src/Application/Features/Get{Entity}sInPeriod/Get{Entity}sInPeriodQueryHandler.cs"
+    template: |
+      using Application.Core.Queries;
+      using Shared.Application;
+
+      namespace Application.Features.Get{Entity}sInPeriod;
+
+      /// <summary>
+      /// 期間内の{Entity}一覧取得ハンドラー
+      /// </summary>
+      public sealed class Get{Entity}sInPeriodQueryHandler
+          : IQueryHandler<Get{Entity}sInPeriodQuery, Result<IReadOnlyList<{Entity}Dto>>>
+      {
+          private readonly I{Entity}ReadRepository _readRepository;
+
+          public Get{Entity}sInPeriodQueryHandler(I{Entity}ReadRepository readRepository)
+          {
+              _readRepository = readRepository;
+          }
+
+          public async Task<Result<IReadOnlyList<{Entity}Dto>>> Handle(
+              Get{Entity}sInPeriodQuery query,
+              CancellationToken ct)
+          {
+              var items = query.{ParentEntity}Id.HasValue
+                  ? await _readRepository.Get{Entity}sFor{ParentEntity}InPeriodAsync(
+                      {ParentEntity}Id.From(query.{ParentEntity}Id.Value),
+                      query.From,
+                      query.To,
+                      ct)
+                  : await _readRepository.Get{Entity}sInPeriodAsync(
+                      query.From,
+                      query.To,
+                      ct);
+
+              return Result.Success(items);
+          }
+      }
+
+  repository_interface: |
+    public interface I{Entity}ReadRepository
+    {
+        /// <summary>
+        /// 期間内の{Entity}を取得
+        /// </summary>
+        Task<IReadOnlyList<{Entity}Dto>> Get{Entity}sInPeriodAsync(
+            DateTime from,
+            DateTime to,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 特定の{ParentEntity}の期間内{Entity}を取得
+        /// </summary>
+        Task<IReadOnlyList<{Entity}Dto>> Get{Entity}sFor{ParentEntity}InPeriodAsync(
+            {ParentEntity}Id {parentEntity}Id,
+            DateTime from,
+            DateTime to,
+            CancellationToken ct = default);
+    }
+
+  dapper_implementation: |
+    public async Task<IReadOnlyList<{Entity}Dto>> Get{Entity}sInPeriodAsync(
+        DateTime from,
+        DateTime to,
+        CancellationToken ct = default)
+    {
+        const string sql = @"
+            SELECT
+                e.id AS Id,
+                e.title AS Title,
+                e.start_time AS StartTime,
+                e.end_time AS EndTime,
+                e.status AS Status
+            FROM {entities} e
+            WHERE e.start_time >= @From
+              AND e.start_time < @To
+              AND e.status = @ConfirmedStatus
+            ORDER BY e.start_time";
+
+        await using var connection = await _connectionFactory.CreateConnectionAsync();
+        var items = await connection.QueryAsync<{Entity}Dto>(sql, new
+        {
+            From = from,
+            To = to,
+            ConfirmedStatus = (int){Entity}Status.Confirmed
+        });
+
+        return items.ToList();
+    }
+
+example_usage: |
+  // 今日の予約を取得
+  var today = DateTime.Today;
+  var tomorrow = today.AddDays(1);
+  var result = await mediator.Send(new GetBookingsInPeriodQuery(today, tomorrow));
+
+  // 今週の特定会議室の予約を取得
+  var weekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+  var weekEnd = weekStart.AddDays(7);
+  var result = await mediator.Send(new GetBookingsInPeriodQuery(
+      weekStart,
+      weekEnd,
+      RoomId: roomId));
+
+  // 今月のすべての予約を取得
+  var monthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+  var monthEnd = monthStart.AddMonths(1);
+  var result = await mediator.Send(new GetBookingsInPeriodQuery(monthStart, monthEnd));
+
+period_handling:
+  description: |
+    期間の扱いについての注意点
+
+  half_open_interval: |
+    半開区間 [From, To) として扱う
+    - From: この時刻以降を含む（>=）
+    - To: この時刻より前まで（<）
+
+    例: [2024-01-01, 2024-01-02) は 1月1日の全データ
+
+  common_periods:
+    - name: "今日"
+      from: "DateTime.Today"
+      to: "DateTime.Today.AddDays(1)"
+
+    - name: "今週（日曜始まり）"
+      from: "DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek)"
+      to: "上記.AddDays(7)"
+
+    - name: "今月"
+      from: "new DateTime(now.Year, now.Month, 1)"
+      to: "上記.AddMonths(1)"
+
+ai_guidance:
+  when_to_use:
+    - "カレンダー表示で特定期間のデータが必要な場合"
+    - "レポート生成で期間指定が必要な場合"
+    - "履歴検索で日付範囲を指定する場合"
+    - "予約システムで特定日の予約一覧を表示する場合"
+
+  when_not_to_use:
+    - "単一エンティティの取得（query-get-by-id を使用）"
+    - "全件取得（query-get-list を使用）"
+    - "複雑な検索条件（feature-search-entity を使用）"
+
+  common_mistakes:
+    - mistake: "閉区間 [From, To] で実装"
+      solution: "半開区間 [From, To) を使用（To は含まない）"
+      severity: "medium"
+
+    - mistake: "タイムゾーンを考慮しない"
+      solution: "UTC で統一するか、ローカル時刻を明示的に扱う"
+      severity: "medium"
+
+    - mistake: "期間の検証をしない"
+      solution: "From < To を Validator で検証"
+      severity: "low"
+
+related_patterns:
+  - id: "query-get-list"
+    relationship: "extends"
+    description: "全件取得に期間フィルタを追加"
+  - id: "domain-timeslot"
+    relationship: "uses"
+    description: "TimeSlot の期間判定ロジックを活用"
+  - id: "caching-behavior"
+    relationship: "complements"
+    description: "短期間のクエリはキャッシュ効果が低い点に注意"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版リリース"
+      - "Reserve（会議室予約システム）からパターン抽出"
+
+evidence:
+  reference_implementation: "Reserve: src/Application/Features/GetBookingsInPeriod/"
+  repository_example: "Reserve: src/Application/Shared/RoomReservation/Persistence/BookingRepository.cs"

@@ -1,0 +1,183 @@
+id: domain-typed-id
+version: 1.0.0
+name: Typed ID Value Object Pattern
+category: domain-pattern
+intent: 集約固有の強型付けIDで型安全性を確保し、ID取り違えを防止
+description: |
+  Guid をそのまま使用する代わりに、集約ごとに専用のID型を定義。
+  コンパイル時に異なる集約のIDを取り違えることを防止。
+
+  例: BookingId と RoomId は両方 Guid だが、型が異なるため
+  メソッド引数で取り違えるとコンパイルエラーになる。
+
+benefits:
+  - "型安全性: BookingId と RoomId の取り違えをコンパイル時に検出"
+  - "意図の明確化: メソッドシグネチャが自己文書化される"
+  - "ファクトリ制御: ID生成ルールを一元管理"
+  - "暗黙的変換: 必要に応じて Guid への変換を許可"
+
+implementation:
+  file_path: "src/Domain/{BoundedContext}/{Aggregate}/{Entity}Id.cs"
+  template: |
+    using {Kernel.Namespace};
+
+    namespace {BoundedContext}.Domain.{Aggregate};
+
+    /// <summary>
+    /// {Entity}ID（値オブジェクト）
+    /// </summary>
+    public sealed class {Entity}Id : ValueObject
+    {
+        public Guid Value { get; }
+
+        public {Entity}Id(Guid value)
+        {
+            if (value == Guid.Empty)
+                throw new ArgumentException("{Entity}IDは空にできません", nameof(value));
+            Value = value;
+        }
+
+        /// <summary>
+        /// 新しいIDを生成
+        /// </summary>
+        public static {Entity}Id New() => new(Guid.NewGuid());
+
+        /// <summary>
+        /// 既存のGuidからIDを生成
+        /// </summary>
+        public static {Entity}Id From(Guid value) => new(value);
+
+        protected override IEnumerable<object?> GetEqualityComponents()
+        {
+            yield return Value;
+        }
+
+        /// <summary>
+        /// Guidへの暗黙的変換（APIレスポンス等で便利）
+        /// </summary>
+        public static implicit operator Guid({Entity}Id id) => id.Value;
+
+        public override string ToString() => Value.ToString();
+    }
+
+  ef_core_configuration: |
+    // Entity Framework Core での設定例
+    public class {Entity}Configuration : IEntityTypeConfiguration<{Entity}>
+    {
+        public void Configure(EntityTypeBuilder<{Entity}> builder)
+        {
+            builder.HasKey(e => e.Id);
+
+            builder.Property(e => e.Id)
+                .HasConversion(
+                    id => id.Value,           // {Entity}Id → Guid
+                    value => {Entity}Id.From(value))  // Guid → {Entity}Id
+                .IsRequired();
+        }
+    }
+
+example_usage: |
+  // 型安全な引数
+  public async Task<Booking?> GetBookingForRoom(
+      BookingId bookingId,  // ← RoomId を渡すとコンパイルエラー
+      RoomId roomId,        // ← BookingId を渡すとコンパイルエラー
+      CancellationToken ct)
+  {
+      var booking = await _repository.GetByIdAsync(bookingId, ct);
+      if (booking?.RoomId != roomId)
+          return null;
+      return booking;
+  }
+
+  // ファクトリでの新規ID生成
+  public static Booking Create(
+      RoomId roomId,
+      string title,
+      TimeSlot timeSlot)
+  {
+      return new Booking(
+          BookingId.New(),  // 新しいID生成
+          roomId,
+          title,
+          timeSlot);
+  }
+
+  // Command から ID 変換
+  public async Task<Result<BookingDto>> Handle(
+      GetBookingByIdQuery query,
+      CancellationToken ct)
+  {
+      var bookingId = BookingId.From(query.BookingId);  // Guid → BookingId
+      var booking = await _repository.GetByIdAsync(bookingId, ct);
+      // ...
+  }
+
+  // API レスポンスでの暗黙的変換
+  public record BookingCreatedResponse(Guid BookingId);
+
+  return new BookingCreatedResponse(booking.Id);  // BookingId → Guid（暗黙的）
+
+comparison:
+  without_typed_id: |
+    // 型安全でない例（Guid直接使用）
+    public async Task UpdateBooking(
+        Guid bookingId,
+        Guid roomId,
+        Guid organizerId)
+    {
+        // bookingId と roomId を間違えてもコンパイルが通る！
+    }
+
+  with_typed_id: |
+    // 型安全な例（Typed ID使用）
+    public async Task UpdateBooking(
+        BookingId bookingId,
+        RoomId roomId,
+        UserId organizerId)
+    {
+        // 型が異なるため、間違えるとコンパイルエラー
+    }
+
+ai_guidance:
+  when_to_use:
+    - "複数の集約があり、IDの取り違えリスクがある場合"
+    - "メソッドシグネチャを自己文書化したい場合"
+    - "ID生成ルール（例：プレフィックス付き）を統一したい場合"
+    - "DDD で集約の境界を明確にしたい場合"
+
+  when_not_to_use:
+    - "単一の集約しかない小規模プロジェクト"
+    - "外部APIとの互換性で Guid を強制される場合"
+    - "過度な抽象化を避けたい場合"
+
+  common_mistakes:
+    - mistake: "Guid.Empty を許可する"
+      solution: "コンストラクタで Guid.Empty をチェックし例外をスロー"
+      severity: "medium"
+
+    - mistake: "暗黙的変換を双方向にする"
+      solution: "Guid → TypedId は明示的（From メソッド）、TypedId → Guid のみ暗黙的"
+      severity: "low"
+
+    - mistake: "EF Core の変換設定を忘れる"
+      solution: "HasConversion でマッピングを設定"
+      severity: "high"
+
+related_patterns:
+  - id: "aggregate-root"
+    relationship: "used-by"
+    description: "集約ルートのIDとして使用"
+  - id: "domain-timeslot"
+    relationship: "sibling"
+    description: "同じく値オブジェクトパターン"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-25
+    changes:
+      - "初版リリース"
+      - "Reserve（会議室予約システム）からパターン抽出"
+
+evidence:
+  reference_implementation: "Reserve: src/Domain/RoomReservation/Bookings/BookingId.cs"
+  another_example: "Reserve: src/Domain/RoomReservation/Rooms/RoomId.cs"
