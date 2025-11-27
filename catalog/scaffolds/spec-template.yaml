@@ -157,6 +157,40 @@ template: |
   | セキュリティ | {要件} |
   | 同時実行制御 | {楽観的/悲観的ロック} |
 
+  ---
+
+  ## 7. 適用パターン（★必須）
+
+  > **重要**: このセクションは必須です。
+  > catalog/index.json の nonfunctional_pattern_hints を参照し、
+  > ドメインに応じた推奨パターンを確認すること。
+
+  ### 7.1 機能パターン
+
+  | パターンID | 目的 | 適用対象 |
+  |-----------|------|---------|
+  | {pattern-id} | {目的} | {適用対象のCommand/Query} |
+
+  ### 7.2 非機能要件パターン（Pipeline Behaviors）
+
+  > 参照: catalog/index.json → nonfunctional_pattern_hints → domains
+
+  | パターンID | 優先度 | 適用理由 | 適用する/しない |
+  |-----------|-------|---------|---------------|
+  | logging-behavior | {high/medium/low} | {理由} | {適用する/適用しない（理由）} |
+  | audit-log-behavior | {high/medium/low} | {理由} | {適用する/適用しない（理由）} |
+  | caching-behavior | {high/medium/low} | {理由} | {適用する/適用しない（理由）} |
+  | metrics-behavior | {high/medium/low} | {理由} | {適用する/適用しない（理由）} |
+
+  ### 7.3 適用しないパターンの理由
+
+  > 推奨されているが適用しないパターンがある場合、その理由を明記する。
+  > 理由なく省略した場合、計画は不完全とみなす。
+
+  | パターンID | 適用しない理由 |
+  |-----------|--------------|
+  | {pattern-id} | {理由} |
+
 # ============================================================================
 # 必須セクション定義
 # ============================================================================
@@ -189,6 +223,18 @@ required_sections:
     fields:
       - commands: コマンド一覧
       - queries: クエリ一覧
+
+  - id: applied_patterns
+    name: Applied Patterns
+    description: 適用するパターンの一覧（非機能要件含む）
+    fields:
+      - functional_patterns: 機能パターン一覧
+      - nonfunctional_patterns: 非機能要件パターン一覧
+      - excluded_patterns_reason: 適用しないパターンの理由
+    validation_rules:
+      - "nonfunctional_patterns が空の場合、nonfunctional_pattern_hints を確認したか確認する"
+      - "推奨パターンを適用しない場合、excluded_patterns_reason に理由を記載すること"
+      - "理由なく推奨パターンを省略した場合、仕様書は不完全とみなす"
 
 # ============================================================================
 # AI向けガイダンス

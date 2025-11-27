@@ -1,0 +1,274 @@
+id: value-object
+version: 1.0.0
+name: ValueObject Base Class (DDD Foundation)
+category: kernel
+intent: 値による同一性を持つ不変オブジェクトの基底クラス。Money、Address、DateRange等の値オブジェクト作成の基盤。
+
+description: |
+  ValueObjectは、DDDにおける値オブジェクトの基底クラスです。
+
+  【Entity vs ValueObject】
+  - Entity: 識別子（ID）による同一性。同じIDなら同一エンティティ。
+  - ValueObject: 値による同一性。すべての属性が同じなら同一。
+
+  【ValueObjectの特徴】
+  - 不変（Immutable）: 一度作成したら変更しない
+  - 自己完結: 自身の検証ロジックを持つ
+  - 副作用なし: メソッドは新しいインスタンスを返す
+
+  【使用例】
+  - Money（金額 + 通貨）
+  - Address（住所）
+  - DateRange（開始日〜終了日）
+  - Email（形式検証付きメールアドレス）
+  - TimeSlot（開始時刻〜終了時刻）
+
+# ============================================================================
+# 実装テンプレート
+# ============================================================================
+
+implementation:
+  file_path: "src/Kernel/ValueObject.cs"
+  template: |
+    namespace Shared.Kernel;
+
+    /// <summary>
+    /// 値オブジェクトの基底クラス
+    /// 値による同一性を持つ不変オブジェクト
+    /// </summary>
+    public abstract class ValueObject
+    {
+        /// <summary>
+        /// 等価性を判定するためのコンポーネント
+        /// 派生クラスでオーバーライドして、比較に使用するプロパティを返す
+        /// </summary>
+        protected abstract IEnumerable<object?> GetEqualityComponents();
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is null || obj.GetType() != GetType())
+            {
+                return false;
+            }
+
+            var other = (ValueObject)obj;
+
+            return GetEqualityComponents().SequenceEqual(other.GetEqualityComponents());
+        }
+
+        public override int GetHashCode()
+        {
+            return GetEqualityComponents()
+                .Select(x => x?.GetHashCode() ?? 0)
+                .Aggregate((x, y) => x ^ y);
+        }
+
+        public static bool operator ==(ValueObject? left, ValueObject? right)
+        {
+            if (left is null && right is null)
+                return true;
+
+            if (left is null || right is null)
+                return false;
+
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(ValueObject? left, ValueObject? right)
+        {
+            return !(left == right);
+        }
+    }
+
+# ============================================================================
+# 使用例
+# ============================================================================
+
+example_usage: |
+  // 例1: Money（金額）
+  public sealed class Money : ValueObject
+  {
+      public decimal Amount { get; }
+      public string Currency { get; }
+
+      private Money(decimal amount, string currency)
+      {
+          Amount = amount;
+          Currency = currency;
+      }
+
+      public static Money Create(decimal amount, string currency = "JPY")
+      {
+          if (amount < 0)
+              throw new ArgumentException("金額は0以上である必要があります");
+
+          return new Money(amount, currency);
+      }
+
+      // 不変性: 新しいインスタンスを返す
+      public Money Add(Money other)
+      {
+          if (Currency != other.Currency)
+              throw new InvalidOperationException("通貨が異なります");
+
+          return Create(Amount + other.Amount, Currency);
+      }
+
+      protected override IEnumerable<object?> GetEqualityComponents()
+      {
+          yield return Amount;
+          yield return Currency;
+      }
+
+      public override string ToString() => $"{Amount:N0} {Currency}";
+  }
+
+  // 例2: Email（検証付き）
+  public sealed class Email : ValueObject
+  {
+      public string Value { get; }
+
+      private Email(string value) => Value = value;
+
+      public static Email Create(string email)
+      {
+          if (string.IsNullOrWhiteSpace(email))
+              throw new ArgumentException("メールアドレスは必須です");
+
+          if (!email.Contains('@'))
+              throw new ArgumentException("無効なメールアドレス形式です");
+
+          return new Email(email.ToLowerInvariant());
+      }
+
+      protected override IEnumerable<object?> GetEqualityComponents()
+      {
+          yield return Value;
+      }
+
+      public override string ToString() => Value;
+  }
+
+  // 例3: DateRange（期間）
+  public sealed class DateRange : ValueObject
+  {
+      public DateOnly Start { get; }
+      public DateOnly End { get; }
+
+      private DateRange(DateOnly start, DateOnly end)
+      {
+          Start = start;
+          End = end;
+      }
+
+      public static DateRange Create(DateOnly start, DateOnly end)
+      {
+          if (start > end)
+              throw new ArgumentException("開始日は終了日以前である必要があります");
+
+          return new DateRange(start, end);
+      }
+
+      public bool Overlaps(DateRange other)
+      {
+          return Start < other.End && other.Start < End;
+      }
+
+      public int Days => End.DayNumber - Start.DayNumber;
+
+      protected override IEnumerable<object?> GetEqualityComponents()
+      {
+          yield return Start;
+          yield return End;
+      }
+  }
+
+  // 使用例
+  var money1 = Money.Create(1000);
+  var money2 = Money.Create(1000);
+  Console.WriteLine(money1 == money2);  // true（値が同じ）
+
+  var email = Email.Create("User@Example.COM");
+  Console.WriteLine(email.Value);  // user@example.com（正規化済み）
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_use:
+    - "複数の属性をまとめて1つの概念として扱う場合（Money = Amount + Currency）"
+    - "ドメインの語彙を型で表現したい場合（Email, PhoneNumber）"
+    - "不変性が重要な場合"
+    - "自己完結した検証ロジックを持たせたい場合"
+
+  when_not_to_use:
+    - "識別子が必要な場合 → Entity を使用"
+    - "ライフサイクルがある場合 → Entity を使用"
+    - "単一のプリミティブ値をラップするだけの場合 → domain-typed-id を検討"
+
+  common_mistakes:
+    - mistake: "ValueObjectを可変（mutable）にする"
+      severity: critical
+      solution: "プロパティは init または readonly にし、変更は新しいインスタンスを返す"
+
+    - mistake: "GetEqualityComponents で一部のプロパティを省略"
+      severity: high
+      solution: "等価性判定に使用すべきすべてのプロパティを含める"
+
+    - mistake: "EF Core の LINQ で .Value プロパティにアクセス"
+      severity: high
+      solution: |
+        インスタンス同士で比較する。
+        ❌ .Where(x => x.Email.Value == "test@example.com")
+        ✅ .Where(x => x.Email == Email.Create("test@example.com"))
+
+    - mistake: "publicコンストラクタを持つ"
+      severity: medium
+      solution: "privateコンストラクタ + static Create メソッドで検証を強制"
+
+  design_considerations:
+    - "ファクトリメソッド（Create）で不変条件を検証"
+    - "ToString() をオーバーライドしてデバッグを容易に"
+    - "暗黙の型変換は避ける（明示的な Create を使う）"
+
+# ============================================================================
+# 関連パターン
+# ============================================================================
+
+related_patterns:
+  - id: entity-base
+    description: "識別子による同一性を持つエンティティの基底クラス"
+
+  - id: domain-typed-id
+    description: "単一のGUIDをラップする型安全ID。ValueObjectの特殊形。"
+
+# ============================================================================
+# 依存関係
+# ============================================================================
+
+dependencies:
+  patterns: []  # 他のパターンに依存しない基盤パターン
+  nuget: []     # 外部パッケージ不要
+
+# ============================================================================
+# エビデンス
+# ============================================================================
+
+evidence:
+  implementation_file: "src/Kernel/ValueObject.cs"
+  usage_examples:
+    - "src/Kernel/Money.cs"
+    - "src/Domain/ProductCatalog/Product/ProductId.cs"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-27
+    changes:
+      - "初版リリース"
+      - "AIフィードバックに基づきカタログ化"
+      - "Money, Email, DateRange の使用例を追加"

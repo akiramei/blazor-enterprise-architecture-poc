@@ -440,6 +440,61 @@ public async Task<Result<Guid>> Handle(CreateBookingCommand request, Cancellatio
 
 ---
 
+## 📋 実装後チェックリスト（非機能要件パターン）
+
+**実装完了後に、以下のチェックリストで運用に必要なパターンの適用漏れを確認してください。**
+
+### 運用パターンの適用確認
+
+```
+□ LoggingBehavior を適用したか？
+  → 運用時のトラブルシューティングに必須
+  → 適用しない場合の理由: ____________
+
+□ AuditLogBehavior を適用したか？
+  → 監査証跡が必要な業務（図書館、金融、医療等）では必須
+  → 適用しない場合の理由: ____________
+
+□ MetricsBehavior を適用したか？
+  → パフォーマンス監視が必要な場合
+  → 適用しない場合の理由: ____________
+
+□ CachingBehavior を検討したか？
+  → 頻繁にアクセスされるクエリがある場合
+  → 適用しない場合の理由: ____________
+
+□ ConcurrencyControl を適用したか？
+  → 同時更新が発生する可能性がある場合
+  → 適用しない場合の理由: ____________
+```
+
+### ドメイン別の推奨パターン確認
+
+**参照**: `catalog/index.json` → `nonfunctional_pattern_hints` → `domains`
+
+| ドメイン | 必須パターン |
+|---------|------------|
+| 図書館・貸出管理 | logging-behavior, audit-log-behavior |
+| 金融・決済 | logging-behavior, audit-log-behavior, idempotency-behavior |
+| 医療・ヘルスケア | logging-behavior, audit-log-behavior, authorization-behavior |
+| EC・在庫管理 | logging-behavior, concurrency-control |
+
+### 適用しないパターンの文書化
+
+推奨パターンを適用しない場合は、**必ず理由を文書化**してください。
+理由なく省略したパターンは、レビュー時に指摘対象となります。
+
+```markdown
+## 適用しないパターンと理由
+
+| パターン | 適用しない理由 |
+|---------|--------------|
+| audit-log-behavior | 内部ツールであり監査証跡が不要 |
+| caching-behavior | データが頻繁に更新されキャッシュが無効になるため |
+```
+
+---
+
 ## 🔗 関連ドキュメント
 
 - [AI_USAGE_GUIDE.md](AI_USAGE_GUIDE.md) - 詳細な実装ガイド

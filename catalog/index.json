@@ -1,7 +1,8 @@
 {
   "$schema": "consumer-example/patterns.manifest.schema.json",
-  "version": "v2025.11.27",
+  "version": "v2025.11.27.1",
   "last_updated": "2025-11-27",
+  "changelog_summary": "AIフィードバックに基づきKernel層パターン追加、非機能要件推奨機能強化",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "ai_bootstrap": {
@@ -103,6 +104,23 @@
           "condition": "予約 / ダブルブッキング防止",
           "mustread": "patterns/concurrency-control.yaml",
           "reason": "同時実行制御（悲観的ロック）が必要なため"
+        },
+        {
+          "condition": "本番運用を想定 / 運用監視が必要",
+          "mustread": "patterns/logging-behavior.yaml",
+          "reason": "運用時のトラブルシューティングに必須。全システムで推奨。",
+          "plan_requirement": "非機能要件セクションにロギング要件を記載すること"
+        },
+        {
+          "condition": "監査証跡が必要 / 履歴追跡が必要 / コンプライアンス要件あり",
+          "mustread": "patterns/audit-log-behavior.yaml",
+          "reason": "誰が・いつ・何をしたかの記録。図書館・金融・医療等で必須。",
+          "plan_requirement": "監査対象のCommand一覧を計画に含めること"
+        },
+        {
+          "condition": "パフォーマンス要件あり / 負荷が高い",
+          "mustread": ["patterns/metrics-behavior.yaml", "patterns/caching-behavior.yaml"],
+          "reason": "メトリクス収集とキャッシュによる最適化"
         }
       ],
       "enforcement": {
@@ -112,6 +130,13 @@
     }
   },
   "categories": {
+    "kernel": {
+      "name": "Kernel (DDD Foundations)",
+      "description": "DDD基盤型（Entity, ValueObject, Result）。他の全パターンの前提となる基盤。",
+      "scope": "全パターン共通",
+      "priority": "critical",
+      "note": "これらのパターンは他のパターンを使用する前に理解しておく必要がある"
+    },
     "scaffold": {
       "name": "Scaffolds",
       "description": "新規プロジェクト作成時の標準構造・テンプレート",
@@ -154,6 +179,42 @@
     }
   },
   "patterns": [
+    {
+      "id": "result-pattern",
+      "name": "Result Pattern (Railway Oriented Programming)",
+      "category": "kernel",
+      "version": "1.0.0",
+      "file": "kernel/result-pattern.yaml",
+      "intent": "例外に頼らないエラーハンドリングの基盤。すべてのCommand/Queryの戻り値として使用。",
+      "tags": ["kernel", "error-handling", "result", "railway", "foundation"],
+      "stability": "stable",
+      "scope": "foundation",
+      "priority": "critical"
+    },
+    {
+      "id": "value-object",
+      "name": "ValueObject Base Class (DDD Foundation)",
+      "category": "kernel",
+      "version": "1.0.0",
+      "file": "kernel/value-object.yaml",
+      "intent": "値による同一性を持つ不変オブジェクトの基底クラス。Money、Address等の値オブジェクト作成の基盤。",
+      "tags": ["kernel", "value-object", "ddd", "immutable", "foundation"],
+      "stability": "stable",
+      "scope": "foundation",
+      "priority": "critical"
+    },
+    {
+      "id": "entity-base",
+      "name": "Entity Base Class (DDD Foundation)",
+      "category": "kernel",
+      "version": "1.0.0",
+      "file": "kernel/entity-base.yaml",
+      "intent": "識別子による同一性を持つエンティティの基底クラス。ドメインイベント発行機能を含む。",
+      "tags": ["kernel", "entity", "ddd", "domain-event", "foundation"],
+      "stability": "stable",
+      "scope": "foundation",
+      "priority": "high"
+    },
     {
       "id": "project-structure",
       "name": "Project Structure (VSA Standard)",
@@ -790,7 +851,8 @@
         "1. Feature Sliceを選択（例: feature-create-entity）",
         "2. ユーザーの要求からドメインキーワードを抽出（例: 予約、会議室）",
         "3. domain_hints.trigger_keywords でマッチするドメインを特定",
-        "4. recommended_patterns の各パターンも合わせて適用"
+        "4. recommended_patterns の各パターンも合わせて適用",
+        "5. ★ 非機能要件パターンも確認（下記参照）"
       ],
       "example": {
         "user_request": "会議室予約の作成機能を実装して",
@@ -804,6 +866,54 @@
           "concurrency-control（同時予約防止）"
         ]
       }
+    },
+    "nonfunctional_pattern_hints": {
+      "description": "ドメイン特性に応じて推奨される非機能要件パターン。計画フェーズで必ず確認すること。",
+      "domains": {
+        "図書館・貸出管理": {
+          "trigger_keywords": ["図書館", "貸出", "返却", "蔵書", "会員"],
+          "recommended_behaviors": [
+            {"id": "logging-behavior", "priority": "high", "reason": "運用トラブルシューティング"},
+            {"id": "audit-log-behavior", "priority": "high", "reason": "貸出履歴の監査証跡（誰が何をいつ借りたか）"},
+            {"id": "concurrency-control", "priority": "medium", "reason": "同一書籍の同時貸出競合防止"}
+          ]
+        },
+        "金融・決済": {
+          "trigger_keywords": ["決済", "支払い", "口座", "残高", "振込", "請求"],
+          "recommended_behaviors": [
+            {"id": "logging-behavior", "priority": "high", "reason": "取引ログ必須"},
+            {"id": "audit-log-behavior", "priority": "critical", "reason": "金融規制コンプライアンス"},
+            {"id": "idempotency-behavior", "priority": "critical", "reason": "二重決済防止"},
+            {"id": "concurrency-control", "priority": "critical", "reason": "残高整合性"}
+          ]
+        },
+        "医療・ヘルスケア": {
+          "trigger_keywords": ["患者", "診療", "処方", "カルテ", "予約"],
+          "recommended_behaviors": [
+            {"id": "logging-behavior", "priority": "high", "reason": "診療記録追跡"},
+            {"id": "audit-log-behavior", "priority": "critical", "reason": "医療法規制コンプライアンス"},
+            {"id": "authorization-behavior", "priority": "critical", "reason": "患者情報アクセス制御"}
+          ]
+        },
+        "EC・在庫管理": {
+          "trigger_keywords": ["商品", "在庫", "注文", "カート", "出荷"],
+          "recommended_behaviors": [
+            {"id": "logging-behavior", "priority": "high", "reason": "注文追跡"},
+            {"id": "concurrency-control", "priority": "high", "reason": "在庫引当競合防止"},
+            {"id": "caching-behavior", "priority": "medium", "reason": "商品一覧の高速化"}
+          ]
+        },
+        "汎用業務システム": {
+          "trigger_keywords": [],
+          "recommended_behaviors": [
+            {"id": "logging-behavior", "priority": "high", "reason": "基本的な運用監視"},
+            {"id": "validation-behavior", "priority": "critical", "reason": "入力検証は必須"},
+            {"id": "transaction-behavior", "priority": "critical", "reason": "データ整合性"}
+          ],
+          "note": "キーワードに一致しない場合のデフォルト推奨"
+        }
+      },
+      "usage_instruction": "計画フェーズで、ドメインキーワードから該当するdomainを特定し、recommended_behaviorsを確認すること"
     },
     "template_variables": {
       "EntityPascalCase": "エンティティ名（PascalCase）例: Product, Order, Customer",

@@ -1,0 +1,268 @@
+id: entity-base
+version: 1.0.0
+name: Entity Base Class (DDD Foundation)
+category: kernel
+intent: 識別子による同一性を持つエンティティの基底クラス。ドメインイベント発行機能を含む。
+
+description: |
+  Entityは、DDDにおけるエンティティの基底クラスです。
+
+  【Entity vs ValueObject】
+  - Entity: 識別子（ID）による同一性。属性が変わっても同一エンティティ。
+  - ValueObject: 値による同一性。すべての属性が同じなら同一。
+
+  【Entityの特徴】
+  - 識別子を持つ（ID）
+  - ライフサイクルがある（作成→更新→削除）
+  - ドメインイベントを発行できる
+  - 集約ルートになる場合は AggregateRoot を継承
+
+  【ドメインイベント】
+  Entity内で重要なビジネスイベントが発生した際に、
+  RaiseDomainEvent() でイベントを発行します。
+  これらのイベントは永続化時に取り出され、Outboxパターンで配信されます。
+
+# ============================================================================
+# 実装テンプレート
+# ============================================================================
+
+implementation:
+  file_path: "src/Kernel/Entity.cs"
+  template: |
+    namespace Shared.Kernel;
+
+    /// <summary>
+    /// エンティティの基底クラス
+    /// 識別子による同一性を持つ
+    /// </summary>
+    public abstract class Entity
+    {
+        private readonly List<DomainEvent> _domainEvents = new();
+
+        /// <summary>
+        /// ドメインイベント一覧（読み取り専用）
+        /// </summary>
+        public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+        /// <summary>
+        /// ドメインイベントを取得
+        /// </summary>
+        public IReadOnlyList<DomainEvent> GetDomainEvents() => _domainEvents.AsReadOnly();
+
+        /// <summary>
+        /// ドメインイベントを追加
+        /// </summary>
+        protected void RaiseDomainEvent(DomainEvent domainEvent)
+        {
+            _domainEvents.Add(domainEvent);
+        }
+
+        /// <summary>
+        /// ドメインイベントをクリア（永続化後に呼び出される）
+        /// </summary>
+        public void ClearDomainEvents()
+        {
+            _domainEvents.Clear();
+        }
+    }
+
+    /// <summary>
+    /// 型付きIDを持つエンティティの基底クラス
+    /// </summary>
+    public abstract class Entity<TId> : Entity where TId : notnull
+    {
+        public TId Id { get; protected set; } = default!;
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is not Entity<TId> other)
+                return false;
+
+            if (ReferenceEquals(this, other))
+                return true;
+
+            if (GetType() != other.GetType())
+                return false;
+
+            return Id.Equals(other.Id);
+        }
+
+        public override int GetHashCode()
+        {
+            return Id.GetHashCode();
+        }
+
+        public static bool operator ==(Entity<TId>? left, Entity<TId>? right)
+        {
+            if (left is null && right is null)
+                return true;
+
+            if (left is null || right is null)
+                return false;
+
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(Entity<TId>? left, Entity<TId>? right)
+        {
+            return !(left == right);
+        }
+    }
+
+# ============================================================================
+# 使用例
+# ============================================================================
+
+example_usage: |
+  // 型付きID（別パターン: domain-typed-id）
+  public readonly record struct ProductId(Guid Value)
+  {
+      public static ProductId NewId() => new(Guid.NewGuid());
+      public static ProductId From(Guid value) => new(value);
+  }
+
+  // エンティティの実装
+  public class Product : Entity<ProductId>
+  {
+      public string Name { get; private set; }
+      public Money Price { get; private set; }
+      public ProductStatus Status { get; private set; }
+
+      // コンストラクタは private、ファクトリメソッドで作成
+      private Product() { }  // EF Core用
+
+      private Product(ProductId id, string name, Money price)
+      {
+          Id = id;
+          Name = name;
+          Price = price;
+          Status = ProductStatus.Draft;
+
+          // ドメインイベントを発行
+          RaiseDomainEvent(new ProductCreatedEvent(id, name));
+      }
+
+      // ファクトリメソッド
+      public static Product Create(string name, Money price)
+      {
+          if (string.IsNullOrWhiteSpace(name))
+              throw new ArgumentException("商品名は必須です");
+
+          return new Product(ProductId.NewId(), name, price);
+      }
+
+      // ビジネスロジックを持つメソッド
+      public void Publish()
+      {
+          if (Status != ProductStatus.Draft)
+              throw new InvalidOperationException("下書き状態でのみ公開できます");
+
+          Status = ProductStatus.Published;
+          RaiseDomainEvent(new ProductPublishedEvent(Id));
+      }
+
+      // Boundary用: 操作可否判定
+      public BoundaryDecision CanPublish()
+      {
+          return Status switch
+          {
+              ProductStatus.Draft => BoundaryDecision.Allow(),
+              ProductStatus.Published => BoundaryDecision.Deny("既に公開済みです"),
+              _ => BoundaryDecision.Deny("公開できない状態です")
+          };
+      }
+  }
+
+  // ドメインイベント
+  public sealed record ProductCreatedEvent(ProductId ProductId, string Name) : DomainEvent;
+  public sealed record ProductPublishedEvent(ProductId ProductId) : DomainEvent;
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_use:
+    - "識別子を持つドメインオブジェクトを作成する場合"
+    - "ライフサイクル（作成→更新→削除）があるオブジェクト"
+    - "ドメインイベントを発行する必要がある場合"
+
+  when_not_to_use:
+    - "識別子が不要な場合 → ValueObject を使用"
+    - "集約ルートの場合 → AggregateRoot を継承（Entity を間接継承）"
+
+  common_mistakes:
+    - mistake: "publicセッターを持つ"
+      severity: critical
+      solution: "セッターは private に。変更は意味のあるメソッド経由で行う"
+
+    - mistake: "publicコンストラクタで直接インスタンス化"
+      severity: high
+      solution: "privateコンストラクタ + static Create メソッドで不変条件を検証"
+
+    - mistake: "ビジネスロジックをHandler内に書く"
+      severity: critical
+      solution: "ビジネスロジックはEntity内のメソッドに実装"
+
+    - mistake: "ドメインイベントを永続化前にクリアする"
+      severity: high
+      solution: "ClearDomainEvents は永続化後に呼び出す（通常はインフラ層が行う）"
+
+    - mistake: "EF Core用の引数なしコンストラクタを忘れる"
+      severity: medium
+      solution: "private または protected の引数なしコンストラクタを追加"
+
+  design_patterns:
+    - "ファクトリメソッドパターン: Create() で不変条件を検証"
+    - "Tell Don't Ask: 状態を問い合わせて外部で判断するのではなく、Entityにメソッドを持たせる"
+    - "Boundary: CanXxx() メソッドで操作可否を判定"
+
+# ============================================================================
+# 関連パターン
+# ============================================================================
+
+related_patterns:
+  - id: value-object
+    description: "値による同一性を持つオブジェクト"
+
+  - id: domain-typed-id
+    description: "型安全なID（Entityの識別子として使用）"
+
+  - id: boundary-pattern
+    description: "Entity.CanXxx() メソッドとBoundaryServiceの連携"
+
+  - id: outbox-pattern
+    description: "ドメインイベントの確実な配信"
+
+# ============================================================================
+# 依存関係
+# ============================================================================
+
+dependencies:
+  patterns:
+    - domain-typed-id  # ID型として使用することが多い
+  nuget: []
+
+# ============================================================================
+# エビデンス
+# ============================================================================
+
+evidence:
+  implementation_file: "src/Kernel/Entity.cs"
+  aggregate_root_file: "src/Kernel/AggregateRoot.cs"
+  usage_examples:
+    - "src/Domain/ProductCatalog/Product/Product.cs"
+    - "src/Domain/PurchaseManagement/PurchaseRequest/PurchaseRequest.cs"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-27
+    changes:
+      - "初版リリース"
+      - "AIフィードバックに基づきカタログ化"
+      - "Entity<TId> ジェネリック版を追加"
+      - "CanXxx() メソッドの例を追加"

@@ -76,6 +76,136 @@ implementation:
         }
     }
 
+# ============================================================================
+# EF Core 詳細設定（★追加セクション）
+# ============================================================================
+
+efcore_detailed_configuration:
+  description: |
+    TypedIdをEF Coreで使用する際の詳細な設定ガイド。
+    フィードバックに基づき追加されたセクション。
+
+  record_struct_version:
+    description: "C# 10以降で推奨される record struct バージョン"
+    template: |
+      /// <summary>
+      /// {Entity}ID（record struct版 - 軽量・高速）
+      /// </summary>
+      public readonly record struct {Entity}Id(Guid Value)
+      {
+          public static {Entity}Id NewId() => new(Guid.NewGuid());
+          public static {Entity}Id From(Guid value) => new(value);
+
+          // record struct は自動的に Equals/GetHashCode を生成
+      }
+
+      // EF Core Configuration
+      builder.Property(e => e.Id)
+          .HasConversion(
+              id => id.Value,
+              value => new {Entity}Id(value));  // record struct のコンストラクタ呼び出し
+
+  multiple_typed_ids:
+    description: "複数のTypedIdを持つEntityの設定例"
+    template: |
+      // Entity: Loan（貸出）
+      public class Loan : Entity<LoanId>
+      {
+          public BookId BookId { get; private set; }
+          public MemberId MemberId { get; private set; }
+          public CopyId CopyId { get; private set; }
+          // ...
+      }
+
+      // Configuration
+      public class LoanConfiguration : IEntityTypeConfiguration<Loan>
+      {
+          public void Configure(EntityTypeBuilder<Loan> builder)
+          {
+              builder.HasKey(e => e.Id);
+
+              // 主キー
+              builder.Property(e => e.Id)
+                  .HasConversion(id => id.Value, value => LoanId.From(value));
+
+              // 外部キー（それぞれ変換が必要）
+              builder.Property(e => e.BookId)
+                  .HasConversion(id => id.Value, value => BookId.From(value));
+
+              builder.Property(e => e.MemberId)
+                  .HasConversion(id => id.Value, value => MemberId.From(value));
+
+              builder.Property(e => e.CopyId)
+                  .HasConversion(id => id.Value, value => CopyId.From(value));
+
+              // リレーション設定
+              builder.HasOne<Book>()
+                  .WithMany()
+                  .HasForeignKey(e => e.BookId);
+
+              builder.HasOne<Member>()
+                  .WithMany()
+                  .HasForeignKey(e => e.MemberId);
+          }
+      }
+
+  linq_query_notes:
+    description: "LINQ クエリでの注意点"
+    content: |
+      【重要】TypedId の LINQ クエリでの比較
+
+      ❌ 禁止: .Value プロパティでの比較
+      ```csharp
+      // EF Core がSQLに変換できない
+      var book = await _dbContext.Books
+          .Where(b => b.Id.Value == requestGuid)  // エラー
+          .FirstOrDefaultAsync();
+      ```
+
+      ✅ 正しい: TypedId インスタンスでの比較
+      ```csharp
+      var bookId = BookId.From(requestGuid);
+      var book = await _dbContext.Books
+          .Where(b => b.Id == bookId)  // OK - HasConversion が適用される
+          .FirstOrDefaultAsync();
+      ```
+
+      ✅ 外部キーも同様
+      ```csharp
+      var memberId = MemberId.From(request.MemberId);
+      var loans = await _dbContext.Loans
+          .Where(l => l.MemberId == memberId)
+          .ToListAsync();
+      ```
+
+  value_comparer_for_collections:
+    description: "コレクションやインデックスでの ValueComparer 設定"
+    template: |
+      // コレクション内でのTypedId比較を最適化
+      builder.Property(e => e.Id)
+          .HasConversion(
+              id => id.Value,
+              value => {Entity}Id.From(value))
+          .Metadata.SetValueComparer(
+              new ValueComparer<{Entity}Id>(
+                  (a, b) => a.Value == b.Value,
+                  id => id.Value.GetHashCode(),
+                  id => {Entity}Id.From(id.Value)));
+
+  migration_notes:
+    description: "マイグレーション時の注意"
+    content: |
+      【注意】既存のGuid列をTypedIdに変更する場合
+
+      1. TypedIdの変換設定は「コード上の型」のみ変更
+      2. データベース列の型（uniqueidentifier/uuid）は変わらない
+      3. したがって、追加のマイグレーションは不要
+
+      既存データはそのまま使用可能：
+      - DB: uniqueidentifier 列 → 変更なし
+      - C#: Guid → TypedId に変更
+      - HasConversion で相互変換
+
 example_usage: |
   // 型安全な引数
   public async Task<Booking?> GetBookingForRoom(

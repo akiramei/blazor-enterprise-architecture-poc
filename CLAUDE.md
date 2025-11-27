@@ -19,6 +19,14 @@
 | 3 | `catalog/COMMON_MISTAKES.md` | 頻出ミスと回避方法 | **必須** |
 | 4 | `catalog/DECISION_FLOWCHART.md` | パターン選択アルゴリズム | 推奨 |
 
+### 基盤パターン（Kernel）
+
+| ファイル | 目的 | 必須度 |
+|----------|------|:------:|
+| `catalog/kernel/result-pattern.yaml` | エラーハンドリング基盤（Result<T>） | **必須** |
+| `catalog/kernel/value-object.yaml` | 値オブジェクト基底クラス | 参照 |
+| `catalog/kernel/entity-base.yaml` | エンティティ基底クラス | 参照 |
+
 **これらを読まずに実装を開始してはいけません。**
 
 ---
@@ -351,5 +359,5 @@ public async Task<BoundaryDecision> ValidatePayAsync(OrderId id, CancellationTok
 
 ---
 
-**カタログバージョン**: v2025.11.27
+**カタログバージョン**: v2025.11.27.1
 **最終更新**: 2025-11-27

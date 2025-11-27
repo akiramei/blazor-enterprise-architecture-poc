@@ -1,0 +1,197 @@
+id: result-pattern
+version: 1.0.0
+name: Result Pattern (Railway Oriented Programming)
+category: kernel
+intent: 例外に頼らないエラーハンドリングの基盤。すべてのCommand/Queryの戻り値として使用される。
+
+description: |
+  Result<T>パターンは、処理の成功/失敗を明示的に表現するパターンです。
+
+  【なぜ例外ではなくResultを使うのか】
+  - 例外は「予期しないエラー」のためのもの
+  - ビジネスロジック上のエラー（例: 在庫不足、権限なし）は「予期されるエラー」
+  - 予期されるエラーは戻り値で明示的に伝播する方が意図が明確
+
+  【Railway Oriented Programming】
+  - 成功の線路と失敗の線路を切り替えながら処理を進める
+  - 一度失敗の線路に乗ると、以降の処理はスキップされる
+  - Match/Map/Bind などのメソッドで関数型スタイルの合成が可能
+
+# ============================================================================
+# 実装テンプレート
+# ============================================================================
+
+implementation:
+  file_path: "src/Shared/Application/Result.cs"
+  template: |
+    namespace Shared.Application;
+
+    /// <summary>
+    /// 処理結果を表すクラス
+    /// </summary>
+    public class Result
+    {
+        public bool IsSuccess { get; }
+        public string? Error { get; }
+
+        protected Result(bool isSuccess, string? error)
+        {
+            IsSuccess = isSuccess;
+            Error = error;
+        }
+
+        public static Result Success() => new(true, null);
+        public static Result Fail(string error) => new(false, error);
+        public static Result<T> Success<T>(T value) => new(value, true, null);
+        public static Result<T> Fail<T>(string error) => new(default, false, error);
+    }
+
+    /// <summary>
+    /// 値を持つ処理結果
+    /// </summary>
+    public class Result<T> : Result
+    {
+        public T? Value { get; }
+
+        internal Result(T? value, bool isSuccess, string? error) : base(isSuccess, error)
+        {
+            Value = value;
+        }
+
+        /// <summary>
+        /// 成功/失敗に応じて処理を分岐
+        /// </summary>
+        public TResult Match<TResult>(
+            Func<T, TResult> onSuccess,
+            Func<string, TResult> onFailure)
+        {
+            return IsSuccess
+                ? onSuccess(Value!)
+                : onFailure(Error!);
+        }
+
+        /// <summary>
+        /// 成功時に値を変換
+        /// </summary>
+        public Result<TNew> Map<TNew>(Func<T, TNew> mapper)
+        {
+            return IsSuccess
+                ? Result.Success(mapper(Value!))
+                : Result.Fail<TNew>(Error!);
+        }
+
+        /// <summary>
+        /// 成功時に別のResult操作を連鎖
+        /// </summary>
+        public Result<TNew> Bind<TNew>(Func<T, Result<TNew>> binder)
+        {
+            return IsSuccess
+                ? binder(Value!)
+                : Result.Fail<TNew>(Error!);
+        }
+    }
+
+# ============================================================================
+# 使用例
+# ============================================================================
+
+example_usage: |
+  // Command の戻り値は Result<T>
+  public sealed record CreateProductCommand(
+      string Name,
+      decimal Price
+  ) : ICommand<Result<Guid>>;
+
+  // Handler の実装
+  public async Task<Result<Guid>> Handle(CreateProductCommand request, CancellationToken ct)
+  {
+      // 検証失敗時は Result.Fail を返す（例外をthrowしない）
+      if (string.IsNullOrEmpty(request.Name))
+          return Result.Fail<Guid>("商品名は必須です");
+
+      var product = new Product(request.Name, request.Price);
+      await _repository.AddAsync(product, ct);
+
+      return Result.Success(product.Id);
+  }
+
+  // 呼び出し側での使用
+  var result = await _mediator.Send(new CreateProductCommand("商品A", 1000));
+
+  // パターン1: Match で分岐
+  var response = result.Match(
+      onSuccess: id => new { Success = true, ProductId = id },
+      onFailure: error => new { Success = false, Error = error }
+  );
+
+  // パターン2: IsSuccess で判定
+  if (!result.IsSuccess)
+  {
+      _logger.LogWarning("商品作成失敗: {Error}", result.Error);
+      return BadRequest(result.Error);
+  }
+  return Ok(result.Value);
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_use:
+    - "すべてのCommand/Queryの戻り値型として使用"
+    - "ビジネスロジック上のエラーを伝播する場合"
+    - "検証失敗、存在しない、権限なしなどの「予期されるエラー」"
+
+  when_not_to_use:
+    - "インフラ層の予期しないエラー（DB接続エラー等）→ 例外を使用"
+    - "プログラミングエラー（null参照等）→ 例外を使用"
+
+  common_mistakes:
+    - mistake: "例外をthrowしてビジネスエラーを伝播する"
+      severity: critical
+      solution: "Result.Fail<T>(error) を返す"
+
+    - mistake: "Result.IsSuccess を確認せずに Value にアクセス"
+      severity: high
+      solution: "必ず IsSuccess を確認するか、Match メソッドを使用"
+
+    - mistake: "エラーメッセージにスタックトレースや内部情報を含める"
+      severity: medium
+      solution: "ユーザー向けのメッセージのみ含める。詳細はログに記録"
+
+  integration_with_other_patterns:
+    - pattern: "validation-behavior"
+      description: "FluentValidation の検証結果は自動的に Result.Fail に変換される"
+
+    - pattern: "boundary-pattern"
+      description: "BoundaryDecision と Result は相互変換可能"
+
+# ============================================================================
+# 依存関係
+# ============================================================================
+
+dependencies:
+  patterns: []  # 他のパターンに依存しない基盤パターン
+  nuget: []     # 外部パッケージ不要
+
+# ============================================================================
+# エビデンス
+# ============================================================================
+
+evidence:
+  implementation_file: "src/Shared/Application/Result.cs"
+  usage_examples:
+    - "src/Application/Features/CreateProduct/CreateProductCommandHandler.cs"
+    - "src/Application/Features/UpdateProduct/UpdateProductCommandHandler.cs"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 1.0.0
+    date: 2025-11-27
+    changes:
+      - "初版リリース"
+      - "AIフィードバックに基づきカタログ化"
+      - "Match/Map/Bind メソッドの拡張例を追加"
