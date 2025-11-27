@@ -1,0 +1,507 @@
+# Pattern Combinations - パターン組み合わせ例
+#
+# このファイルは、典型的なユースケースにおけるパターンの組み合わせ例を提供します。
+# 計画フェーズで「どのパターンを組み合わせるべきか」の判断に使用してください。
+
+version: "1.0.0"
+last_updated: "2025-11-27"
+
+# ============================================================================
+# 基本構成（すべてのプロジェクトで推奨）
+# ============================================================================
+
+base_configuration:
+  name: "基本構成"
+  description: "すべてのプロジェクトで適用すべき最小限のパターン"
+
+  patterns:
+    kernel:
+      - id: result-pattern
+        required: true
+        reason: "エラーハンドリングの基盤"
+      - id: value-object
+        required: true
+        reason: "値オブジェクトの基盤"
+      - id: entity-base
+        required: true
+        reason: "エンティティの基盤"
+
+    behaviors:
+      - id: validation-behavior
+        required: true
+        reason: "入力検証は必須"
+      - id: transaction-behavior
+        required: true
+        reason: "トランザクション管理は必須"
+      - id: logging-behavior
+        required: true
+        reason: "運用ログは必須"
+
+  file_count_estimate: "5-10ファイル（Kernel層は既存利用）"
+
+# ============================================================================
+# ドメイン別の推奨構成
+# ============================================================================
+
+domain_configurations:
+
+  # --------------------------------------------------------------------------
+  # 図書館・貸出管理システム
+  # --------------------------------------------------------------------------
+  library_management:
+    name: "図書館・貸出管理システム"
+    description: "書籍の貸出・返却・予約を管理するシステム"
+
+    trigger_keywords:
+      - "図書館"
+      - "貸出"
+      - "返却"
+      - "蔵書"
+      - "会員"
+      - "予約"
+
+    entities:
+      - name: "Book（書籍）"
+        patterns: [domain-typed-id, entity-base, domain-state-machine]
+      - name: "Member（会員）"
+        patterns: [domain-typed-id, entity-base]
+      - name: "Loan（貸出）"
+        patterns: [domain-typed-id, entity-base, domain-state-machine]
+      - name: "Copy（蔵書）"
+        patterns: [domain-typed-id, entity-base, domain-state-machine]
+
+    feature_patterns:
+      - id: feature-create-entity
+        applies_to: [Book, Member]
+      - id: feature-search-entity
+        applies_to: [Book, Member, Loan]
+      - id: feature-update-entity
+        applies_to: [Book, Member]
+      - id: feature-delete-entity
+        applies_to: [Book, Member]
+
+    domain_patterns:
+      - id: domain-typed-id
+        reason: "BookId, MemberId, LoanId, CopyId の型安全性"
+      - id: domain-state-machine
+        reason: "貸出状態（Available→Borrowed→Returned）の遷移管理"
+      - id: domain-validation-service
+        reason: "貸出可否チェック（在庫確認、貸出上限、延滞チェック）"
+      - id: boundary-pattern
+        reason: "貸出/返却/延長の操作可否判定（Book.CanBorrow(), Loan.CanReturn()）"
+
+    nonfunctional_patterns:
+      - id: logging-behavior
+        priority: high
+        reason: "運用トラブルシューティング"
+      - id: audit-log-behavior
+        priority: high
+        reason: "貸出履歴の監査証跡（コンプライアンス）"
+      - id: concurrency-control
+        priority: medium
+        reason: "同一蔵書の同時貸出競合防止"
+
+    application_order:
+      - step: 1
+        layer: Domain
+        patterns: [domain-typed-id]
+        description: "BookId, MemberId, LoanId, CopyId を定義"
+      - step: 2
+        layer: Domain
+        patterns: [entity-base, domain-state-machine]
+        description: "Book, Member, Loan, Copy エンティティを定義"
+      - step: 3
+        layer: Domain
+        patterns: [boundary-pattern]
+        description: "Book.CanBorrow(), Loan.CanReturn() を定義"
+      - step: 4
+        layer: Domain
+        patterns: [domain-validation-service]
+        description: "LoanValidationService を定義"
+      - step: 5
+        layer: Infrastructure
+        patterns: [logging-behavior, audit-log-behavior]
+        description: "Behaviors を設定"
+      - step: 6
+        layer: Application
+        patterns: [feature-create-entity, feature-search-entity]
+        description: "CRUD機能を実装"
+
+    file_count_estimate: "30-50ファイル"
+    complexity: "medium"
+
+  # --------------------------------------------------------------------------
+  # 会議室予約システム
+  # --------------------------------------------------------------------------
+  room_reservation:
+    name: "会議室予約システム"
+    description: "会議室の予約・キャンセルを管理するシステム"
+
+    trigger_keywords:
+      - "会議室"
+      - "予約"
+      - "ダブルブッキング"
+      - "時間枠"
+      - "スケジュール"
+
+    entities:
+      - name: "Room（会議室）"
+        patterns: [domain-typed-id, entity-base]
+      - name: "Booking（予約）"
+        patterns: [domain-typed-id, entity-base, domain-state-machine]
+
+    feature_patterns:
+      - id: feature-create-entity
+        applies_to: [Room, Booking]
+      - id: feature-search-entity
+        applies_to: [Room, Booking]
+      - id: feature-update-entity
+        applies_to: [Room, Booking]
+      - id: feature-delete-entity
+        applies_to: [Booking]
+
+    domain_patterns:
+      - id: domain-typed-id
+        reason: "RoomId, BookingId の型安全性"
+      - id: domain-timeslot
+        reason: "開始/終了時刻の時間枠抽象化"
+      - id: domain-validation-service
+        reason: "予約重複チェック（ダブルブッキング防止）"
+      - id: concurrency-control
+        reason: "同時予約の競合防止（悲観的ロック）"
+      - id: boundary-pattern
+        reason: "予約可否判定（Room.CanBook()）"
+      - id: query-get-by-period
+        reason: "今日/今週の予約一覧取得"
+
+    nonfunctional_patterns:
+      - id: logging-behavior
+        priority: high
+        reason: "運用ログ"
+      - id: concurrency-control
+        priority: critical
+        reason: "ダブルブッキング防止には悲観的ロックが必須"
+
+    application_order:
+      - step: 1
+        layer: Domain
+        patterns: [domain-typed-id, domain-timeslot]
+        description: "RoomId, BookingId, TimeSlot を定義"
+      - step: 2
+        layer: Domain
+        patterns: [entity-base, domain-state-machine]
+        description: "Room, Booking エンティティを定義"
+      - step: 3
+        layer: Domain
+        patterns: [domain-validation-service, concurrency-control]
+        description: "BookingValidationService（重複チェック+悲観的ロック）"
+      - step: 4
+        layer: Application
+        patterns: [feature-create-entity, query-get-by-period]
+        description: "予約作成、期間検索を実装"
+
+    file_count_estimate: "25-40ファイル"
+    complexity: "medium-high"
+
+    special_considerations:
+      - "悲観的ロック（FOR UPDATE）が必要"
+      - "時間枠の重複判定ロジックが複雑"
+
+  # --------------------------------------------------------------------------
+  # ECサイト（商品・注文管理）
+  # --------------------------------------------------------------------------
+  ecommerce:
+    name: "ECサイト（商品・注文管理）"
+    description: "商品カタログ、カート、注文を管理するシステム"
+
+    trigger_keywords:
+      - "商品"
+      - "注文"
+      - "カート"
+      - "在庫"
+      - "出荷"
+      - "EC"
+
+    entities:
+      - name: "Product（商品）"
+        patterns: [domain-typed-id, entity-base]
+      - name: "Order（注文）"
+        patterns: [domain-typed-id, entity-base, domain-state-machine]
+      - name: "Cart（カート）"
+        patterns: [domain-typed-id, entity-base]
+      - name: "Inventory（在庫）"
+        patterns: [domain-typed-id, entity-base]
+
+    domain_patterns:
+      - id: domain-typed-id
+        reason: "ProductId, OrderId, CartId の型安全性"
+      - id: domain-state-machine
+        reason: "注文状態（Pending→Paid→Shipped→Delivered）の遷移"
+      - id: domain-validation-service
+        reason: "在庫確認・引当"
+      - id: concurrency-control
+        reason: "在庫引当の競合防止"
+      - id: boundary-pattern
+        reason: "注文可否判定（Cart.CanCheckout()）"
+
+    nonfunctional_patterns:
+      - id: logging-behavior
+        priority: high
+        reason: "注文追跡"
+      - id: audit-log-behavior
+        priority: medium
+        reason: "注文履歴"
+      - id: concurrency-control
+        priority: critical
+        reason: "在庫引当の整合性"
+      - id: caching-behavior
+        priority: medium
+        reason: "商品一覧の高速化"
+
+    file_count_estimate: "40-60ファイル"
+    complexity: "high"
+
+  # --------------------------------------------------------------------------
+  # 承認ワークフローシステム
+  # --------------------------------------------------------------------------
+  approval_workflow:
+    name: "承認ワークフローシステム"
+    description: "稟議・申請の承認ワークフローを管理するシステム"
+
+    trigger_keywords:
+      - "承認"
+      - "稟議"
+      - "申請"
+      - "ワークフロー"
+      - "却下"
+      - "差戻"
+
+    entities:
+      - name: "Request（申請）"
+        patterns: [domain-typed-id, entity-base, domain-state-machine]
+      - name: "ApprovalStep（承認ステップ）"
+        patterns: [domain-typed-id, entity-base]
+
+    domain_patterns:
+      - id: domain-typed-id
+        reason: "RequestId, ApprovalStepId の型安全性"
+      - id: domain-state-machine
+        reason: "申請状態（Draft→Submitted→Approved/Rejected）の遷移"
+      - id: domain-approval-history
+        reason: "承認履歴の記録・追跡"
+      - id: boundary-pattern
+        reason: "承認可否判定（Request.CanApprove(), Request.CanReject()）"
+
+    nonfunctional_patterns:
+      - id: logging-behavior
+        priority: high
+        reason: "操作ログ"
+      - id: audit-log-behavior
+        priority: critical
+        reason: "承認履歴はコンプライアンス必須"
+      - id: authorization-behavior
+        priority: critical
+        reason: "承認権限チェック"
+
+    special_considerations:
+      - "多段階承認のロジックが複雑"
+      - "権限管理が重要"
+
+    file_count_estimate: "35-50ファイル"
+    complexity: "high"
+
+  # --------------------------------------------------------------------------
+  # 金融・決済システム
+  # --------------------------------------------------------------------------
+  financial:
+    name: "金融・決済システム"
+    description: "口座残高、決済、振込を管理するシステム"
+
+    trigger_keywords:
+      - "決済"
+      - "支払い"
+      - "口座"
+      - "残高"
+      - "振込"
+      - "請求"
+
+    domain_patterns:
+      - id: domain-typed-id
+        reason: "AccountId, TransactionId の型安全性"
+      - id: domain-validation-service
+        reason: "残高確認"
+      - id: concurrency-control
+        reason: "残高更新の整合性（悲観的ロック必須）"
+      - id: boundary-pattern
+        reason: "決済可否判定（Account.CanWithdraw()）"
+
+    nonfunctional_patterns:
+      - id: logging-behavior
+        priority: critical
+        reason: "取引ログ必須"
+      - id: audit-log-behavior
+        priority: critical
+        reason: "金融規制コンプライアンス"
+      - id: idempotency-behavior
+        priority: critical
+        reason: "二重決済防止"
+      - id: concurrency-control
+        priority: critical
+        reason: "残高整合性"
+
+    special_considerations:
+      - "冪等性が必須（IdempotencyBehavior）"
+      - "監査ログは法的要件"
+      - "悲観的ロックが必須"
+
+    file_count_estimate: "40-60ファイル"
+    complexity: "very-high"
+
+# ============================================================================
+# シンプルなCRUDアプリケーション
+# ============================================================================
+
+simple_crud:
+  name: "シンプルなCRUDアプリケーション"
+  description: "マスタ管理など、シンプルなCRUD機能のみのアプリケーション"
+
+  trigger_keywords:
+    - "マスタ"
+    - "カタログ"
+    - "一覧"
+    - "登録"
+    - "シンプル"
+
+  patterns:
+    - id: domain-typed-id
+      reason: "ID型の安全性"
+    - id: feature-create-entity
+      reason: "作成機能"
+    - id: feature-search-entity
+      reason: "検索・一覧機能"
+    - id: feature-update-entity
+      reason: "更新機能"
+    - id: feature-delete-entity
+      reason: "削除機能"
+    - id: caching-behavior
+      reason: "一覧の高速化（オプション）"
+
+  nonfunctional_patterns:
+    - id: logging-behavior
+      priority: high
+      reason: "基本的な運用ログ"
+
+  file_count_estimate: "15-25ファイル"
+  complexity: "low"
+
+# ============================================================================
+# パターン依存関係マップ
+# ============================================================================
+
+dependency_map:
+  description: "パターン間の依存関係。適用順序を決める際に参照。"
+
+  dependencies:
+    # Kernel層（依存なし）
+    result-pattern:
+      depends_on: []
+    value-object:
+      depends_on: []
+    entity-base:
+      depends_on: [value-object]
+
+    # Domain層
+    domain-typed-id:
+      depends_on: [value-object]
+    domain-state-machine:
+      depends_on: [entity-base]
+    domain-timeslot:
+      depends_on: [value-object]
+    domain-validation-service:
+      depends_on: [entity-base]
+    boundary-pattern:
+      depends_on: [entity-base]
+
+    # Infrastructure層（依存なし、独立）
+    validation-behavior:
+      depends_on: []
+    transaction-behavior:
+      depends_on: []
+    logging-behavior:
+      depends_on: []
+    audit-log-behavior:
+      depends_on: []
+    caching-behavior:
+      depends_on: []
+    idempotency-behavior:
+      depends_on: []
+    authorization-behavior:
+      depends_on: []
+    concurrency-control:
+      depends_on: []
+
+    # Application層（Feature Slice）
+    feature-create-entity:
+      depends_on: [validation-behavior, transaction-behavior, entity-base]
+    feature-search-entity:
+      depends_on: [entity-base]
+    feature-update-entity:
+      depends_on: [validation-behavior, transaction-behavior, entity-base]
+    feature-delete-entity:
+      depends_on: [transaction-behavior, entity-base]
+
+    # Query層
+    query-get-by-period:
+      depends_on: [entity-base]
+    query-get-by-id:
+      depends_on: [entity-base]
+    query-get-list:
+      depends_on: [entity-base]
+
+# ============================================================================
+# 適用順序テンプレート
+# ============================================================================
+
+application_order_template:
+  description: "パターン適用の推奨順序"
+
+  order:
+    - phase: 1
+      name: "Kernel層"
+      description: "基盤型の確認（通常は既存利用）"
+      patterns: [result-pattern, value-object, entity-base]
+
+    - phase: 2
+      name: "Domain層 - ID"
+      description: "TypedIdを先に定義"
+      patterns: [domain-typed-id]
+
+    - phase: 3
+      name: "Domain層 - Entity"
+      description: "エンティティを定義"
+      patterns: [entity-base, domain-state-machine]
+
+    - phase: 4
+      name: "Domain層 - Boundary"
+      description: "操作可否判定を定義"
+      patterns: [boundary-pattern]
+
+    - phase: 5
+      name: "Domain層 - Service"
+      description: "ドメインサービスを定義"
+      patterns: [domain-validation-service]
+
+    - phase: 6
+      name: "Infrastructure層"
+      description: "Behaviorsを設定"
+      patterns: [validation-behavior, transaction-behavior, logging-behavior, audit-log-behavior]
+
+    - phase: 7
+      name: "Application層"
+      description: "Feature Sliceを実装"
+      patterns: [feature-create-entity, feature-search-entity, feature-update-entity, feature-delete-entity]
+
+    - phase: 8
+      name: "UI層"
+      description: "Store, PageActions, Componentを実装"
+      patterns: [layer-store, layer-pageactions]

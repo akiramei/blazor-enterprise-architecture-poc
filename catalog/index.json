@@ -1,61 +1,257 @@
 {
   "$schema": "consumer-example/patterns.manifest.schema.json",
-  "version": "v2025.11.27.1",
+  "version": "v2025.11.27.3",
   "last_updated": "2025-11-27",
-  "changelog_summary": "AIフィードバックに基づきKernel層パターン追加、非機能要件推奨機能強化",
+  "changelog_summary": "計画フェーズへの導線強化（planning_required_conditions, pre_implementation_check追加）",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
+  "phase_guidance": {
+    "description": "計画フェーズと実装フェーズでのカタログの使い分け",
+    "phases": {
+      "planning": {
+        "description": "要求分析、パターン選択、組み合わせ決定、影響範囲評価",
+        "key_files": [
+          "catalog/planning/PLANNING_GUIDE.md",
+          "catalog/planning/pattern-combinations.yaml",
+          "catalog/planning/handoff-template.yaml"
+        ],
+        "focus": [
+          "ai_decision_matrix でパターンカテゴリを特定",
+          "domain_hints でドメイン固有パターンを追加",
+          "nonfunctional_pattern_hints で非機能要件パターンを選択",
+          "依存関係に基づいて適用順序を決定",
+          "Boundary設計（UIがある場合は必須）"
+        ],
+        "output": "計画書（適用パターン一覧、適用順序、影響範囲）"
+      },
+      "implementation": {
+        "description": "計画に基づいたコード生成、テンプレート適用、検証",
+        "key_files": [
+          "catalog/implementation/IMPLEMENTATION_GUIDE.md",
+          "各パターンのYAMLファイル（implementation.template）"
+        ],
+        "focus": [
+          "パターンYAMLの implementation.template を使用",
+          "テンプレート変数を置換してコード生成",
+          "ai_guidance.common_mistakes を確認",
+          "evidence で実装例を参照"
+        ],
+        "output": "実装コード"
+      }
+    },
+    "workflow": {
+      "step1": "計画フェーズ: PLANNING_GUIDE.md に従ってパターンを選択",
+      "step2": "引き継ぎ: handoff-template.yaml で計画書を作成",
+      "step3": "承認: ユーザーに計画を提示して承認を得る",
+      "step4": "実装フェーズ: IMPLEMENTATION_GUIDE.md に従ってコードを生成"
+    }
+  },
+  "planning_required_conditions": {
+    "description": "計画フェーズが必要かどうかを判断する条件。実装開始前に必ず確認すること。",
+    "requires_planning": {
+      "triggers": [
+        {
+          "condition": "新規機能の追加",
+          "examples": ["〇〇機能を作って", "〇〇画面を追加", "〇〇できるようにして"],
+          "reason": "パターン選択と組み合わせの検討が必要"
+        },
+        {
+          "condition": "3ファイル以上の作成が予想される",
+          "examples": ["Command + Handler + Validator + UI", "Entity + Repository + Configuration"],
+          "reason": "影響範囲の把握と適用順序の決定が必要"
+        },
+        {
+          "condition": "複数パターンの組み合わせが必要",
+          "examples": ["CRUD + 状態遷移", "検索 + 重複チェック", "作成 + 監査ログ"],
+          "reason": "パターン間の依存関係を解決する必要がある"
+        },
+        {
+          "condition": "UIがある",
+          "examples": ["画面", "フォーム", "一覧表示", "ダイアログ"],
+          "reason": "Boundaryモデリングが必須（Entity.CanXxx()の設計）"
+        },
+        {
+          "condition": "ドメイン固有の業務ロジック",
+          "examples": ["貸出ルール", "予約ルール", "承認フロー", "在庫引当"],
+          "reason": "ドメインパターンの選択が必要"
+        },
+        {
+          "condition": "非機能要件の考慮が必要",
+          "examples": ["監査ログ", "同時実行制御", "キャッシュ", "認可"],
+          "reason": "nonfunctional_pattern_hintsの確認が必要"
+        }
+      ],
+      "action": "catalog/planning/PLANNING_GUIDE.md を読み、計画フェーズを実行する"
+    },
+    "skip_planning": {
+      "conditions": [
+        {
+          "condition": "単一ファイルの修正",
+          "examples": ["バグ修正", "リファクタリング", "typo修正"]
+        },
+        {
+          "condition": "既存機能への小さな変更",
+          "examples": ["フィールド追加", "バリデーション修正", "ラベル変更"]
+        },
+        {
+          "condition": "テンプレート変数の置換のみ",
+          "examples": ["既存パターンの別エンティティへの適用"]
+        },
+        {
+          "condition": "ドキュメントの更新",
+          "examples": ["README更新", "コメント追加"]
+        }
+      ],
+      "action": "直接実装に進む（catalog/implementation/IMPLEMENTATION_GUIDE.md）"
+    },
+    "decision_flowchart": "CLAUDE.md の「計画フェーズが必要か判断する」セクションを参照"
+  },
   "ai_bootstrap": {
-    "description": "AI エージェントが最初に読むべき情報",
+    "description": "AI エージェントが最初に読むべき情報（フェーズ別）",
+    "pre_implementation_check": {
+      "instruction": "⚠️ 実装を開始する前に、このタスクが計画フェーズを必要とするか判断すること",
+      "check_order": [
+        "1. CLAUDE.md の「計画フェーズが必要か判断する」セクションを確認",
+        "2. planning_required_conditions の triggers に該当するか確認",
+        "3. 該当する場合 → catalog/planning/PLANNING_GUIDE.md を読む",
+        "4. 該当しない場合 → catalog/implementation/IMPLEMENTATION_GUIDE.md を読む"
+      ],
+      "mandatory": true,
+      "skip_penalty": "計画なしで実装を開始した場合、パターンの組み合わせミスやBoundaryモデリングの欠落が発生しやすい"
+    },
+    "phase_specific_reading": {
+      "planning_phase": {
+        "description": "計画フェーズで読むべきファイル",
+        "files": [
+          {
+            "order": 1,
+            "file": "catalog/planning/PLANNING_GUIDE.md",
+            "purpose": "planning_workflow",
+            "description": "計画フェーズの進め方（6ステップ）",
+            "required": true
+          },
+          {
+            "order": 2,
+            "file": "catalog/index.json",
+            "purpose": "ai_decision_matrix",
+            "description": "パターン選択の意思決定マトリクス",
+            "required": true
+          },
+          {
+            "order": 3,
+            "file": "catalog/planning/pattern-combinations.yaml",
+            "purpose": "pattern_combinations",
+            "description": "ドメイン別パターン組み合わせ例",
+            "required": true
+          },
+          {
+            "order": 4,
+            "file": "catalog/planning/handoff-template.yaml",
+            "purpose": "handoff_format",
+            "description": "計画→実装の引き継ぎフォーマット",
+            "required": true
+          }
+        ]
+      },
+      "implementation_phase": {
+        "description": "実装フェーズで読むべきファイル",
+        "files": [
+          {
+            "order": 1,
+            "file": "catalog/implementation/IMPLEMENTATION_GUIDE.md",
+            "purpose": "implementation_workflow",
+            "description": "実装フェーズの進め方",
+            "required": true
+          },
+          {
+            "order": 2,
+            "file": "catalog/COMMON_MISTAKES.md",
+            "purpose": "common_mistakes",
+            "description": "頻出する実装ミス（SaveChangesAsync、Value Object比較）",
+            "required": true
+          },
+          {
+            "order": 3,
+            "file": "各パターンのYAMLファイル",
+            "purpose": "implementation_template",
+            "description": "計画で選択されたパターンのテンプレートを参照",
+            "required": true
+          }
+        ]
+      }
+    },
     "priority_reading_order": [
       {
         "order": 1,
         "file": "catalog/scaffolds/project-structure.yaml",
         "purpose": "project_structure",
         "description": "標準プロジェクト構造（5プロジェクト構成、依存関係、UI配置ルール）",
-        "required": true
+        "required": true,
+        "phases": ["planning", "implementation"]
       },
       {
         "order": 2,
         "file": "CLAUDE.md",
         "purpose": "critical_constraints",
         "description": "実装ルール・禁止事項・クイックリファレンス",
-        "required": true
+        "required": true,
+        "phases": ["planning", "implementation"]
       },
       {
         "order": 3,
         "file": "catalog/COMMON_MISTAKES.md",
         "purpose": "common_mistakes",
         "description": "頻出する実装ミス（SaveChangesAsync、Value Object比較、Boundary判定）",
-        "required": true
+        "required": true,
+        "phases": ["implementation"]
       },
       {
         "order": 4,
         "file": "catalog/AI_USAGE_GUIDE.md",
         "purpose": "implementation_guide",
         "description": "詳細な実装ガイド・アーキテクチャ全体像",
-        "required": true
+        "required": true,
+        "phases": ["planning", "implementation"]
       },
       {
         "order": 5,
         "file": "catalog/index.json",
         "purpose": "pattern_index",
         "description": "パターン索引・意思決定マトリクス",
-        "required": true
+        "required": true,
+        "phases": ["planning", "implementation"]
       },
       {
         "order": 6,
         "file": "patterns.manifest.json",
         "purpose": "enabled_patterns",
         "description": "有効なパターン一覧",
-        "required": false
+        "required": false,
+        "phases": ["implementation"]
       },
       {
         "order": 7,
         "file": "catalog/DECISION_FLOWCHART.md",
         "purpose": "pattern_selection",
         "description": "パターン選択アルゴリズム",
-        "required": false
+        "required": false,
+        "phases": ["planning"]
+      },
+      {
+        "order": 8,
+        "file": "catalog/planning/PLANNING_GUIDE.md",
+        "purpose": "planning_guide",
+        "description": "計画フェーズの進め方",
+        "required": false,
+        "phases": ["planning"]
+      },
+      {
+        "order": 9,
+        "file": "catalog/implementation/IMPLEMENTATION_GUIDE.md",
+        "purpose": "implementation_guide",
+        "description": "実装フェーズの進め方",
+        "required": false,
+        "phases": ["implementation"]
       }
     ],
     "skip_if_familiar": [

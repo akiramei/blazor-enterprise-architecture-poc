@@ -1,0 +1,378 @@
+# Handoff Template - 計画→実装の引き継ぎフォーマット
+#
+# このテンプレートは、計画フェーズの出力を実装フェーズに引き継ぐための
+# 構造化されたフォーマットを定義します。
+#
+# 使用方法:
+# 1. 計画フェーズ完了時にこのフォーマットで引き継ぎ書を作成
+# 2. 実装フェーズ開始時にこの引き継ぎ書を読み込む
+# 3. 実装中は進捗を更新する
+
+version: "1.0.0"
+last_updated: "2025-11-27"
+
+# ============================================================================
+# 引き継ぎ書テンプレート
+# ============================================================================
+
+handoff_template:
+  # --------------------------------------------------------------------------
+  # メタ情報
+  # --------------------------------------------------------------------------
+  metadata:
+    feature_name: "{機能名}"
+    created_at: "{作成日時}"
+    approved_by: "{承認者}"
+    planning_completed: true  # 計画完了フラグ
+
+  # --------------------------------------------------------------------------
+  # 要求サマリー
+  # --------------------------------------------------------------------------
+  requirement_summary:
+    description: |
+      {ユーザー要求の要約}
+
+    domain: "{ドメイン名}"  # 例: 図書館・貸出管理
+
+    keywords:
+      - "{キーワード1}"
+      - "{キーワード2}"
+
+  # --------------------------------------------------------------------------
+  # Boundary設計（★必須）
+  # --------------------------------------------------------------------------
+  boundary_design:
+    # ユーザーの意図
+    intents:
+      - name: "{Intent名}"
+        description: "{ユーザーが何をしたいか}"
+        trigger: "{どのUIアクションか}"
+
+    # 操作可否判定（Entity.CanXxx()）
+    can_operations:
+      - entity: "{Entity名}"
+        method: "Can{Operation}()"
+        rules:
+          - "{ルール1}"
+          - "{ルール2}"
+
+    # BoundaryService（オプション）
+    boundary_service:
+      name: "{Entity}BoundaryService"
+      note: "業務ロジックはEntityに委譲、存在チェックのみ"
+
+  # --------------------------------------------------------------------------
+  # 適用パターン一覧
+  # --------------------------------------------------------------------------
+  patterns:
+    # 機能パターン
+    feature_patterns:
+      - id: "{パターンID}"
+        applies_to: ["{Entity1}", "{Entity2}"]
+        reason: "{選択理由}"
+
+    # ドメインパターン
+    domain_patterns:
+      - id: "{パターンID}"
+        reason: "{選択理由}"
+
+    # 非機能要件パターン
+    nonfunctional_patterns:
+      - id: "{パターンID}"
+        priority: "{high/medium/low}"
+        applied: true  # or false
+        reason: "{適用/不適用の理由}"
+
+  # --------------------------------------------------------------------------
+  # 適用順序
+  # --------------------------------------------------------------------------
+  application_order:
+    - step: 1
+      layer: "Domain"
+      pattern_id: "{パターンID}"
+      description: "{何を実装するか}"
+      files_to_create:
+        - "{ファイルパス1}"
+        - "{ファイルパス2}"
+
+    - step: 2
+      layer: "Domain"
+      pattern_id: "{パターンID}"
+      description: "{何を実装するか}"
+      files_to_create:
+        - "{ファイルパス}"
+
+    # ... 以下同様
+
+  # --------------------------------------------------------------------------
+  # 影響範囲（ファイル構成）
+  # --------------------------------------------------------------------------
+  affected_files:
+    create:
+      - path: "src/Domain/{BC}/{Aggregate}/{File}.cs"
+        pattern: "{パターンID}"
+        description: "{何を定義するか}"
+
+    modify:
+      - path: "src/Application/Infrastructure/{BC}/DbContext.cs"
+        change: "DbSet追加"
+
+    delete: []  # 通常は空
+
+  # --------------------------------------------------------------------------
+  # テンプレート変数
+  # --------------------------------------------------------------------------
+  template_variables:
+    BoundedContext: "{BC名}"
+    Entity: "{Entity名}"
+    Entities: "{Entities名（複数形）}"
+    Feature: "{Feature名}"
+    Aggregate: "{Aggregate名}"
+    Kernel_Namespace: "Shared.Kernel"
+
+  # --------------------------------------------------------------------------
+  # 実装時の注意事項
+  # --------------------------------------------------------------------------
+  implementation_notes:
+    critical:
+      - "Handler内でSaveChangesAsync()を呼ばない"
+      - "Result<T>で戻り値をラップする"
+
+    domain_specific:
+      - "{ドメイン固有の注意事項}"
+
+    patterns_specific:
+      - pattern_id: "{パターンID}"
+        note: "{パターン固有の注意事項}"
+
+  # --------------------------------------------------------------------------
+  # 実装進捗（実装中に更新）
+  # --------------------------------------------------------------------------
+  implementation_progress:
+    status: "not_started"  # not_started / in_progress / completed
+    current_step: 0
+    completed_steps: []
+    notes: []
+
+# ============================================================================
+# 記入例
+# ============================================================================
+
+example_handoff:
+  metadata:
+    feature_name: "図書館貸出管理システム"
+    created_at: "2025-11-27"
+    approved_by: "user"
+    planning_completed: true
+
+  requirement_summary:
+    description: |
+      図書館の蔵書管理と貸出・返却を管理するシステム。
+      会員は書籍を検索し、貸出・返却ができる。
+      同一書籍の同時貸出を防止する。
+
+    domain: "図書館・貸出管理"
+
+    keywords:
+      - "図書館"
+      - "貸出"
+      - "返却"
+      - "蔵書"
+      - "会員"
+
+  boundary_design:
+    intents:
+      - name: "BorrowBook"
+        description: "会員が書籍を借りたい"
+        trigger: "貸出ボタンクリック"
+      - name: "ReturnBook"
+        description: "会員が書籍を返却したい"
+        trigger: "返却ボタンクリック"
+
+    can_operations:
+      - entity: "Book"
+        method: "CanBorrow()"
+        rules:
+          - "状態がAvailableである"
+          - "在庫数が1以上である"
+      - entity: "Loan"
+        method: "CanReturn()"
+        rules:
+          - "状態がBorrowedである"
+          - "返却期限内である（警告のみ）"
+
+    boundary_service:
+      name: "LoanBoundaryService"
+      note: "Book.CanBorrow(), Loan.CanReturn() に委譲"
+
+  patterns:
+    feature_patterns:
+      - id: "feature-create-entity"
+        applies_to: ["Book", "Member"]
+        reason: "書籍・会員の新規登録"
+      - id: "feature-search-entity"
+        applies_to: ["Book", "Member", "Loan"]
+        reason: "検索・一覧表示"
+
+    domain_patterns:
+      - id: "domain-typed-id"
+        reason: "BookId, MemberId, LoanId の型安全性"
+      - id: "domain-state-machine"
+        reason: "貸出状態の遷移管理"
+      - id: "boundary-pattern"
+        reason: "貸出/返却の操作可否判定"
+
+    nonfunctional_patterns:
+      - id: "logging-behavior"
+        priority: "high"
+        applied: true
+        reason: "運用トラブルシューティング"
+      - id: "audit-log-behavior"
+        priority: "high"
+        applied: true
+        reason: "貸出履歴の監査証跡"
+      - id: "concurrency-control"
+        priority: "medium"
+        applied: true
+        reason: "同一蔵書の同時貸出競合防止"
+      - id: "caching-behavior"
+        priority: "low"
+        applied: false
+        reason: "初期リリースでは不要"
+
+  application_order:
+    - step: 1
+      layer: "Domain"
+      pattern_id: "domain-typed-id"
+      description: "BookId, MemberId, LoanId を定義"
+      files_to_create:
+        - "src/Domain/LibraryManagement/Books/BookId.cs"
+        - "src/Domain/LibraryManagement/Members/MemberId.cs"
+        - "src/Domain/LibraryManagement/Loans/LoanId.cs"
+
+    - step: 2
+      layer: "Domain"
+      pattern_id: "entity-base"
+      description: "Book, Member, Loan エンティティを定義"
+      files_to_create:
+        - "src/Domain/LibraryManagement/Books/Book.cs"
+        - "src/Domain/LibraryManagement/Members/Member.cs"
+        - "src/Domain/LibraryManagement/Loans/Loan.cs"
+
+    - step: 3
+      layer: "Domain"
+      pattern_id: "domain-state-machine"
+      description: "LoanStatus 状態遷移を定義"
+      files_to_create:
+        - "src/Domain/LibraryManagement/Loans/LoanStatus.cs"
+
+    - step: 4
+      layer: "Domain"
+      pattern_id: "boundary-pattern"
+      description: "Book.CanBorrow(), Loan.CanReturn() を実装"
+      files_to_create: []  # Entityファイル内に実装
+
+    - step: 5
+      layer: "Infrastructure"
+      pattern_id: "logging-behavior"
+      description: "Behaviorsを設定"
+      files_to_create:
+        - "src/Application/Infrastructure/LibraryManagement/DependencyInjection.cs"
+
+    - step: 6
+      layer: "Application"
+      pattern_id: "feature-create-entity"
+      description: "CreateBook, CreateMember を実装"
+      files_to_create:
+        - "src/Application/Features/CreateBook/CreateBookCommand.cs"
+        - "src/Application/Features/CreateBook/CreateBookCommandHandler.cs"
+        - "src/Application/Features/CreateBook/CreateBookCommandValidator.cs"
+        - "src/Application/Features/CreateBook/CreateBook.razor"
+
+  affected_files:
+    create:
+      - path: "src/Domain/LibraryManagement/Books/BookId.cs"
+        pattern: "domain-typed-id"
+        description: "書籍ID値オブジェクト"
+      - path: "src/Domain/LibraryManagement/Books/Book.cs"
+        pattern: "entity-base"
+        description: "書籍エンティティ"
+      # ... 以下省略
+
+    modify:
+      - path: "src/Application/Infrastructure/LibraryManagement/LibraryDbContext.cs"
+        change: "DbSet<Book>, DbSet<Member>, DbSet<Loan> 追加"
+
+    delete: []
+
+  template_variables:
+    BoundedContext: "LibraryManagement"
+    Entity: "Book"  # 主要エンティティ
+    Entities: "Books"
+    Feature: "CreateBook"  # 最初に実装する機能
+    Aggregate: "Books"
+    Kernel_Namespace: "Shared.Kernel"
+
+  implementation_notes:
+    critical:
+      - "Handler内でSaveChangesAsync()を呼ばない"
+      - "Result<T>で戻り値をラップする"
+
+    domain_specific:
+      - "同一会員の同時貸出上限は5冊"
+      - "延滞書籍がある場合は新規貸出不可"
+
+    patterns_specific:
+      - pattern_id: "domain-typed-id"
+        note: "EF Core の HasConversion 設定を忘れない"
+      - pattern_id: "concurrency-control"
+        note: "Book への同時アクセスには悲観的ロックを使用"
+
+  implementation_progress:
+    status: "not_started"
+    current_step: 0
+    completed_steps: []
+    notes: []
+
+# ============================================================================
+# 使用ガイドライン
+# ============================================================================
+
+usage_guidelines:
+  planning_phase:
+    - "計画完了時にこのテンプレートで引き継ぎ書を作成"
+    - "すべてのセクションを埋める（特にboundary_design）"
+    - "approved_by を記録"
+
+  implementation_phase:
+    - "実装開始前にこの引き継ぎ書を読み込む"
+    - "application_order に従って実装"
+    - "implementation_progress を更新しながら進める"
+
+  handoff_validation:
+    - "boundary_design が空でないこと"
+    - "patterns セクションが空でないこと"
+    - "application_order が定義されていること"
+    - "planning_completed が true であること"
+
+# ============================================================================
+# 検証ルール
+# ============================================================================
+
+validation_rules:
+  required_sections:
+    - "metadata.feature_name"
+    - "metadata.planning_completed"
+    - "requirement_summary.domain"
+    - "boundary_design.intents"
+    - "boundary_design.can_operations"
+    - "patterns.feature_patterns"
+    - "application_order"
+
+  conditions:
+    - rule: "planning_completed must be true"
+      check: "metadata.planning_completed == true"
+    - rule: "at least one intent must be defined"
+      check: "boundary_design.intents.length > 0"
+    - rule: "at least one pattern must be selected"
+      check: "patterns.feature_patterns.length > 0 || patterns.domain_patterns.length > 0"
