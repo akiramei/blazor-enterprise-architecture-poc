@@ -6,6 +6,70 @@
 
 ---
 
+## 🚨 計画フェーズでのBoundaryモデリング忘却（最重要）
+
+**UIがある機能を計画する際、Boundaryモデリングを忘れる問題が頻発しています。**
+
+### なぜ忘れるのか
+
+```
+【AIの学習バイアス】
+古典的DDDはUIを対象外とするため、AIの学習データには「Boundaryをモデリングする」
+という発想がほとんど含まれていません。
+
+結果として：
+- 「Domain → Application → UI」の順で計画を立てる
+- Boundaryは「後から追加すればいい」と判断される
+- 実装フェーズで初めて操作可否の判定が必要だと気づく
+```
+
+### 計画フェーズの必須確認事項
+
+**UIまたはユーザー対話を含む機能を計画する場合：**
+
+```
+□ boundary-pattern.yaml を読んだか？（必須）
+□ 各ユースケースに対して Boundary セクションを定義したか？
+□ ユーザーの意図（Intent）を列挙したか？
+□ 各操作の可否判定（CanXxx）をEntityに定義する計画があるか？
+```
+
+### 計画が不完全とみなされる条件
+
+| 条件 | 判定 |
+|-----|------|
+| UIがあるのに Boundary セクションがない | ❌ 不完全 |
+| Intent（ユーザーの意図）が定義されていない | ❌ 不完全 |
+| Entity.CanXxx() の設計がない | ❌ 不完全 |
+| 「後からBoundaryを追加する」という計画 | ❌ 不完全 |
+
+### 正しい計画の例
+
+```markdown
+## 図書貸出機能
+
+### Boundary（必須）
+- Intent: Borrow, Return, Extend, Reserve
+- 各Intentに対応するEntity.CanXxx():
+  - Book.CanBorrow() → 貸出可否判定
+  - Book.CanReturn() → 返却可否判定
+  - Book.CanExtend() → 延長可否判定
+  - Book.CanReserve() → 予約可否判定
+
+### Domain Model
+- Book（Entity）
+- Loan（Entity）
+- ...
+
+### Application
+- BorrowBookCommand
+- ...
+```
+
+**参照**: `catalog/patterns/boundary-pattern.yaml`
+
+---
+
 ## 🚨 絶対禁止事項（NEVER DO）
 
 ### 1. Handler内でSaveChangesAsync()を呼ばない

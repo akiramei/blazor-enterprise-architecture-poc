@@ -12,6 +12,82 @@
 
 ---
 
+## 🚨 ステップ0: Boundary判断（最初に実行・必須）
+
+**すべての計画の最初に、このステップを実行してください。**
+
+### なぜ最初なのか
+
+```
+【AIの学習バイアス問題】
+古典的DDDはUIを対象外とするため、AIは「Boundaryをモデリングする」という
+発想を持ちません。このステップをスキップすると、Boundaryが欠落した計画が生成されます。
+
+「後からBoundaryを追加する」では手遅れです。最初に設計してください。
+```
+
+### フローチャート
+
+```
+開始
+  ↓
+【質問】この機能にUIまたはユーザー対話がある？
+  │
+  ├─ Yes → 【必須】boundary-pattern.yaml を読む
+  │         ↓
+  │        Boundaryモデリングを先に完成させる:
+  │         - Intent（ユーザーの意図）を列挙
+  │         - 各Intentに対応する Entity.CanXxx() を設計
+  │         - BoundaryDecision を返す設計
+  │         ↓
+  │        計画に Boundary セクションを含める（必須）
+  │         ↓
+  │        ステップ1へ進む
+  │
+  └─ No → ステップ1へ進む（Boundary不要）
+```
+
+### Boundary判断の出力テンプレート
+
+UIがある場合、計画には以下のセクションが必須です：
+
+```markdown
+## Boundary設計（UIがあるため必須）
+
+### Intent（ユーザーの意図）
+- Create: 新規作成したい
+- Update: 編集したい
+- Delete: 削除したい
+- [ドメイン固有の操作を追加]
+
+### Entity.CanXxx() 設計
+| Intent | Entityメソッド | 判定ロジック |
+|--------|---------------|-------------|
+| Create | Parent.CanCreate() | WIP制限チェック、状態チェック |
+| Update | Entity.CanUpdate() | 状態が編集可能か |
+| Delete | Entity.CanDelete() | 依存関係チェック |
+
+### BoundaryService（委譲のみ）
+- データ取得 + Entity.CanXxx() に委譲
+- 業務ロジック（if文）は書かない
+```
+
+### チェックリスト
+
+計画を次のステップに進める前に確認：
+
+```
+□ boundary-pattern.yaml を読んだ
+□ Intent を列挙した
+□ Entity.CanXxx() を設計した
+□ BoundaryService は委譲のみの設計
+□ 計画に Boundary セクションを含めた
+```
+
+**このチェックリストが完了しないと、計画は不完全とみなされます。**
+
+---
+
 ## 📊 ステップ1: ユーザー要求の分類
 
 ```python

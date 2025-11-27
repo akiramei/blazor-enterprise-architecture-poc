@@ -1,7 +1,7 @@
 {
   "$schema": "consumer-example/patterns.manifest.schema.json",
-  "version": "v2025.11.26",
-  "last_updated": "2025-11-26",
+  "version": "v2025.11.27",
+  "last_updated": "2025-11-27",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "ai_bootstrap": {
@@ -79,7 +79,37 @@
         "BC固有インフラは Application/Infrastructure/{BC}/ に配置"
       ]
     },
-    "default_pattern_on_uncertainty": "feature-slice"
+    "default_pattern_on_uncertainty": "feature-slice",
+    "conditional_mustread_patterns": {
+      "description": "特定の条件下で必ず読むべきパターン。計画フェーズで確認必須。",
+      "rules": [
+        {
+          "condition": "UIがある / ユーザー対話がある",
+          "mustread": "patterns/boundary-pattern.yaml",
+          "reason": "AIの学習バイアスによりBoundaryモデリングが忘却されやすい。UIがある場合は必ず読むこと。",
+          "plan_requirement": "計画にBoundaryセクション（Intent, Entity.CanXxx()）を含めること"
+        },
+        {
+          "condition": "状態遷移がある",
+          "mustread": "patterns/domain-state-machine.yaml",
+          "reason": "状態遷移の制約を明確化するため"
+        },
+        {
+          "condition": "重複チェック / 在庫引当がある",
+          "mustread": "patterns/domain-validation-service.yaml",
+          "reason": "複数エンティティをまたぐビジネスルール検証のため"
+        },
+        {
+          "condition": "予約 / ダブルブッキング防止",
+          "mustread": "patterns/concurrency-control.yaml",
+          "reason": "同時実行制御（悲観的ロック）が必要なため"
+        }
+      ],
+      "enforcement": {
+        "plan_phase_check": "UIがあるのにBoundaryセクションがない計画は不完全とみなす",
+        "spec_template": "catalog/scaffolds/spec-template.yaml を使用して仕様書を作成すること"
+      }
+    }
   },
   "categories": {
     "scaffold": {
@@ -132,6 +162,17 @@
       "file": "scaffolds/project-structure.yaml",
       "intent": "新規プロジェクトの標準構造を定義し、一貫性のあるソリューションを生成する",
       "tags": ["scaffold", "project-structure", "vsa", "standard"],
+      "stability": "stable",
+      "scope": "project-wide"
+    },
+    {
+      "id": "spec-template",
+      "name": "Specification Template (Boundary Required)",
+      "category": "scaffold",
+      "version": "1.0.0",
+      "file": "scaffolds/spec-template.yaml",
+      "intent": "AIに仕様を与える際の標準フォーマット。Boundaryセクションを必須化し、モデリング忘却を防止する",
+      "tags": ["scaffold", "specification", "boundary", "template", "ai-bias-prevention"],
       "stability": "stable",
       "scope": "project-wide"
     },

@@ -35,6 +35,92 @@
 
 **このチェックリストをスキップすると、独自実装→修正の手戻りが発生します。**
 
+---
+
+## 🚨 計画フェーズの必読パターン（CRITICAL）
+
+**UIがある機能を計画する前に、以下のパターンを必ず読んでください。**
+
+### なぜ必読なのか
+
+```
+【AIの学習バイアス問題】
+古典的DDDはUIを対象外とするため、AIは「Boundaryをモデリングする」という
+発想を持ちません。高レベルガイドだけ読んで計画を立てると、Boundaryが欠落します。
+
+これは「Boundaryが重要」という説明では解決できません。
+パターンYAMLを実際に読んで、構造を理解する必要があります。
+```
+
+### 条件別の必読パターン
+
+| 条件 | 必読パターン | 理由 |
+|------|-------------|------|
+| **UIがある** | `boundary-pattern.yaml` | 操作可否判定、Intent定義 |
+| 状態遷移がある | `domain-state-machine.yaml` | 状態遷移の制約 |
+| 重複チェックが必要 | `domain-validation-service.yaml` | ビジネスルール検証 |
+| 時間枠を扱う | `domain-timeslot.yaml` | 時間枠の抽象化 |
+| 予約・在庫を扱う | `concurrency-control.yaml` | 同時実行制御 |
+
+### 計画フェーズのセルフチェックリスト
+
+**計画を提出する前に、以下を確認すること：**
+
+#### Boundaryモデリング（UIがある場合は必須）
+
+```
+□ boundary-pattern.yaml を読んだか？
+□ 全ユースケースに Boundary セクションがあるか？
+□ Intent（ユーザーの意図）を列挙したか？
+□ 各Intentに対応する Entity.CanXxx() を設計したか？
+□ BoundaryDecision を返す設計になっているか？
+```
+
+#### ドメインモデル
+
+```
+□ 業務ルールの if 文が BoundaryService に入っていないか？
+□ Entity に CanXxx() メソッドがあるか？
+□ BoundaryService は委譲のみか？
+```
+
+### 計画が不合格となる条件
+
+以下のいずれかに該当する場合、計画は不完全です：
+
+| 条件 | 判定 |
+|-----|------|
+| UIがあるのに Boundary セクションがない | ❌ 不合格 |
+| Intent が定義されていない | ❌ 不合格 |
+| Entity.CanXxx() の設計がない | ❌ 不合格 |
+| 「後から Boundary を追加する」という計画 | ❌ 不合格 |
+| boundary-pattern.yaml を読まずに計画を立てた | ❌ 不合格 |
+
+### 正しい計画の構造
+
+```markdown
+## 機能名: 図書貸出
+
+### 1. Boundary（★必須・最初に設計）
+- Intent: Borrow, Return, Extend, Reserve
+- Entity.CanXxx():
+  - Book.CanBorrow() → 貸出可否判定
+  - Book.CanReturn() → 返却可否判定
+
+### 2. Domain Model
+- Book（Entity）: CanBorrow(), CanReturn() を持つ
+- Loan（Entity）
+
+### 3. Application
+- BorrowBookCommand
+- ReturnBookCommand
+
+### 4. UI
+- BorrowBook.razor（Boundary結果を表示するだけ）
+```
+
+**重要**: Boundaryは「最初に設計する」ものであり、「後から追加する」ものではありません。
+
 ### クイックスタート
 
 1. **まず `catalog/index.json` を読む**

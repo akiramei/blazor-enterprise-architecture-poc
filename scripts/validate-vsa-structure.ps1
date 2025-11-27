@@ -173,10 +173,113 @@ if ($PageRazors) {
 }
 Write-Host ""
 
+# Check 7: UI-Boundary Symmetry Validation
+Write-Host "[Check 7] UI-Boundary Symmetry Validation..." -ForegroundColor White
+Write-Host ""
+
+$Infos = 0
+
+# 7a. UIがあるのにBoundaryServiceが1つもない場合を検出
+$AllRazorInFeatures = Get-ChildItem -Path "src\*\Features" -Recurse -Filter "*.razor" -ErrorAction SilentlyContinue
+$AllBoundaryServices = Get-ChildItem -Path "src\*\*\Boundaries" -Recurse -Filter "*BoundaryService.cs" -ErrorAction SilentlyContinue
+
+if ($AllRazorInFeatures -and -not $AllBoundaryServices) {
+    Write-Host "[!] WARNING: UI components exist but no BoundaryService found" -ForegroundColor Yellow
+    Write-Host "    Found .razor files in Features/ but no *BoundaryService.cs in Boundaries/"
+    Write-Host ""
+    Write-Host "    When UI exists, Boundary modeling is recommended."
+    Write-Host ""
+    Write-Host "    References:" -ForegroundColor Gray
+    Write-Host "      - Pattern:  catalog/patterns/boundary-pattern.yaml"
+    Write-Host "      - Mistakes: catalog/COMMON_MISTAKES.md (Boundary Modeling section)"
+    Write-Host "      - Template: catalog/scaffolds/spec-template.yaml"
+    Write-Host ""
+    $Warnings++
+}
+
+# 7b. 各Featureに対して、対応するBoundaryを推測して検索
+if ($AllRazorInFeatures) {
+    Write-Host "Checking UI-Boundary correspondence..." -ForegroundColor Gray
+    Write-Host ""
+
+    # Featureフォルダ名のユニークリストを取得
+    $FeatureNames = $AllRazorInFeatures | ForEach-Object { $_.Directory.Name } | Select-Object -Unique
+
+    foreach ($FeatureName in $FeatureNames) {
+        # Featureからエンティティ名を推測（Create/Update/Delete/Get/Searchを除去）
+        $EntityName = $FeatureName -replace "^(Create|Update|Delete|Get|Search|List|Edit|Add|Remove)", ""
+
+        if ([string]::IsNullOrWhiteSpace($EntityName)) {
+            $EntityName = $FeatureName
+        }
+
+        # 対応するBoundaryServiceを検索（$AllBoundaryServicesがnullの場合も考慮）
+        $MatchingBoundary = $null
+        if ($AllBoundaryServices) {
+            # パターン1: {Entity}BoundaryService.cs
+            # パターン2: I{Entity}Boundary.cs
+            $MatchingBoundary = $AllBoundaryServices | Where-Object {
+                $_.Name -match "^$($EntityName)BoundaryService\.cs$" -or
+                $_.Name -match "^I$($EntityName)Boundary\.cs$"
+            }
+
+            # 部分一致も検索（EntityNameを含むBoundaryService）
+            if (-not $MatchingBoundary) {
+                $MatchingBoundary = $AllBoundaryServices | Where-Object {
+                    $_.BaseName -match $EntityName
+                }
+            }
+        }
+
+        if ($MatchingBoundary) {
+            $BoundaryName = ($MatchingBoundary | Select-Object -First 1).Name
+            Write-Host "  [OK] $FeatureName -> $BoundaryName" -ForegroundColor Green
+        } else {
+            # Boundaryが見つからない場合は INFO 扱い（警告ではない）
+            Write-Host "  [INFO] $FeatureName - No matching BoundaryService found" -ForegroundColor Cyan
+            Write-Host "         Inferred entity: $EntityName"
+            Write-Host "         Expected: ${EntityName}BoundaryService.cs or I${EntityName}Boundary.cs"
+            $Infos++
+        }
+    }
+
+    if ($Infos -gt 0) {
+        Write-Host ""
+        Write-Host "  Note: INFO items are suggestions, not errors." -ForegroundColor Gray
+        Write-Host "        See: catalog/patterns/boundary-pattern.yaml" -ForegroundColor Gray
+    }
+
+    Write-Host ""
+}
+
+# 7c. Boundaryがあるのに対応するUIがない場合（逆方向チェック）
+if ($AllBoundaryServices -and -not $AllRazorInFeatures) {
+    Write-Host "  [INFO] BoundaryService exists but no UI found in Features/" -ForegroundColor Cyan
+    Write-Host "         This may be intentional (API-only or batch processing)"
+    $Infos++
+}
+
+# 7d. Intent定義の存在チェック
+$AllIntentFiles = Get-ChildItem -Path "src\*\*\Boundaries" -Recurse -Filter "*Intent.cs" -ErrorAction SilentlyContinue
+
+if ($AllBoundaryServices -and -not $AllIntentFiles) {
+    Write-Host "  [INFO] BoundaryService exists but no Intent enum found" -ForegroundColor Cyan
+    Write-Host "         Consider defining EntityIntent.cs for explicit intent modeling"
+    Write-Host "         See: catalog/patterns/boundary-pattern.yaml"
+    $Infos++
+}
+
+Write-Host ""
+
 # Summary
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Validation Summary" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host ""
+
+Write-Host "  Errors:   $Errors" -ForegroundColor $(if ($Errors -gt 0) { "Red" } else { "Green" })
+Write-Host "  Warnings: $Warnings" -ForegroundColor $(if ($Warnings -gt 0) { "Yellow" } else { "Green" })
+Write-Host "  Infos:    $Infos" -ForegroundColor Cyan
 Write-Host ""
 
 if ($Errors -gt 0) {
@@ -189,13 +292,29 @@ if ($Errors -gt 0) {
     Write-Host ""
     exit 1
 } elseif ($Warnings -gt 0) {
-    Write-Host "⚠️  PASSED with $Warnings warning(s)" -ForegroundColor Yellow
+    Write-Host "[!] PASSED with $Warnings warning(s)" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Review warnings above and ensure VSA structure is correct."
+    if ($Infos -gt 0) {
+        Write-Host ""
+        Write-Host "[i] $Infos info message(s) about UI-Boundary symmetry." -ForegroundColor Cyan
+        Write-Host "    Review if Boundary modeling is needed for your UI components."
+        Write-Host ""
+        Write-Host "    References:" -ForegroundColor Gray
+        Write-Host "      - catalog/patterns/boundary-pattern.yaml"
+        Write-Host "      - catalog/COMMON_MISTAKES.md"
+        Write-Host "      - catalog/scaffolds/spec-template.yaml"
+    }
     Write-Host ""
     exit 0
 } else {
-    Write-Host "✅ ALL CHECKS PASSED" -ForegroundColor Green
+    Write-Host "[OK] ALL CHECKS PASSED" -ForegroundColor Green
+    if ($Infos -gt 0) {
+        Write-Host ""
+        Write-Host "[i] $Infos info message(s) about UI-Boundary symmetry." -ForegroundColor Cyan
+        Write-Host "    These are suggestions, not errors."
+        Write-Host "    See: catalog/patterns/boundary-pattern.yaml" -ForegroundColor Gray
+    }
     Write-Host ""
     Write-Host "Project structure conforms to Vertical Slice Architecture."
     Write-Host ""
