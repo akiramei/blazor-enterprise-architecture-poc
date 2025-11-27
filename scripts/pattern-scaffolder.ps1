@@ -42,23 +42,22 @@ function Get-CatalogIndex {
 
     Write-Info "カタログインデックスを取得中: $CatalogUrl"
 
-    # ローカルファイルパスの場合
-    if ($CatalogUrl -match "^\.") {
-        if (Test-Path $CatalogUrl) {
-            try {
-                $content = Get-Content $CatalogUrl -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
-                Write-Success "カタログインデックスを読み込みました（ローカル）"
-                return $content
-            }
-            catch {
-                Write-Error "カタログインデックスの読み込みに失敗しました: $_"
-                exit 1
-            }
+    # ローカルファイルパスの場合（相対パス "." または絶対パス）
+    $isLocalPath = ($CatalogUrl -match "^\.") -or (Test-Path $CatalogUrl -IsValid)
+    if ($isLocalPath -and (Test-Path $CatalogUrl)) {
+        try {
+            $content = Get-Content $CatalogUrl -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
+            Write-Success "カタログインデックスを読み込みました（ローカル）"
+            return $content
         }
-        else {
-            Write-Error "カタログファイルが見つかりません: $CatalogUrl"
+        catch {
+            Write-Error "カタログインデックスの読み込みに失敗しました: $_"
             exit 1
         }
+    }
+    elseif ($isLocalPath) {
+        Write-Error "カタログファイルが見つかりません: $CatalogUrl"
+        exit 1
     }
 
     # github: プレフィックスを実際のURLに変換
@@ -312,7 +311,20 @@ Write-Host "=" * 80
 Write-Host ""
 
 $manifest = Read-Manifest -Path $ManifestPath
-$catalogIndex = Get-CatalogIndex -CatalogUrl $manifest.catalog_index
+
+# catalog_index の相対パスをマニフェストファイルのディレクトリから解決
+$manifestDir = Split-Path -Parent (Resolve-Path $ManifestPath)
+$catalogIndexPath = $manifest.catalog_index
+
+if ($catalogIndexPath -match "^\.") {
+    # 相対パスの場合、マニフェストファイルのディレクトリを基準に解決
+    $resolvedCatalogPath = Join-Path $manifestDir $catalogIndexPath
+    $resolvedCatalogPath = [System.IO.Path]::GetFullPath($resolvedCatalogPath)
+    Write-Info "カタログパスを解決: $catalogIndexPath → $resolvedCatalogPath"
+    $catalogIndexPath = $resolvedCatalogPath
+}
+
+$catalogIndex = Get-CatalogIndex -CatalogUrl $catalogIndexPath
 
 switch ($Command) {
     "validate" {
