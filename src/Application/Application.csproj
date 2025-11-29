@@ -61,6 +61,7 @@
     <!-- Domain Projects -->
     <ProjectReference Include="..\Domain\ProductCatalog\Domain.ProductCatalog.csproj" />
     <ProjectReference Include="..\Domain\PurchaseManagement\Domain.PurchaseManagement.csproj" />
+    <ProjectReference Include="..\Domain\ApprovalWorkflow\Domain.ApprovalWorkflow.csproj" />
 
     <!-- Shared Projects -->
     <ProjectReference Include="..\Kernel\Kernel.csproj" />

@@ -55,7 +55,10 @@
       "Bash(if grep -q \"\"\"id\"\": \"\"$bname,,\"\"\" catalog/index.json)",
       "Bash(then echo \"✓ $bname\")",
       "Bash(else echo \"✗ $bname\")",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(git push:*)",
+      "Bash(dotnet ef migrations add:*)",
+      "Bash(dotnet ef migrations:*)"
     ],
     "deny": [],
     "ask": []

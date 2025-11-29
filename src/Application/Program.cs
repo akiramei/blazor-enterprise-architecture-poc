@@ -26,6 +26,7 @@ using ProductCatalog.Shared.UI.Store;
 using Serilog;
 using Shared.Infrastructure.Platform.Persistence;
 using PurchaseManagement.Infrastructure;
+using ApprovalWorkflow.Infrastructure;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Application.Middleware;
@@ -86,6 +87,7 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infras
 // 7. Transaction (Command) - BC固有
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PurchaseManagement.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ApprovalWorkflow.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -120,6 +122,7 @@ builder.Services.AddSingleton<Shared.Application.Interfaces.IIdempotencyStore>(i
 //       トランザクション保証を確保するため。詳細: docs/architecture/OUTBOX_PATTERN.md
 builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, ProductCatalog.Shared.Infrastructure.Persistence.ProductCatalogOutboxReader>();
 builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, PurchaseManagement.Infrastructure.Persistence.PurchaseManagementOutboxReader>();
+builder.Services.AddScoped<Shared.Abstractions.Platform.IOutboxReader, ApprovalWorkflow.Infrastructure.Persistence.ApprovalWorkflowOutboxReader>();
 
 // Legacy Idempotency Store (Old Interface - for compatibility) - removed as it's deprecated
 
@@ -138,10 +141,16 @@ if (!builder.Environment.IsEnvironment("Test"))
 
     builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
         options.UseNpgsql(connectionString));
+
+    builder.Services.AddDbContext<ApprovalWorkflow.Infrastructure.Persistence.ApprovalWorkflowDbContext>(options =>
+        options.UseNpgsql(connectionString));
 }
 
 // PurchaseManagement BC Services (Repository, Domain Services)
 builder.Services.AddPurchaseManagementServices(builder.Configuration);
+
+// ApprovalWorkflow BC Services (Repository, Boundary Services)
+builder.Services.AddApprovalWorkflowServices(builder.Configuration);
 
 // ASP.NET Core Identity（本番用認証・認可）
 // Identity は技術的関心事なので PlatformDbContext を使用
@@ -371,6 +380,10 @@ if (!app.Environment.IsEnvironment("Test"))
         // PurchaseManagement migrations (PurchaseRequest entities)
         var purchaseManagementContext = scope.ServiceProvider.GetRequiredService<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>();
         await purchaseManagementContext.Database.MigrateAsync();
+
+        // ApprovalWorkflow migrations (Application, WorkflowDefinition entities)
+        var approvalWorkflowContext = scope.ServiceProvider.GetRequiredService<ApprovalWorkflow.Infrastructure.Persistence.ApprovalWorkflowDbContext>();
+        await approvalWorkflowContext.Database.MigrateAsync();
 
         var repository = scope.ServiceProvider.GetRequiredService<IProductRepository>();
 

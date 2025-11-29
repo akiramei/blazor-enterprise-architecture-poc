@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Domain.ApprovalWorkflow</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Domain は Kernel と Shared.Domain のみに依存 -->
+    <ProjectReference Include="..\..\Kernel\Kernel.csproj" />
+    <ProjectReference Include="..\..\Shared\Domain\Shared.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
