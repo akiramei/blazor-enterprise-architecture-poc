@@ -10,6 +10,8 @@ Vertical Slice Architecture（VSA）と20個の実装パターンを提供し、
 
 > **人間の読者へ**: このセクションはAIエージェント専用です。[👤 For Humans](#-for-humans) へスキップしてください。
 
+> **AI向け入口**: まず [LLM_BOOTSTRAP.md](LLM_BOOTSTRAP.md) を読み、指示に従ってください。
+
 ### 必読ファイル（実装前に必ず読むこと）
 
 | 順序 | ファイル | 目的 |

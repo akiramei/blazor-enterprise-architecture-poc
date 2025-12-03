@@ -2,6 +2,12 @@
 
 このファイルは Claude Code および Claude AI エージェントが自動的に読み込む設定ファイルです。
 
+> **このファイルについて**:
+> このCLAUDE.mdは「参照されるガイド」です。
+> 別プロジェクトのCLAUDE.mdから参照して使用します。
+>
+> **推奨**: 初めて読む場合は、まず `LLM_BOOTSTRAP.md` を読んでください。
+
 > **詳細版**: より詳しい情報は `AGENTS.md` を参照してください。
 
 ---
@@ -45,10 +51,12 @@
 
 | 順序 | ファイル | 目的 | 必須度 |
 |:---:|----------|------|:------:|
-| 1 | `catalog/AI_USAGE_GUIDE.md` | 実装ルール・制約・UI配置ルール | **必須** |
-| 2 | `catalog/index.json` | パターン索引・意思決定マトリクス | **必須** |
-| 3 | `catalog/COMMON_MISTAKES.md` | 頻出ミスと回避方法 | **必須** |
-| 4 | `catalog/DECISION_FLOWCHART.md` | パターン選択アルゴリズム | 推奨 |
+| 0 | `LLM_BOOTSTRAP.md` | AIの入口（超要約版） | **推奨** |
+| 1 | `catalog/LLM_PATTERN_INDEX.md` | パターン選択早見表（Markdown版） | **推奨** |
+| 2 | `catalog/AI_USAGE_GUIDE.md` | 実装ルール・制約・UI配置ルール | **必須** |
+| 3 | `catalog/index.json` | パターン索引・意思決定マトリクス | **必須** |
+| 4 | `catalog/COMMON_MISTAKES.md` | 頻出ミスと回避方法 | **必須** |
+| 5 | `catalog/DECISION_FLOWCHART.md` | パターン選択アルゴリズム | 推奨 |
 
 ### 基盤パターン（Kernel）
 
