@@ -10,6 +10,24 @@
 
 ---
 
+## 0. 初回接触（First Contact）
+
+**FIRST_CONTACT.md の URL を受け取った場合**:
+
+開発者から以下のようなURLを受け取った場合：
+```
+https://raw.githubusercontent.com/akiramei/blazor-enterprise-architecture-poc/main/FIRST_CONTACT.md
+```
+
+**対応**:
+1. WebFetch で URL を読み込む
+2. `FIRST_CONTACT.md` の手順に従ってベンダリングを実行
+3. 完了後、`catalog/LLM_BOOTSTRAP.md`（このファイル）を読んで待機
+
+**詳細**: [FIRST_CONTACT.md](FIRST_CONTACT.md) を参照
+
+---
+
 ## 1. このカタログについて
 
 このリポジトリは **Blazor Enterprise Architecture のパターンカタログ** です。
