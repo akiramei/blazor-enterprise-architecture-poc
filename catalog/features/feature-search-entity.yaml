@@ -49,6 +49,17 @@ ai_selection_hints:
     2. ID指定の単一取得 → query-get-by-id
     3. Store だけの追加 → layer-store
 
+applicability:
+  required_characteristics:
+    - op:read-only
+  recommended_characteristics:
+    - layer:full-slice
+  conflicts_with:
+    - op:mutates-state
+  auto_include_behaviors:
+    - logging-behavior
+    - caching-behavior
+
 relationship:
   contains:
     - layer-store

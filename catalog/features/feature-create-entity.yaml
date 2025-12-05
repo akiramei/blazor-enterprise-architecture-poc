@@ -53,6 +53,20 @@ ai_selection_hints:
     2. Store だけの追加 → layer-store
     3. 横断的関心事 → pipeline-behavior
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  recommended_characteristics:
+    - struct:single-aggregate
+    - op:single-transaction
+    - layer:full-slice
+  conflicts_with:
+    - op:read-only
+  auto_include_behaviors:
+    - validation-behavior
+    - transaction-behavior
+    - logging-behavior
+
 relationship:
   contains:
     - layer-store

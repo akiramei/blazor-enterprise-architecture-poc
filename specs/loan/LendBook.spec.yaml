@@ -1,0 +1,99 @@
+# specs/loan/LendBook.spec.yaml
+
+meta:
+  feature: Loan
+  slice: LendBook
+  version: "1.0.0"
+  last_updated: "2025-12-05"
+
+summary: |
+  会員と本を指定して貸出記録を作成する。
+  職員がバーコードリーダーで会員カードと本のバーコードを読み取り、
+  貸出を登録する業務フロー。
+
+# カタログに渡す情報
+catalog_interface:
+  intent_keywords:
+    - "貸出"
+    - "登録"
+    - "作成"
+
+  domain_category: "予約・スケジュール系"
+
+  nonfunctional_requirements:
+    - "監査ログ必須"
+    - "認証必須"
+    - "貸出処理はオンライン完結（同期処理）"
+
+  fallback_characteristics:
+    - op:mutates-state
+    - op:single-transaction
+    - xcut:auth
+    - xcut:audit
+    - struct:single-aggregate
+    - domain:library-core
+
+characteristics:
+  - op:mutates-state
+  - op:single-transaction
+  - xcut:auth
+  - xcut:audit
+  - struct:single-aggregate
+  - domain:library-core
+
+actor: Librarian
+
+boundary:
+  input:
+    - name: member_id
+      source: barcode_scan
+      description: 会員カードのバーコード
+    - name: book_copy_id
+      source: barcode_scan
+      description: 本の蔵書番号バーコード
+  
+  output:
+    success:
+      - "貸出を登録しました（返却期限: {due_date}）"
+    errors:
+      - code: MEMBER_NOT_FOUND
+        message: "会員が見つかりません"
+      - code: LOAN_LIMIT_EXCEEDED
+        message: "現在{current}冊貸出中です。最大5冊までです。"
+      - code: BOOK_NOT_AVAILABLE
+        message: "この本は現在貸出中です"
+      - code: BOOK_NOT_LOANABLE
+        message: "この本は貸出禁止です（参考図書）"
+
+scenarios:
+  happy_path:
+    - 職員が会員番号を入力
+    - 会員が存在し、有効である
+    - 職員が本の蔵書番号を入力
+    - 本が貸出可能状態である
+    - システムが貸出レコードを作成（返却期限 = 貸出日 + 14日）
+    - 完了メッセージを表示
+  
+  exceptions:
+    - id: E1
+      trigger: 会員の貸出数が5冊に達している
+      response: LOAN_LIMIT_EXCEEDED
+    - id: E2
+      trigger: 本が他の会員に貸出中
+      response: BOOK_NOT_AVAILABLE
+
+domain_rules:
+  - id: DR1
+    rule: "1会員あたり同時貸出上限 = 5冊"
+  - id: DR2
+    rule: "貸出期間 = 14日"
+  - id: DR3
+    rule: "延滞判定: 今日 > 返却期限 かつ 未返却 → overdue = true"
+
+creative_areas:
+  - area: domain_model
+    description: "Member, BookCopy, Loan エンティティの設計"
+  - area: validation_logic
+    description: "DR1-DR3を満たす検証ロジック"
+  - area: ui_layout
+    description: "バーコード入力フォームのレイアウト"

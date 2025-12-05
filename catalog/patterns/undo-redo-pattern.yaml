@@ -18,6 +18,15 @@ layers:
   - application
   - domain
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  recommended_for:
+    - layer:ui
+  typical_scenarios:
+    - "操作の取り消し"
+    - "やり直し機能"
+
 ai_selection_hints:
   trigger_phrases:
     - "元に戻す"

@@ -10,6 +10,14 @@ description: |
   オプショナルなフィルタ条件を組み合わせることで、
   柔軟な絞り込みが可能。
 
+applicability:
+  required_characteristics:
+    - op:read-only
+  recommended_for:
+    - domain:reporting
+  conflicts_with:
+    - op:mutates-state
+
 use_cases:
   - "予約一覧（今日/今週/今月の予約）"
   - "売上履歴（期間指定）"

@@ -20,6 +20,13 @@ preconditions:
   - "ApplicationMetrics が実装されている"
   - "OpenTelemetry が構成されている"
 
+applicability:
+  always_apply: true
+  reason: "メトリクス収集は全ての操作で推奨"
+  required_characteristics:
+    - xcut:metrics
+  recommended_for: []
+
 implementation:
   file_path: "src/Shared/Infrastructure/Behaviors/MetricsBehavior.cs"
   namespace: "Shared.Infrastructure.Behaviors"

@@ -281,6 +281,94 @@ src/
 
 ---
 
+## 🔄 Standard Generation Flow（SPEC/Manifest統合）
+
+SPEC + Manifest がある場合の標準生成フロー。
+`specs/` と `manifests/` が提供された場合、こちらのフローを優先する。
+
+### Phase 0: 事前読み込み
+
+```
+1. specs/{feature}/{slice}.spec.yaml を読む
+2. manifests/{feature}/{slice}.manifest.yaml を読む
+3. catalog/CHARACTERISTICS_CATALOG.md で語彙を確認
+4. catalog_binding.from_catalog からパターンIDリストを取得
+5. 各パターンYAMLを読み込む
+```
+
+### Phase 1: 骨組み生成（Non-Creative）
+
+Manifestの `non_creative` 領域に基づき、パターンテンプレートを適用：
+
+| カテゴリ | パターン | 生成物 |
+|---------|---------|-------|
+| command_structure | feature-create-entity | Command.cs, Handler.cs |
+| validation_pipeline | validation-behavior | Validator.cs（自動適用） |
+| transaction_management | transaction-behavior | （自動適用、SaveChangesAsync不要） |
+| authorization | authorization-behavior | （属性で制御） |
+| audit_logging | audit-log-behavior | （自動適用） |
+
+### Phase 2: Cross-cutting適用
+
+SPECの `characteristics` に基づき、非機能要件パターンを適用：
+
+| characteristic | 適用パターン | 実行順序 |
+|---------------|-------------|:--------:|
+| xcut:validation | validation-behavior | 100 |
+| xcut:auth | authorization-behavior | 200 |
+| xcut:idempotent | idempotency-behavior | 300 |
+| xcut:cache | caching-behavior | 350 |
+| xcut:transaction | transaction-behavior | 400 |
+| xcut:audit | audit-log-behavior | 550 |
+| xcut:logging | logging-behavior | 600 |
+
+### Phase 3: Business Logic実装（Creative）
+
+Manifestの `creative` 領域に基づき実装：
+
+```
+□ Domain Model設計
+  └── SPECの domain_rules を参照
+  └── Entity.CanXxx() メソッドを実装
+
+□ Validation Logic
+  └── SPECの scenarios.exceptions を参照
+  └── FluentValidation ルールを実装
+
+□ Repository Interface
+  └── I{Entity}Repository.cs を作成
+```
+
+### Phase 4: UI実装（Creative）
+
+SPECの `boundary` 定義に基づき実装：
+
+```
+□ Store + State定義
+  └── {Feature}Store.cs
+  └── {Feature}State.cs
+
+□ PageActions定義
+  └── {Feature}PageActions.cs
+
+□ Razorコンポーネント
+  └── Features/{Feature}/{Feature}.razor に配置
+  └── SPECの boundary.input/output を参照
+```
+
+### 生成完了チェックリスト
+
+```
+□ Manifestのnon_creativeはパターンテンプレート通りか
+□ SaveChangesAsync()を呼んでいないか（TransactionBehaviorに任せる）
+□ Result<T>パターンを使用しているか
+□ UIはFeatures/{Feature}/に配置されているか
+□ Entity.CanXxx()がドメインルールを実装しているか
+□ ICommand<Result<T>>を使用しているか（IRequest<T>直接使用禁止）
+```
+
+---
+
 ## 📋 推奨実装順序（機能スライス単位）
 
 **1つの機能を完了してから次の機能へ進む。** これにより、UIを作成する時点で「この.razorはどの機能の一部か」が明確になる。

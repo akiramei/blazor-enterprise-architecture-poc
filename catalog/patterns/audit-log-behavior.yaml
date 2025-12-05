@@ -52,6 +52,16 @@ ai_selection_hints:
     2. パフォーマンス測定 → MetricsBehavior
     3. Query実行の記録 → 不要（Queryは副作用がないため）
 
+applicability:
+  required_characteristics:
+    - xcut:audit
+  recommended_for:
+    - op:mutates-state
+    - domain:financial
+    - domain:library-core
+  conflicts_with: []
+  reason: "監査要件がある場合に適用"
+
 relationship:
   works_with:
     - transaction-behavior (同一トランザクション内でコミット)

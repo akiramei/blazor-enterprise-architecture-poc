@@ -7,6 +7,15 @@ description: |
   ドメインファクトリメソッドを使用して新規エンティティを作成するパターン。
   検証、認可、トランザクション、冪等性が自動的に適用されます。
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  recommended_for:
+    - struct:single-aggregate
+  typical_scenarios:
+    - "新規エンティティ作成"
+  note: "feature-create-entity の内部で使用される低レベルパターン"
+
 dependencies:
   patterns:
     - validation-behavior

@@ -37,6 +37,16 @@ preconditions:
   - "ICurrentUserService がDIで利用可能（テナント/ユーザー情報取得）"
   - "Query が ICacheableQuery を実装している"
 
+applicability:
+  required_characteristics:
+    - xcut:cache
+  recommended_for:
+    - op:read-only
+    - domain:master
+  conflicts_with:
+    - op:mutates-state
+  reason: "読み取り操作のキャッシュに使用"
+
 interface_definition:
   file_path: "src/Shared/Application/Interfaces/ICacheableQuery.cs"
   namespace: "Shared.Application.Interfaces"

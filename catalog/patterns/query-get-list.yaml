@@ -7,6 +7,14 @@ description: |
   エンティティの全件を取得するシンプルなクエリパターン。
   キャッシュを有効化して、頻繁にアクセスされるデータの取得を高速化できます。
 
+applicability:
+  required_characteristics:
+    - op:read-only
+  recommended_for:
+    - layer:application
+  conflicts_with:
+    - op:mutates-state
+
 dependencies:
   patterns:
     - caching-behavior

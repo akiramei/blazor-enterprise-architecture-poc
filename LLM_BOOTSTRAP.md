@@ -97,6 +97,31 @@
 | catalog/implementation/IMPLEMENTATION_GUIDE.md | 実装の6ステップ |
 | 計画で選択されたパターンYAML | テンプレート適用 |
 
+### SPEC/Manifestがある場合の読み順
+
+`specs/` と `manifests/` フォルダが存在する場合、以下の順序で読むこと：
+
+| 順序 | ファイル | 目的 |
+|:---:|----------|------|
+| 1 | `specs/{feature}/{slice}.spec.yaml` | 業務仕様（What） |
+| 2 | `manifests/{feature}/{slice}.manifest.yaml` | パターン選択記録（Bridge） |
+| 3 | `catalog/CHARACTERISTICS_CATALOG.md` | characteristics語彙理解 |
+| 4 | `catalog_binding.from_catalog` のパターンYAML | テンプレート取得 |
+
+**characteristicsからパターン選択**:
+
+SPECの `characteristics` を確認し、対応するパターンを特定：
+
+```
+op:mutates-state → feature-create/update/delete-entity
+op:read-only → query-get-list, feature-search-entity
+xcut:auth → authorization-behavior
+xcut:audit → audit-log-behavior
+struct:multi-aggregate → domain-validation-service
+```
+
+**生成フロー**: CLAUDE.md の「Standard Generation Flow」セクションを参照
+
 ---
 
 ## 5. フェーズ判断フロー

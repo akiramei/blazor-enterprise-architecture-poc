@@ -8,6 +8,14 @@ description: |
   詳細画面や編集画面でのデータ取得に使用。
   キャッシュを有効化して、同一IDへの頻繁なアクセスを高速化できます。
 
+applicability:
+  required_characteristics:
+    - op:read-only
+  recommended_for:
+    - layer:application
+  conflicts_with:
+    - op:mutates-state
+
 dependencies:
   patterns:
     - caching-behavior

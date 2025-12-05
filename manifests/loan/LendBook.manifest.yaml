@@ -1,0 +1,92 @@
+# manifests/loan/LendBook.manifest.yaml
+
+meta:
+  slice: LendBook
+  spec_path: "../../specs/loan/LendBook.spec.yaml"
+  generated_at: "2025-12-05T10:00:00Z"
+  generator: "ai"
+
+catalog_binding:
+  catalog:
+    repo: "akiramei/blazor-enterprise-architecture-poc"
+    version: "v2025.11.27.3"
+  match_result:
+    status: "full"
+    from_catalog:
+      # intent_keywords → ai_decision_matrix
+      - id: feature-create-entity
+        matched_by: "intent_keywords['作成', '登録'] → ai_decision_matrix.新機能追加"
+      
+      # domain_category → domain_hints
+      - id: domain-validation-service
+        matched_by: "domain_category['予約・スケジュール系'] → domain_hints.recommended_patterns"
+      
+      - id: domain-typed-id
+        matched_by: "domain_category['予約・スケジュール系'] → domain_hints.recommended_patterns"
+      
+      # nonfunctional_requirements → nonfunctional_pattern_hints
+      - id: audit-log-behavior
+        matched_by: "nonfunctional_requirements['監査ログ必須'] → nonfunctional_pattern_hints.図書館・貸出管理"
+      
+      - id: logging-behavior
+        matched_by: "nonfunctional_requirements → nonfunctional_pattern_hints.図書館・貸出管理"
+      
+      - id: validation-behavior
+        matched_by: "標準CQRS構成 → recommended_combinations"
+      
+      - id: transaction-behavior
+        matched_by: "標準CQRS構成 → recommended_combinations"
+      
+      - id: authorization-behavior
+        matched_by: "nonfunctional_requirements['認証必須'] → 標準CQRS構成"
+
+    unmatched: []
+
+spec_derived:
+  supplemental_guidance:
+    # カタログのパターンを使うが、SPEC固有の補足が必要な場合
+    - pattern_id: domain-validation-service
+      guidance: |
+        SPECのDR1「1会員あたり同時貸出上限 = 5冊」を実装。
+        - Member.CurrentLoanCount を取得
+        - Member.CanBorrow() メソッドで判定
+        
+        SPECのE2「本が他の会員に貸出中」を実装。
+        - BookCopy.IsAvailableForLoan で判定
+
+creative_boundary:
+  non_creative:
+    - category: "command_structure"
+      provider: "feature-create-entity"
+    
+    - category: "validation_pipeline"
+      provider: "validation-behavior"
+    
+    - category: "transaction_management"
+      provider: "transaction-behavior"
+    
+    - category: "authorization"
+      provider: "authorization-behavior"
+    
+    - category: "audit_logging"
+      provider: "audit-log-behavior"
+    
+    - category: "request_logging"
+      provider: "logging-behavior"
+
+  creative:
+    - area: domain_model
+      owner: ai
+    
+    - area: validation_logic
+      owner: ai
+    
+    - area: ui_layout
+      owner: ai
+
+generation_hints:
+  notes:
+    - "SaveChangesAsyncはHandler内で呼ばない（TransactionBehaviorに任せる）"
+    - "Result<T>パターンを使用（例外をthrowしない）"
+    - "ICommand<Result<Guid>>を使用（IRequest<T>直接使用禁止）"
+    - "Store + PageActionsパターンでUIを実装"

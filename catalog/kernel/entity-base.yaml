@@ -22,6 +22,15 @@ description: |
   RaiseDomainEvent() でイベントを発行します。
   これらのイベントは永続化時に取り出され、Outboxパターンで配信されます。
 
+applicability:
+  always_apply: true
+  reason: "DDDでエンティティを使用する際の基盤パターン"
+  required_characteristics: []
+  recommended_for:
+    - layer:domain
+    - struct:single-aggregate
+  note: "プロジェクト初期化時に必ず含める"
+
 # ============================================================================
 # 実装テンプレート
 # ============================================================================

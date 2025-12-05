@@ -23,6 +23,15 @@ preconditions:
   - "認証ミドルウェアが有効"
   - "[Authorize] 属性が定義されている (Shared.Application.Attributes)"
 
+applicability:
+  required_characteristics:
+    - xcut:auth
+  recommended_for:
+    - op:mutates-state
+    - domain:workflow
+  conflicts_with: []
+  reason: "認証/認可が必要な操作に適用"
+
 implementation:
   file_path: "src/Shared/Infrastructure/Behaviors/AuthorizationBehavior.cs"
   namespace: "Shared.Infrastructure.Behaviors"

@@ -28,6 +28,16 @@ layers:
   - application
   - infrastructure
 
+applicability:
+  required_characteristics:
+    - op:read-only
+    - domain:reporting
+  recommended_for:
+    - xcut:cache
+  typical_scenarios:
+    - "集計レポート"
+    - "統計情報"
+
 # ============================================================================
 # AI選択ヒント
 # ============================================================================

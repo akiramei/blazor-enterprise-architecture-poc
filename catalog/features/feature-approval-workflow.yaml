@@ -49,6 +49,21 @@ ai_selection_hints:
     2. タスク管理システム → task-management-pattern
     3. 単一承認のみ → 簡易版でOK
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+    - domain:workflow
+  recommended_characteristics:
+    - struct:state-machine
+    - xcut:audit
+  conflicts_with:
+    - op:read-only
+  auto_include_behaviors:
+    - validation-behavior
+    - transaction-behavior
+    - audit-log-behavior
+    - authorization-behavior
+
 relationship:
   contains:
     - command-pattern

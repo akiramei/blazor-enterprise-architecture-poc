@@ -19,6 +19,17 @@ description: |
   - 入力値の形式検証 → FluentValidation（ValidationBehavior）
   - データベースの存在確認のみ → Handler内で実装
 
+applicability:
+  required_characteristics:
+    - struct:multi-aggregate
+  recommended_for:
+    - op:mutates-state
+  typical_scenarios:
+    - "重複チェック"
+    - "在庫確認"
+    - "残高確認"
+    - "予約可否判定"
+
 preconditions:
   - "ドメイン層（src/Domain/{BC}/）が存在すること"
   - "検証対象のエンティティが定義されていること"

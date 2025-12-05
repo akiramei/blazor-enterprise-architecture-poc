@@ -21,6 +21,13 @@ comparison:
   mvc: "Controller"
   redux: "Action Creators"
 
+applicability:
+  required_characteristics:
+    - layer:ui
+  recommended_for:
+    - layer:full-slice
+  note: "Feature Sliceに含まれるUI手順オーケストレーションパターン"
+
 implementation:
   file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Actions/{Entity}{Operation}Actions.cs"
   template: |

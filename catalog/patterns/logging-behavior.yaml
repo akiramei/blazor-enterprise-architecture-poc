@@ -21,6 +21,12 @@ preconditions:
   - "ILogger が DI 登録されている"
   - "ICorrelationIdAccessor が実装されている"
 
+applicability:
+  always_apply: true
+  reason: "リクエストログは全ての操作で必要"
+  required_characteristics: []
+  recommended_for: []
+
 implementation:
   file_path: "src/Shared/Infrastructure/Behaviors/LoggingBehavior.cs"
   namespace: "Shared.Infrastructure.Behaviors"

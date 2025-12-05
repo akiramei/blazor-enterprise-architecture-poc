@@ -21,6 +21,13 @@ comparison:
   redux: "Store + Actions"
   mvc: "Controller (部分的)"
 
+applicability:
+  required_characteristics:
+    - layer:ui
+  recommended_for:
+    - layer:full-slice
+  note: "Feature Sliceに含まれるUI層の状態管理パターン"
+
 implementation:
   state:
     file_path: "src/Application/Infrastructure/{BoundedContext}/UI/Store/{Entity}{Operation}State.cs"

@@ -43,6 +43,15 @@ preconditions:
   - "Validator クラスが AbstractValidator<T> を継承している"
   - "Result 型が定義されている"
 
+applicability:
+  always_apply: true
+  reason: "入力検証は全てのCommand/Queryで必要"
+  required_characteristics: []
+  recommended_for:
+    - op:mutates-state
+  optional_for:
+    - op:read-only
+
 implementation:
   file_path: "src/Shared/Infrastructure/Behaviors/ValidationBehavior.cs"
   namespace: "Shared.Infrastructure.Behaviors"

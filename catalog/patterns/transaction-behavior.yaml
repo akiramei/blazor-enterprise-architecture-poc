@@ -46,6 +46,15 @@ preconditions:
   - "すべての Command が ICommand を実装している"
   - "OutboxMessages DbSet が定義されている"
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  always_apply_when:
+    - op:single-transaction
+  conflicts_with:
+    - op:read-only
+  reason: "状態変更には必ずトランザクション管理が必要"
+
 implementation:
   file_path: "src/Application/Infrastructure/ProductCatalog/Infrastructure/Persistence/Behaviors/TransactionBehavior.cs"
   namespace: "ProductCatalog.Shared.Infrastructure.Persistence.Behaviors"

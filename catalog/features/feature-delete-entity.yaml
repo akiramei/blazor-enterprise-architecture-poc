@@ -50,6 +50,19 @@ ai_selection_hints:
     2. 更新・編集 → feature-update-entity
     3. 一括削除 → feature-bulk-delete (別パターン)
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  recommended_characteristics:
+    - struct:single-aggregate
+    - op:single-transaction
+  conflicts_with:
+    - op:read-only
+  auto_include_behaviors:
+    - validation-behavior
+    - transaction-behavior
+    - logging-behavior
+
 relationship:
   contains:
     - command-pattern

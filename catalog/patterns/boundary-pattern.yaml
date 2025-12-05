@@ -18,6 +18,16 @@ scope: domain-pattern
 layers:
   - domain
 
+applicability:
+  required_characteristics:
+    - layer:ui
+  recommended_for:
+    - op:mutates-state
+  typical_scenarios:
+    - "操作可否判定"
+    - "Entity.CanXxx()パターン"
+    - "UIからの操作制御"
+
 # ============================================================================
 # Robustness Analysis との対応
 # ============================================================================

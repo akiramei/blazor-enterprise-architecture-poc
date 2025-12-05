@@ -21,6 +21,16 @@ description: |
   - 読み取り時にロックを取得し、他の更新をブロック
   - **用途**: 予約の重複チェックなど、厳密な排他制御が必要な場合
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  recommended_for:
+    - domain:inventory
+    - struct:multi-aggregate
+  typical_scenarios:
+    - "楽観的ロック"
+    - "在庫引当"
+
 preconditions:
   - "EF Core または Dapper を使用していること"
   - "データベースがトランザクションをサポートしていること"

@@ -19,6 +19,17 @@ description: |
   - `src/Application/Infrastructure/{BC}/Application/Queries/` にインターフェース
   - `src/Application/Infrastructure/{BC}/Infrastructure/Persistence/` に実装
 
+applicability:
+  required_characteristics:
+    - op:read-only
+    - struct:multi-aggregate
+  recommended_for:
+    - domain:reporting
+  typical_scenarios:
+    - "空き検索"
+    - "NOT EXISTS条件"
+    - "複合条件検索"
+
 preconditions:
   - "Dapper または EF Core が使用可能であること"
   - "IDbConnectionFactory が定義されていること（Dapper使用時）"

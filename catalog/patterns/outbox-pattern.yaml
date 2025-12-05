@@ -21,6 +21,16 @@ layers:
   - infrastructure
   - application
 
+applicability:
+  required_characteristics:
+    - struct:event-driven
+    - op:async
+  recommended_for:
+    - op:mutates-state
+  typical_scenarios:
+    - "イベント配信"
+    - "結果整合性"
+
 # ============================================================================
 # AI選択ヒント
 # ============================================================================

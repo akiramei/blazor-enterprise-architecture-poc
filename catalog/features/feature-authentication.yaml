@@ -297,6 +297,16 @@ security_considerations:
   - item: "Token Revocation"
     description: "ログアウト時・パスワード変更時にRefresh Tokenを無効化"
 
+applicability:
+  required_characteristics:
+    - xcut:auth
+  recommended_characteristics:
+    - layer:full-slice
+  conflicts_with: []
+  auto_include_behaviors:
+    - logging-behavior
+    - metrics-behavior
+
 related_patterns:
   - id: "authorization-behavior"
     relationship: "uses"

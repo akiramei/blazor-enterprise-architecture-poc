@@ -47,6 +47,17 @@ ai_selection_hints:
     2. PDF出力 → 別パターン
     3. 画面表示のみ → feature-search-entity
 
+applicability:
+  required_characteristics:
+    - op:read-only
+    - op:batch
+  recommended_characteristics:
+    - layer:full-slice
+  conflicts_with:
+    - op:mutates-state
+  auto_include_behaviors:
+    - logging-behavior
+
 relationship:
   contains:
     - query-pattern

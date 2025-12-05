@@ -1,0 +1,130 @@
+@page "/lend-book"
+@using Application.Features.LendBook
+@inject LendBookStore Store
+@inject LendBookPageActions Actions
+@implements IDisposable
+
+<PageTitle>貸出登録</PageTitle>
+
+<h1>貸出登録</h1>
+
+@* SPEC: boundary.input - バーコード入力 *@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">バーコード入力</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label for="memberBarcode" class="form-label">会員バーコード</label>
+            <input type="text"
+                   id="memberBarcode"
+                   class="form-control"
+                   placeholder="会員カードをスキャン"
+                   value="@Store.State.MemberBarcode"
+                   @onchange="OnMemberBarcodeChanged"
+                   disabled="@Store.State.IsLoading" />
+        </div>
+
+        <div class="mb-3">
+            <label for="bookCopyBarcode" class="form-label">蔵書バーコード</label>
+            <input type="text"
+                   id="bookCopyBarcode"
+                   class="form-control"
+                   placeholder="本のバーコードをスキャン"
+                   value="@Store.State.BookCopyBarcode"
+                   @onchange="OnBookCopyBarcodeChanged"
+                   disabled="@Store.State.IsLoading" />
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button"
+                    class="btn btn-primary"
+                    disabled="@(!Store.State.CanSubmit)"
+                    @onclick="OnLendClicked">
+                @if (Store.State.IsLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>処理中...</span>
+                }
+                else
+                {
+                    <span>貸出登録</span>
+                }
+            </button>
+
+            <button type="button"
+                    class="btn btn-secondary"
+                    disabled="@Store.State.IsLoading"
+                    @onclick="OnResetClicked">
+                リセット
+            </button>
+        </div>
+    </div>
+</div>
+
+@* SPEC: boundary.output.errors - エラー表示 *@
+@if (!string.IsNullOrEmpty(Store.State.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>エラー:</strong> @Store.State.ErrorMessage
+        <button type="button" class="btn-close" @onclick="OnDismissError"></button>
+    </div>
+}
+
+@* SPEC: boundary.output.success - 成功メッセージ *@
+@if (!string.IsNullOrEmpty(Store.State.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>成功:</strong> @Store.State.SuccessMessage
+        <button type="button" class="btn-close" @onclick="OnDismissSuccess"></button>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Store.OnChangeAsync += StateHasChangedAsync;
+    }
+
+    private async Task StateHasChangedAsync()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnMemberBarcodeChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        await Actions.OnMemberBarcodeScannedAsync(value);
+    }
+
+    private async Task OnBookCopyBarcodeChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        await Actions.OnBookCopyBarcodeScannedAsync(value);
+    }
+
+    private async Task OnLendClicked()
+    {
+        await Actions.OnLendClickedAsync();
+    }
+
+    private async Task OnResetClicked()
+    {
+        await Actions.OnResetClickedAsync();
+    }
+
+    private async Task OnDismissError()
+    {
+        await Store.ResetAsync();
+    }
+
+    private async Task OnDismissSuccess()
+    {
+        await Store.ResetAsync();
+    }
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= StateHasChangedAsync;
+    }
+}

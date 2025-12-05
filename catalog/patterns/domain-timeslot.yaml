@@ -18,6 +18,16 @@ use_cases:
   - "施設利用予約"
   - "診察予約"
 
+applicability:
+  required_characteristics:
+    - struct:timeslot
+  recommended_for:
+    - domain:reservation
+  typical_scenarios:
+    - "予約時間枠"
+    - "会議室予約"
+    - "施設利用時間"
+
 implementation:
   file_path: "src/Domain/{BoundedContext}/{Aggregate}/TimeSlot.cs"
   template: |

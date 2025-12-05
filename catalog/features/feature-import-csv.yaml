@@ -47,6 +47,19 @@ ai_selection_hints:
     2. 単一ファイルのアップロード → feature-file-upload
     3. Excelファイル（.xlsx） → feature-import-excel (別パターン)
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+    - op:batch
+  recommended_characteristics:
+    - layer:full-slice
+  conflicts_with:
+    - op:read-only
+  auto_include_behaviors:
+    - validation-behavior
+    - transaction-behavior
+    - logging-behavior
+
 relationship:
   contains:
     - command-pattern

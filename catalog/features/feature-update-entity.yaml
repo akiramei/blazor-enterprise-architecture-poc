@@ -48,6 +48,20 @@ ai_selection_hints:
     2. 削除 → feature-delete-entity
     3. 検索・表示のみ → feature-search-entity
 
+applicability:
+  required_characteristics:
+    - op:mutates-state
+  recommended_characteristics:
+    - struct:single-aggregate
+    - op:single-transaction
+    - layer:full-slice
+  conflicts_with:
+    - op:read-only
+  auto_include_behaviors:
+    - validation-behavior
+    - transaction-behavior
+    - logging-behavior
+
 relationship:
   contains:
     - command-pattern

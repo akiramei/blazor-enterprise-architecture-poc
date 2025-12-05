@@ -12,6 +12,17 @@ scope: domain-pattern
 layers:
   - domain
 
+applicability:
+  required_characteristics:
+    - struct:state-machine
+  recommended_for:
+    - domain:workflow
+    - op:mutates-state
+  typical_scenarios:
+    - "承認フロー"
+    - "注文ステータス"
+    - "貸出状態管理"
+
 ai_selection_hints:
   trigger_phrases:
     - "ステートマシン"

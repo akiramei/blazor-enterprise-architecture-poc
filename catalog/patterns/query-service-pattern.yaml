@@ -17,6 +17,14 @@ layers:
   - application
   - infrastructure
 
+applicability:
+  required_characteristics:
+    - op:read-only
+  recommended_for:
+    - struct:multi-aggregate
+  conflicts_with:
+    - op:mutates-state
+
 ai_selection_hints:
   trigger_phrases:
     - "Query統一"

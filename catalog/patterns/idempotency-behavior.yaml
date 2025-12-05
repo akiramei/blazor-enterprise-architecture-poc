@@ -25,6 +25,17 @@ preconditions:
   - "IdempotencyRecord ドメインモデルが定義されている"
   - "すべての Command が IdempotencyKey プロパティを持つ"
 
+applicability:
+  required_characteristics:
+    - xcut:idempotent
+    - op:idempotent
+  recommended_for:
+    - op:mutates-state
+    - domain:financial
+  conflicts_with:
+    - op:read-only
+  reason: "冪等性が必要な操作に適用"
+
 implementation:
   file_path: "src/Shared/Infrastructure/Behaviors/IdempotencyBehavior.cs"
   namespace: "Shared.Infrastructure.Behaviors"

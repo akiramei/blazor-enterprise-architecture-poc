@@ -13,6 +13,15 @@ layers:
   - application
   - ui
 
+applicability:
+  required_characteristics:
+    - struct:event-driven
+  recommended_for:
+    - layer:ui
+  typical_scenarios:
+    - "リアルタイム通知"
+    - "WebSocket/SignalR"
+
 ai_selection_hints:
   trigger_phrases:
     - "リアルタイム通知"

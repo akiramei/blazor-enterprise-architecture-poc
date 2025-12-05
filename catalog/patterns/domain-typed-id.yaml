@@ -16,6 +16,15 @@ benefits:
   - "ファクトリ制御: ID生成ルールを一元管理"
   - "暗黙的変換: 必要に応じて Guid への変換を許可"
 
+applicability:
+  required_characteristics:
+    - struct:typed-id
+  recommended_for:
+    - struct:single-aggregate
+  typical_scenarios:
+    - "型安全なエンティティID"
+    - "集約ルートの識別"
+
 implementation:
   file_path: "src/Domain/{BoundedContext}/{Aggregate}/{Entity}Id.cs"
   template: |

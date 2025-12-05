@@ -12,6 +12,16 @@ scope: domain-pattern
 layers:
   - domain
 
+applicability:
+  required_characteristics:
+    - domain:workflow
+  recommended_for:
+    - xcut:audit
+    - struct:state-machine
+  typical_scenarios:
+    - "承認履歴記録"
+    - "ワークフロー追跡"
+
 ai_selection_hints:
   trigger_phrases:
     - "承認履歴"
