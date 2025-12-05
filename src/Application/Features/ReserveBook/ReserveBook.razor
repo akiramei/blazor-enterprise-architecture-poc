@@ -1,0 +1,138 @@
+@page "/reserve-book"
+@using Application.Features.ReserveBook
+@inject ReserveBookStore Store
+@inject ReserveBookPageActions Actions
+@implements IDisposable
+
+<PageTitle>予約登録</PageTitle>
+
+<h1>予約登録</h1>
+
+@* SPEC: boundary.input - 会員・本の選択 *@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">予約情報入力</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label for="memberId" class="form-label">会員ID</label>
+            <input type="text"
+                   id="memberId"
+                   class="form-control"
+                   placeholder="会員IDを入力"
+                   value="@Store.State.MemberId"
+                   @onchange="OnMemberIdChanged"
+                   disabled="@Store.State.IsLoading" />
+            <div class="form-text">※ 本来は会員検索から選択</div>
+        </div>
+
+        <div class="mb-3">
+            <label for="bookCopyId" class="form-label">蔵書ID</label>
+            <input type="text"
+                   id="bookCopyId"
+                   class="form-control"
+                   placeholder="蔵書IDを入力"
+                   value="@Store.State.BookCopyId"
+                   @onchange="OnBookCopyIdChanged"
+                   disabled="@Store.State.IsLoading" />
+            <div class="form-text">※ 本来は検索結果から選択</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button"
+                    class="btn btn-primary"
+                    disabled="@(!Store.State.CanSubmit)"
+                    @onclick="OnReserveClicked">
+                @if (Store.State.IsLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>処理中...</span>
+                }
+                else
+                {
+                    <span>予約する</span>
+                }
+            </button>
+
+            <button type="button"
+                    class="btn btn-secondary"
+                    disabled="@Store.State.IsLoading"
+                    @onclick="OnResetClicked">
+                リセット
+            </button>
+        </div>
+    </div>
+</div>
+
+@* SPEC: boundary.output.errors - エラー表示 *@
+@if (!string.IsNullOrEmpty(Store.State.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>エラー:</strong> @Store.State.ErrorMessage
+        <button type="button" class="btn-close" @onclick="OnDismissError"></button>
+    </div>
+}
+
+@* SPEC: boundary.output.success - 成功メッセージ *@
+@if (!string.IsNullOrEmpty(Store.State.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>成功:</strong> @Store.State.SuccessMessage
+        <button type="button" class="btn-close" @onclick="OnDismissSuccess"></button>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Store.OnChangeAsync += StateHasChangedAsync;
+    }
+
+    private async Task StateHasChangedAsync()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnMemberIdChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        if (Guid.TryParse(value, out var memberId))
+        {
+            await Actions.OnMemberSelectedAsync(memberId);
+        }
+    }
+
+    private async Task OnBookCopyIdChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        if (Guid.TryParse(value, out var bookCopyId))
+        {
+            await Actions.OnBookSelectedAsync(bookCopyId);
+        }
+    }
+
+    private async Task OnReserveClicked()
+    {
+        await Actions.OnReserveClickedAsync();
+    }
+
+    private async Task OnResetClicked()
+    {
+        await Actions.OnResetClickedAsync();
+    }
+
+    private async Task OnDismissError()
+    {
+        await Store.ResetAsync();
+    }
+
+    private async Task OnDismissSuccess()
+    {
+        await Store.ResetAsync();
+    }
+
+    public void Dispose()
+    {
+        Store.OnChangeAsync -= StateHasChangedAsync;
+    }
+}

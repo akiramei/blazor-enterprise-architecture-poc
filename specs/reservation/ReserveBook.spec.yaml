@@ -1,0 +1,99 @@
+# specs/reservation/ReserveBook.spec.yaml
+
+meta:
+  feature: Reservation
+  slice: ReserveBook
+  version: "1.0.0"
+  last_updated: "2025-12-05"
+
+summary: |
+  貸出中の本を予約する機能。
+  会員が貸出中の本を予約すると、返却時に優先的に借りられるようになる。
+
+catalog_interface:
+  intent_keywords:
+    - "予約"
+    - "取り置き"
+    - "登録"
+
+  domain_category: "予約・スケジュール系"
+
+  nonfunctional_requirements:
+    - "認証必須"
+    - "予約処理はオンライン完結（同期処理）"
+
+  fallback_characteristics:
+    - op:mutates-state
+    - op:single-transaction
+    - xcut:auth
+    - xcut:validation
+    - struct:multi-aggregate
+    - domain:reservation
+
+characteristics:
+  - op:mutates-state
+  - op:single-transaction
+  - xcut:auth
+  - xcut:validation
+  - struct:multi-aggregate
+  - domain:reservation
+  - layer:full-slice
+
+actor: Member
+
+boundary:
+  input:
+    - name: book_id
+      source: search_result
+      description: 予約対象の本のID（検索結果から選択）
+
+  output:
+    success:
+      - "予約を受け付けました。順番が来たらメールでお知らせします。"
+      - "現在の予約順位: {position}番目"
+    errors:
+      - code: BOOK_NOT_FOUND
+        message: "本が見つかりません"
+      - code: ALREADY_RESERVED
+        message: "この本は既に予約済みです"
+      - code: BOOK_AVAILABLE
+        message: "この本は現在貸出可能です。予約ではなく貸出をご利用ください"
+      - code: RESERVATION_LIMIT_EXCEEDED
+        message: "予約上限（3冊）に達しています"
+
+scenarios:
+  happy_path:
+    - 会員が本を検索する
+    - 貸出中の本を選択する
+    - 予約ボタンを押す
+    - システムが予約を登録
+    - 予約確認メッセージを表示
+
+  exceptions:
+    - id: E1
+      trigger: 会員の予約数が3件に達している
+      response: RESERVATION_LIMIT_EXCEEDED
+    - id: E2
+      trigger: 同じ本を既に予約している
+      response: ALREADY_RESERVED
+    - id: E3
+      trigger: 本が貸出可能（予約不要）
+      response: BOOK_AVAILABLE
+
+domain_rules:
+  - id: DR1
+    rule: "1会員あたり同時予約上限 = 3冊"
+  - id: DR2
+    rule: "予約は貸出中の本のみ可能"
+  - id: DR3
+    rule: "同一会員が同じ本を複数回予約することは不可"
+  - id: DR4
+    rule: "予約順位は予約日時の早い順"
+
+creative_areas:
+  - area: domain_model
+    description: "Reservation, Book エンティティの設計"
+  - area: validation_logic
+    description: "DR1-DR4を満たす検証ロジック"
+  - area: ui_layout
+    description: "本の検索・予約フォームのレイアウト"

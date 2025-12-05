@@ -1,0 +1,118 @@
+# catalog/scaffolds/spec-yaml-template.yaml
+#
+# SPEC（業務仕様）のYAMLテンプレート
+#
+# 使い方:
+#   1. このファイルをコピーして specs/{feature}/{slice}.spec.yaml を作成
+#   2. {placeholder} を実際の値に置換
+#   3. オプションセクションは必要に応じて削除可能
+#
+# 関連ドキュメント:
+#   - specs/README.md: SPECの書き方ガイド
+#   - catalog/CHARACTERISTICS_CATALOG.md: characteristics語彙定義
+
+# ============================================================================
+# 必須セクション
+# ============================================================================
+
+meta:
+  feature: "{Feature}"          # 機能名（例: Loan, Reservation）
+  slice: "{Slice}"              # スライス名（例: LendBook, ReserveBook）
+  version: "1.0.0"
+  last_updated: "{YYYY-MM-DD}"
+
+summary: |
+  {この機能が何をするか、1-3文で説明}
+
+actor: "{Actor}"  # 誰が使うか（例: Librarian, Customer, Admin）
+
+# characteristics: パターン自動選択のヒント
+# 詳細: catalog/CHARACTERISTICS_CATALOG.md
+characteristics:
+  # 操作タイプ
+  - op:{mutates-state|read-only|batch}
+
+  # 横断的関心事（必要なものを選択）
+  - xcut:validation
+  # - xcut:auth
+  # - xcut:audit
+  # - xcut:cache
+
+  # 構造的特性
+  - struct:{single-aggregate|multi-aggregate}
+
+  # ドメイン分類
+  - domain:{library-core|reservation|workflow|...}
+
+  # 層の指定
+  - layer:{full-slice|ui|domain-only}
+
+# ドメインルール
+domain_rules:
+  - id: DR1
+    rule: "{業務ルール1}"
+  - id: DR2
+    rule: "{業務ルール2}"
+
+# ============================================================================
+# オプションセクション（必要に応じて使用）
+# ============================================================================
+
+# catalog_interface: カタログとの連携を強化したい場合に使用
+# 注意: 省略可能。単純なSliceでは不要
+catalog_interface:
+  intent_keywords:
+    - "{キーワード1}"
+    - "{キーワード2}"
+
+  domain_category: "{ドメインカテゴリ}"
+  # 選択肢: 在庫・リソース管理系, 予約・スケジュール系, ワークフロー系, マスタメンテナンス系
+
+  nonfunctional_requirements:
+    - "{非機能要件1}"
+    - "{非機能要件2}"
+
+  # フォールバック: catalog_interfaceが機能しない場合の代替
+  fallback_characteristics:
+    - op:mutates-state
+    - xcut:validation
+
+# boundary: UIがある場合に使用
+boundary:
+  input:
+    - name: "{入力名}"
+      source: "{入力元}"  # form_input, barcode_scan, file_upload, etc.
+      description: "{説明}"
+
+  output:
+    success:
+      - "{成功メッセージ}"
+    errors:
+      - code: "{ERROR_CODE}"
+        message: "{エラーメッセージ}"
+
+# scenarios: 複雑な業務フローがある場合に使用
+scenarios:
+  happy_path:
+    - "{ステップ1}"
+    - "{ステップ2}"
+    - "{ステップ3}"
+
+  exceptions:
+    - id: E1
+      trigger: "{例外条件}"
+      response: "{エラーコード}"
+
+# creative_areas: AIが創造的判断を行う領域を明示
+creative_areas:
+  - area: domain_model
+    description: "{ドメインモデルの説明}"
+  - area: validation_logic
+    description: "{検証ロジックの説明}"
+  - area: ui_layout
+    description: "{UIレイアウトの説明}"
+
+# out_of_scope: 対象外を明示したい場合に使用
+out_of_scope:
+  - "{対象外1}"
+  - "{対象外2}"

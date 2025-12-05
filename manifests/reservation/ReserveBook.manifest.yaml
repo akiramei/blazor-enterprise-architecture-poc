@@ -1,0 +1,96 @@
+# manifests/reservation/ReserveBook.manifest.yaml
+
+meta:
+  slice: ReserveBook
+  spec_path: "../../specs/reservation/ReserveBook.spec.yaml"
+  generated_at: "2025-12-05T12:00:00Z"
+  generator: "ai"
+  author: "ai"
+  review_status: "draft"  # draft | reviewed | approved
+
+catalog_binding:
+  catalog:
+    repo: "akiramei/blazor-enterprise-architecture-poc"
+    version: "v2025.11.27.3"
+  match_result:
+    status: "full"
+    from_catalog:
+      # op:mutates-state + struct:multi-aggregate → feature-create-entity
+      - id: feature-create-entity
+        matched_by: "op:mutates-state → ai_decision_matrix.新機能追加"
+
+      # struct:multi-aggregate → domain-validation-service
+      - id: domain-validation-service
+        matched_by: "struct:multi-aggregate → 複数集約間の検証が必要"
+
+      # domain:reservation → domain-typed-id
+      - id: domain-typed-id
+        matched_by: "domain:reservation → 型安全IDが推奨"
+
+      # xcut:validation → validation-behavior
+      - id: validation-behavior
+        matched_by: "xcut:validation → auto_include_behaviors"
+
+      # op:mutates-state → transaction-behavior
+      - id: transaction-behavior
+        matched_by: "op:mutates-state → auto_include_behaviors"
+
+      # xcut:auth → authorization-behavior
+      - id: authorization-behavior
+        matched_by: "xcut:auth → nonfunctional_pattern_hints"
+
+      # 標準CQRS構成
+      - id: logging-behavior
+        matched_by: "標準CQRS構成 → recommended_combinations"
+
+    unmatched: []
+
+spec_derived:
+  supplemental_guidance:
+    - pattern_id: domain-validation-service
+      guidance: |
+        SPECのDR1「1会員あたり同時予約上限 = 3冊」を実装。
+        - Member.CurrentReservationCount を取得
+        - Member.CanReserve() メソッドで判定
+
+        SPECのDR2「予約は貸出中の本のみ可能」を実装。
+        - Book.IsAvailableForReservation で判定
+        - 貸出可能な本は予約不可（BOOK_AVAILABLE エラー）
+
+        SPECのDR3「同一会員が同じ本を複数回予約不可」を実装。
+        - Reservation.ExistsForMemberAndBook で重複チェック
+
+creative_boundary:
+  non_creative:
+    - category: "command_structure"
+      provider: "feature-create-entity"
+
+    - category: "validation_pipeline"
+      provider: "validation-behavior"
+
+    - category: "transaction_management"
+      provider: "transaction-behavior"
+
+    - category: "authorization"
+      provider: "authorization-behavior"
+
+    - category: "request_logging"
+      provider: "logging-behavior"
+
+  creative:
+    - area: domain_model
+      owner: ai
+
+    - area: validation_logic
+      owner: ai
+
+    - area: ui_layout
+      owner: ai
+
+generation_hints:
+  notes:
+    - "SaveChangesAsyncはHandler内で呼ばない（TransactionBehaviorに任せる）"
+    - "Result<T>パターンを使用（例外をthrowしない）"
+    - "ICommand<Result<Guid>>を使用（IRequest<T>直接使用禁止）"
+    - "Store + PageActionsパターンでUIを実装"
+    - "struct:multi-aggregateのため、Book/Memberへのアクセスが必要"

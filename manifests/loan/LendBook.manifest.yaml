@@ -5,6 +5,8 @@ meta:
   spec_path: "../../specs/loan/LendBook.spec.yaml"
   generated_at: "2025-12-05T10:00:00Z"
   generator: "ai"
+  author: "ai+human-review"
+  review_status: "approved"  # draft | reviewed | approved
 
 catalog_binding:
   catalog:
