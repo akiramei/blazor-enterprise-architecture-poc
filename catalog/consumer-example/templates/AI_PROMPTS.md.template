@@ -1,0 +1,266 @@
+# AI_PROMPTS.md - フェーズ別プロンプト集
+
+> **このファイルについて**: 各開発フェーズで使用するプロンプトテンプレート集です。
+> `{PLACEHOLDER}` を実際の値に置き換えて使用してください。
+
+---
+
+## 使い方
+
+1. 該当フェーズのプロンプトをコピー
+2. `{PLACEHOLDER}` を実際の値に置換
+3. AIに送信
+
+---
+
+## Phase 1: 仕様整形フェーズ（要求仕様 → SPEC）
+
+### 1.1 初回プロンプト（プロジェクト初期化時）
+
+```
+このプロジェクトは `./catalog/` のカタログに準拠します。
+外部ネットワークは参照しません。
+
+最初に以下のファイルを読んでください：
+1. catalog/LLM_BOOTSTRAP.md
+2. catalog/CLAUDE.md
+3. catalog/CHARACTERISTICS_CATALOG.md
+
+以後、「カタログ」と言ったら `./catalog/` を指します。
+カタログの内容は書き換えないでください。
+変更が必要だと思った場合は「提案」としてテキストで説明してください。
+```
+
+### 1.2 SPEC生成プロンプト
+
+```
+以下の要求仕様から SPEC ファイルを生成してください。
+
+【要求仕様】
+{要求仕様をここに記述}
+
+【指示】
+1. catalog/scaffolds/spec-template.yaml を参照してフォーマットを確認
+2. catalog/CHARACTERISTICS_CATALOG.md を参照して characteristics を選択
+3. 以下のセクションを必ず含めること：
+   - meta（feature, slice, version）
+   - summary
+   - characteristics（op:, xcut:, struct:, domain: prefixを使用）
+   - actor
+   - boundary（UIがある場合は必須）
+   - scenarios
+   - domain_rules
+
+【出力先】
+specs/{FEATURE}/{SLICE}.spec.yaml
+```
+
+### 1.3 SPEC レビュー補助プロンプト
+
+```
+specs/{FEATURE}/{SLICE}.spec.yaml を読み、以下を確認してください：
+
+1. characteristics は適切か（CHARACTERISTICS_CATALOG.md と照合）
+2. boundary セクションは完備しているか（UIがある場合）
+3. domain_rules は明確か
+4. scenarios.exceptions は網羅的か
+
+問題があれば指摘してください。
+```
+
+---
+
+## Phase 2: Manifest生成フェーズ（SPEC → Manifest）
+
+### 2.1 Manifest生成プロンプト
+
+```
+specs/{FEATURE}/{SLICE}.spec.yaml を読み、Manifest を生成してください。
+
+【指示】
+1. catalog/scaffolds/manifest-template.yaml を参照してフォーマットを確認
+2. catalog/CHARACTERISTICS_CATALOG.md のマッピング規則に従ってパターンを選択
+3. 以下のセクションを含めること：
+   - meta（spec_path を正しく設定）
+   - catalog_binding
+     - catalog.local_path: "../catalog"
+     - match_result.status: full/partial/none
+     - from_catalog: 選択したパターンとマッチング根拠
+     - unmatched: カバーできない要件（あれば）
+   - spec_derived.supplemental_guidance（必要な場合）
+   - creative_boundary（non_creative と creative を分離）
+   - generation_hints
+
+【出力先】
+manifests/{FEATURE}/{SLICE}.manifest.yaml
+```
+
+### 2.2 パターン選択確認プロンプト
+
+```
+manifests/{FEATURE}/{SLICE}.manifest.yaml の catalog_binding.from_catalog を確認してください。
+
+以下の観点でレビュー：
+1. 選択されたパターンは SPEC の characteristics と整合しているか
+2. 暗黙適用されるべきパターン（validation-behavior, transaction-behavior）は含まれているか
+3. matched_by の根拠は明確か
+4. unmatched に記載すべき要件はないか
+
+問題があれば修正を提案してください。
+```
+
+---
+
+## Phase 3: 計画フェーズ
+
+### 3.1 計画作成プロンプト
+
+```
+以下の SPEC と Manifest を読み、実装計画を作成してください。
+
+【対象ファイル】
+- specs/{FEATURE}/*.spec.yaml
+- manifests/{FEATURE}/*.manifest.yaml
+
+【指示】
+1. 依存関係を分析し、着手順序を決定
+2. 各 Slice について以下を計画：
+   - 生成するファイル一覧
+   - 使用するパターン
+   - 創造的判断が必要な箇所
+3. catalog/planning/PLANNING_GUIDE.md を参照して計画形式を確認
+
+【計画に含めること】
+- 実装順序（依存関係順）
+- 各 Slice の成果物リスト
+- リスク・注意点
+```
+
+### 3.2 Boundary確認プロンプト（UIがある場合）
+
+```
+計画に Boundary セクションが含まれているか確認してください。
+
+以下が欠けている場合、計画は不完全です：
+- Intent（ユーザーの意図）の列挙
+- Entity.CanXxx() メソッドの設計
+- BoundaryDecision の使用
+
+catalog/patterns/boundary-pattern.yaml を参照して補完してください。
+```
+
+---
+
+## Phase 4: 実装フェーズ
+
+### 4.1 Domain層実装プロンプト
+
+```
+manifests/{FEATURE}/{SLICE}.manifest.yaml を読み、Domain層を実装してください。
+
+【指示】
+1. SPEC の domain_rules を参照してエンティティを設計
+2. catalog/patterns/domain-*.yaml を参照してテンプレートを適用
+3. Entity.CanXxx() メソッドで業務ルールを実装
+4. 値オブジェクトは不変（immutable）で作成
+
+【生成するファイル】
+- src/Domain/{BC}/{Aggregate}/{Entity}.cs
+- src/Domain/{BC}/{Aggregate}/{ValueObject}.cs
+- src/Domain/{BC}/{Aggregate}/I{Entity}Repository.cs
+
+【禁止事項】
+- Entity に Infrastructure 依存を持たせない
+- 業務ロジックを Repository に書かない
+```
+
+### 4.2 Application層実装プロンプト
+
+```
+manifests/{FEATURE}/{SLICE}.manifest.yaml を読み、Application層を実装してください。
+
+【指示】
+1. catalog_binding.from_catalog のパターンを適用
+2. Command/Query は ICommand<Result<T>> / IQuery<T> を使用
+3. Handler は SaveChangesAsync を呼ばない（TransactionBehavior に任せる）
+4. FluentValidation で Validator を作成
+
+【生成するファイル】
+- src/Application/Features/{Feature}/{Slice}Command.cs
+- src/Application/Features/{Feature}/{Slice}CommandHandler.cs
+- src/Application/Features/{Feature}/{Slice}CommandValidator.cs
+
+【必須パターン】
+- Result<T> でエラーを返す（例外を throw しない）
+- ICommand<Result<Guid>> 形式
+```
+
+### 4.3 UI層実装プロンプト（Blazor）
+
+```
+manifests/{FEATURE}/{SLICE}.manifest.yaml と SPEC の boundary を読み、UI層を実装してください。
+
+【指示】
+1. Store + PageActions パターンを使用
+2. .razor は Features/{Feature}/ に配置（Components/Pages/ には置かない）
+3. SPEC の boundary.input/output を参照してフォーム設計
+
+【生成するファイル】
+- src/Application/Features/{Feature}/{Slice}Store.cs
+- src/Application/Features/{Feature}/{Slice}State.cs
+- src/Application/Features/{Feature}/{Slice}PageActions.cs
+- src/Application/Features/{Feature}/{Slice}.razor
+
+【UIルール】
+- 機能固有UIは Features/ に配置
+- 共有コンポーネントのみ Components/Shared/ に配置
+```
+
+### 4.4 実装完了確認プロンプト
+
+```
+以下のチェックリストを確認してください：
+
+□ Handler内で SaveChangesAsync() を呼んでいない
+□ Result<T> パターンを使用している
+□ ICommand<Result<T>> を使用している（IRequest<T> ではない）
+□ UIが Features/{Feature}/ に配置されている
+□ Entity.CanXxx() がドメインルールを実装している
+□ FluentValidation で入力検証している
+□ ビルドが通る
+
+問題があれば修正してください。
+```
+
+---
+
+## 汎用プロンプト
+
+### カタログパターン参照
+
+```
+catalog/patterns/{PATTERN_ID}.yaml を読み、
+このパターンの使い方と注意点を説明してください。
+```
+
+### 頻出ミス確認
+
+```
+catalog/COMMON_MISTAKES.md を読み、
+現在の実装に該当するミスがないか確認してください。
+```
+
+### パターン選択支援
+
+```
+以下の要件に最適なパターンを選択してください：
+
+【要件】
+{要件を記述}
+
+catalog/DECISION_FLOWCHART.md と catalog/LLM_PATTERN_INDEX.md を参照して判断してください。
+```
+
+---
+
+**最終更新: {DATE}**

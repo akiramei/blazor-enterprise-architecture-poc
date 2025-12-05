@@ -55,6 +55,19 @@
 
 ---
 
+### ローカルカタログとして使用する場合
+
+このカタログを別プロジェクト（ProjectX）にベンダリング（コピー）して使用する場合：
+
+**重要なルール**:
+- `./catalog/` が唯一の参照元（外部ネットワークは参照しない）
+- カタログは読み取り専用（書き換えない）
+- 変更が必要な場合は「提案」としてテキストで説明
+
+詳細: `catalog/consumer-example/README.md` および `catalog/INTEGRATION_WITH_SPEC.md` 参照
+
+---
+
 ### 読み込み優先順位（必須）
 
 | 順序 | ファイル | 目的 | 必須度 |
@@ -65,6 +78,7 @@
 | 3 | `catalog/index.json` | パターン索引・意思決定マトリクス | **必須** |
 | 4 | `catalog/COMMON_MISTAKES.md` | 頻出ミスと回避方法 | **必須** |
 | 5 | `catalog/DECISION_FLOWCHART.md` | パターン選択アルゴリズム | 推奨 |
+| 6 | `catalog/INTEGRATION_WITH_SPEC.md` | SPEC/Manifest連携設計 | 参照 |
 
 ### 基盤パターン（Kernel）
 
@@ -494,5 +508,5 @@ public async Task<BoundaryDecision> ValidatePayAsync(OrderId id, CancellationTok
 
 ---
 
-**カタログバージョン**: v2025.11.27.1
-**最終更新**: 2025-11-27
+**カタログバージョン**: v2025.12.05.1
+**最終更新**: 2025-12-05

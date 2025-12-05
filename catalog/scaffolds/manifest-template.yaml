@@ -10,6 +10,7 @@
 # 関連ドキュメント:
 #   - manifests/README.md: Manifestの書き方ガイド
 #   - catalog/CHARACTERISTICS_CATALOG.md: characteristicsからパターンへのマッピング
+#   - catalog/INTEGRATION_WITH_SPEC.md: SPEC/Manifest連携設計
 
 # ============================================================================
 # メタ情報
@@ -26,11 +27,20 @@ meta:
 # ============================================================================
 # カタログバインディング
 # ============================================================================
+#
+# ローカルカタログ前提:
+#   - local_path: プロジェクト内のカタログパス
+#   - upstream_repo: 元のリポジトリURL（ドキュメント用）
+#   - upstream_commit: ベンダリング時のコミットID（トレーサビリティ用）
+#
+# 詳細: catalog/INTEGRATION_WITH_SPEC.md 参照
 
 catalog_binding:
   catalog:
-    repo: "akiramei/blazor-enterprise-architecture-poc"
-    version: "v2025.11.27.3"
+    id: "blazor-vsa-catalog"
+    local_path: "../catalog"                    # ★ ローカルパス
+    upstream_repo: "https://github.com/akiramei/blazor-enterprise-architecture-poc"
+    upstream_commit: "{COMMIT_HASH}"            # ★ ベンダリング時のコミット
 
   match_result:
     status: "pending"  # pending | partial | full

@@ -10,8 +10,10 @@ meta:
 
 catalog_binding:
   catalog:
-    repo: "akiramei/blazor-enterprise-architecture-poc"
-    version: "v2025.11.27.3"
+    id: "blazor-vsa-catalog"
+    local_path: "../catalog"
+    upstream_repo: "https://github.com/akiramei/blazor-enterprise-architecture-poc"
+    upstream_commit: "2469d17"  # v2025.11.27.3 相当
   match_result:
     status: "full"
     from_catalog:

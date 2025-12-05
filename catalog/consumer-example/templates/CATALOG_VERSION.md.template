@@ -1,0 +1,104 @@
+# CATALOG_VERSION.md - カタログバージョン情報
+
+> **このファイルについて**: このプロジェクトで使用しているカタログのバージョン情報を記録します。
+> カタログをベンダリング（コピー）した際に、この情報を記入してください。
+
+---
+
+## カタログ情報
+
+| 項目 | 値 |
+|------|-----|
+| **Upstream Repository** | https://github.com/akiramei/blazor-enterprise-architecture-poc |
+| **Upstream Commit** | `{COMMIT_HASH}` |
+| **Catalog Version** | `{VERSION}` (例: v2025.11.27.3) |
+| **Copied At** | `{YYYY-MM-DD}` |
+| **Copied By** | `{YOUR_NAME}` |
+
+---
+
+## 変更ポリシー
+
+### 原則
+
+```
+catalog/ ディレクトリは原則として不変です。
+開発中にカタログを変更してはいけません。
+```
+
+### 変更が必要な場合
+
+1. **このファイルを更新**
+   - `Upstream Commit` を新しいコミットIDに変更
+   - `Copied At` を更新
+   - `Updated By` に更新者を記入
+
+2. **変更履歴に記録**（下記セクション）
+   - どのパターンを追加/変更したか
+   - 既存 Slice への影響はあるか
+
+3. **レビュー必須**
+   - カタログ変更は Pull Request でレビューを受ける
+   - 既存 Manifest との整合性を確認
+
+---
+
+## 変更履歴
+
+| 日付 | 変更者 | 変更内容 | 影響範囲 |
+|------|--------|---------|---------|
+| {YYYY-MM-DD} | {NAME} | 初回ベンダリング | なし |
+<!--
+| 2025-12-10 | 山田 | feature-approval-workflow パターン追加 | なし（新規パターン） |
+| 2025-12-15 | 鈴木 | validation-behavior の修正 | 全 Manifest を確認済み |
+-->
+
+---
+
+## AIへの指示
+
+```
+このプロジェクトでは `./catalog/` のカタログを唯一の参照元とします。
+外部ネットワーク（GitHub等）は参照しません。
+
+カタログの変更が必要だと思った場合は、
+コードを変更するのではなく「提案」としてテキストで説明してください。
+カタログ変更は人間が責任を持って行い、このファイルに記録します。
+```
+
+---
+
+## 確認コマンド
+
+### ローカルカタログのバージョン確認
+
+```bash
+# LLM_BOOTSTRAP.md からバージョンを確認
+grep -A2 "カタログバージョン" catalog/LLM_BOOTSTRAP.md
+
+# または index.json から確認
+jq '.metadata.version' catalog/index.json
+```
+
+### Upstream との差分確認
+
+```bash
+# 一時ディレクトリに最新を取得して比較
+git clone --depth 1 https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
+diff -rq catalog temp-catalog/catalog --exclude=".git"
+rm -rf temp-catalog
+```
+
+---
+
+## 関連ドキュメント
+
+| ドキュメント | 目的 |
+|-------------|------|
+| `catalog/LLM_BOOTSTRAP.md` | AI向け入口（カタログバージョン記載） |
+| `catalog/INTEGRATION_WITH_SPEC.md` | SPEC/Manifest連携設計 |
+| `docs/AI_WORKFLOW.md` | 開発ワークフロー |
+
+---
+
+**最終更新: {DATE}**

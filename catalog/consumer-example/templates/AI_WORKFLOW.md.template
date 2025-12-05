@@ -1,0 +1,233 @@
+# AI_WORKFLOW.md - AI開発ワークフロー
+
+> **このファイルについて**: カタログベースのAI駆動開発の完全ガイドです。
+> まっさらな状態から開発を始める手順を説明します。
+
+---
+
+## 1. 概要
+
+このプロジェクトは **カタログ駆動開発** を採用しています。
+
+```
+カタログ（How）+ SPEC（What）+ Manifest（Bridge）→ コード
+```
+
+### 前提条件
+
+- `catalog/` ディレクトリにカタログがベンダリング済み
+- `docs/CATALOG_VERSION.md` でバージョンが固定済み
+- AI（Claude等）を使用
+
+---
+
+## 2. プロジェクト初期化（まっさらから）
+
+### Step 0: カタログのベンダリング
+
+```bash
+# リポジトリ作成
+mkdir {PROJECT_NAME}
+cd {PROJECT_NAME}
+git init
+
+# カタログをコピー（ベンダリング）
+git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
+cp -r temp-catalog/catalog ./catalog
+rm -rf temp-catalog
+
+# テンプレートをコピー
+mkdir -p docs specs manifests
+cp catalog/consumer-example/templates/*.template docs/
+# 拡張子を削除（必要に応じて）
+```
+
+### Step 1: CATALOG_VERSION.md の作成
+
+`docs/CATALOG_VERSION.md` を編集し、以下を記入：
+
+- コピー元のコミットID
+- コピー日
+- 変更ポリシー
+
+### Step 2: AI起動時の初期プロンプト
+
+AIを起動したら、最初に以下を伝えます：
+
+```
+このプロジェクトは `./catalog/` のカタログに準拠します。
+外部ネットワークは参照しません。
+
+最初に以下のファイルを読んでください：
+1. catalog/LLM_BOOTSTRAP.md
+2. catalog/CLAUDE.md（または CLAUDE.md）
+3. catalog/CHARACTERISTICS_CATALOG.md
+
+以後、「カタログ」と言ったら `./catalog/` を指します。
+カタログは書き換えないでください。
+```
+
+---
+
+## 3. 機能開発サイクル（Slice一周）
+
+### Phase 1: 要求仕様 → SPEC
+
+**目的**: 業務仕様を構造化する
+
+```
+1. ユーザーから要求仕様を受け取る（自然言語）
+2. AIに SPEC 生成を依頼（AI_PROMPTS.md の「仕様整形フェーズ」参照）
+3. specs/{feature}/{slice}.spec.yaml を作成
+4. 人間がレビュー・修正
+```
+
+**成果物**: `specs/{feature}/{slice}.spec.yaml`
+
+### Phase 2: SPEC → Manifest
+
+**目的**: パターン選択を記録する
+
+```
+1. AIに Manifest 生成を依頼（AI_PROMPTS.md の「Manifest生成フェーズ」参照）
+2. manifests/{feature}/{slice}.manifest.yaml を作成
+3. catalog_binding.from_catalog のパターン選択をレビュー
+4. creative_boundary の分類を確認
+```
+
+**成果物**: `manifests/{feature}/{slice}.manifest.yaml`
+
+### Phase 3: 計画フェーズ
+
+**目的**: 実装順序を決める
+
+```
+1. 全SPEC/Manifestを確認
+2. 着手順序を決定（依存関係を考慮）
+3. 計画書を作成（AI_PROMPTS.md の「計画フェーズ」参照）
+4. 人間が承認
+```
+
+**成果物**: 計画書（テキストまたは Markdown）
+
+### Phase 4: 実装フェーズ
+
+**目的**: コードを生成する
+
+```
+1. 計画に従い、1 Slice ずつ実装
+2. Domain → Application → UI の順で進行
+3. 各 Slice 完了後にビルド確認
+```
+
+**実装順序**:
+```
+Domain層:
+  - Entity, ValueObject, AggregateRoot
+  - Repository Interface
+
+Application層:
+  - Command/Query
+  - Handler
+  - Validator
+
+UI層（Blazor）:
+  - Store + State
+  - PageActions
+  - .razor コンポーネント
+```
+
+---
+
+## 4. ファイル配置ルール
+
+```
+{PROJECT_NAME}/
+├── catalog/                    # カタログ（読み取り専用）
+│   ├── LLM_BOOTSTRAP.md
+│   ├── CLAUDE.md
+│   ├── patterns/
+│   └── ...
+│
+├── docs/
+│   ├── AI_WORKFLOW.md          # このファイル
+│   ├── AI_PROMPTS.md           # プロンプト集
+│   └── CATALOG_VERSION.md      # バージョン固定
+│
+├── specs/                      # SPEC（業務仕様）
+│   └── {feature}/
+│       └── {slice}.spec.yaml
+│
+├── manifests/                  # Manifest（パターン選択記録）
+│   └── {feature}/
+│       └── {slice}.manifest.yaml
+│
+└── src/
+    ├── Domain/{BC}/            # ドメイン層
+    │   └── {Aggregate}/
+    └── Application/
+        └── Features/{Feature}/ # 機能スライス（UI含む）
+```
+
+---
+
+## 5. AIへの基本ルール
+
+以下のルールを常に守ってください：
+
+### 絶対禁止
+```
+❌ Handler内でSaveChangesAsync()を呼ばない
+❌ 例外をthrowしてエラーを伝播しない（Result<T>を使う）
+❌ 機能固有の.razorをComponents/Pages/に配置しない
+❌ カタログ（catalog/）を書き換えない
+```
+
+### 必須パターン
+```
+✅ ICommand<Result<T>> を使用（IRequest<T>は使わない）
+✅ FluentValidation で入力検証
+✅ Entity.CanXxx() で業務ルール判定
+✅ 機能固有UIは Features/{Feature}/ に配置
+```
+
+---
+
+## 6. トラブルシューティング
+
+### Q: カタログにないパターンが必要
+
+```
+A: Manifest の unmatched に記載し、
+   supplemental_guidance で補足指示を追加。
+   カタログ自体は変更しない。
+```
+
+### Q: AIがカタログを無視する
+
+```
+A: 最初に LLM_BOOTSTRAP.md を読ませているか確認。
+   「カタログを読んで」と明示的に指示。
+```
+
+### Q: パターン選択に迷う
+
+```
+A: catalog/DECISION_FLOWCHART.md を参照。
+   または catalog/LLM_PATTERN_INDEX.md で早見表を確認。
+```
+
+---
+
+## 7. 参照ドキュメント
+
+| ドキュメント | 目的 |
+|-------------|------|
+| `docs/AI_PROMPTS.md` | 各フェーズ用プロンプト集 |
+| `docs/CATALOG_VERSION.md` | カタログバージョン情報 |
+| `catalog/LLM_BOOTSTRAP.md` | AI向け入口 |
+| `catalog/INTEGRATION_WITH_SPEC.md` | SPEC/Manifest連携設計 |
+
+---
+
+**最終更新: {DATE}**
