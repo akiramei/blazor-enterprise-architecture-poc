@@ -1,0 +1,140 @@
+# SPEC_SLICE.yaml.template
+#
+# SPEC（業務仕様）のテンプレート
+#
+# 使い方:
+#   1. specs/{feature}/ ディレクトリを作成
+#   2. このファイルをコピーして specs/{feature}/{Slice}.spec.yaml を作成
+#   3. __REQUIRED__ / __RECOMMENDED__ / __OPTIONAL__ のプレースホルダを埋める
+#   4. __OPTIONAL__ セクションは不要なら削除可能
+#
+# ケース別ガイド:
+#   ケースA（カタログ充実）: 必須セクションだけでOK
+#   ケースB（カタログ部分）: 必須 + 推奨セクション
+#   ケースC（カタログなし）: 必須 + 推奨 + オプション（詳細に記述）
+#
+# 関連ドキュメント:
+#   - catalog/CHARACTERISTICS_CATALOG.md: characteristics語彙定義
+#   - catalog/INTEGRATION_WITH_SPEC.md: SPEC/Manifest連携設計
+
+# ============================================================================
+# 必須セクション（__REQUIRED__）
+# ============================================================================
+
+meta:
+  feature: __REQUIRED__           # 機能名（例: Loan, Reservation, Order）
+  slice: __REQUIRED__             # スライス名（例: LendBook, ReserveBook, CreateOrder）
+  version: "1.0.0"
+  last_updated: __REQUIRED__      # YYYY-MM-DD形式
+
+summary: |
+  __REQUIRED__
+  # この機能が何をするか、1-3文で説明
+  # 例: 会員と本を指定して貸出記録を作成する。
+
+actor: __REQUIRED__
+  # 誰が使うか（例: Librarian, Customer, Admin, System）
+
+# characteristics: パターン自動選択のヒント（★重要）
+# 詳細: catalog/CHARACTERISTICS_CATALOG.md
+characteristics:
+  # --- 操作タイプ（1つ選択）---
+  - op:mutates-state        # 状態を変更する場合
+  # - op:read-only          # 読み取り専用の場合
+  # - op:batch              # バッチ処理の場合
+
+  # --- 横断的関心事（該当するものを選択）---
+  - xcut:validation         # 入力検証（ほぼ必須）
+  # - xcut:auth             # 認証/認可が必要な場合
+  # - xcut:audit            # 監査ログが必要な場合
+  # - xcut:cache            # キャッシュ対象の場合
+
+  # --- 構造的特性（1つ選択）---
+  - struct:single-aggregate # 単一集約のみ操作
+  # - struct:multi-aggregate # 複数集約を跨ぐ操作
+
+  # --- ドメイン分類（1つ選択）---
+  # - domain:library-core   # 図書館コア業務
+  # - domain:reservation    # 予約・スケジュール系
+  # - domain:workflow       # 承認・ワークフロー系
+  # - domain:inventory      # 在庫・引当系
+  # - domain:master         # マスタ・カタログ系
+
+  # --- 層の指定（1つ選択）---
+  - layer:full-slice        # 全レイヤー（Domain + Application + UI）
+  # - layer:domain-only     # ドメイン層のみ
+  # - layer:api             # API層を含む
+
+# ドメインルール（業務ルール）
+domain_rules:
+  - id: DR1
+    rule: __REQUIRED__      # 例: "1会員あたり同時貸出上限 = 5冊"
+  # - id: DR2
+  #   rule: "{業務ルール2}"
+
+# ============================================================================
+# 推奨セクション（__RECOMMENDED__）
+# UIがある場合、または複雑な業務フローがある場合に記述
+# ============================================================================
+
+# boundary: UIがある場合は記述を強く推奨
+# ★ UIがあるのにboundaryがない = 不完全な仕様書
+boundary:
+  input:
+    - name: __RECOMMENDED__       # 例: member_id
+      source: __RECOMMENDED__     # form_input, barcode_scan, file_upload, dropdown, etc.
+      description: __RECOMMENDED__ # 例: 会員カードのバーコード
+
+  output:
+    success:
+      - __RECOMMENDED__           # 例: "貸出を登録しました（返却期限: {due_date}）"
+    errors:
+      - code: __RECOMMENDED__     # 例: MEMBER_NOT_FOUND
+        message: __RECOMMENDED__  # 例: "会員が見つかりません"
+
+# scenarios: 複雑な業務フローがある場合に記述
+scenarios:
+  happy_path:
+    - __RECOMMENDED__             # 例: 職員が会員番号を入力
+    - __RECOMMENDED__             # 例: 会員が存在し、有効である
+    - __RECOMMENDED__             # 例: システムが貸出レコードを作成
+
+  exceptions:
+    - id: E1
+      trigger: __RECOMMENDED__    # 例: 会員の貸出数が5冊に達している
+      response: __RECOMMENDED__   # 例: LOAN_LIMIT_EXCEEDED
+
+# ============================================================================
+# オプションセクション（__OPTIONAL__）
+# ケースB/Cで詳細に記述したい場合、または特殊な要件がある場合に使用
+# ============================================================================
+
+# catalog_interface: カタログとの連携を強化したい場合（ケースA/B向け）
+# catalog_interface:
+#   intent_keywords:
+#     - __OPTIONAL__            # 例: "貸出", "登録", "作成"
+#
+#   domain_category: __OPTIONAL__
+#   # 選択肢: 在庫・リソース管理系, 予約・スケジュール系, ワークフロー系, マスタメンテナンス系
+#
+#   nonfunctional_requirements:
+#     - __OPTIONAL__            # 例: "監査ログ必須", "認証必須"
+#
+#   # フォールバック: 自動マッチングが失敗した場合の代替characteristics
+#   fallback_characteristics:
+#     - op:mutates-state
+#     - xcut:validation
+
+# creative_areas: AIが創造的判断を行う領域を明示（ケースC向け）
+# creative_areas:
+#   - area: domain_model
+#     description: __OPTIONAL__  # 例: "Member, BookCopy, Loan エンティティの設計"
+#   - area: validation_logic
+#     description: __OPTIONAL__  # 例: "DR1-DR3を満たす検証ロジック"
+#   - area: ui_layout
+#     description: __OPTIONAL__  # 例: "バーコード入力フォームのレイアウト"
+
+# out_of_scope: 対象外を明示したい場合
+# out_of_scope:
+#   - __OPTIONAL__              # 例: "返却処理は別Sliceで実装"
+#   - __OPTIONAL__              # 例: "延滞料金の計算は含まない"

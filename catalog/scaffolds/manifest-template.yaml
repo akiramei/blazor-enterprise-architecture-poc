@@ -4,72 +4,81 @@
 #
 # 使い方:
 #   1. このファイルをコピーして manifests/{feature}/{slice}.manifest.yaml を作成
-#   2. {placeholder} を実際の値に置換
+#   2. __REQUIRED__ / __OPTIONAL__ のプレースホルダを埋める
 #   3. AIに生成させる場合は、SPECファイルと一緒に渡す
 #
+# ケース別ガイド:
+#   ケースA（カタログ充実）: 必須セクションのみ。from_catalogにパターン列挙、creativeは薄く
+#   ケースB（カタログ部分）: 必須 + spec_derived.supplemental_guidance で補足
+#   ケースC（カタログなし）: 必須 + spec_derived.additional_patterns + generation_hints を厚く
+#
 # 関連ドキュメント:
-#   - manifests/README.md: Manifestの書き方ガイド
 #   - catalog/CHARACTERISTICS_CATALOG.md: characteristicsからパターンへのマッピング
 #   - catalog/INTEGRATION_WITH_SPEC.md: SPEC/Manifest連携設計
 
 # ============================================================================
-# メタ情報
+# メタ情報（__REQUIRED__）
 # ============================================================================
 
 meta:
-  slice: "{Slice}"
-  spec_path: "../../specs/{feature}/{slice}.spec.yaml"
-  generated_at: "{YYYY-MM-DDTHH:MM:SSZ}"
-  generator: "ai"                    # ai | human
-  author: "ai"                       # ai | human | ai+human-review
-  review_status: "draft"             # draft | reviewed | approved
+  slice: __REQUIRED__                           # スライス名（例: LendBook）
+  spec_path: __REQUIRED__                       # 例: "../../specs/loan/LendBook.spec.yaml"
+  generated_at: __REQUIRED__                    # ISO 8601形式
+  generator: "ai"                               # ai | human
+  author: "ai"                                  # ai | human | ai+human-review
+  review_status: "draft"                        # draft | reviewed | approved
 
 # ============================================================================
-# カタログバインディング
+# カタログバインディング（__REQUIRED__）
 # ============================================================================
-#
-# ローカルカタログ前提:
-#   - local_path: プロジェクト内のカタログパス
-#   - upstream_repo: 元のリポジトリURL（ドキュメント用）
-#   - upstream_commit: ベンダリング時のコミットID（トレーサビリティ用）
-#
-# 詳細: catalog/INTEGRATION_WITH_SPEC.md 参照
 
 catalog_binding:
   catalog:
     id: "blazor-vsa-catalog"
-    local_path: "../catalog"                    # ★ ローカルパス
-    upstream_repo: "https://github.com/akiramei/blazor-enterprise-architecture-poc"
-    upstream_commit: "{COMMIT_HASH}"            # ★ ベンダリング時のコミット
+    local_path: __REQUIRED__                    # 例: "../catalog"（プロジェクト構造に合わせる）
+    upstream_repo: __OPTIONAL__                 # 例: "https://github.com/akiramei/blazor-enterprise-architecture-poc"
+    upstream_commit: __OPTIONAL__               # 例: "abc123def..."（トレーサビリティ用）
 
   match_result:
-    status: "pending"  # pending | partial | full
+    # ケースA: full（カタログで全てカバー）
+    # ケースB: partial（一部カバー）
+    # ケースC: none（カタログパターンなし）
+    status: __REQUIRED__                        # full | partial | none
+
+    # ケースA/B: SPECのcharacteristicsから選択されたパターンを列挙
+    # ケースC: 空配列でOK
     from_catalog:
-      # AIがSPECのcharacteristicsを分析して、ここにパターンを列挙
-      # 例:
+      # 例（ケースA/B）:
       # - id: feature-create-entity
       #   matched_by: "op:mutates-state + struct:single-aggregate"
-      #
       # - id: validation-behavior
       #   matched_by: "xcut:validation → auto_include"
-      #
       # - id: transaction-behavior
       #   matched_by: "op:mutates-state → auto_include"
+      []
 
-    unmatched: []
-    # SPECの要件のうち、カタログパターンでカバーできないもの
-    # 例:
-    # - requirement: "特殊な業務ロジック"
-    #   reason: "カタログに該当パターンなし"
+    # ケースB/C: カタログでカバーできない要件を列挙
+    # ケースA: 空配列でOK
+    unmatched:
+      # 例（ケースB/C）:
+      # - requirement: "特殊な重複チェックロジック"
+      #   reason: "カタログに汎用パターンなし"
+      []
 
 # ============================================================================
-# SPEC由来の補足情報
+# SPEC由来の補足情報（ケースB/C向け）
 # ============================================================================
 
 spec_derived:
-  supplemental_guidance:
-    # カタログパターンだけでは埋まらない、SPEC固有の実装ガイダンス
-    # 例:
+  # ケースC: カタログにないパターンを独自定義
+  additional_patterns: []
+    # 例（ケースC）:
+    # - id: custom-reservation-pattern
+    #   description: "このプロジェクト固有の予約ロジック"
+
+  # ケースB/C: カタログパターンだけでは足りない補足ガイダンス
+  supplemental_guidance: []
+    # 例（ケースB）:
     # - pattern_id: domain-validation-service
     #   guidance: |
     #     SPECのDR1を実装。
@@ -80,32 +89,27 @@ spec_derived:
 # ============================================================================
 
 creative_boundary:
+  # non_creative: カタログパターンで決まる部分（テンプレート適用）
+  # ケースA: ここが厚い（ほぼ全てカタログ任せ）
+  # ケースC: ここが薄い（独自実装が多い）
   non_creative:
-    # カタログパターンで決まる部分（テンプレート適用）
-    - category: "command_structure"
-      provider: "{pattern-id}"  # 例: feature-create-entity
+    # 例（ケースA/B）:
+    # - category: "command_structure"
+    #   provider: "feature-create-entity"
+    # - category: "validation_pipeline"
+    #   provider: "validation-behavior"
+    # - category: "transaction_management"
+    #   provider: "transaction-behavior"
+    []
 
-    - category: "validation_pipeline"
-      provider: "validation-behavior"
-
-    - category: "transaction_management"
-      provider: "transaction-behavior"
-
-    # 必要に応じて追加
-    # - category: "authorization"
-    #   provider: "authorization-behavior"
-    #
-    # - category: "audit_logging"
-    #   provider: "audit-log-behavior"
-
+  # creative: AI/人間が創造的判断を行う部分
+  # ケースA: ここが薄い
+  # ケースC: ここが厚い
   creative:
-    # AI/人間が創造的判断を行う部分
     - area: domain_model
       owner: ai
-
     - area: validation_logic
       owner: ai
-
     - area: ui_layout
       owner: ai
 
@@ -114,9 +118,14 @@ creative_boundary:
 # ============================================================================
 
 generation_hints:
+  # override_order: 通常はfalse。特殊なSliceで生成順序を変えたい場合のみtrue
+  override_order: false
+
+  # notes: 生成時の注意事項（常に適用）
   notes:
     - "SaveChangesAsyncはHandler内で呼ばない（TransactionBehaviorに任せる）"
     - "Result<T>パターンを使用（例外をthrowしない）"
     - "ICommand<Result<T>>を使用（IRequest<T>直接使用禁止）"
-    # 必要に応じて追加
-    # - "Store + PageActionsパターンでUIを実装"
+    # ケースC向け追加例:
+    # - "このSliceは独自のリポジトリパターンを使用"
+    # - "外部API連携のため、HttpClientを使用"

@@ -21,6 +21,7 @@
 | `templates/AI_WORKFLOW.md.template` | まっさらからの開発手順 |
 | `templates/AI_PROMPTS.md.template` | 4フェーズ用プロンプト集 |
 | `templates/CATALOG_VERSION.md.template` | カタログバージョン固定用 |
+| `templates/SPEC_SLICE.yaml.template` | SPEC（業務仕様）テンプレート |
 
 ---
 
@@ -46,10 +47,13 @@ rm -rf temp-catalog
 # ディレクトリ作成
 mkdir -p docs specs manifests
 
-# テンプレートをコピー
+# ドキュメントテンプレートをコピー
 cp catalog/consumer-example/templates/AI_WORKFLOW.md.template docs/AI_WORKFLOW.md
 cp catalog/consumer-example/templates/AI_PROMPTS.md.template docs/AI_PROMPTS.md
 cp catalog/consumer-example/templates/CATALOG_VERSION.md.template docs/CATALOG_VERSION.md
+
+# SPECテンプレートをコピー（新しいSlice作成時に使用）
+cp catalog/consumer-example/templates/SPEC_SLICE.yaml.template specs/_template.yaml
 ```
 
 ### Step 3: CATALOG_VERSION.md を編集

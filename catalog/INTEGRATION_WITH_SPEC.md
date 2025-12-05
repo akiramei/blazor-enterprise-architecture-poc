@@ -4,6 +4,28 @@
 
 ---
 
+## TL;DR（10行サマリ）
+
+```
+- SPEC = What（業務仕様）を記述する。技術手段は書かない。
+- Manifest = SPECとカタログを橋渡しする「Bridgeレイヤー」。
+- Catalog = How（実装パターン）を定義する。ProjectXにはvendoringして固定バージョンを使う。
+
+- 開発フロー:
+  1. SPECでSliceの業務仕様を定義（characteristics, domain_rules など）
+  2. Catalogのapplicabilityに基づき、Manifestでパターンを選択（from_catalog）
+  3. Manifestでcreative/non-creativeの境界を宣言（creative_boundary）
+  4. CLAUDE.mdのStandard Generation Flowに従ってコード生成
+
+- ケースA（カタログ充実）: Manifestは薄く、ほぼfrom_catalogのみ。
+- ケースB（カタログ部分）: Manifestにsupplemental_guidanceで補足を追加。
+- ケースC（カタログなし）: Manifestにadditional_patternsとgeneration_hintsを厚く書く。
+```
+
+**詳細は以降のセクションを参照してください。**
+
+---
+
 ## 1. 三層モデル概要
 
 このカタログは **三層モデル** で設計されています：

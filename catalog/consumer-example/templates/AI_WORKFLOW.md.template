@@ -69,7 +69,33 @@ AIを起動したら、最初に以下を伝えます：
 
 ---
 
-## 3. 機能開発サイクル（Slice一周）
+## 3. 事前チェックリスト（AIに渡す前）
+
+AIにSPEC/Manifestを渡す前に、以下を確認してください：
+
+### プロジェクト初期化時
+- [ ] `docs/CATALOG_VERSION.md` にカタログの commit hash を記入した
+- [ ] `catalog/` ディレクトリはプロジェクトにコピー済み（上流とは独立）
+- [ ] AIへの初期プロンプトを用意した（LLM_BOOTSTRAP.md を読ませる）
+
+### 新しいSlice追加時
+- [ ] SPECを `specs/{feature}/{slice}.spec.yaml` に作成した
+  - [ ] `meta` セクションを記入した
+  - [ ] `characteristics` を選択した
+  - [ ] `domain_rules` を記述した
+  - [ ] UIがある場合、`boundary` セクションを含めた
+- [ ] Manifestを `manifests/{feature}/{slice}.manifest.yaml` に作成した
+  - [ ] `spec_path` が正しい相対パスになっている
+  - [ ] `catalog_binding.catalog.local_path` が正しい
+  - [ ] `match_result.status` を設定した（full/partial/none）
+
+### 実装開始前
+- [ ] CLAUDE.md / LLM_BOOTSTRAP.md / INTEGRATION_WITH_SPEC.md をAIに読ませた
+- [ ] 依存関係を確認し、実装順序を決定した
+
+---
+
+## 4. 機能開発サイクル（Slice一周）
 
 ### Phase 1: 要求仕様 → SPEC
 
@@ -139,7 +165,7 @@ UI層（Blazor）:
 
 ---
 
-## 4. ファイル配置ルール
+## 5. ファイル配置ルール
 
 ```
 {PROJECT_NAME}/
@@ -171,7 +197,7 @@ UI層（Blazor）:
 
 ---
 
-## 5. AIへの基本ルール
+## 6. AIへの基本ルール
 
 以下のルールを常に守ってください：
 
@@ -193,7 +219,7 @@ UI層（Blazor）:
 
 ---
 
-## 6. トラブルシューティング
+## 7. トラブルシューティング
 
 ### Q: カタログにないパターンが必要
 
@@ -219,7 +245,7 @@ A: catalog/DECISION_FLOWCHART.md を参照。
 
 ---
 
-## 7. 参照ドキュメント
+## 8. 参照ドキュメント
 
 | ドキュメント | 目的 |
 |-------------|------|
