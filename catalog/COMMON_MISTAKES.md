@@ -503,5 +503,147 @@ public async Task<Result<Guid>> Handle(CreateBookingCommand request, Cancellatio
 
 ---
 
-**最終更新: 2025-11-24**
-**カタログバージョン: v2025.11.24**
+## ⚠️ ケアレスミス集（実装時の注意）
+
+**実際のプロジェクト開発で繰り返し発生した、見落としやすいミスをまとめています。**
+
+### 1. MediatR.Unit と独自 Unit 型の衝突
+
+```csharp
+// ❌ エラー: 'Unit' は 'MyApp.Shared.Application.Unit' と 'MediatR.Unit' 間のあいまいな参照
+public class ReturnCopyCommandHandler : IRequestHandler<ReturnCopyCommand, Result<Unit>>
+
+// ✅ 正しい: using エイリアスで明示
+using Unit = MyApp.Shared.Application.Unit;
+
+public class ReturnCopyCommandHandler : IRequestHandler<ReturnCopyCommand, Result<Unit>>
+```
+
+**推奨**: 独自の `Unit` 型を使用するプロジェクトでは、Handler ファイルの先頭に `using Unit = ...` を追加することを標準化する。
+
+---
+
+### 2. Query/Command の引数順序の誤り
+
+```csharp
+// ❌ 誤り: bool を第1引数に渡した
+await Mediator.Send(new GetBooksQuery(true));
+
+// ✅ 正しい: シグネチャは (string? SearchTerm, bool IncludeInactive)
+await Mediator.Send(new GetBooksQuery(null, true));
+```
+
+**対策**:
+- 名前付き引数を使用する: `new GetBooksQuery(searchTerm: null, includeInactive: true)`
+- Query/Command の定義を確認してから呼び出す
+
+---
+
+### 3. DTO プロパティ名の不一致
+
+```csharp
+// ❌ 誤り: Entity のプロパティ名を推測で使用
+<h1>@_member.MemberName</h1>
+
+// ✅ 正しい: DTO のプロパティ名を確認
+<h1>@_member.Name</h1>
+```
+
+**対策**:
+- DTO の定義を必ず確認してからUIを実装する
+- IDE の補完機能を活用する
+
+---
+
+### 4. Repository メソッドの引数順序
+
+```csharp
+// ❌ 誤り: オプション引数を省略
+await _bookCopyRepository.GetByBookIdAsync(bookId, cancellationToken);
+
+// ✅ 正しい: シグネチャは (BookId, bool includeInactive, CancellationToken)
+await _bookCopyRepository.GetByBookIdAsync(bookId, false, cancellationToken);
+```
+
+**対策**:
+- Repository インターフェースの定義を確認する
+- オプション引数を持つメソッドは名前付き引数を使用する
+
+---
+
+### 5. using 文の不足（型の所在不明）
+
+```razor
+@* ❌ エラー: ValidationResultDto が見つからない *@
+@using Library.Application.Features.ValidateReserve
+
+@* ✅ 正しい: DTO が定義されている正しい namespace をインポート *@
+@using Library.Application.Features.ValidateLend
+```
+
+**対策**:
+- 型のエラーが出た場合は、その型がどの namespace に定義されているか確認する
+- 共有 DTO は専用の namespace にまとめることを検討する
+
+---
+
+### ケアレスミス防止のベストプラクティス
+
+| カテゴリ | 推奨対策 |
+|---------|---------|
+| 型の衝突 | using エイリアスを標準化 |
+| 引数順序 | 名前付き引数を使用 |
+| プロパティ名 | DTO 定義を確認してから実装 |
+| namespace | IDE の補完・エラーメッセージを活用 |
+
+**重要**: これらのミスはすべてビルドエラーで検出できます。ビルドを頻繁に実行し、早期に問題を発見してください。
+
+---
+
+## 📋 DTO 命名規則
+
+### 標準命名パターン
+
+**Entity のプロパティ名と DTO のプロパティ名を一致させる**ことで、マッピングミスを防止します。
+
+| Entity プロパティ | DTO プロパティ | 備考 |
+|------------------|---------------|------|
+| `Name` | `Name` | ✅ そのまま |
+| `Email` | `Email` | ✅ そのまま |
+| `CreatedAt` | `CreatedAt` | ✅ そのまま |
+| `Member.Name` | `MemberName` | ✅ ナビゲーションは結合 |
+
+### 禁止パターン
+
+```csharp
+// ❌ 禁止: Entity と異なる名前を使用
+public record MemberDto(
+    Guid Id,
+    string MemberName,  // Entity は Name なのに MemberName
+    string EmailAddress  // Entity は Email なのに EmailAddress
+);
+
+// ✅ 正しい: Entity と同じ名前を使用
+public record MemberDto(
+    Guid Id,
+    string Name,
+    string Email
+);
+```
+
+### 例外: ナビゲーションプロパティの展開
+
+```csharp
+// Entity: Loan.Member.Name
+// DTO では結合して MemberName とする（これは許可）
+public record LoanDto(
+    Guid Id,
+    string MemberName,  // ✅ Loan.Member.Name の展開
+    string BookTitle    // ✅ Loan.BookCopy.Book.Title の展開
+);
+```
+
+---
+
+**最終更新: 2025-12-07**
+**カタログバージョン: v2025.12.07**

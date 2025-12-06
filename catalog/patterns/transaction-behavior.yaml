@@ -249,6 +249,20 @@ metrics:
   performance_impact: "中 (トランザクション開始/コミット: 5-10ms)"
   execution_order: 400
 
+# ============================================================================
+# 実装時必読チェックリスト（AIが引用すべき項目）
+# ============================================================================
+must_read_checklist:
+  description: |
+    実装前に必ず確認し、実装メモに引用すること。
+    引用することで「読んだつもり」を防止する。
+  items:
+    - "Handler 内で SaveChangesAsync を呼ばない（TransactionBehavior が自動実行）"
+    - "独自の BeginTransaction/Commit は不要（TransactionBehavior に任せる）"
+    - "Query に ICommand を実装しない（IQuery を使う）"
+    - "Result.Fail 時はロールバックされる（ドメインイベントは発行されない）"
+    - "DbContext に依存するサービスは Scoped で登録する"
+
 ai_guidance:
   when_to_use:
     - "データベースへの書き込みを伴う Command"

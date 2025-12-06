@@ -19,7 +19,7 @@
    # Windows (PowerShell)
    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
-3. **.NET 8 SDK**: https://dotnet.microsoft.com/download
+3. **.NET 9 SDK**: https://dotnet.microsoft.com/download
 
 ### Step 1: spec-kit をインストール
 
@@ -27,12 +27,11 @@
 uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
 ```
 
-### Step 2: プロジェクトを作成
+### Step 2: spec-kit を初期化
 
 ```bash
 mkdir MyApp
 cd MyApp
-dotnet new blazorserver -n Application
 specify init . --ai claude
 ```
 
@@ -44,12 +43,26 @@ specify init . --ai claude
 
 ### Step 3: カタログを追加
 
+**Linux / macOS (bash):**
 ```bash
 git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
 cp -r temp-catalog/catalog ./catalog
-cp catalog/speckit-extensions/commands/speckit.plan.md .claude/commands/
+mkdir -p .claude/commands
+mkdir -p memory
+cp catalog/speckit-extensions/commands/*.md .claude/commands/
 cat catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
 rm -rf temp-catalog
+```
+
+**Windows (PowerShell):**
+```powershell
+git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
+Copy-Item temp-catalog/catalog ./catalog -Recurse
+New-Item -ItemType Directory -Force -Path .claude/commands
+New-Item -ItemType Directory -Force -Path memory
+Copy-Item catalog/speckit-extensions/commands/*.md .claude/commands/
+Get-Content catalog/speckit-extensions/constitution-additions.md | Add-Content memory/constitution.md
+Remove-Item temp-catalog -Recurse -Force
 ```
 
 ### Step 4: Claude Code を起動
@@ -127,7 +140,7 @@ dotnet run --project Application
 ## 🎯 このカタログでできること
 
 - **20+ の実装パターン**を提供（CRUD、検索、状態管理、認証など）
-- **Blazor Server + .NET 8** のエンタープライズアプリを生成
+- **Blazor Server + .NET 9** のエンタープライズアプリを生成
 - **MediatR (CQRS)** による Command/Query 分離
 - **Pipeline Behaviors** で検証・トランザクション・ログを自動化
 

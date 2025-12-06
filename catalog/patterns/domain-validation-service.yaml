@@ -216,6 +216,20 @@ wiring:
   service_registrations:
     - "services.AddScoped<IBookingValidationService, BookingValidationService>();"
 
+# ============================================================================
+# 実装時必読チェックリスト（AIが引用すべき項目）
+# ============================================================================
+must_read_checklist:
+  description: |
+    実装前に必ず確認し、実装メモに引用すること。
+    引用することで「読んだつもり」を防止する。
+  items:
+    - "複数エンティティをまたぐ検証のみドメインサービスに実装する"
+    - "単一エンティティ内で完結する検証は Entity のメソッドで実装"
+    - "入力値の形式検証は FluentValidation（Handler に書かない）"
+    - "Handler は ValidationService の結果を Result に変換して返す"
+    - "ValidationService は Repository 経由でデータ取得（DbContext 直接使用禁止）"
+
 ai_guidance:
   when_to_use:
     - "予約の重複チェックなど、複数レコードを参照するビジネスルール"

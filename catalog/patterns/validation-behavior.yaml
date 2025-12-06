@@ -152,6 +152,20 @@ metrics:
   performance_impact: "低 (通常 1-5ms)"
   execution_order: 100
 
+# ============================================================================
+# 実装時必読チェックリスト（AIが引用すべき項目）
+# ============================================================================
+must_read_checklist:
+  description: |
+    実装前に必ず確認し、実装メモに引用すること。
+    引用することで「読んだつもり」を防止する。
+  items:
+    - "Validator は AddValidatorsFromAssembly() で自動登録する"
+    - "FluentValidation は形式検証のみ（DBアクセスを伴う検証は Handler で）"
+    - "すべての Command/Query は Result<T> を返す"
+    - "MediatR のメソッド名は Handle（HandleAsync ではない）"
+    - "Singleton/Scoped 混在禁止（すべて Scoped で統一）"
+
 ai_guidance:
   when_to_use:
     - "Command の入力検証が必要な場合"
