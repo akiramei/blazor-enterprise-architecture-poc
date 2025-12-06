@@ -402,3 +402,6 @@ FodyWeavers.xsd
 # Local test configuration files that may contain sensitive credentials
 appsettings.Test.Local.json
 **/appsettings.Test.Local.json
+
+# AI coding assistant tool-specific folders
+.serena/

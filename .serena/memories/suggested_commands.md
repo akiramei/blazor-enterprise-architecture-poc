@@ -1,7 +1,0 @@
-- `podman compose up -d` (project root): start the PostgreSQL container defined in `compose.yml`.
-- `podman compose down -v`: tear down the database container/volume when resetting state.
-- `dotnet build ProductCatalog.sln`: compile all projects with analyzers.
-- `dotnet run --project src/ProductCatalog.Host/ProductCatalog.Host.csproj`: launch the Blazor Server host (applies EF migrations and seeds users on first run).
-- `dotnet ef database update --project src/ProductCatalog/Shared/Infrastructure/Persistence/ProductCatalog.Shared.Infrastructure.Persistence.csproj --startup-project src/ProductCatalog.Host/ProductCatalog.Host.csproj`: apply migrations without running the UI.
-- `dotnet test ProductCatalog.sln` (or scope to a single `tests/ProductCatalog.*Tests` project): execute xUnit suites with coverlet instrumentation.
-- `scripts/validate-vsa-structure.sh`: lint the folder layout and detect non-VSA regressions.
