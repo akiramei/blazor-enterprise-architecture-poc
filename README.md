@@ -1,117 +1,218 @@
-# Blazor Enterprise Architecture PoC
+# Blazor Enterprise Architecture Catalog
 
-**AI駆動開発のための、実装パターンカタログ付きエンタープライズアーキテクチャ実証実験**
-
----
-
-## 👋 あなたはどちらですか？
-
-| 目的 | 読むべきセクション |
-|------|-------------------|
-| **このカタログを自分のプロジェクトで使いたい** | → [📦 カタログ利用ガイド](#-カタログ利用ガイド) |
-| **このVSASampleプロジェクトを動かしたい・開発したい** | → [🛠️ VSASample開発者向け](#️-vsasample開発者向け) |
+**アプリの仕様を自然言語で書いて、AIと一緒にソフトウェアを作るためのカタログ**
 
 ---
 
-## 📦 カタログ利用ガイド
+## 🚀 5分で始める
 
-このカタログは、AIエージェントと人間が協調して開発するための**実装パターンカタログ**です。
+### 必要なもの
 
-### カタログの特徴
+以下を先にインストールしてください：
 
-- **20個のパターン**: Pipeline Behaviors、Feature Slices、Domain Patterns等
-- **SPEC/Manifest方式**: 業務仕様（What）と実装パターン（How）を分離
-- **実装証跡付き**: すべてのパターンが実際のコードとリンク
-
-### AIと一緒に始める（推奨）
-
-1. **新規プロジェクトを作成**
+1. **Claude Code**: https://claude.ai/download （AI コーディングツール）
+2. **uv**: 以下のコマンドでインストール
    ```bash
-   mkdir MyProject && cd MyProject && git init
+   # macOS / Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Windows (PowerShell)
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
+3. **.NET 8 SDK**: https://dotnet.microsoft.com/download
 
-2. **AIエージェント（Claude Code等）を起動**
+### Step 1: spec-kit をインストール
 
-3. **AIに以下のURLを伝える**：
-   ```
-   https://raw.githubusercontent.com/akiramei/blazor-enterprise-architecture-poc/main/FIRST_CONTACT.md
-   ```
-
-4. **AIがセットアップを完了したら、要求仕様を伝える**
-
-### 手動でセットアップする場合
-
-詳細は [catalog/consumer-example/README.md](catalog/consumer-example/README.md) を参照してください。
-
-### 開発フロー概要
-
-```
-要求仕様 → SPEC作成 → Manifest作成 → 計画 → 実装
+```bash
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
 ```
 
-詳細は [catalog/INTEGRATION_WITH_SPEC.md](catalog/INTEGRATION_WITH_SPEC.md) を参照。
+### Step 2: プロジェクトを作成
+
+```bash
+mkdir MyApp
+cd MyApp
+dotnet new blazorserver -n Application
+specify init . --ai claude
+```
+
+> **Windows ユーザーへ**: `specify init` が止まる場合は、以下を試してください：
+> ```powershell
+> $env:PYTHONUTF8=1
+> specify init . --ai claude
+> ```
+
+### Step 3: カタログを追加
+
+```bash
+git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
+cp -r temp-catalog/catalog ./catalog
+cp catalog/speckit-extensions/commands/speckit.plan.md .claude/commands/
+cat catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
+rm -rf temp-catalog
+```
+
+### Step 4: Claude Code を起動
+
+```bash
+claude
+```
+
+### Step 5: アプリを作る
+
+Claude Code で以下のように話しかけてください：
+
+```
+/speckit.specify 図書館の貸出管理アプリを作りたい。
+会員がバーコードで本を借りて、返却期限を管理できる。
+1人5冊まで借りられる。
+```
+
+AI が仕様書を作成したら、続けて：
+
+```
+/speckit.plan
+```
+
+技術計画ができたら：
+
+```
+/speckit.tasks
+```
+
+タスクが分解されたら：
+
+```
+/speckit.implement
+```
+
+これで AI がコードを生成します。
+
+### Step 6: アプリを起動
+
+```bash
+dotnet run --project Application
+```
+
+ブラウザで表示された URL（例: `https://localhost:5001`）を開きます。
 
 ---
 
-## 🛠️ VSASample開発者向け
+## 📖 開発の流れ
 
-> このセクションは、VSASampleプロジェクト自体をビルド・実行・開発する人向けです。
+```
+あなたの頭の中のアイデア
+    ↓
+/speckit.specify  「〇〇を作りたい」と自然言語で伝える
+    ↓
+/speckit.plan     AI が技術計画を立てる（カタログのパターンを選択）
+    ↓
+/speckit.tasks    タスクを分解する
+    ↓
+/speckit.implement  コードを生成する
+    ↓
+動くソフトウェア
+```
 
-### 🤖 For AI Agents（VSASample開発用）
+### 困ったときは
 
-> **AI向け入口**: まず [LLM_BOOTSTRAP.md](LLM_BOOTSTRAP.md) を読み、指示に従ってください。
+| 状況 | 対処 |
+|------|------|
+| 仕様が曖昧と言われた | `/speckit.clarify` で AI に質問してもらう |
+| 計画を確認したい | `/speckit.analyze` で整合性をチェック |
+| テスト項目を作りたい | `/speckit.checklist` でチェックリスト生成 |
 
-| 順序 | ファイル | 目的 |
-|:---:|----------|------|
-| 1 | [CLAUDE.md](CLAUDE.md) | 実装ルール・禁止事項・パターン選択 |
-| 2 | [catalog/AI_USAGE_GUIDE.md](catalog/AI_USAGE_GUIDE.md) | 詳細な実装ガイド |
-| 3 | [catalog/index.json](catalog/index.json) | パターン索引・意思決定マトリクス |
+---
 
-**絶対禁止（これを破るとバグになる）**:
+## 🎯 このカタログでできること
+
+- **20+ の実装パターン**を提供（CRUD、検索、状態管理、認証など）
+- **Blazor Server + .NET 8** のエンタープライズアプリを生成
+- **MediatR (CQRS)** による Command/Query 分離
+- **Pipeline Behaviors** で検証・トランザクション・ログを自動化
+
+---
+
+## 📚 詳細ドキュメント
+
+| 目的 | ファイル |
+|------|----------|
+| spec-kit + カタログ統合の詳細 | [catalog/INTEGRATION_WITH_SPEC.md](catalog/INTEGRATION_WITH_SPEC.md) |
+| パターン一覧 | [catalog/README.md](catalog/README.md) |
+| パターン選択フローチャート | [catalog/DECISION_FLOWCHART.md](catalog/DECISION_FLOWCHART.md) |
+
+---
+
+## 🤖 AI エージェント向け情報
+
+> このセクションは AI エージェントが読むための情報です。人間は読み飛ばして構いません。
+
+<details>
+<summary>AI エージェント向け詳細（クリックで展開）</summary>
+
+### 読み込み順序
+
+1. [LLM_BOOTSTRAP.md](LLM_BOOTSTRAP.md) - 最初に読む入口
+2. [CLAUDE.md](CLAUDE.md) - 実装ルール・禁止事項
+3. [catalog/index.json](catalog/index.json) - パターン索引
+
+### 絶対禁止事項
+
 ```
 ❌ Handler内でSaveChangesAsync()を呼ばない → TransactionBehaviorが自動実行
 ❌ Singletonでサービス登録しない → すべてScoped
 ❌ 例外をthrowしない → Result<T>で返す
+❌ カタログに存在するパターンを独自実装しない
 ```
 
-### クイックスタート（VSASampleを動かす）
+### Constitution 参照
+
+`memory/constitution.md` にカタログ駆動開発のルールが記載されています。
+
+</details>
+
+---
+
+## 🛠️ このリポジトリを開発する人向け
+
+> このセクションは、カタログ自体を改善・開発する人向けです。カタログを使うだけなら読む必要はありません。
+
+<details>
+<summary>開発者向け情報（クリックで展開）</summary>
+
+### VSASample を動かす
 
 ```bash
-# 1. PostgreSQLを起動
+# PostgreSQL を起動
 podman run -d --name postgres-productcatalog \
   -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=productcatalog -p 5432:5432 postgres:17
 
-# 2. ビルド＆実行
+# ビルド＆実行
 dotnet build
 cd src/Application && dotnet run
 
-# 3. ブラウザで https://localhost:5001 を開く
-#    ログイン: admin@example.com / Admin@123
+# ブラウザで https://localhost:5001 を開く
+# ログイン: admin@example.com / Admin@123
 ```
-
-### ドキュメント
-
-| 目的 | ファイル |
-|------|----------|
-| パターン一覧 | [catalog/README.md](catalog/README.md) |
-| アーキテクチャ全体像 | [docs/blazor-guide-package/docs/](docs/blazor-guide-package/docs/00_README.md) |
-| 3層アーキテクチャからの移行 | [18_3層アーキテクチャからの移行ガイド.md](docs/blazor-guide-package/docs/18_3層アーキテクチャからの移行ガイド.md) |
-| AI実装ガイド | [19_AIへの実装ガイド.md](docs/blazor-guide-package/docs/19_AIへの実装ガイド.md) |
 
 ### 技術情報
 
 | 項目 | 値 |
 |------|-----|
 | .NET | 9.0 |
-| カタログバージョン | v2025.12.05 |
+| カタログバージョン | v2025.12.06 |
 | パターン数 | 23 |
-| データベース | PostgreSQL 17 |
 
-**採用アーキテクチャ**: Vertical Slice Architecture (VSA) + CQRS + DDD
+### アーキテクチャドキュメント
+
+- [アーキテクチャ全体像](docs/blazor-guide-package/docs/00_README.md)
+- [3層アーキテクチャからの移行](docs/blazor-guide-package/docs/18_3層アーキテクチャからの移行ガイド.md)
+
+</details>
 
 ---
 
 ## ライセンス
 
-このプロジェクトは実証実験用のサンプルコードです。
+MIT License

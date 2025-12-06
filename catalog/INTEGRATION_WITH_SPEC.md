@@ -1,32 +1,89 @@
-# INTEGRATION_WITH_SPEC.md - SPEC/Manifest連携設計
+# INTEGRATION_WITH_SPEC.md - spec-kit / カタログ統合ガイド
 
-> **目的**: このカタログをSPEC/Manifestと組み合わせて使う方法を説明する公式ドキュメント
-
----
-
-## TL;DR（10行サマリ）
-
-```
-- SPEC = What（業務仕様）を記述する。技術手段は書かない。
-- Manifest = SPECとカタログを橋渡しする「Bridgeレイヤー」。
-- Catalog = How（実装パターン）を定義する。ProjectXにはvendoringして固定バージョンを使う。
-
-- 開発フロー:
-  1. SPECでSliceの業務仕様を定義（characteristics, domain_rules など）
-  2. Catalogのapplicabilityに基づき、Manifestでパターンを選択（from_catalog）
-  3. Manifestでcreative/non-creativeの境界を宣言（creative_boundary）
-  4. CLAUDE.mdのStandard Generation Flowに従ってコード生成
-
-- ケースA（カタログ充実）: Manifestは薄く、ほぼfrom_catalogのみ。
-- ケースB（カタログ部分）: Manifestにsupplemental_guidanceで補足を追加。
-- ケースC（カタログなし）: Manifestにadditional_patternsとgeneration_hintsを厚く書く。
-```
-
-**詳細は以降のセクションを参照してください。**
+> **目的**: GitHub spec-kit とこのカタログを組み合わせて使う方法を説明する公式ドキュメント
 
 ---
 
-## 1. 三層モデル概要
+## TL;DR（推奨ワークフロー）
+
+```
+1. spec-kit を初期化: specify init . --ai claude
+2. カタログをベンダリング: catalog/ と speckit-extensions/ をコピー
+3. 拡張コマンドを適用: speckit.plan.md を上書き
+4. Constitution にカタログルールを追記
+5. /speckit.specify → /speckit.plan → /speckit.tasks → /speckit.implement
+```
+
+---
+
+## 0. spec-kit + カタログ統合セットアップ（推奨）
+
+### 0.1 前提条件
+
+- [uv](https://github.com/astral-sh/uv) がインストールされていること
+- spec-kit CLI: `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`
+
+### 0.2 消費者プロジェクトのセットアップ
+
+```bash
+# 1. プロジェクト作成
+mkdir MyProject && cd MyProject
+
+# 2. spec-kit 初期化
+specify init . --ai claude
+
+# 3. カタログをベンダリング
+git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
+cp -r temp-catalog/catalog ./catalog
+rm -rf temp-catalog
+
+# 4. 拡張コマンドを適用（spec-kit の plan.md を上書き）
+cp catalog/speckit-extensions/commands/speckit.plan.md .claude/commands/
+
+# 5. Constitution にカタログルールを追記
+cat catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
+
+# 6. バージョン情報を記録（任意）
+echo "Catalog version: $(date +%Y-%m-%d)" > docs/CATALOG_VERSION.md
+```
+
+### 0.3 統合後のディレクトリ構造
+
+```
+MyProject/
+├── .claude/commands/
+│   ├── speckit.specify.md      ← spec-kit 標準
+│   ├── speckit.plan.md         ← カタログ拡張版で上書き ★
+│   ├── speckit.tasks.md        ← spec-kit 標準
+│   └── speckit.implement.md    ← spec-kit 標準
+├── memory/
+│   └── constitution.md         ← カタログルール追記済み ★
+├── templates/                  ← spec-kit 標準
+├── specs/                      ← 機能仕様（spec-kit 形式）
+├── catalog/                    ← カタログ（読み取り専用）★
+│   ├── index.json
+│   ├── patterns/*.yaml
+│   └── speckit-extensions/     ← 拡張ファイル（コピー元）
+└── src/                        ← 生成コード
+```
+
+### 0.4 ワークフロー
+
+```
+/speckit.specify  →  /speckit.plan  →  /speckit.tasks  →  /speckit.implement
+業務仕様(What)        技術計画(How)      タスク分解         実装
+                      ↓
+                  Catalog Binding
+                  (パターン選択)
+                      ↓
+               catalog/patterns/*.yaml
+```
+
+---
+
+## 1. Alternative: SPEC/Manifest方式（従来方式）
+
+> **注意**: 以下は spec-kit を使わない従来方式です。spec-kit 統合（セクション0）を推奨します。
 
 このカタログは **三層モデル** で設計されています：
 
@@ -316,6 +373,11 @@ SPEC の `boundary` 定義に基づき実装：
 ---
 
 ## バージョン
+
+- **v2.0.0** (2025-12-06): spec-kit 統合版
+  - GitHub spec-kit との統合セットアップ手順を追加
+  - speckit-extensions/ に拡張コマンドを配置
+  - 従来の SPEC/Manifest 方式は Alternative として残存
 
 - **v1.0.0** (2025-12-05): 初版リリース
   - 三層モデルの説明
