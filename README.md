@@ -81,6 +81,12 @@ Claude Code で以下のように話しかけてください：
 1人5冊まで借りられる。
 ```
 
+> **より詳細な要求仕様の例**: [図書館貸出管理システム要求仕様](docs/samples/library-loan-system-requirements.md)
+>
+> 上記ファイルには、ドメインモデル、機能要件、ビジネスルールが詳細に記載されています。
+> 本格的なシステムを作る場合は、このような詳細仕様を `/speckit.specify` に渡すことで、
+> AI がより正確に意図を理解できます。
+
 AI が仕様書を作成したら、続けて：
 
 ```
@@ -153,6 +159,7 @@ dotnet run --project Application
 | spec-kit + カタログ統合の詳細 | [catalog/INTEGRATION_WITH_SPEC.md](catalog/INTEGRATION_WITH_SPEC.md) |
 | パターン一覧 | [catalog/README.md](catalog/README.md) |
 | パターン選択フローチャート | [catalog/DECISION_FLOWCHART.md](catalog/DECISION_FLOWCHART.md) |
+| 要求仕様サンプル（図書館システム） | [docs/samples/library-loan-system-requirements.md](docs/samples/library-loan-system-requirements.md) |
 
 ---
 
