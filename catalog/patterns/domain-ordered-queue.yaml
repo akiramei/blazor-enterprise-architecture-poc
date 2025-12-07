@@ -1,0 +1,648 @@
+id: domain-ordered-queue
+version: 1.0.0
+name: Ordered Queue Pattern (Position Management)
+category: domain-pattern
+intent: 順序付きキュー（待ち行列）の管理パターン。予約順、処理順、優先度順などの順序管理を実装
+
+description: |
+  待ち行列や予約順序など、エンティティに「順番（Position）」を持たせるパターン。
+  予約の順番管理、処理キュー、優先度付きリストなどに適用。
+
+  ## いつ使うか
+  - 予約の順番管理（図書館予約、レストラン予約、順番待ち）
+  - 処理キュー（タスクキュー、承認待ちキュー）
+  - 優先度付きリスト（優先順位のある処理）
+
+  ## キーコンセプト
+  - Position: 順番を示す整数値（1から始まる）
+  - Enqueue: キューに追加（末尾に Position を割り当て）
+  - Dequeue: キューから取り出し（先頭を削除、後続の Position を繰り上げ）
+  - Reorder: 順番の入れ替え
+
+  ## Ready状態と優先権
+  順番が回ってきた（先頭になった）エンティティは「Ready」状態に遷移。
+  Ready状態のエンティティは、対象リソースに対する優先権を持つ。
+
+  ## 背景（FR-018問題）
+  図書館ドッグフーディングで「予約の順番管理（Position）」が完全に未実装だった。
+  カタログにこのパターンが存在しなかったため、AIが実装方法を知らなかった。
+
+scope: domain-pattern
+layers:
+  - domain
+  - infrastructure
+
+applicability:
+  required_characteristics:
+    - struct:ordered-collection
+  recommended_for:
+    - domain:reservation
+    - domain:queue
+    - domain:waiting-list
+  typical_scenarios:
+    - "予約の順番管理"
+    - "待ち行列管理"
+    - "処理キュー"
+    - "順番待ち"
+
+ai_selection_hints:
+  trigger_phrases:
+    - "予約の順番"
+    - "待ち行列"
+    - "キュー"
+    - "順番待ち"
+    - "Position"
+    - "何番目"
+    - "次の人"
+    - "先頭"
+    - "Ready状態"
+    - "先着順"
+
+  confidence_keywords:
+    high:    ["Position", "Queue", "順番", "待ち行列", "Ready", "先着順"]
+    medium:  ["予約順", "処理順", "優先度", "順序"]
+    low:     ["リスト", "キャンセル待ち"]
+
+  anti_patterns:
+    - "単純なステータス管理のみ"    # → domain-state-machine
+    - "優先度だけで順番は不要"      # → enum で十分
+    - "時間枠の重複チェック"        # → domain-timeslot
+
+  typical_requests:
+    - "予約の順番を管理したい"
+    - "待ち行列を実装したい"
+    - "順番が回ってきたらReady状態にしたい"
+    - "先頭の予約者に優先権を与えたい"
+    - "キャンセル時に後続の順番を繰り上げたい"
+
+  decision_logic: |
+    このパターンを選択すべき条件:
+    1. エンティティに「順番（Position）」が必要
+    2. 先頭（Position=1）になったら特別な状態（Ready）に遷移
+    3. キャンセル時に後続の順番を繰り上げる必要がある
+
+    このパターンを選択すべきでない条件:
+    1. 単純なステータス管理のみ → domain-state-machine
+    2. 順番ではなく優先度のみ → Priority enum で十分
+    3. 時間枠の重複チェック → domain-timeslot
+
+relationship:
+  works_with:
+    - domain-state-machine (Pending→Ready→Fulfilled の状態遷移)
+    - boundary-pattern (Ready状態のエンティティが優先権を持つ操作可否判定)
+    - concurrency-control (同時登録時のPosition重複防止)
+
+  dependencies:
+    - IRepository<T> (Repository基盤)
+
+file_structure: |
+  src/Domain/{BoundedContext}/{Entity}s/
+  ├── {Entity}.cs                    # Position プロパティを持つEntity
+  ├── {Entity}Status.cs              # ステータス enum (Pending, Ready, Fulfilled, Cancelled)
+  └── I{Entity}Repository.cs         # Position関連メソッドを持つRepository Interface
+
+  src/Domain/{BoundedContext}/Services/
+  └── {Entity}QueueService.cs        # キュー全体操作（Position繰り上げ等）
+
+  src/Infrastructure/{BoundedContext}/Services/
+  └── {Entity}QueueService.cs        # キューサービス実装
+
+implementation:
+  # ===== Entity =====
+  entity:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/{Entity}.cs"
+    template: |
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      /// <summary>
+      /// {Entity}（順序付きキュー管理）
+      ///
+      /// 【パターン: Ordered Queue】
+      ///
+      /// Position: キュー内の順番（1から始まる、nullはキュー外）
+      /// Status: Pending（待機中）→ Ready（順番到来）→ Fulfilled/Cancelled
+      ///
+      /// AI実装時の注意:
+      /// - Position は 1 から始まる（0 は使わない）
+      /// - Position = null はキュー外を意味する
+      /// - 先頭（Position = 1）になったら Ready 状態に遷移する
+      /// </summary>
+      public class {Entity} : AggregateRoot<{Entity}Id>
+      {
+          /// <summary>
+          /// キュー内の順番（1から始まる、nullの場合はキュー外）
+          /// </summary>
+          public int? Position { get; private set; }
+
+          /// <summary>
+          /// キューの対象（例: BookId, RoomId）
+          /// </summary>
+          public {Target}Id TargetId { get; private set; }
+
+          /// <summary>
+          /// 申請者
+          /// </summary>
+          public {User}Id UserId { get; private set; }
+
+          /// <summary>
+          /// 状態（Pending, Ready, Fulfilled, Cancelled）
+          /// </summary>
+          public {Entity}Status Status { get; private set; }
+
+          /// <summary>
+          /// 作成日時
+          /// </summary>
+          public DateTime CreatedAt { get; private set; }
+
+          /// <summary>
+          /// Ready状態になった日時
+          /// </summary>
+          public DateTime? ReadyAt { get; private set; }
+
+          /// <summary>
+          /// Ready状態の有効期限
+          /// </summary>
+          public DateTime? ExpiresAt { get; private set; }
+
+          // ================================================================
+          // Factory Method
+          // ================================================================
+
+          public static {Entity} Create({Target}Id targetId, {User}Id userId)
+          {
+              return new {Entity}
+              {
+                  Id = {Entity}Id.NewId(),
+                  TargetId = targetId,
+                  UserId = userId,
+                  Status = {Entity}Status.Pending,
+                  Position = null, // キュー追加時に設定
+                  CreatedAt = DateTime.UtcNow
+              };
+          }
+
+          // ================================================================
+          // キュー操作メソッド
+          // ================================================================
+
+          /// <summary>
+          /// キューに追加（末尾にPositionを割り当て）
+          /// </summary>
+          /// <param name="position">割り当てるPosition（1以上）</param>
+          public void EnqueueAt(int position)
+          {
+              if (position < 1)
+                  throw new DomainException("Positionは1以上である必要があります");
+
+              if (Position.HasValue)
+                  throw new DomainException("既にキューに登録されています");
+
+              Position = position;
+              Status = {Entity}Status.Pending;
+
+              // Position=1なら即座にReady状態に
+              if (position == 1)
+              {
+                  MakeReady();
+              }
+          }
+
+          /// <summary>
+          /// Ready状態に遷移（順番が回ってきた）
+          /// </summary>
+          /// <param name="expirationHours">Ready状態の有効期限（時間）</param>
+          public void MakeReady(int expirationHours = 24)
+          {
+              if (Status != {Entity}Status.Pending)
+                  throw new DomainException("Pending状態でなければReady状態にできません");
+
+              if (Position != 1)
+                  throw new DomainException("先頭（Position=1）でなければReady状態にできません");
+
+              Status = {Entity}Status.Ready;
+              ReadyAt = DateTime.UtcNow;
+              ExpiresAt = DateTime.UtcNow.AddHours(expirationHours);
+          }
+
+          /// <summary>
+          /// 完了（キューから削除）
+          /// </summary>
+          public void Fulfill()
+          {
+              if (Status != {Entity}Status.Ready)
+                  throw new DomainException("Ready状態でなければ完了できません");
+
+              Status = {Entity}Status.Fulfilled;
+              Position = null;
+          }
+
+          /// <summary>
+          /// キャンセル（キューから削除）
+          /// </summary>
+          public void Cancel()
+          {
+              if (Status == {Entity}Status.Fulfilled || Status == {Entity}Status.Cancelled)
+                  throw new DomainException("既に完了またはキャンセル済みです");
+
+              Status = {Entity}Status.Cancelled;
+              Position = null;
+          }
+
+          /// <summary>
+          /// 順番を繰り上げる（前の人がキャンセルした場合）
+          /// </summary>
+          /// <param name="expirationHours">Ready状態の有効期限（時間）</param>
+          public void PromotePosition(int expirationHours = 24)
+          {
+              if (!Position.HasValue || Position <= 1)
+                  throw new DomainException("繰り上げできません");
+
+              Position--;
+
+              // 先頭になったらReady状態に
+              if (Position == 1)
+              {
+                  MakeReady(expirationHours);
+              }
+          }
+
+          /// <summary>
+          /// Ready状態の有効期限切れチェック
+          /// </summary>
+          public bool IsExpired()
+          {
+              return Status == {Entity}Status.Ready
+                  && ExpiresAt.HasValue
+                  && DateTime.UtcNow > ExpiresAt.Value;
+          }
+      }
+
+  # ===== Status Enum =====
+  status_enum:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/{Entity}Status.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      /// <summary>
+      /// {Entity}の状態
+      ///
+      /// 【パターン: Ordered Queue】
+      ///
+      /// 状態遷移:
+      /// Pending → Ready → Fulfilled
+      ///        ↘      ↘
+      ///         Cancelled
+      /// </summary>
+      public enum {Entity}Status
+      {
+          /// <summary>待機中（キュー内で順番待ち）</summary>
+          Pending,
+
+          /// <summary>順番到来（優先権あり）</summary>
+          Ready,
+
+          /// <summary>完了（正常終了）</summary>
+          Fulfilled,
+
+          /// <summary>キャンセル（中断）</summary>
+          Cancelled
+      }
+
+  # ===== Repository Interface =====
+  repository_interface:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/I{Entity}Repository.cs"
+    template: |
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      /// <summary>
+      /// {Entity}リポジトリインターフェース
+      ///
+      /// 【パターン: Ordered Queue】
+      ///
+      /// Position関連メソッド:
+      /// - GetNextPositionAsync: 次のPosition値を取得
+      /// - GetFirstInQueueAsync: 先頭（Position=1）を取得
+      /// - GetByTargetIdOrderedByPositionAsync: Position順で取得
+      /// </summary>
+      public interface I{Entity}Repository
+      {
+          Task<{Entity}?> GetByIdAsync({Entity}Id id, CancellationToken ct = default);
+
+          Task AddAsync({Entity} entity, CancellationToken ct = default);
+
+          // ================================================================
+          // Position関連メソッド
+          // ================================================================
+
+          /// <summary>
+          /// 対象のキューをPosition順で取得
+          /// </summary>
+          Task<IReadOnlyList<{Entity}>> GetByTargetIdOrderedByPositionAsync(
+              {Target}Id targetId,
+              CancellationToken ct = default);
+
+          /// <summary>
+          /// 次のPosition値を取得（現在の最大Position + 1、なければ1）
+          /// </summary>
+          Task<int> GetNextPositionAsync({Target}Id targetId, CancellationToken ct = default);
+
+          /// <summary>
+          /// 指定Positionより大きいエンティティを取得（繰り上げ用）
+          /// </summary>
+          Task<IReadOnlyList<{Entity}>> GetByTargetIdWithPositionGreaterThanAsync(
+              {Target}Id targetId,
+              int position,
+              CancellationToken ct = default);
+
+          /// <summary>
+          /// 先頭（Position=1）を取得
+          /// </summary>
+          Task<{Entity}?> GetFirstInQueueAsync({Target}Id targetId, CancellationToken ct = default);
+
+          /// <summary>
+          /// Ready状態のエンティティを取得
+          /// </summary>
+          Task<{Entity}?> GetReadyByTargetIdAsync({Target}Id targetId, CancellationToken ct = default);
+
+          /// <summary>
+          /// 指定ユーザーのアクティブなエンティティを取得（重複チェック用）
+          /// </summary>
+          Task<{Entity}?> GetActiveByUserAndTargetAsync(
+              {User}Id userId,
+              {Target}Id targetId,
+              CancellationToken ct = default);
+      }
+
+  # ===== Queue Service Interface =====
+  queue_service_interface:
+    file_path: "src/Domain/{BoundedContext}/Services/I{Entity}QueueService.cs"
+    template: |
+      using Domain.{BoundedContext}.{Entity}s;
+
+      namespace Domain.{BoundedContext}.Services;
+
+      /// <summary>
+      /// {Entity}キューサービスインターフェース
+      ///
+      /// 【パターン: Ordered Queue】
+      ///
+      /// キュー全体の操作を管理するドメインサービス。
+      /// 複数エンティティにまたがる操作（Position繰り上げ等）を担当。
+      /// </summary>
+      public interface I{Entity}QueueService
+      {
+          /// <summary>
+          /// キューに追加
+          /// </summary>
+          /// <returns>割り当てられたPosition</returns>
+          Task<int> EnqueueAsync({Target}Id targetId, {User}Id userId, CancellationToken ct = default);
+
+          /// <summary>
+          /// キューから削除（後続のPosition繰り上げ）
+          /// </summary>
+          Task DequeueAsync({Entity}Id entityId, CancellationToken ct = default);
+
+          /// <summary>
+          /// 先頭の人を取得（Ready状態への遷移判定）
+          /// </summary>
+          Task<{Entity}?> GetFirstInQueueAsync({Target}Id targetId, CancellationToken ct = default);
+
+          /// <summary>
+          /// 順番を確認
+          /// </summary>
+          Task<int?> GetPositionAsync({Entity}Id entityId, CancellationToken ct = default);
+
+          /// <summary>
+          /// Ready状態のエンティティを取得（優先権判定用）
+          /// </summary>
+          Task<{Entity}?> GetReadyEntityAsync({Target}Id targetId, CancellationToken ct = default);
+      }
+
+  # ===== Queue Service Implementation =====
+  queue_service_implementation:
+    file_path: "src/Infrastructure/{BoundedContext}/Services/{Entity}QueueService.cs"
+    template: |
+      using Domain.{BoundedContext}.{Entity}s;
+      using Domain.{BoundedContext}.Services;
+
+      namespace Infrastructure.{BoundedContext}.Services;
+
+      /// <summary>
+      /// {Entity}キューサービス実装
+      ///
+      /// 【パターン: Ordered Queue】
+      ///
+      /// AI実装時の注意:
+      /// - EnqueueAsync で同時登録時の Position 重複に注意（悲観的ロック推奨）
+      /// - DequeueAsync で後続の Position を必ず繰り上げる
+      /// - SaveChangesAsync は呼ばない（TransactionBehavior に任せる）
+      /// </summary>
+      public class {Entity}QueueService : I{Entity}QueueService
+      {
+          private readonly I{Entity}Repository _repository;
+
+          public {Entity}QueueService(I{Entity}Repository repository)
+          {
+              _repository = repository;
+          }
+
+          public async Task<int> EnqueueAsync(
+              {Target}Id targetId,
+              {User}Id userId,
+              CancellationToken ct = default)
+          {
+              // 重複チェック
+              var existing = await _repository.GetActiveByUserAndTargetAsync(userId, targetId, ct);
+              if (existing != null)
+                  throw new DomainException("既にキューに登録されています");
+
+              // 次のPosition値を取得
+              // ★ 同時登録時の重複防止には悲観的ロックが必要
+              var nextPosition = await _repository.GetNextPositionAsync(targetId, ct);
+
+              // エンティティを作成してキューに追加
+              var entity = {Entity}.Create(targetId, userId);
+              entity.EnqueueAt(nextPosition);
+
+              await _repository.AddAsync(entity, ct);
+
+              return nextPosition;
+          }
+
+          public async Task DequeueAsync({Entity}Id entityId, CancellationToken ct = default)
+          {
+              var entity = await _repository.GetByIdAsync(entityId, ct);
+              if (entity == null)
+                  return;
+
+              var targetId = entity.TargetId;
+              var removedPosition = entity.Position;
+
+              // ステータスに応じてFulfillまたはCancel
+              if (entity.Status == {Entity}Status.Ready)
+              {
+                  entity.Fulfill();
+              }
+              else
+              {
+                  entity.Cancel();
+              }
+
+              // 後続のPositionを繰り上げ
+              if (removedPosition.HasValue)
+              {
+                  var followers = await _repository
+                      .GetByTargetIdWithPositionGreaterThanAsync(targetId, removedPosition.Value, ct);
+
+                  foreach (var follower in followers)
+                  {
+                      follower.PromotePosition();
+                  }
+              }
+          }
+
+          public async Task<{Entity}?> GetFirstInQueueAsync(
+              {Target}Id targetId,
+              CancellationToken ct = default)
+          {
+              return await _repository.GetFirstInQueueAsync(targetId, ct);
+          }
+
+          public async Task<int?> GetPositionAsync({Entity}Id entityId, CancellationToken ct = default)
+          {
+              var entity = await _repository.GetByIdAsync(entityId, ct);
+              return entity?.Position;
+          }
+
+          public async Task<{Entity}?> GetReadyEntityAsync(
+              {Target}Id targetId,
+              CancellationToken ct = default)
+          {
+              return await _repository.GetReadyByTargetIdAsync(targetId, ct);
+          }
+      }
+
+# ============================================================================
+# 実装時必読チェックリスト（AIが引用すべき項目）
+# ============================================================================
+must_read_checklist:
+  description: |
+    実装前に必ず確認し、実装メモに引用すること。
+    引用することで「読んだつもり」を防止する。
+  items:
+    - "Position は 1 から始まる整数（0 は使わない）"
+    - "Position = null はキュー外を意味する"
+    - "先頭（Position = 1）になったら Ready 状態に遷移する"
+    - "Dequeue 時は後続の Position を必ず繰り上げる"
+    - "Ready 状態には有効期限を設定する（期限切れでキャンセル）"
+    - "同時登録時の Position 重複には悲観的ロックで対応"
+    - "SaveChangesAsync は呼ばない（TransactionBehavior に任せる）"
+
+ai_guidance:
+  when_to_use:
+    - "予約の順番を管理する必要がある場合"
+    - "待ち行列を実装する場合"
+    - "順番が回ってきたら特別な処理（Ready状態）が必要な場合"
+    - "キャンセル時に後続の順番を繰り上げる必要がある場合"
+
+  when_not_to_use:
+    - "単純なステータス管理のみ → domain-state-machine"
+    - "優先度だけで順番は不要 → Priority enum で十分"
+    - "時間枠の重複チェック → domain-timeslot"
+
+  implementation_steps:
+    - step: 1
+      description: "Entity に Position プロパティと Status enum を追加"
+      files: ["{Entity}.cs", "{Entity}Status.cs"]
+    - step: 2
+      description: "Repository Interface に Position 関連メソッドを追加"
+      files: ["I{Entity}Repository.cs"]
+    - step: 3
+      description: "QueueService Interface と実装を作成"
+      files: ["I{Entity}QueueService.cs", "{Entity}QueueService.cs"]
+    - step: 4
+      description: "DB設定（EF Core Configuration）に Position カラムを追加"
+      files: ["{Entity}Configuration.cs"]
+    - step: 5
+      description: "Repository 実装に Position 関連クエリを追加"
+      files: ["{Entity}Repository.cs"]
+
+  common_mistakes:
+    - mistake: "Position を 0 から始める"
+      solution: "Position は 1 から始める（自然な順番表現）"
+    - mistake: "Dequeue 時に Position 繰り上げを忘れる"
+      solution: "QueueService.DequeueAsync() で後続を自動繰り上げ"
+    - mistake: "Ready 状態の有効期限を設定しない"
+      solution: "Ready 状態には必ず ExpiresAt を設定し、期限切れ処理を実装"
+    - mistake: "同時登録時の Position 重複"
+      solution: "GetNextPositionAsync() で悲観的ロック（FOR UPDATE）を使用"
+    - mistake: "Entity に Position フィールドを追加し忘れる"
+      solution: "仕様書の「順番管理」を見たら、このパターンを適用し Position フィールドを追加"
+
+  key_patterns:
+    - pattern: "Position（int?）"
+      description: "キュー内の順番。1から始まる。nullはキュー外。"
+    - pattern: "EnqueueAt(position)"
+      description: "キューに追加。指定されたPositionを設定。"
+    - pattern: "PromotePosition()"
+      description: "順番を1つ繰り上げ。先頭になったらReady状態に。"
+    - pattern: "GetNextPositionAsync()"
+      description: "次のPosition値を取得。現在の最大+1、なければ1。"
+    - pattern: "GetReadyByTargetIdAsync()"
+      description: "Ready状態のエンティティを取得。優先権判定に使用。"
+
+  combination_with_other_patterns:
+    - pattern: concurrency-control
+      reason: "同時登録時のPosition重複防止に悲観的ロックが必要"
+      usage: "GetNextPositionAsync() で FOR UPDATE を使用"
+    - pattern: domain-state-machine
+      reason: "Pending→Ready→Fulfilled の状態遷移と組み合わせ"
+      usage: "複雑な状態遷移がある場合は StateMachine パターンを併用"
+    - pattern: boundary-pattern
+      reason: "Ready状態のエンティティが優先権を持つ操作可否判定"
+      usage: "CanBorrow(memberId, readyReservation) のように優先権情報を渡す"
+
+  design_decision:
+    position_vs_timestamp: |
+      Position（順番）vs Timestamp（作成日時）での順序管理:
+
+      Position を使うべき:
+      - 明示的な順番表示が必要（「あなたは3番目です」）
+      - 順番の入れ替えが発生する可能性がある
+      - キャンセル時の繰り上げが必要
+
+      Timestamp で十分:
+      - 順番表示は不要
+      - 単純に「先に作成された順」でよい
+      - 繰り上げ処理が不要
+
+    concurrency_strategy: |
+      同時登録時の Position 重複対策:
+
+      推奨: 悲観的ロック（FOR UPDATE）
+      - GetNextPositionAsync() で対象レコードをロック
+      - 同時登録を直列化
+
+      代替: 楽観的ロック + リトライ
+      - RowVersion で競合検出
+      - 競合時はリトライ
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<I{Entity}QueueService, {Entity}QueueService>();"
+
+evidence:
+  note: |
+    図書館ドッグフーディングの FR-018 問題対応として新規作成。
+    予約の順番管理（Position）が完全に未実装だった根本原因は、
+    このパターンがカタログに存在しなかったため。
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-07
+    changes:
+      - "初版リリース"
+      - "図書館ドッグフーディング FR-018 問題の対策として作成"
+      - "Position管理、Ready状態遷移、キューサービスのテンプレートを提供"

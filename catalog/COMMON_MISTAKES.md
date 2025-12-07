@@ -645,5 +645,238 @@ public record LoanDto(
 
 ---
 
+## 🚨 ドッグフーディングで発見されたミス（図書館システム）
+
+以下は、図書館貸出管理システムのドッグフーディングで発見されたミスです。
+仕様書に明記されていたにもかかわらず、実装で見落とされました。
+
+---
+
+### 1. クエリの条件分岐ミス（コピペバグ）
+
+**両分岐が同じメソッドを呼ぶバグ**
+
+```csharp
+// ❌ バグ: 両分岐が同じメソッドを呼んでいる
+if (request.ActiveOnly == true)
+{
+    loans = await _loanRepository.GetOverdueLoansAsync(cancellationToken);
+}
+else
+{
+    loans = await _loanRepository.GetOverdueLoansAsync(cancellationToken);  // ← 同じ！
+}
+
+// ✅ 正しい: 条件に応じて異なるメソッドを呼ぶ
+if (request.ActiveOnly == true)
+{
+    loans = await _loanRepository.GetActiveLoansAsync(cancellationToken);
+}
+else
+{
+    loans = await _loanRepository.GetAllLoansAsync(cancellationToken);
+}
+```
+
+**対策**:
+- コピペ後は必ずメソッド名を確認する
+- ユニットテストで両分岐をカバーする
+- コードレビューで条件分岐を重点的に確認する
+
+---
+
+### 2. 複合前提条件の検証漏れ（FR-017問題）
+
+**「〜のみ可能」という前提条件のチェック漏れ**
+
+仕様: 「予約は対象図書の**全コピーが貸出中の場合のみ**可能」
+
+```csharp
+// ❌ 漏れ: 「全コピー貸出中のみ予約可能」のチェックがない
+public async Task<Result<Guid>> Handle(CreateReservationCommand request, CancellationToken ct)
+{
+    // 重複予約チェックはある
+    var existing = await _reservationRepository.GetByMemberAndBookAsync(...);
+    if (existing != null)
+        return Result.Fail("既に予約しています");
+
+    // しかし「全コピー貸出中か」のチェックがない！
+    var reservation = Reservation.Create(...);
+    // ...
+}
+
+// ✅ 正しい: ValidationService で全前提条件をチェック
+public async Task<Result<Guid>> Handle(CreateReservationCommand request, CancellationToken ct)
+{
+    // ValidationService で複合前提条件をまとめてチェック
+    var validation = await _reservationValidationService.ValidateCanReserveAsync(
+        request.BookId, request.MemberId, ct);
+
+    if (!validation.IsValid)
+        return Result.Fail<Guid>(validation.ErrorMessage!);
+
+    var reservation = Reservation.Create(...);
+    // ...
+}
+```
+
+**ValidationService の実装例**:
+
+```csharp
+public async Task<ValidationResult> ValidateCanReserveAsync(
+    BookId bookId, MemberId memberId, CancellationToken ct)
+{
+    // 1. 書籍存在チェック
+    var book = await _bookRepository.GetByIdAsync(bookId, ct);
+    if (book == null)
+        return ValidationResult.Failure("書籍が見つかりません");
+
+    // 2. ★ 全コピー貸出中チェック（FR-017対策）
+    var availableCopies = await _copyRepository
+        .GetAvailableCopiesByBookIdAsync(bookId, ct);
+    if (availableCopies.Any())
+        return ValidationResult.Failure(
+            "利用可能なコピーがあります。直接貸出してください。");
+
+    // 3. 会員の予約上限チェック
+    // ...
+
+    return ValidationResult.Success();
+}
+```
+
+**対策**:
+- 仕様書の「前提条件」「制約」セクションを必ず確認する
+- 「〜のみ可能」「〜の場合のみ」という文言を見逃さない
+- ValidationService に全前提条件を列挙する
+- 各条件にコメントで理由を明記する
+
+**参照**: `catalog/patterns/domain-validation-service.yaml`
+
+---
+
+### 3. 優先権のある操作可否判定の漏れ（FR-021問題）
+
+**Ready状態の予約者優先ロジックの実装漏れ**
+
+仕様: 「Ready状態の予約者に対して**優先的に**貸出ができなければならない」
+
+```csharp
+// ❌ 漏れ: Ready状態の予約者優先チェックがない
+public async Task<BoundaryDecision> ValidateBorrowAsync(BookId bookId, MemberId memberId, CancellationToken ct)
+{
+    var copy = await _bookCopyRepository.GetAvailableCopyAsync(bookId, ct);
+    if (copy == null)
+        return BoundaryDecision.Deny("貸出可能なコピーがありません");
+
+    // Ready状態の予約者がいるかチェックしていない！
+    return BoundaryDecision.Allow();
+}
+
+// ✅ 正しい: Ready状態の予約者をチェック
+public async Task<BoundaryDecision> ValidateBorrowAsync(BookId bookId, MemberId memberId, CancellationToken ct)
+{
+    var copy = await _bookCopyRepository.GetAvailableCopyAsync(bookId, ct);
+    if (copy == null)
+        return BoundaryDecision.Deny("貸出可能なコピーがありません");
+
+    // ★ Ready状態の予約者を取得（FR-021対策）
+    var readyReservation = await _reservationRepository
+        .GetReadyReservationByBookIdAsync(bookId, ct);
+
+    // Entity.CanBorrow() に予約者情報を渡して委譲
+    return copy.CanBorrow(memberId, readyReservation?.MemberId);
+}
+```
+
+**Entity の実装例**:
+
+```csharp
+public class BookCopy : AggregateRoot<BookCopyId>
+{
+    public BoundaryDecision CanBorrow(MemberId memberId, MemberId? readyReserverId)
+    {
+        if (Status != BookCopyStatus.Available && Status != BookCopyStatus.Reserved)
+            return BoundaryDecision.Deny("このコピーは貸出可能状態ではありません");
+
+        // ★ Ready状態の予約者がいる場合、その人以外はDeny
+        if (readyReserverId.HasValue && readyReserverId.Value != memberId)
+        {
+            return BoundaryDecision.Deny(
+                "予約者に優先権があります。予約者の貸出処理をお待ちください。");
+        }
+
+        return BoundaryDecision.Allow();
+    }
+}
+```
+
+**対策**:
+- 「〜者優先」「〜のみ可能」という仕様を見落とさない
+- CanXxx() メソッドに優先権エンティティを渡す設計にする
+- BoundaryService で優先権エンティティを事前取得する
+- Deny理由に「誰が優先権を持っているか」を明記する
+
+**参照**: `catalog/patterns/boundary-pattern.yaml`
+
+---
+
+### 4. 順序付きキュー（Position）の実装漏れ（FR-018問題）
+
+**予約の順番管理（Position）が完全に未実装**
+
+仕様: 「予約は先着順（Position）で管理される」
+
+```csharp
+// ❌ 漏れ: Position フィールドがない
+public class Reservation : AggregateRoot<ReservationId>
+{
+    public MemberId MemberId { get; private set; }
+    public BookId BookId { get; private set; }
+    public ReservationStatus Status { get; private set; }
+    public DateTime ReservedAt { get; private set; }
+    // Position が定義されていない！
+}
+
+// ✅ 正しい: Position フィールドを追加
+public class Reservation : AggregateRoot<ReservationId>
+{
+    public MemberId MemberId { get; private set; }
+    public BookId BookId { get; private set; }
+    public ReservationStatus Status { get; private set; }
+    public DateTime ReservedAt { get; private set; }
+
+    /// <summary>
+    /// キュー内の順番（1から始まる）
+    /// </summary>
+    public int Position { get; private set; }  // ★ FR-018対策
+}
+```
+
+**対策**:
+- 仕様書に「順番」「キュー」「Position」という文言があれば、このパターンを適用する
+- Entity に Position フィールドを追加する
+- Repository に GetNextPositionAsync() メソッドを追加する
+- キャンセル時の Position 繰り上げを実装する
+
+**参照**: `catalog/patterns/domain-ordered-queue.yaml`
+
+---
+
+### ドッグフーディング問題の共通原因
+
+| 問題 | 共通原因 |
+|-----|---------|
+| FR-017, FR-021 | 仕様にあるが「当然の条件」として見落とし |
+| FR-018 | カタログにパターンがなくAIが実装方法を知らなかった |
+| クエリ分岐ミス | コピペ後の確認不足 |
+
+**教訓**:
+1. 仕様書の「〜のみ」「〜優先」という文言を意識的にチェックする
+2. 新しいパターン（順序付きキュー等）はカタログを確認する
+3. コピペ後は必ずメソッド名を確認する
+
+---
+
 **最終更新: 2025-12-07**
 **カタログバージョン: v2025.12.07**

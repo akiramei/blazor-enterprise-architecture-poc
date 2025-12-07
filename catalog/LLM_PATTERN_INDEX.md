@@ -109,12 +109,13 @@ CQRS の Query 側パターン。
 
 | パターンID | 用途 | トリガーフレーズ | YAMLファイル |
 |-----------|------|-----------------|-------------|
-| boundary-pattern | 操作可否判定 | 「〇〇できるか」「権限チェック」「CanXxx」 | patterns/boundary-pattern.yaml |
+| boundary-pattern | 操作可否判定 | 「〇〇できるか」「権限チェック」「CanXxx」「優先権」 | patterns/boundary-pattern.yaml |
 | domain-state-machine | 状態遷移 | 「ステータス」「状態遷移」「ワークフロー状態」 | patterns/domain-state-machine.yaml |
-| domain-validation-service | 業務ルール検証 | 「重複チェック」「在庫確認」「残高確認」「引当」 | patterns/domain-validation-service.yaml |
+| domain-validation-service | 業務ルール検証 | 「重複チェック」「在庫確認」「残高確認」「引当」「〜のみ可能」 | patterns/domain-validation-service.yaml |
 | domain-typed-id | 型安全ID | 「強い型付け」「ProductId」「OrderId」 | patterns/domain-typed-id.yaml |
 | domain-timeslot | 時間枠管理 | 「予約時間」「タイムスロット」「重複判定」 | patterns/domain-timeslot.yaml |
 | domain-approval-history | 承認履歴 | 「承認履歴」「誰が承認」「承認追跡」 | patterns/domain-approval-history.yaml |
+| domain-ordered-queue | 順序付きキュー管理 | 「順番」「待ち行列」「キュー」「Position」「Ready状態」 | patterns/domain-ordered-queue.yaml |
 
 ---
 
@@ -165,6 +166,9 @@ CQRS の Query 側パターン。
 | 予約/ダブルブッキング | concurrency-control | 同時実行制御が必須 |
 | 監査証跡が必要 | audit-log-behavior | コンプライアンス対応 |
 | パフォーマンス要件 | metrics-behavior, caching-behavior | 最適化のため |
+| **順番管理がある** | domain-ordered-queue | Position/Queue管理が必要（FR-018対策） |
+| **「〜のみ可能」という前提条件** | domain-validation-service | 複合前提条件の検証漏れ防止（FR-017対策） |
+| **優先権のある操作** | boundary-pattern（advanced_patterns） | Ready状態の優先権判定（FR-021対策） |
 
 ---
 
@@ -174,6 +178,9 @@ CQRS の Query 側パターン。
 - audit-log-behavior（貸出・返却履歴）
 - concurrency-control（同時貸出防止）
 - domain-timeslot（貸出期間）
+- **domain-ordered-queue**（予約順番管理・Position）★FR-018対策
+- **domain-validation-service**（全コピー貸出中のみ予約可能）★FR-017対策
+- **boundary-pattern（advanced_patterns）**（Ready予約者の優先権）★FR-021対策
 
 ### 金融・決済
 - audit-log-behavior（決済履歴）
@@ -228,5 +235,6 @@ dependencies:
 
 ## カタログバージョン
 
-- **バージョン**: v2025.11.27.3
-- **最終更新**: 2025-11-27
+- **バージョン**: v2025.12.07.1
+- **最終更新**: 2025-12-07
+- **更新内容**: 図書館ドッグフーディングフィードバック対応（FR-017, FR-018, FR-021対策パターン追加）

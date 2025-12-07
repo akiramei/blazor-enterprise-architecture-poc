@@ -810,6 +810,17 @@
       "intent": "期間（日付範囲）を指定してエンティティを取得するクエリパターン",
       "tags": ["query", "cqrs", "period", "date-range", "calendar", "schedule", "booking"],
       "stability": "stable"
+    },
+    {
+      "id": "domain-ordered-queue",
+      "name": "Ordered Queue Pattern (Position Management)",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-ordered-queue.yaml",
+      "intent": "順序付きキュー（待ち行列）の管理パターン。予約順、処理順、優先度順などの順序管理を実装",
+      "tags": ["domain", "queue", "position", "ready-state", "reservation", "waiting-list", "priority"],
+      "stability": "stable",
+      "note": "図書館ドッグフーディングFR-018対策として追加。予約の順番管理が完全に未実装だった問題を解決。"
     }
   ],
   "recommended_combinations": [
@@ -1018,6 +1029,42 @@
           "期間を指定して集計したい → aggregation-reporting"
         ],
         "decision_rule": "集計クエリ（GROUP BY、SUM、ランキング、ダッシュボード）は aggregation-reporting"
+      },
+      "順序管理・キュー": {
+        "pattern_category": "domain-pattern",
+        "confidence": 0.95,
+        "trigger_keywords": ["順番", "キュー", "待ち行列", "Position", "予約順", "何番目", "先頭", "Ready状態", "順番待ち", "先着順", "繰り上げ"],
+        "examples": [
+          "予約の順番を管理したい → domain-ordered-queue",
+          "待ち行列を実装したい → domain-ordered-queue",
+          "順番が回ってきたらReady状態にしたい → domain-ordered-queue + domain-state-machine",
+          "先頭の予約者に優先権を与えたい → domain-ordered-queue + boundary-pattern",
+          "キャンセル時に後続の順番を繰り上げたい → domain-ordered-queue"
+        ],
+        "decision_rule": "順番（Position）を持つキュー管理は domain-ordered-queue。図書館ドッグフーディングFR-018対策。"
+      },
+      "複合前提条件チェック": {
+        "pattern_category": "domain-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["〜のみ", "〜の場合のみ", "前提条件", "すべて〜の場合", "全部〜なら", "利用可能なコピーがある場合"],
+        "examples": [
+          "全コピー貸出中のみ予約可能 → domain-validation-service（複合前提条件）",
+          "在庫がある場合のみ注文可能 → domain-validation-service",
+          "残高がある場合のみ決済可能 → domain-validation-service",
+          "利用可能なコピーがあれば予約不可 → domain-validation-service"
+        ],
+        "decision_rule": "複数条件を組み合わせた前提条件チェックは domain-validation-service の composite_precondition_check パターン。図書館ドッグフーディングFR-017対策。"
+      },
+      "優先権のある操作可否": {
+        "pattern_category": "domain-pattern",
+        "confidence": 0.90,
+        "trigger_keywords": ["優先権", "優先", "Ready状態の人", "先頭の人", "予約者のみ", "〜者優先", "優先的に"],
+        "examples": [
+          "Ready状態の予約者のみ貸出可能 → boundary-pattern（優先権）",
+          "先頭の人のみ入場可能 → boundary-pattern + domain-ordered-queue",
+          "予約者に優先的に貸出したい → boundary-pattern（優先権）"
+        ],
+        "decision_rule": "「特定の人のみ操作可能」という優先権判定は boundary-pattern の advanced_patterns.priority_based_decision を参照。図書館ドッグフーディングFR-021対策。"
       }
     },
     "selection_algorithm": {

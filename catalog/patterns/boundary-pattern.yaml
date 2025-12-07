@@ -707,6 +707,111 @@ wiring:
     patterns:
       - "domain-state-machine (状態遷移判定に使用する場合)"
 
+# ============================================================================
+# 高度なパターン
+# ============================================================================
+advanced_patterns:
+  # ================================================================
+  # 優先権に基づく操作可否判定（FR-021問題対策）
+  # ================================================================
+  priority_based_decision:
+    name: "優先権に基づく操作可否判定"
+    description: |
+      Ready状態の予約者など、「優先権」を持つエンティティがある場合の
+      操作可否判定パターン。
+
+      ## 背景（FR-021問題）
+      図書館ドッグフーディングで「Ready状態の予約者優先」ロジックが
+      実装されなかった。BoundaryServiceが「待機中」の予約だけを探し、
+      Ready状態の予約者以外でも貸出できてしまった。
+
+      ## いつ使うか
+      - Ready状態の予約者のみが貸出可能
+      - 先頭の順番待ちのみが入場可能
+      - 承認待ちの最上位者のみが承認可能
+
+    entity_pattern: |
+      public class BookCopy : AggregateRoot<BookCopyId>
+      {
+          /// <summary>
+          /// 貸出可否を判定（優先権チェック含む）
+          /// </summary>
+          /// <param name="memberId">貸出を試みる会員</param>
+          /// <param name="readyReserverId">Ready状態の予約者（いれば）</param>
+          public BoundaryDecision CanBorrow(MemberId memberId, MemberId? readyReserverId)
+          {
+              // 1. 基本条件: 貸出可能な状態か
+              if (Status != BookCopyStatus.Available && Status != BookCopyStatus.Reserved)
+                  return BoundaryDecision.Deny($"このコピーは現在{Status}状態のため貸出できません");
+
+              // 2. ★ 優先権チェック（FR-021対策）
+              if (readyReserverId.HasValue)
+              {
+                  // Ready状態の予約がある場合、その予約者のみ貸出可能
+                  if (readyReserverId.Value != memberId)
+                  {
+                      return BoundaryDecision.Deny(
+                          "予約者に優先権があります。予約者の貸出処理をお待ちください。");
+                  }
+                  // 予約者本人の場合は許可（予約消化として）
+              }
+
+              return BoundaryDecision.Allow();
+          }
+      }
+
+    boundary_service_pattern: |
+      public class LoanBoundaryService : ILoanBoundary
+      {
+          private readonly IBookCopyRepository _bookCopyRepository;
+          private readonly IReservationRepository _reservationRepository;
+
+          public async Task<BoundaryDecision> ValidateBorrowAsync(
+              BookId bookId,
+              MemberId memberId,
+              CancellationToken ct = default)
+          {
+              // 1. 貸出可能なコピーを取得
+              var copy = await _bookCopyRepository.GetAvailableCopyAsync(bookId, ct);
+              if (copy == null)
+                  return BoundaryDecision.Deny("貸出可能なコピーがありません");
+
+              // 2. ★ Ready状態の予約を取得（優先権チェック用）
+              var readyReservation = await _reservationRepository
+                  .GetReadyReservationByBookIdAsync(bookId, ct);
+
+              // 3. ★ Entity.CanBorrow() に委譲（優先権情報を渡す）
+              return copy.CanBorrow(memberId, readyReservation?.MemberId);
+          }
+      }
+
+    critical_note: |
+      ★★★ 重要: FR-021問題の対策 ★★★
+
+      「Ready状態の予約者優先」のような優先権ロジックは、
+      以下の理由で実装漏れしやすい：
+
+      1. 基本的な操作可否判定とは別のロジック
+      2. 「誰でもOK」と「特定の人のみOK」の分岐が必要
+      3. 優先権を持つエンティティの取得が必要
+
+      対策:
+      - CanXxx() メソッドに「優先権エンティティ」のIDを渡す
+      - BoundaryService で優先権エンティティを事前取得
+      - Deny理由に「誰が優先権を持っているか」を明記
+
+    checklist:
+      - "[ ] Ready状態の予約者がいる場合、その人以外はDenyか？"
+      - "[ ] 優先権を持つ人が操作した場合、予約が消化されるか？"
+      - "[ ] 優先権の有効期限は管理されているか？"
+      - "[ ] BoundaryServiceで優先権エンティティを事前取得しているか？"
+      - "[ ] CanXxx()に優先権情報を渡しているか？"
+
+    combination_with_other_patterns:
+      - pattern: domain-ordered-queue
+        reason: "Ready状態はキュー管理パターンの一部"
+        usage: "Position=1 になったら Ready 状態に遷移、Ready 状態の人に優先権"
+
 evidence:
   # 実際の実装例があれば追加
   domain_layer:
@@ -715,6 +820,9 @@ evidence:
     このパターンはカンバンシステム実装時のフィードバックから生まれました。
     WIP制限やカード移動可否の判定をドメイン層に集約することで、
     UIとビジネスロジックの責務を明確に分離できます。
+
+    v2.1.0で「優先権に基づく操作可否判定」パターンを追加。
+    図書館ドッグフーディング（FR-021問題）のフィードバックから。
 
 changelog:
   - version: 2.0.0

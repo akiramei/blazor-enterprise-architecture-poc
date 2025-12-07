@@ -52,6 +52,47 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. Generate and dispatch research agents
 3. Consolidate findings in research.md
 
+### Phase 0.25: Guardrails Extraction (CRITICAL - NEW)
+
+**This phase extracts business rules that MUST NOT be violated.**
+
+背景: 図書館ドッグフーディングで FR-017, FR-021 などの重要ルールが
+実装まで伝播せず、仕様違反が発生した。Guardrails で強制伝播する。
+
+1. **Read feature spec and identify Guardrails**:
+
+   Guardrail の条件:
+   - 「〜のみ可能」「〜の場合のみ」という前提条件
+   - 「〜が優先」「〜が先」という優先権ルール
+   - 違反するとビジネス上の問題が発生するルール
+
+2. **Extract and format Guardrails**:
+
+   ```markdown
+   ## Guardrails（絶対遵守）
+
+   以下のルールは実装で必ず満たすこと。違反は仕様違反とみなす。
+
+   | ID | FR | ルール | 対象スコープ | 違反時の問題 |
+   |----|----|----|------|-------------|
+   | GR-001 | FR-021 | Ready 状態の予約者が最優先で貸出権を持つ | LoanBoundaryService | Ready 予約者以外に貸出してしまう |
+   | GR-002 | FR-017 | Available なコピーがある間は予約不可 | ReservationValidationService | 不要な予約を受け付けてしまう |
+   | GR-003 | FR-018 | 予約は先着順（Position で管理） | Reservation Entity | 順番が管理できない |
+   ```
+
+3. **Guardrail identification checklist**:
+
+   spec を読む際に以下をチェック：
+   - [ ] 「〜のみ」「〜だけ」「〜の場合のみ」という文言があるか？
+   - [ ] 「優先」「先着」「順番」という文言があるか？
+   - [ ] 複数の条件を満たす必要がある操作があるか？
+   - [ ] 状態に依存する操作可否判定があるか？
+
+4. **Output**: plan.md に Guardrails セクションを追加
+
+**警告**: Guardrails が0件の場合、spec に前提条件が明示されていない可能性がある。
+その場合は research フェーズで確認すること。
+
 ### Phase 0.5: Catalog Pattern Selection (CATALOG EXTENSION)
 
 **This phase is added by the catalog. DO NOT skip.**
@@ -128,11 +169,68 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 1. Extract entities from feature spec → data-model.md
    - Include **Entity.CanXxx() methods from Boundary section**
+   - **属性の強制反映チェック（CRITICAL - NEW）**
 
 2. Generate API contracts from functional requirements
    - Use MediatR patterns from catalog (not REST endpoints)
+   - **Query Semantics の明示（CRITICAL - NEW）**
 
 3. Agent context update
+
+#### 1.1 属性の強制反映チェック（FR-018 対策）
+
+背景: 図書館ドッグフーディングで `Position` 属性が spec に明記されていたにもかかわらず、
+data-model から欠落した。
+
+**ルール**: spec に明記された属性は data-model から落としてはならない。
+
+**チェック手順**:
+
+1. spec から全エンティティの属性を抽出
+2. data-model.md と照合
+3. 欠落があればエラー
+
+```markdown
+## Attribute Enforcement Check
+
+| Entity | Attribute | Spec | data-model | Status |
+|--------|-----------|:----:|:----------:|:------:|
+| Reservation | Position | ✅ | ✅ | OK |
+| Reservation | Status | ✅ | ✅ | OK |
+| Loan | DueDate | ✅ | ❌ | **ERROR** |
+
+**欠落属性**: Loan.DueDate が data-model にありません。追加してください。
+```
+
+**特に注意すべき属性**:
+- Position, Order, Sequence（順序管理）
+- Status, State（状態管理）
+- Priority, Rank（優先度）
+- Limit, Max, Min（上限/下限）
+
+#### 1.2 Query Semantics の明示（Query バグ対策）
+
+背景: 図書館ドッグフーディングで `GetLoansQuery` が一般一覧と Overdue の
+両方の意味を持ち、実装で混同された（コピペバグ）。
+
+**ルール**: Query の意味（semantic）を plan で明示し、使用すべき Repository メソッドを指定する。
+
+```markdown
+## Query Semantics
+
+| Query | Semantic | Repository Method | 禁止 |
+|-------|----------|-------------------|------|
+| GetLoansQuery | 全 Loan 一覧 / Active 一覧 | GetAllLoansAsync, GetActiveLoansByMemberIdAsync | ❌ GetOverdueLoansAsync |
+| GetOverdueLoansQuery | Overdue 専用 | GetOverdueLoansAsync | ❌ GetActiveLoansByMemberIdAsync |
+| GetReservationsQuery | 予約一覧 | GetReservationsByMemberIdAsync | - |
+
+**注意**: Query と Repository メソッドの対応を間違えないこと。
+```
+
+**チェック項目**:
+- [ ] 同じ Repository メソッドを異なる Query で使いまわしていないか？
+- [ ] Query の semantic が明確に区別されているか？
+- [ ] 「〜専用」の Query が他の用途に使われていないか？
 
 ### Phase 1.5: Design-Level COMMON_MISTAKES Check (CRITICAL - AUTO)
 
@@ -246,12 +344,17 @@ IF unable to auto-correct (requires spec clarification):
 
 - Use absolute paths
 - ERROR on gate failures or unresolved clarifications
+- **NEVER skip Guardrails Extraction phase** - 重要ルールの伝播漏れを防ぐ
 - **NEVER skip Catalog Binding phase** - Constitution requires it
 - **NEVER skip Design-Level Check phase** - Runs AUTOMATICALLY after Phase 1
 - **NEVER ask user permission to fix violations** - Self-correct automatically
 - **NEVER implement patterns that exist in catalog** - use templates
+- **NEVER drop attributes from spec** - 属性の強制反映チェックを実行
+- **ALWAYS define Query Semantics** - Query と Repository の対応を明示
 - If Boundary section is empty for UI features → ERROR
 - If Design-Level Check cannot auto-correct → ERROR (do not proceed to tasks)
+- If Attribute Enforcement Check fails → ERROR (do not proceed)
+- If Guardrails section is empty → WARNING (confirm with spec)
 - **ALWAYS output corrected plan** if violations were found and fixed
 
 ---

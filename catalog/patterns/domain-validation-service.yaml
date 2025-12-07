@@ -38,6 +38,67 @@ structure:
   domain_service: "src/Domain/{BC}/Services/{Entity}ValidationService.cs"
   interface: "src/Domain/{BC}/Services/I{Entity}ValidationService.cs"
 
+# ============================================================================
+# Validation Contract（検証契約）- spec-kit 連携用
+# ============================================================================
+#
+# このセクションは ValidationService が「何を参照し、何を保証するか」を
+# 明示的に定義するための契約仕様です。
+#
+# spec-kit の tasks.md 生成時に、この契約を参照することで
+# 「どのリポジトリを使うべきか」が実装者に伝わります。
+#
+validation_contract:
+  description: |
+    ValidationService の契約を定義するスキーマ。
+    spec-kit や tasks.md で以下の形式で記述することを推奨。
+
+  schema:
+    validation_service_name: "string - サービス名（例: ReservationValidationService）"
+    method_name: "string - メソッド名（例: ValidateCanReserveAsync）"
+    requires:
+      description: "必ず呼び出すべきリポジトリメソッド"
+      format: "I{Repository}.{Method}({params})"
+    ensures:
+      description: "このValidationServiceが保証する条件（FR番号付き）"
+      format: "{条件の説明} ({FR番号})"
+    fr_references:
+      description: "関連するFR番号のリスト"
+
+  example: |
+    # tasks.md での記述例
+    ```yaml
+    validation_contract:
+      service: ReservationValidationService
+      method: ValidateCanReserveAsync
+      requires:
+        - IBookRepository.GetByIdAsync(bookId)
+        - IBookCopyRepository.GetAvailableCopiesByBookIdAsync(bookId)
+        - IMemberRepository.GetByIdAsync(memberId)
+        - IReservationRepository.GetActiveReservationsByMemberIdAsync(memberId)
+        - IReservationRepository.GetActiveReservationByMemberAndBookAsync(memberId, bookId)
+      ensures:
+        - "書籍が存在する"
+        - "Available なコピーが0件である (FR-017)"
+        - "会員がアクティブである"
+        - "予約上限に達していない"
+        - "同じ書籍を二重予約していない"
+      fr_references: [FR-017]
+    ```
+
+  ai_instruction: |
+    ★★★ AI実装者への指示 ★★★
+
+    ValidationService を実装する際、spec/tasks に `requires` が定義されている場合：
+
+    1. requires に列挙された全てのリポジトリメソッドを呼び出すこと
+    2. 呼び出しを省略してはならない（「不要」と判断しない）
+    3. ensures に列挙された全ての条件をチェックすること
+    4. FR番号がある条件は特に注意（仕様で明示された重要ルール）
+
+    ❌ NG例: 「MemberRepository だけ見れば十分」と判断して BookCopyRepository を省略
+    ✅ OK例: requires に書かれた全リポジトリを呼び出し、ensures の全条件をチェック
+
 implementation:
   interface:
     file_path: "src/Domain/{BC}/Services/I{Entity}ValidationService.cs"
@@ -212,6 +273,149 @@ example_usage:
               .ToListAsync(cancellationToken);
       }
 
+  # ================================================================
+  # 複合前提条件チェック（FR-017問題対策）
+  # ================================================================
+  composite_precondition_check:
+    description: |
+      複合前提条件チェック（例: 全コピー貸出中のみ予約可能）
+
+      ## 背景（FR-017問題）
+      図書館ドッグフーディングで「全コピー貸出中のみ予約可能」という
+      前提条件のチェックが漏れていた。仕様書には明記されていたが、
+      実装で「当然の条件」として見落とされた。
+
+      ## いつ使うか
+      - 「〜のみ可能」「〜の場合のみ」という前提条件がある
+      - 複数の条件を組み合わせて「操作可能かどうか」を判定する
+      - 単純な重複チェックではなく、状態や可用性を確認する
+
+    # ★★★ Validation Contract（検証契約）★★★
+    # この契約を tasks.md に記載することで、実装漏れを防ぐ
+    validation_contract:
+      service: ReservationValidationService
+      method: ValidateCanReserveAsync
+      requires:
+        - "IBookRepository.GetByIdAsync(bookId) - 書籍存在確認"
+        - "IBookCopyRepository.GetAvailableCopiesByBookIdAsync(bookId) - ★必須: 利用可能コピー確認"
+        - "IMemberRepository.GetByIdAsync(memberId) - 会員存在・状態確認"
+        - "IReservationRepository.GetActiveReservationsByMemberIdAsync(memberId) - 予約上限確認"
+        - "IReservationRepository.GetActiveReservationByMemberAndBookAsync(memberId, bookId) - 二重予約確認"
+      ensures:
+        - "書籍が存在すること"
+        - "★ Available なコピーが0件であること (FR-017) - 利用可能なコピーがあれば予約不可"
+        - "会員がアクティブであること"
+        - "会員の予約上限に達していないこと"
+        - "同じ書籍を二重予約していないこと"
+      fr_references: [FR-017]
+      critical_requires:
+        - repository: "IBookCopyRepository"
+          method: "GetAvailableCopiesByBookIdAsync"
+          reason: "このメソッドを呼ばないと FR-017 違反になる"
+
+    interface: |
+      public interface IReservationValidationService
+      {
+          /// <summary>
+          /// 予約可否を判定（複合前提条件）
+          /// </summary>
+          /// <remarks>
+          /// 前提条件:
+          /// 1. 対象書籍が存在する
+          /// 2. 全コピーが貸出中である（Available なコピーがない）← FR-017
+          /// 3. 会員がアクティブである
+          /// 4. 会員が予約上限に達していない
+          /// 5. 同じ書籍を二重予約していない
+          /// </remarks>
+          Task<ValidationResult> ValidateCanReserveAsync(
+              BookId bookId,
+              MemberId memberId,
+              CancellationToken ct = default);
+      }
+
+    implementation: |
+      public class ReservationValidationService : IReservationValidationService
+      {
+          private readonly IBookRepository _bookRepository;
+          private readonly IBookCopyRepository _copyRepository;
+          private readonly IReservationRepository _reservationRepository;
+          private readonly IMemberRepository _memberRepository;
+
+          public ReservationValidationService(
+              IBookRepository bookRepository,
+              IBookCopyRepository copyRepository,
+              IReservationRepository reservationRepository,
+              IMemberRepository memberRepository)
+          {
+              _bookRepository = bookRepository;
+              _copyRepository = copyRepository;
+              _reservationRepository = reservationRepository;
+              _memberRepository = memberRepository;
+          }
+
+          public async Task<ValidationResult> ValidateCanReserveAsync(
+              BookId bookId,
+              MemberId memberId,
+              CancellationToken ct = default)
+          {
+              // 1. 書籍存在チェック
+              var book = await _bookRepository.GetByIdAsync(bookId, ct);
+              if (book == null)
+                  return ValidationResult.Failure("書籍が見つかりません");
+
+              // 2. ★ 全コピー貸出中チェック（FR-017対策）
+              //    利用可能なコピーがあれば予約は不要
+              var availableCopies = await _copyRepository
+                  .GetAvailableCopiesByBookIdAsync(bookId, ct);
+              if (availableCopies.Any())
+                  return ValidationResult.Failure(
+                      "利用可能なコピーがあります。直接貸出してください。");
+
+              // 3. 会員存在・状態チェック
+              var member = await _memberRepository.GetByIdAsync(memberId, ct);
+              if (member == null)
+                  return ValidationResult.Failure("会員が見つかりません");
+              if (member.Status != MemberStatus.Active)
+                  return ValidationResult.Failure("会員が停止中です");
+
+              // 4. 予約上限チェック
+              var activeReservations = await _reservationRepository
+                  .GetActiveReservationsByMemberIdAsync(memberId, ct);
+              if (activeReservations.Count >= member.ReservationLimit)
+                  return ValidationResult.Failure(
+                      $"予約上限（{member.ReservationLimit}件）に達しています");
+
+              // 5. 二重予約チェック
+              var existing = await _reservationRepository
+                  .GetActiveReservationByMemberAndBookAsync(memberId, bookId, ct);
+              if (existing != null)
+                  return ValidationResult.Failure("既にこの書籍を予約しています");
+
+              return ValidationResult.Success();
+          }
+      }
+
+    critical_note: |
+      ★★★ 重要: FR-017問題の対策 ★★★
+
+      「全コピー貸出中のみ予約可能」のような複合前提条件は、
+      以下の理由で実装漏れしやすい：
+
+      1. 仕様書に書いてあっても、AIが「当然の条件」として見落とす
+      2. 単純な重複チェックパターンには含まれない
+      3. テストケースで網羅しないと気づかない
+
+      対策:
+      - ValidateCanXxxAsync() メソッドに全前提条件を列挙する
+      - 各条件にコメントで「なぜこのチェックが必要か」を明記
+      - 仕様書の「〜のみ可能」「〜の場合のみ」という文言を意識的にチェック
+
+    checklist:
+      - "[ ] 仕様書に「〜のみ可能」「〜の場合のみ」という前提条件がないか？"
+      - "[ ] 前提条件を全て ValidationService で検証しているか？"
+      - "[ ] 各条件にコメントで理由を明記したか？"
+      - "[ ] 前提条件のテストケースを作成したか？"
+
 wiring:
   service_registrations:
     - "services.AddScoped<IBookingValidationService, BookingValidationService>();"
@@ -270,6 +474,18 @@ evidence:
   note: "新規パターン - 実装例は今後追加"
 
 changelog:
+  - version: 1.2.0
+    date: 2025-12-07
+    changes:
+      - "validation_contract セクションを追加（requires/ensures による契約仕様）"
+      - "composite_precondition_check に具体的な validation_contract 例を追加"
+      - "spec-kit 連携用の AI 実装指示を追加"
+
+  - version: 1.1.0
+    date: 2025-12-07
+    changes:
+      - "複合前提条件チェックパターンを追加（FR-017問題対策）"
+
   - version: 1.0.0
     date: 2025-11-24
     changes:
