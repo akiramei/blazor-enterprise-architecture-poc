@@ -97,6 +97,10 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **This phase is added by the catalog. DO NOT skip.**
 
+> **Skills ヒント**: パターン選択時に `vsa-pattern-selector` の知識が自動的に適用される
+> 可能性があります。Feature Slices、Query Patterns、Domain Patterns の選択基準は
+> Skills が提供します。
+
 1. **Read catalog index**:
    ```
    Read: catalog/index.json
@@ -145,6 +149,11 @@ You **MUST** consider the user input before proceeding (if not empty).
    ```
 
 5. **Boundary modeling** (if UI is involved):
+
+   > **Skills ヒント**: UI がある場合、`vsa-boundary-modeler` の知識が自動的に適用される
+   > 可能性があります。Intent 定義、Entity.CanXxx() 設計、BoundaryService の責務分離は
+   > Skills が提供します。
+
    - Read: `catalog/patterns/boundary-pattern.yaml`
    - List all Intents (user intentions)
    - Design Entity.CanXxx() methods for each Intent
@@ -235,6 +244,9 @@ data-model から欠落した。
 ### Phase 1.5: Design-Level COMMON_MISTAKES Check (CRITICAL - AUTO)
 
 **This check is MANDATORY and runs AUTOMATICALLY after Phase 1.**
+
+> **Skills ヒント**: 実装計画チェック時に `vsa-implementation-guard` の知識が自動的に適用される
+> 可能性があります。禁止事項、必須パターンは Skills が提供します。
 
 Do NOT wait for user instruction. Execute this phase immediately after Phase 1.
 

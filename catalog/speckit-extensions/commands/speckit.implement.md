@@ -23,6 +23,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **This phase is MANDATORY. Do NOT skip.**
 
+> **Skills ヒント**: 実装時に `vsa-implementation-guard` の知識が自動的に適用される可能性があります。
+> SaveChangesAsync 禁止、Result<T> パターン強制などの禁止事項は Skills が提供します。
+
 ### Why This Phase Exists
 
 ```

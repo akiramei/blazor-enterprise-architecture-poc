@@ -33,6 +33,11 @@ This ensures:
 
 ## Step 2: Map Tasks to Patterns and Guardrails
 
+> **Skills ヒント**: タスク生成時に以下の Skills が自動適用される可能性があります：
+> - `vsa-pattern-selector`: パターン選択の妥当性検証
+> - `vsa-boundary-modeler`: Boundary タスクの完全性検証
+> - `vsa-implementation-guard`: 制約の自動抽出
+
 For each implementation task, determine:
 - Which Pattern ID applies
 - The YAML path for that pattern
