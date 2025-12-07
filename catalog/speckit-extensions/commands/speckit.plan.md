@@ -24,6 +24,12 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## このコマンドの目的
+
+- SPEC の内容を元に、Vertical Slice + パターンカタログ前提の技術計画を作ること
+- 選択されたパターンは後続の `/speckit.tasks`, `/speckit.implement` から再利用される
+- Boundary セクション（UI がある場合）と Catalog Binding セクションが必須出力
+
 ## Outline
 
 1. **Setup**: Run `{SCRIPT}` from repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
