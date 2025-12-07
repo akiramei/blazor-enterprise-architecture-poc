@@ -117,6 +117,49 @@ dotnet run --project Application
 
 ---
 
+## 🤖 ヘッドレスモード（自動化 / CI向け）
+
+対話なしでコマンドラインから直接実行することもできます。
+
+### 基本的な使い方
+
+```bash
+# 仕様書を作成（詳細仕様ファイルを渡す）
+claude -p "/speckit.specify $(cat docs/samples/library-loan-system-requirements.md)"
+
+# 計画を立てる
+claude -p --continue "/speckit.plan"
+
+# タスクを分解
+claude -p --continue "/speckit.tasks"
+
+# 実装する
+claude -p --continue "/speckit.implement"
+```
+
+### オプション
+
+| オプション | 説明 |
+|-----------|------|
+| `-p, --print` | 非対話モード（結果を出力して終了） |
+| `--continue` | 直前のセッションを継続 |
+| `--output-format json` | JSON形式で出力 |
+| `--dangerously-skip-permissions` | 権限確認をスキップ（サンドボックス環境向け） |
+
+### パイプラインの例
+
+```bash
+# 一連の処理を連続実行
+claude -p "/speckit.specify $(cat requirements.md)" && \
+claude -p --continue "/speckit.plan" && \
+claude -p --continue "/speckit.tasks" && \
+claude -p --continue "/speckit.implement"
+```
+
+> **注意**: `--dangerously-skip-permissions` はインターネットアクセスのないサンドボックス環境でのみ使用してください。
+
+---
+
 ## 📖 開発の流れ
 
 ```
