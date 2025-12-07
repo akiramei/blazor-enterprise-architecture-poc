@@ -48,8 +48,10 @@ specify init . --ai claude
 git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
 cp -r temp-catalog/catalog ./catalog
 mkdir -p .claude/commands
+mkdir -p .claude/skills
 mkdir -p memory
 cp catalog/speckit-extensions/commands/*.md .claude/commands/
+cp -r catalog/skills/* .claude/skills/
 cat catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
 rm -rf temp-catalog
 ```
@@ -59,8 +61,10 @@ rm -rf temp-catalog
 git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
 Copy-Item temp-catalog/catalog ./catalog -Recurse
 New-Item -ItemType Directory -Force -Path .claude/commands
+New-Item -ItemType Directory -Force -Path .claude/skills
 New-Item -ItemType Directory -Force -Path memory
 Copy-Item catalog/speckit-extensions/commands/*.md .claude/commands/
+Copy-Item catalog/skills/* .claude/skills/ -Recurse
 Get-Content catalog/speckit-extensions/constitution-additions.md | Add-Content memory/constitution.md
 Remove-Item temp-catalog -Recurse -Force
 ```
