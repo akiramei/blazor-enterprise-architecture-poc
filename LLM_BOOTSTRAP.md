@@ -4,9 +4,10 @@
 > 最初にこのファイルを読み、指示に従って必要なファイルを読んでください。
 
 > **正本について**:
-> このファイルは「禁止事項」「パターン早見表」「基本ルール」の**正本**です。
-> `CLAUDE.md` にも同内容を再掲していますが、更新時はこのファイルを先に修正し、
-> `CLAUDE.md` に同期してください。
+> - **禁止事項（NEVER-DO）の正本**: `catalog/COMMON_MISTAKES.md`
+> - **パターン早見表・基本ルールの正本**: このファイル
+>
+> `CLAUDE.md` にも同内容を再掲していますが、更新時は正本を先に修正してください。
 
 ---
 
@@ -82,28 +83,17 @@ ProjectX/
 
 ## 3. 絶対禁止事項（NEVER DO）
 
+> **正本**: `catalog/COMMON_MISTAKES.md` を必ず先に読み、常にそちらを優先してください。
+
+代表例（詳細は正本参照）：
+
 ```
-❌ Handler内でSaveChangesAsync()を呼ばない
-   → TransactionBehaviorが自動実行する
-
-❌ SingletonでDbContextやScopedサービスを注入しない
-   → すべてのサービスはScopedで登録
-
-❌ MediatRのHandleメソッド名をHandleAsyncにしない
-   → 正しくは Handle
-
-❌ 独自のCQRS基盤を作らない
-   → MediatR + ICommand<T> / IQuery<T> を使用
-
-❌ 例外をthrowしてエラーを伝播しない
-   → Result<T> パターンを使用
-
-❌ カタログに存在するパターンを独自実装しない
-   → 必ず catalog/patterns/*.yaml を参照
-
-❌ 機能固有の.razorをComponents/Pages/に配置しない
-   → Features/{Feature}/ に .cs と同列配置
+❌ Handler内でSaveChangesAsync()を呼ばない → TransactionBehaviorが自動実行
+❌ BoundaryServiceに業務ロジック（if文）を書かない → Entity.CanXxx()に委譲
+❌ 例外をthrowしてエラーを伝播しない → Result<T>パターンを使用
 ```
+
+**完全なリスト**: `catalog/COMMON_MISTAKES.md` を参照
 
 ---
 

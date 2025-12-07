@@ -190,6 +190,31 @@ claude -p --continue "/speckit.implement"
 
 ---
 
+## 🧠 AI Skills（Claude Code 統合）
+
+このカタログは Claude Code の Skills と連携し、実装ミス防止・パターン選択支援・Boundary モデリングを自動化できます。
+
+### 利用可能な Skills
+
+| Skill 名 | 役割 | 対象フェーズ |
+|---------|------|------------|
+| `vsa-implementation-guard` | NEVER-DO 違反の自動検出と自己修正支援 | 実装全般（plan / tasks / implement） |
+| `vsa-boundary-modeler` | UI 機能の Boundary モデリング支援 | plan / tasks（UI 周り） |
+| `vsa-pattern-selector` | characteristics → パターン選択の自動支援 | plan / tasks |
+
+### Skills の導入
+
+Skills は Step 3 のカタログ追加時に自動的にコピーされます：
+
+```bash
+# このコマンドで Skills も一緒にコピーされる
+cp -r catalog/skills/* .claude/skills/
+```
+
+Claude Code は `.claude/skills/` を自動検出し、`/speckit.plan`, `/speckit.tasks`, `/speckit.implement` 実行時に必要に応じて Skills を利用します。
+
+---
+
 ## 🎯 このカタログでできること
 
 - **20+ の実装パターン**を提供（CRUD、検索、状態管理、認証など）

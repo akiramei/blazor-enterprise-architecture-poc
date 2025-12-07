@@ -13,8 +13,9 @@
 > このファイル単体だけを読むAIエージェント（シナリオB）を想定し、
 > あえて禁止事項や基本ルールを再掲しています。
 >
-> **正本**: 禁止事項・パターン早見表の正本は `LLM_BOOTSTRAP.md` です。
-> 更新時は両方を同期してください。
+> **正本**:
+> - **禁止事項（NEVER-DO）**: `catalog/COMMON_MISTAKES.md`
+> - **パターン早見表・基本ルール**: `LLM_BOOTSTRAP.md`
 
 > **詳細版**: より詳しい情報は `AGENTS.md` を参照してください。
 
@@ -156,28 +157,16 @@
 
 ## ⛔ 絶対禁止事項（NEVER DO）
 
+> **正本**: `catalog/COMMON_MISTAKES.md` を必ず先に読み、常にそちらを優先してください。
+> 以下は代表例のみです。詳細・更新はすべて正本側で管理します。
+
 ```
-❌ Handler内でSaveChangesAsync()を呼ばない
-   → TransactionBehaviorが自動実行する
-
-❌ SingletonでDbContextやScopedサービスを注入しない
-   → すべてのサービスはScopedで登録
-
-❌ MediatRのHandleメソッド名をHandleAsyncにしない
-   → 正しくは Handle（AsyncはMediatRの規約外）
-
-❌ 独自のCQRS基盤を作らない
-   → MediatR + ICommand<T> / IQuery<T> を使用
-
-❌ 例外をthrowしてエラーを伝播しない
-   → Result<T> パターンを使用
-
-❌ カタログに存在するパターンを独自実装しない
-   → 必ず catalog/patterns/*.yaml を参照
-
-❌ 機能固有の.razorをComponents/Pages/に配置しない
-   → Features/{Feature}/ に .cs と同列配置
+❌ Handler内でSaveChangesAsync()を呼ばない → TransactionBehaviorが自動実行
+❌ BoundaryServiceに業務ロジック（if文）を書かない → Entity.CanXxx()に委譲
+❌ 例外をthrowしてエラーを伝播しない → Result<T>パターンを使用
 ```
+
+**完全なリスト**: `catalog/COMMON_MISTAKES.md` を参照
 
 ---
 
