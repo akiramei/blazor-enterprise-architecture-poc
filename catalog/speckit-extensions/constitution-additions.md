@@ -88,6 +88,70 @@ Query 実装時は以下を明示：
 
 これにより、Query と Repository の混同を防ぐ。
 
+## Spec/Plan Consistency (SSOT) - NON-NEGOTIABLE
+
+Spec.md は仕様の唯一の真実の源泉（Single Source of Truth）である。
+Plan.md は Spec を「どう実現するか」を決めるが、「何を実現するか」を変更してはならない。
+
+### MUST
+
+- Plan で追加した制約・デフォルト値は Spec の Assumptions に反映する
+- Spec に定義された Enum 値・属性を Plan から落とさない
+- 曖昧さ解消の決定は "Unknowns Resolved" セクションに記録する
+- Optional 機能の実装判断は "Optional Rule Decisions" に記録する
+
+### MUST NOT
+
+- Spec に明記されていない制約を Plan で暗黙的に追加する（記録なしで）
+- Spec の Enum 値を Plan で勝手に削除・変更する
+- Spec の Enum 値を「要約」「解釈」して省略する
+- 決定の理由を記録せずにデフォルト値を使用する
+
+## Enum Value Enforcement (CRITICAL - 予防的チェック)
+
+Spec の Enum 値は Plan の data-model に **完全一致** で反映されなければならない。
+
+### MUST
+
+- Spec の Key Entities から全ての Status/Enum 定義を抽出する
+- Plan の data-model に全ての Enum 値を含める
+- Enum Value Enforcement Check テーブルを出力する
+- 欠落がある場合は ERROR で停止する
+
+### チェックフォーマット
+
+```markdown
+| Entity | Enum | Spec Values | Plan Values | Status |
+|--------|------|-------------|-------------|:------:|
+| Reservation | ReservationStatus | Waiting, Ready, Completed, Cancelled | Waiting, Ready, Completed, Cancelled | ✅ OK |
+```
+
+### Rationale
+
+属性の存在チェックだけでは Enum の「値」の欠落を検出できない。
+Fulfill() メソッドがあるのに Completed 状態がない、という矛盾を防止する。
+詳細は `spec-plan-consistency.md` および `decision-guide.md` を参照。
+
+## Decision Documentation
+
+曖昧な仕様に対する意思決定は必ず記録する。
+
+### Unknowns Resolved フォーマット
+
+```markdown
+| 項目 | Spec の状態 | 決定 | 理由 | Spec 反映 |
+|------|------------|------|------|:---------:|
+| 予約上限 | 明記なし | 3件 | 図書館業界の標準 | Y |
+```
+
+### Optional Rule Decisions フォーマット
+
+```markdown
+| Rule | Spec Location | キーワード | 決定 | 理由 |
+|------|---------------|-----------|------|------|
+| 延滞ブロック | L132 | optional | MVP 見送り | 明示的に無効化 |
+```
+
 ## Technology Stack (Catalog Patterns)
 
 このカタログで使用する技術スタック：

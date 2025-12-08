@@ -293,16 +293,54 @@ tasks.md 生成後にチェック：
 
 ### spec-kit 改善項目
 
-| # | 改善 | 対象フェーズ | 優先度 |
-|---|------|-------------|:------:|
-| 1 | Guardrails セクションを spec に追加 | spec 定義 | 高 |
-| 2 | plan.md に Guardrails を必ず含める | spec → plan | 高 |
-| 3 | tasks.md に Guardrail を紐付け | plan → tasks | 高 |
-| 4 | required 属性の強制反映 | data-model 生成 | 高 |
-| 5 | validation_contract の tasks 記述 | tasks 生成 | 中 |
-| 6 | Query semantic の明示 | plan 生成 | 中 |
-| 7 | FR 番号の自動紐付け | tasks 生成 | 中 |
-| 8 | 紐付け漏れの自動検出 | 検証 | 低 |
+| # | 改善 | 対象フェーズ | 優先度 | 状態 |
+|---|------|-------------|:------:|:----:|
+| 1 | Guardrails セクションを spec に追加 | spec 定義 | 高 | ✅ |
+| 2 | plan.md に Guardrails を必ず含める | spec → plan | 高 | ✅ |
+| 3 | tasks.md に Guardrail を紐付け | plan → tasks | 高 | ✅ |
+| 4 | required 属性の強制反映 | data-model 生成 | 高 | ✅ |
+| 5 | validation_contract の tasks 記述 | tasks 生成 | 中 | ✅ |
+| 6 | Query semantic の明示 | plan 生成 | 中 | ✅ |
+| 7 | FR 番号の自動紐付け | tasks 生成 | 中 | ✅ |
+| 8 | 紐付け漏れの自動検出 | 検証 | 低 | ✅ |
+| 9 | Spec/Plan 整合性チェック (SSOT) | plan 生成 | 高 | ✅ NEW |
+| 10 | 意思決定記録の強制 | plan 生成 | 中 | ✅ NEW |
+| 11 | Enum値欠落の自動検出 | analyze | 高 | ✅ NEW |
+| 12 | Remediation Suggestions 出力 | analyze | 中 | ✅ NEW |
+| 13 | **Enum Value Enforcement Check** | plan 生成 Phase 1 | **高** | ✅ **予防的チェック** |
+
+### 新規追加ルール（v2025.12.09）
+
+#### PLAN-SSOT-001: Plan Addition Requires Spec Reflection
+
+Plan で追加された制約・デフォルト値は、Spec の Assumptions に反映されなければならない。
+
+**検出方法**: speckit.analyze の G1 チェック
+
+#### PLAN-SSOT-002: Spec Attribute Preservation
+
+Spec に定義された属性・Enum値は Plan から欠落してはならない。
+
+**検出方法**: speckit.analyze の G2, G3 チェック
+
+#### PLAN-SSOT-003: Decision Documentation
+
+曖昧な仕様に対する決定は「Unknowns Resolved」セクションに記録する。
+
+**検出方法**: speckit.analyze の G4 チェック
+
+#### ENUM-ENFORCE-001: Enum Value Enforcement（予防的チェック）
+
+Spec の Enum 値は Plan の data-model に **完全一致** で反映されなければならない。
+
+**検出方法**: speckit.plan の Phase 1 で Enum Value Enforcement Check テーブルを出力
+
+**動作**: 欠落がある場合は ERROR で停止（tasks フェーズに進むことを禁止）
+
+**背景**: 属性の存在チェックだけでは Enum の「値」の欠落を検出できない。
+例: Fulfill() メソッドがあるのに Completed 状態がない、という矛盾を防止する。
+
+**詳細**: `catalog/speckit-extensions/constitution-additions.md` を参照
 
 ### カタログ側の対応（完了）
 
@@ -409,6 +447,8 @@ ensures:
 
 ## カタログバージョン
 
-- **バージョン**: v2025.12.07.2
+- **バージョン**: v2025.12.09
 - **作成日**: 2025-12-07
-- **背景**: 図書館ドッグフーディングフィードバック（カタログの改善19, 20）
+- **更新日**: 2025-12-09
+- **背景**: 図書館ドッグフーディングフィードバック（カタログの改善19, 20, 24, 25, 26）
+- **追加内容**: Spec/Plan 整合性ルール (SSOT)、意思決定ガイド、analyze 強化

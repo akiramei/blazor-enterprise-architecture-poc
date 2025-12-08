@@ -70,6 +70,32 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **警告**: Guardrails が0件の場合、spec に前提条件が明示されていない可能性がある。
 
+#### 0.25.1 Guardrail-FR Cross-Reference Check (U2 対策)
+
+**ルール**: Guardrail に記載した機能は、対応する FR が Spec に存在しなければならない。
+
+**手順**:
+1. 各 Guardrail の FR 参照を確認
+2. 参照先 FR が Spec に存在するか検証
+3. 存在しない機能への言及があれば **WARNING**
+
+**出力フォーマット**:
+```markdown
+### Guardrail-FR Cross-Reference
+
+| Guardrail | FR Reference | FR Exists? | Status |
+|-----------|--------------|:----------:|:------:|
+| GR-001 | FR-016 | ✅ | OK |
+| GR-005 | FR-027 | ✅ | OK |
+| GR-XXX | (extension) | ❌ | ⚠️ WARNING: FR なし - 機能追加 or Guardrail 削除 |
+```
+
+**WARNING 時の対応**:
+- 該当機能を FR に追加するか
+- Guardrail から該当記述を削除するか
+- Out of Scope として明記するか
+を決定してから続行する。
+
 ### Phase 0.5: Catalog Pattern Selection (CATALOG EXTENSION)
 
 **This phase is added by the catalog. DO NOT skip.**
@@ -171,6 +197,50 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 特に注意すべき属性: Position, Order, Status, State, Priority, Limit
 
+#### 1.1.1 Enum Value Enforcement Check（CRITICAL - 予防的チェック）
+
+**ルール**: Spec の Enum 値は Plan の data-model に **完全一致** で反映されなければならない。
+
+**背景**: 属性の存在チェックだけでは不十分。Enum の「値」が欠落するミスを予防する。
+
+**手順**:
+
+1. Spec の Key Entities セクションから Status/Enum 定義を抽出:
+   ```
+   例: Has status (Waiting, Ready, Completed, Cancelled)
+   ```
+
+2. Plan の data-model から対応する Enum 定義を抽出:
+   ```
+   例: Status: ReservationStatus (Waiting, Ready, Cancelled)
+   ```
+
+3. **完全一致を検証**:
+   - Spec の全ての値が Plan に存在するか
+   - 欠落があれば **ERROR**
+
+**出力フォーマット**:
+
+```markdown
+### Enum Value Enforcement Check
+
+| Entity | Enum | Spec Values | Plan Values | Status |
+|--------|------|-------------|-------------|:------:|
+| BookCopy | BookCopyStatus | Available, OnLoan, Reserved, Inactive | Available, OnLoan, Reserved, Inactive | ✅ OK |
+| Member | MemberStatus | Active, Suspended | Active, Suspended | ✅ OK |
+| Loan | LoanStatus | OnLoan, Returned, Overdue | OnLoan, Returned | ⚠️ Overdue? |
+| Reservation | ReservationStatus | Waiting, Ready, Completed, Cancelled | Waiting, Ready, Cancelled | ❌ **ERROR: Completed 欠落** |
+```
+
+**エラー時の動作**:
+- ❌ がある場合 → **ERROR: Plan 生成を停止**
+- 欠落した値を Plan に追加してから再開
+- **tasks フェーズに進むことを禁止**
+
+**注意**:
+- Spec で定義された Enum 値を「要約」「解釈」してはならない
+- 値の追加は許可（Plan で詳細化）、削除は禁止
+
 #### 1.2 Query Semantics の明示（Query バグ対策）
 
 > **詳細**: `catalog/AI_GUARDRAILS.md` の「Query Semantics の明示」を参照
@@ -195,6 +265,66 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **Output**: Corrected plan with Design-Level Check section complete
 
+### Phase 1.75: Spec/Plan Consistency Check (SSOT - NEW)
+
+**This phase ensures SSOT (Single Source of Truth) principle is maintained.**
+
+> **詳細**: `catalog/speckit-extensions/spec-plan-consistency.md` を参照
+
+1. **Scan for unresolved decisions**:
+   - Check for "Unknowns Resolved" section
+   - Each decision should have "Spec 反映: Y" or documented reason
+
+2. **Verify Spec → Plan attribute preservation**:
+   - Extract Enum values from spec.md Key Entities
+   - Verify all values are present in plan.md Data Model
+   - **CRITICAL** if any value is missing (e.g., ReservationStatus Completed)
+
+3. **Verify Plan → Spec constraint reflection**:
+   - Scan Plan for numeric constraints (e.g., "3件", "24時間")
+   - Scan Plan for phrases: "〜をデフォルトとする", "specに明記なし"
+   - **WARNING** if constraint not in spec.md Assumptions
+
+4. **Terminology Consistency Check (T1 対策)**:
+   - Extract key terms from Spec (especially time-related properties, status names)
+   - Compare with Plan terminology for the same concepts
+   - **WARNING** if same concept uses different names
+
+   **出力フォーマット**:
+   ```markdown
+   ### Terminology Consistency Check
+
+   | Concept | Spec Term | Plan Term | Status |
+   |---------|-----------|-----------|:------:|
+   | 予約準備完了時刻 | ReadyAt | ReadyAt | ✅ OK |
+   | 予約有効期限 | ExpiresAt | ExpiresAt | ✅ OK |
+   | 予約有効期限 | - | ReadyAt | ⚠️ WARNING: 用語揺れ |
+   ```
+
+   **チェック対象**:
+   - 時間関連プロパティ: *At, *Date, *Time, *Until, *Expires
+   - 状態関連: Status, State, Phase
+   - 数量関連: Count, Limit, Max, Quantity
+
+   **WARNING 時の対応**:
+   - Spec の用語に統一する（Spec が SSOT）
+   - 用語集（Glossary）への登録を検討
+
+5. **Generate Unknowns Resolved section** (if not exists):
+   ```markdown
+   ## Unknowns Resolved
+
+   | 項目 | Spec の状態 | 決定 | 理由 | Spec 反映 |
+   |------|------------|------|------|:---------:|
+   | 予約上限 | 明記なし | 3件 | 図書館業界の標準 | Y |
+   ```
+
+6. **Output consistency warnings**:
+   - List any Plan constraints not reflected in Spec
+   - Recommend adding to Spec.Assumptions before `/speckit.tasks`
+
+**Output**: Plan with SSOT Check complete, warnings listed
+
 ---
 
 ## Key Rules
@@ -207,10 +337,12 @@ You **MUST** consider the user input before proceeding (if not empty).
 - **NEVER ask user permission to fix violations** - Self-correct automatically
 - **NEVER implement patterns that exist in catalog** - use templates
 - **NEVER drop attributes from spec** - 属性の強制反映チェックを実行
+- **NEVER drop Enum values from spec** - Enum Value Enforcement Check を実行（予防的チェック）
 - **ALWAYS define Query Semantics** - Query と Repository の対応を明示
 - If Boundary section is empty for UI features → ERROR
 - If Design-Level Check cannot auto-correct → ERROR (do not proceed to tasks)
 - If Attribute Enforcement Check fails → ERROR (do not proceed)
+- **If Enum Value Enforcement Check fails → ERROR (do not proceed to tasks)** - Spec の Enum 値欠落は禁止
 - If Guardrails section is empty → WARNING (confirm with spec)
 - **ALWAYS output corrected plan** if violations were found and fixed
 
