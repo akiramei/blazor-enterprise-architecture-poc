@@ -141,6 +141,104 @@ if (product == null)
 
 ---
 
+## 🚨 EF Core トラッキング問題（CRITICAL）
+
+### AsNoTracking で取得したエンティティの状態変更は保存されない
+
+**これは実行時に検出されず、データ不整合を引き起こす深刻なバグです。**
+
+```csharp
+// ❌ 致命的バグ: AsNoTracking で取得したエンティティを変更
+public async Task<IReadOnlyList<BookCopy>> GetCopiesByBookIdAsync(BookId bookId, CancellationToken ct)
+{
+    return await _dbContext.BookCopies
+        .AsNoTracking()  // ← 非トラッキング
+        .Where(c => c.BookId == bookId)
+        .ToListAsync(ct);
+}
+
+// Handler 側
+var copy = (await _bookCopyRepository.GetCopiesByBookIdAsync(bookId, ct))
+    .FirstOrDefault(c => c.Status == BookCopyStatus.Reserved);
+
+copy.MarkAsOnLoan();  // ← 状態変更しても...
+// SaveChangesAsync しても DB に反映されない！
+// 結果: DB上は永遠に Reserved のまま
+
+// ✅ 正しい: 更新用クエリは AsNoTracking を使わない
+public async Task<BookCopy?> GetByIdForUpdateAsync(BookCopyId id, CancellationToken ct)
+{
+    return await _dbContext.BookCopies
+        // AsNoTracking なし = トラッキングされる
+        .FirstOrDefaultAsync(c => c.Id == id, ct);
+}
+```
+
+**対策**:
+- 「更新用リポジトリメソッド」と「参照用リポジトリメソッド」を分ける
+- 更新用: AsNoTracking を使わない（`GetByIdForUpdateAsync`）
+- 参照用: AsNoTracking を使う（`GetByIdAsync`, `GetListAsync`）
+- メソッド名で意図を明示する（`ForUpdate` サフィックス）
+
+**チェックリスト**:
+```
+□ このリポジトリメソッドは更新目的で使われるか？
+□ 更新目的なら AsNoTracking を外しているか？
+□ メソッド名で更新用/参照用が区別できるか？
+```
+
+---
+
+### Include 忘れによる Count = 0 問題
+
+```csharp
+// ❌ バグ: Include なしでナビゲーションプロパティにアクセス
+public async Task<IReadOnlyList<Book>> GetAllBooksAsync(CancellationToken ct)
+{
+    return await _dbContext.Books
+        .AsNoTracking()
+        // Include(b => b.Copies) がない！
+        .ToListAsync(ct);
+}
+
+// UI 側
+@foreach (var book in _books)
+{
+    <p>@book.Title - @book.Copies.Count 冊</p>  // ← 常に 0
+}
+
+// ✅ 正しい方法1: Include を追加
+public async Task<IReadOnlyList<Book>> GetAllBooksWithCopiesAsync(CancellationToken ct)
+{
+    return await _dbContext.Books
+        .AsNoTracking()
+        .Include(b => b.Copies)  // ← 明示的に Include
+        .ToListAsync(ct);
+}
+
+// ✅ 正しい方法2: Read Model（DTO）を使う（推奨）
+public async Task<IReadOnlyList<BookListItemDto>> GetBookListAsync(CancellationToken ct)
+{
+    return await _dbContext.Books
+        .AsNoTracking()
+        .Select(b => new BookListItemDto(
+            b.Id.Value,
+            b.Title,
+            b.Copies.Count  // ← SQL の COUNT に変換される
+        ))
+        .ToListAsync(ct);
+}
+```
+
+**推奨**: 一覧画面では Read Model（DTO）を使い、Aggregate Root を直接返さない。
+
+**対策**:
+- 一覧用クエリは `XxxListItemDto` を返す
+- DTO に必要な集計値を含める
+- Aggregate + ナビゲーションをそのまま UI に渡さない
+
+---
+
 ## ⚠️ EF Core + Value Object の比較
 
 Value Objectの比較は**インスタンス同士**で行ってください。
@@ -878,5 +976,137 @@ public class Reservation : AggregateRoot<ReservationId>
 
 ---
 
-**最終更新: 2025-12-07**
-**カタログバージョン: v2025.12.07**
+## 🚨 キュー/ワークフローのオーケストレーション問題（CRITICAL）
+
+### キューが前に進まない（PromoteNext 忘れ）
+
+**Ready な予約が処理されたが、次の人が Ready にならない問題**
+
+```csharp
+// ❌ バグ: Complete だけ呼んで後続の処理を忘れる
+public async Task<Result<Unit>> Handle(CheckoutReservedCopyCommand request, CancellationToken ct)
+{
+    var reservation = await _reservationRepository.GetReadyByBookIdAsync(request.BookId, ct);
+
+    reservation.Complete();  // Ready → Completed
+
+    // ★ ここで後続の Waiting → Ready への繰り上げが必要！
+    // それがないため、残りの Waiting は一生 Waiting のまま
+
+    return Result.Success(Unit.Value);
+}
+
+// ✅ 正しい: キューサービス経由で後続を自動繰り上げ
+public async Task<Result<Unit>> Handle(CheckoutReservedCopyCommand request, CancellationToken ct)
+{
+    var reservation = await _reservationRepository.GetReadyByBookIdAsync(request.BookId, ct);
+
+    // QueueService.DequeueAsync() が以下を行う:
+    // 1. reservation.Fulfill()
+    // 2. 後続の Position を繰り上げ
+    // 3. 新しい先頭を Ready 状態に
+    await _reservationQueueService.DequeueAsync(reservation.Id, ct);
+
+    return Result.Success(Unit.Value);
+}
+```
+
+**オーケストレーション必須アクション**:
+
+| トリガー | 必須アクション | 忘れた場合の問題 |
+|---------|--------------|----------------|
+| Complete | PromoteNext() | 次の人が Ready にならない |
+| Cancel | PromoteNext() | 次の人が Ready にならない |
+| Expire | PromoteNext() | 次の人が Ready にならない |
+| Return | CheckAndPromoteNext() | 返却後のキュー更新漏れ |
+
+**対策**:
+- Complete/Cancel/Expire を直接呼ばず、QueueService 経由で呼ぶ
+- QueueService が後続の繰り上げを自動実行
+- Handler 側は「何をするか」だけ、「どう繰り上げるか」は QueueService に任せる
+
+**参照**: `catalog/patterns/domain-ordered-queue.yaml`
+
+---
+
+### 期限切れ（ExpiresAt）が使われていない問題
+
+**ExpiresAt を定義したが、どこからも呼ばれていない**
+
+```csharp
+// Entity に ExpiresAt と IsExpired() がある
+public class Reservation : AggregateRoot<ReservationId>
+{
+    public DateTime? ExpiresAt { get; private set; }
+
+    public bool IsExpired() =>
+        Status == ReservationStatus.Ready
+        && ExpiresAt.HasValue
+        && DateTime.UtcNow > ExpiresAt.Value;
+}
+
+// ❌ 問題: どのコードからも IsExpired() が呼ばれない
+// 結果: 期限切れの予約が永遠に Ready のまま、キューが詰まる
+```
+
+**期限付き状態には、必ず期限処理のトリガーが必要**:
+
+| 方法 | 実装例 | 適用ケース |
+|-----|--------|----------|
+| **バックグラウンドジョブ** | `ReservationExpirationJob` | 定期的にチェックが必要な場合 |
+| **関連操作時のチェック** | 返却時に `ExpireIfNeeded()` | 関連処理の流れでチェックできる場合 |
+| **遅延実行** | Hangfire のスケジュール | 特定時刻に確実に実行が必要な場合 |
+
+```csharp
+// ✅ 方法1: バックグラウンドジョブ
+public class ReservationExpirationJob : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var expiredReservations = await _repository
+                .GetExpiredReadyReservationsAsync(ct);
+
+            foreach (var reservation in expiredReservations)
+            {
+                await _queueService.ExpireAndPromoteNextAsync(reservation.Id, ct);
+            }
+
+            await Task.Delay(TimeSpan.FromMinutes(5), ct);
+        }
+    }
+}
+
+// ✅ 方法2: 関連操作時のチェック（返却時）
+public async Task<Result<Unit>> Handle(ReturnCopyCommand request, CancellationToken ct)
+{
+    // 返却処理...
+
+    // ★ 返却時に Ready 予約の期限切れをチェック
+    var readyReservation = await _reservationRepository
+        .GetReadyByBookIdAsync(request.BookId, ct);
+
+    if (readyReservation?.IsExpired() == true)
+    {
+        await _queueService.ExpireAndPromoteNextAsync(readyReservation.Id, ct);
+    }
+
+    return Result.Success(Unit.Value);
+}
+```
+
+**チェックリスト**:
+```
+□ ExpiresAt を持つエンティティがあるか？
+□ その ExpiresAt を使う処理（期限切れ判定）が実装されているか？
+□ 期限切れ時のアクション（Cancel + PromoteNext 等）が実装されているか？
+□ トリガー（ジョブ/操作時チェック）が設定されているか？
+```
+
+**参照**: `catalog/speckit-extensions/constitution-additions.md` - Expiration Rule
+
+---
+
+**最終更新: 2025-12-09**
+**カタログバージョン: v2025.12.09**

@@ -541,6 +541,44 @@ must_read_checklist:
     - "SaveChangesAsync は呼ばない（TransactionBehavior に任せる）"
 
 ai_guidance:
+  # ================================================================
+  # オーケストレーション必須ルール（CRITICAL）
+  # ================================================================
+  orchestration_rules:
+    description: |
+      キュー操作時に必ず実行すべきアクション。
+      これを忘れると「キューが前に進まない」バグが発生する。
+
+    rules:
+      - trigger: "Complete（予約者が借りた）"
+        required_action: "PromoteNext() - 後続をReady状態に"
+        skip_consequence: "残りの Waiting が一生 Waiting のまま"
+
+      - trigger: "Cancel（予約者がキャンセル）"
+        required_action: "PromoteNext() - 後続をReady状態に"
+        skip_consequence: "残りの Waiting が一生 Waiting のまま"
+
+      - trigger: "Expire（Ready状態の期限切れ）"
+        required_action: "PromoteNext() - 後続をReady状態に"
+        skip_consequence: "期限切れの予約がReady状態のまま、キュー詰まり"
+
+      - trigger: "Return（図書返却）"
+        required_action: "CheckAndPromoteNext() - Waitingがあれば先頭をReadyに"
+        skip_consequence: "返却後に予約者への通知/Ready遷移が行われない"
+
+    implementation_pattern: |
+      // ❌ NG: Entity メソッドを直接呼ぶ
+      reservation.Complete();  // これだけでは後続が処理されない
+
+      // ✅ OK: QueueService 経由で呼ぶ
+      await _queueService.DequeueAsync(reservation.Id, ct);
+      // DequeueAsync が内部で Complete + PromoteNext を実行
+
+    checklist:
+      - "Complete/Cancel/Expire を直接呼んでいないか？"
+      - "QueueService 経由で操作しているか？"
+      - "返却時に CheckAndPromoteNext を呼んでいるか？"
+
   when_to_use:
     - "予約の順番を管理する必要がある場合"
     - "待ち行列を実装する場合"
@@ -580,6 +618,15 @@ ai_guidance:
       solution: "GetNextPositionAsync() で悲観的ロック（FOR UPDATE）を使用"
     - mistake: "Entity に Position フィールドを追加し忘れる"
       solution: "仕様書の「順番管理」を見たら、このパターンを適用し Position フィールドを追加"
+    - mistake: "Complete() だけ呼んで PromoteNext() を忘れる"
+      solution: "Entity メソッドを直接呼ばず、QueueService 経由で操作する"
+      severity: critical
+    - mistake: "期限切れ処理（IsExpired + Expire）を実装しない"
+      solution: "バックグラウンドジョブまたは関連操作時に期限切れをチェックし、ExpireAndPromoteNext を呼ぶ"
+      severity: critical
+    - mistake: "返却時に CheckAndPromoteNext を呼ばない"
+      solution: "返却ハンドラで Waiting 予約があれば Ready に繰り上げる処理を追加"
+      severity: high
 
   key_patterns:
     - pattern: "Position（int?）"
