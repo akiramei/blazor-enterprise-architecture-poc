@@ -205,20 +205,17 @@ podman run --rm -it `
 ### コンテナ内での実行
 
 ```bash
-# Windows マウントボリュームの権限修正（最初に1回だけ実行）
-sudo chown -R developer:developer /workspace
-
 # 初期化
 specify init . --ai claude
 
-# カタログを追加（Step 3 の手順）
-git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
-cp -r temp-catalog/catalog ./catalog
+# カタログを追加（/tmp を経由して権限問題を回避）
+git clone https://github.com/akiramei/blazor-enterprise-architecture-poc /tmp/temp-catalog
+cp -r /tmp/temp-catalog/catalog ./catalog
 mkdir -p .claude/commands .claude/skills memory
-cp catalog/speckit-extensions/commands/*.md .claude/commands/
-cp -r catalog/skills/* .claude/skills/
-cat catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
-rm -rf temp-catalog
+cp /tmp/temp-catalog/catalog/speckit-extensions/commands/*.md .claude/commands/
+cp -r /tmp/temp-catalog/catalog/skills/* .claude/skills/
+cat /tmp/temp-catalog/catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
+rm -rf /tmp/temp-catalog
 
 # 自動実行
 claude --dangerously-skip-permissions -p "/speckit.specify 図書館貸出管理アプリを作りたい。..."
