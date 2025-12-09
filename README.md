@@ -158,8 +158,19 @@ WORKDIR /workspace
 ```bash
 # イメージをビルド
 podman build -t spec-kit-env .
+```
 
-# コンテナを起動（カレントディレクトリをマウント）
+**Max プラン（OAuth認証）の場合**:
+```bash
+# 事前にホスト側で claude login を実行しておく
+podman run --rm -it \
+  -v "$(pwd)":/workspace \
+  -v "${HOME}/.claude":/root/.claude \
+  spec-kit-env bash
+```
+
+**API キープランの場合**:
+```bash
 podman run --rm -it \
   -v "$(pwd)":/workspace \
   -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
