@@ -136,19 +136,27 @@ dotnet run --project Application
 ```Dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:9.0
 
-RUN apt-get update && apt-get install -y git curl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git curl ca-certificates sudo && rm -rf /var/lib/apt/lists/*
 
-# uv インストール
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+# 非rootユーザーを作成（--dangerously-skip-permissions はroot不可のため）
+RUN useradd -m -s /bin/bash developer && \
+    echo "developer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# specify-cli インストール
-RUN uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
-
-# claude CLI インストール（npm経由）
+# claude CLI インストール（npm経由、グローバル）
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g @anthropic-ai/claude-code
+
+# 以降は developer ユーザーで実行
+USER developer
+WORKDIR /home/developer
+
+# uv インストール
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/developer/.local/bin:$PATH"
+
+# specify-cli インストール
+RUN /home/developer/.local/bin/uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
 
 WORKDIR /workspace
 ```
@@ -165,7 +173,7 @@ podman build -t spec-kit-env .
 # Max プラン（事前にホスト側で claude login を実行しておく）
 podman run --rm -it \
   -v "$(pwd)":/workspace \
-  -v "${HOME}/.claude":/root/.claude \
+  -v "${HOME}/.claude":/home/developer/.claude \
   spec-kit-env bash
 
 # API キープラン
@@ -180,7 +188,7 @@ podman run --rm -it \
 # Max プラン（事前にホスト側で claude login を実行しておく）
 podman run --rm -it `
   -v "${PWD}:/workspace" `
-  -v "$env:USERPROFILE/.claude:/root/.claude" `
+  -v "$env:USERPROFILE/.claude:/home/developer/.claude" `
   spec-kit-env bash
 
 # API キープラン
