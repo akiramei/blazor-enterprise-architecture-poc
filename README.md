@@ -151,6 +151,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 USER developer
 WORKDIR /home/developer
 
+# git設定（Windows マウントボリュームの権限問題回避）
+RUN git config --global core.filemode false && \
+    git config --global --add safe.directory /workspace
+
 # uv インストール
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/developer/.local/bin:$PATH"
@@ -201,6 +205,9 @@ podman run --rm -it `
 ### コンテナ内での実行
 
 ```bash
+# Windows マウントボリュームの権限修正（最初に1回だけ実行）
+sudo chown -R developer:developer /workspace
+
 # 初期化
 specify init . --ai claude
 
