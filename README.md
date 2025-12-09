@@ -225,12 +225,17 @@ rm -rf /tmp/temp-catalog
 # 重要: 複数の claude -p --continue に分割すると、セッション間で
 #       コンテキストが失われ、UIまで完成しない場合があります。
 #       1回の claude -p で全工程を指示することで、コンテキストを維持します。
-claude --dangerously-skip-permissions -p "
+claude --dangerously-skip-permissions --max-turns 20 -p "
 /speckit.specify $(cat docs/samples/library-loan-system-requirements.md)
 
-仕様書が完成したら /speckit.plan を実行してください。
-計画が完成したら /speckit.tasks を実行してください。
-タスクが完成したら /speckit.implement を実行してください。
+/speckit.specify が完了したら、同じセッションの中で次を順番に実行してください:
+
+1. /speckit.plan
+2. /speckit.tasks
+3. /speckit.implement
+
+途中で質問せず、自動で最後まで実行してください。
+実装はドメイン層だけで止めず、Application 層と UI 層（Blazor）まで完了させてください。
 "
 ```
 
