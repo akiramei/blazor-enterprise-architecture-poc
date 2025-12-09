@@ -218,7 +218,9 @@ cp -r /tmp/temp-catalog/catalog/skills/* .claude/skills/
 cat /tmp/temp-catalog/catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
 rm -rf /tmp/temp-catalog
 
-# 自動実行（詳細仕様ファイルを使用）
+# 自動実行
+# ※ 以下はサンプル仕様書を使用した例です。
+#    実際には自分の要求仕様ファイルを指定してください。
 claude --dangerously-skip-permissions -p "/speckit.specify $(cat docs/samples/library-loan-system-requirements.md)"
 claude --dangerously-skip-permissions -p --continue "/speckit.plan"
 claude --dangerously-skip-permissions -p --continue "/speckit.tasks"
