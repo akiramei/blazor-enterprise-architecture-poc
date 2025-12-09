@@ -218,19 +218,30 @@ cp -r /tmp/temp-catalog/catalog/skills/* .claude/skills/
 cat /tmp/temp-catalog/catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
 rm -rf /tmp/temp-catalog
 
-# 自動実行
+# 自動実行（1セッションで全工程を実行）
 # ※ 以下はサンプル仕様書を使用した例です。
 #    実際には自分の要求仕様ファイルを指定してください。
-claude --dangerously-skip-permissions -p "/speckit.specify $(cat docs/samples/library-loan-system-requirements.md)"
-claude --dangerously-skip-permissions -p --continue "/speckit.plan"
-claude --dangerously-skip-permissions -p --continue "/speckit.tasks"
-claude --dangerously-skip-permissions -p --continue "/speckit.implement"
+#
+# 重要: 複数の claude -p --continue に分割すると、セッション間で
+#       コンテキストが失われ、UIまで完成しない場合があります。
+#       1回の claude -p で全工程を指示することで、コンテキストを維持します。
+claude --dangerously-skip-permissions -p "
+/speckit.specify $(cat docs/samples/library-loan-system-requirements.md)
+
+仕様書が完成したら /speckit.plan を実行してください。
+計画が完成したら /speckit.tasks を実行してください。
+タスクが完成したら /speckit.implement を実行してください。
+"
 ```
 
 > **メリット**:
 > - Claude がブランチ作成・ファイル上書きしても、影響範囲はコンテナ内のみ
 > - 最悪でも `git reset` で即復旧可能
 > - ホスト環境を汚さない
+>
+> **注意**: `--continue` で複数セッションに分割すると、AIの内部コンテキストが
+> リセットされ、ドメイン層だけで実装が止まることがあります。
+> 上記のように1回のコマンドで全工程を指示してください。
 
 ---
 
