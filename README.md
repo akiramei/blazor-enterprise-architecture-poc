@@ -131,7 +131,7 @@ dotnet run --project Application
 対話なしで自動実行するには `--dangerously-skip-permissions` が必要です。
 このフラグはコンテナ環境以外では危険なため、**podman/Docker での実行を前提**としています。
 
-**セキュリティ設計**: ホストへのアクセスは認証情報（読み取り専用）のみ。
+**セキュリティ設計**: ホストへのアクセスは認証情報ディレクトリのみ。
 作業はコンテナ内で完結し、成果物は最後に明示的にコピーします。
 
 ### Containerfile
@@ -172,13 +172,13 @@ podman build -t spec-kit-env .
 
 ### Step 1: コンテナを起動
 
-認証情報のみ読み取り専用でマウントし、作業ディレクトリはマウントしません。
+認証情報ディレクトリをマウントし、作業ディレクトリはマウントしません。
 
 **Linux / macOS (bash)**:
 ```bash
 # Max プラン（事前にホスト側で claude login を実行しておく）
 podman run -it --name spec-kit-work \
-  -v "${HOME}/.claude":/home/developer/.claude:ro \
+  -v "${HOME}/.claude":/home/developer/.claude \
   spec-kit-env bash
 
 # API キープラン
@@ -191,7 +191,7 @@ podman run -it --name spec-kit-work \
 ```powershell
 # Max プラン（事前にホスト側で claude login を実行しておく）
 podman run -it --name spec-kit-work `
-  -v "$env:USERPROFILE/.claude:/home/developer/.claude:ro" `
+  -v "$env:USERPROFILE/.claude:/home/developer/.claude" `
   spec-kit-env bash
 
 # API キープラン
