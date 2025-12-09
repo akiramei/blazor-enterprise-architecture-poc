@@ -131,6 +131,9 @@ dotnet run --project Application
 対話なしで自動実行するには `--dangerously-skip-permissions` が必要です。
 このフラグはコンテナ環境以外では危険なため、**podman/Docker での実行を前提**としています。
 
+**セキュリティ設計**: ホストへのアクセスは認証情報（読み取り専用）のみ。
+作業はコンテナ内で完結し、成果物は最後に明示的にコピーします。
+
 ### Containerfile
 
 ```Dockerfile
@@ -151,10 +154,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 USER developer
 WORKDIR /home/developer
 
-# git設定（Windows マウントボリュームの権限問題回避）
-RUN git config --global core.filemode false && \
-    git config --global --add safe.directory /workspace
-
 # uv インストール
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/home/developer/.local/bin:$PATH"
@@ -165,24 +164,25 @@ RUN /home/developer/.local/bin/uv tool install specify-cli --from git+https://gi
 WORKDIR /workspace
 ```
 
-### ビルドと実行
+### ビルド
 
 ```bash
-# イメージをビルド
 podman build -t spec-kit-env .
 ```
+
+### Step 1: コンテナを起動
+
+認証情報のみ読み取り専用でマウントし、作業ディレクトリはマウントしません。
 
 **Linux / macOS (bash)**:
 ```bash
 # Max プラン（事前にホスト側で claude login を実行しておく）
-podman run --rm -it \
-  -v "$(pwd)":/workspace \
-  -v "${HOME}/.claude":/home/developer/.claude \
+podman run -it --name spec-kit-work \
+  -v "${HOME}/.claude":/home/developer/.claude:ro \
   spec-kit-env bash
 
 # API キープラン
-podman run --rm -it \
-  -v "$(pwd)":/workspace \
+podman run -it --name spec-kit-work \
   -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
   spec-kit-env bash
 ```
@@ -190,25 +190,23 @@ podman run --rm -it \
 **Windows (PowerShell)**:
 ```powershell
 # Max プラン（事前にホスト側で claude login を実行しておく）
-podman run --rm -it `
-  -v "${PWD}:/workspace" `
-  -v "$env:USERPROFILE/.claude:/home/developer/.claude" `
+podman run -it --name spec-kit-work `
+  -v "$env:USERPROFILE/.claude:/home/developer/.claude:ro" `
   spec-kit-env bash
 
 # API キープラン
-podman run --rm -it `
-  -v "${PWD}:/workspace" `
+podman run -it --name spec-kit-work `
   -e ANTHROPIC_API_KEY="$env:ANTHROPIC_API_KEY" `
   spec-kit-env bash
 ```
 
-### コンテナ内での実行
+### Step 2: コンテナ内で実行
 
 ```bash
 # 初期化
 specify init . --ai claude
 
-# カタログを追加（/tmp を経由して権限問題を回避）
+# カタログを追加
 git clone https://github.com/akiramei/blazor-enterprise-architecture-poc /tmp/temp-catalog
 cp -r /tmp/temp-catalog/catalog ./catalog
 cp -r /tmp/temp-catalog/docs ./docs
@@ -221,10 +219,6 @@ rm -rf /tmp/temp-catalog
 # 自動実行（1セッションで全工程を実行）
 # ※ 以下はサンプル仕様書を使用した例です。
 #    実際には自分の要求仕様ファイルを指定してください。
-#
-# 重要: 複数の claude -p --continue に分割すると、セッション間で
-#       コンテキストが失われ、UIまで完成しない場合があります。
-#       1回の claude -p で全工程を指示することで、コンテキストを維持します。
 claude --dangerously-skip-permissions --max-turns 20 -p "
 /speckit.specify $(cat docs/samples/library-loan-system-requirements.md)
 
@@ -237,12 +231,29 @@ claude --dangerously-skip-permissions --max-turns 20 -p "
 途中で質問せず、自動で最後まで実行してください。
 実装はドメイン層だけで止めず、Application 層と UI 層（Blazor）まで完了させてください。
 "
+
+# 完了後、コンテナを終了
+exit
 ```
 
-> **メリット**:
-> - Claude がブランチ作成・ファイル上書きしても、影響範囲はコンテナ内のみ
-> - 最悪でも `git reset` で即復旧可能
-> - ホスト環境を汚さない
+### Step 3: 成果物をホストにコピー
+
+```bash
+# 成果物をホストにコピー
+podman cp spec-kit-work:/workspace/src ./src
+
+# 必要に応じて他のファイルもコピー
+podman cp spec-kit-work:/workspace/specs ./specs
+podman cp spec-kit-work:/workspace/manifests ./manifests
+
+# コンテナを削除
+podman rm spec-kit-work
+```
+
+> **セキュリティメリット**:
+> - ホストへの書き込みアクセスなし（認証情報も読み取り専用）
+> - Claude が誤ってホストのファイルを破壊する可能性がゼロ
+> - 必要な成果物だけを明示的にコピー
 >
 > **注意**: `--continue` で複数セッションに分割すると、AIの内部コンテキストが
 > リセットされ、ドメイン層だけで実装が止まることがあります。
