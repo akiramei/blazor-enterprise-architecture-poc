@@ -160,20 +160,33 @@ WORKDIR /workspace
 podman build -t spec-kit-env .
 ```
 
-**Max プラン（OAuth認証）の場合**:
+**Linux / macOS (bash)**:
 ```bash
-# 事前にホスト側で claude login を実行しておく
+# Max プラン（事前にホスト側で claude login を実行しておく）
 podman run --rm -it \
   -v "$(pwd)":/workspace \
   -v "${HOME}/.claude":/root/.claude \
   spec-kit-env bash
-```
 
-**API キープランの場合**:
-```bash
+# API キープラン
 podman run --rm -it \
   -v "$(pwd)":/workspace \
   -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+  spec-kit-env bash
+```
+
+**Windows (PowerShell)**:
+```powershell
+# Max プラン（事前にホスト側で claude login を実行しておく）
+podman run --rm -it `
+  -v "${PWD}:/workspace" `
+  -v "$env:USERPROFILE/.claude:/root/.claude" `
+  spec-kit-env bash
+
+# API キープラン
+podman run --rm -it `
+  -v "${PWD}:/workspace" `
+  -e ANTHROPIC_API_KEY="$env:ANTHROPIC_API_KEY" `
   spec-kit-env bash
 ```
 
