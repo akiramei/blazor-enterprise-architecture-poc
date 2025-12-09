@@ -219,7 +219,7 @@ rm -rf /tmp/temp-catalog
 # 自動実行（1セッションで全工程を実行）
 # ※ 以下はサンプル仕様書を使用した例です。
 #    実際には自分の要求仕様ファイルを指定してください。
-claude --dangerously-skip-permissions --max-turns 20 -p "
+claude --dangerously-skip-permissions -p "
 /speckit.specify $(cat docs/samples/library-loan-system-requirements.md)
 
 /speckit.specify が完了したら、同じセッションの中で次を順番に実行してください:
@@ -251,13 +251,19 @@ podman rm spec-kit-work
 ```
 
 > **セキュリティメリット**:
-> - ホストへの書き込みアクセスなし（認証情報も読み取り専用）
-> - Claude が誤ってホストのファイルを破壊する可能性がゼロ
+> - ホストへの書き込みアクセスは認証情報ディレクトリのみ
+> - 作業ディレクトリはコンテナ内で完結
 > - 必要な成果物だけを明示的にコピー
 >
 > **注意**: `--continue` で複数セッションに分割すると、AIの内部コンテキストが
 > リセットされ、ドメイン層だけで実装が止まることがあります。
 > 上記のように1回のコマンドで全工程を指示してください。
+>
+> **エラー時のリカバリ**: 途中でエラーになった場合は、生成されたファイルを削除して最初からやり直すのが確実です：
+> ```bash
+> rm -rf src/ specs/ manifests/ memory/project-*.md
+> # 再度 claude コマンドを実行
+> ```
 
 ---
 
