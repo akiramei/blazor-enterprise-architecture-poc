@@ -27,6 +27,11 @@
 uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
 ```
 
+> **PATHが通らない場合**: `specify` が見つからない場合は `uvx` 経由で実行できます：
+> ```bash
+> uvx specify-cli -- init . --ai claude
+> ```
+
 ### Step 2: spec-kit を初期化
 
 ```bash
@@ -121,46 +126,72 @@ dotnet run --project Application
 
 ---
 
-## 🤖 ヘッドレスモード（自動化 / CI向け）
+## 🤖 ヘッドレスモード（コンテナ環境専用）
 
-対話なしでコマンドラインから直接実行することもできます。
+対話なしで自動実行するには `--dangerously-skip-permissions` が必要です。
+このフラグはコンテナ環境以外では危険なため、**podman/Docker での実行を前提**としています。
 
-### 基本的な使い方
+### Containerfile
 
-```bash
-# 仕様書を作成（詳細仕様ファイルを渡す）
-claude -p "/speckit.specify $(cat docs/samples/library-loan-system-requirements.md)"
+```Dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:9.0
 
-# 計画を立てる
-claude -p --continue "/speckit.plan"
+RUN apt-get update && apt-get install -y git curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# タスクを分解
-claude -p --continue "/speckit.tasks"
+# uv インストール
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
-# 実装する
-claude -p --continue "/speckit.implement"
+# specify-cli インストール
+RUN uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+
+# claude CLI インストール（npm経由）
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g @anthropic-ai/claude-code
+
+WORKDIR /workspace
 ```
 
-### オプション
-
-| オプション | 説明 |
-|-----------|------|
-| `-p, --print` | 非対話モード（結果を出力して終了） |
-| `--continue` | 直前のセッションを継続 |
-| `--output-format json` | JSON形式で出力 |
-| `--dangerously-skip-permissions` | 権限確認をスキップ（サンドボックス環境向け） |
-
-### パイプラインの例
+### ビルドと実行
 
 ```bash
-# 一連の処理を連続実行
-claude -p "/speckit.specify $(cat requirements.md)" && \
-claude -p --continue "/speckit.plan" && \
-claude -p --continue "/speckit.tasks" && \
-claude -p --continue "/speckit.implement"
+# イメージをビルド
+podman build -t spec-kit-env .
+
+# コンテナを起動（カレントディレクトリをマウント）
+podman run --rm -it \
+  -v "$(pwd)":/workspace \
+  -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+  spec-kit-env bash
 ```
 
-> **注意**: `--dangerously-skip-permissions` はインターネットアクセスのないサンドボックス環境でのみ使用してください。
+### コンテナ内での実行
+
+```bash
+# 初期化
+specify init . --ai claude
+
+# カタログを追加（Step 3 の手順）
+git clone https://github.com/akiramei/blazor-enterprise-architecture-poc temp-catalog
+cp -r temp-catalog/catalog ./catalog
+mkdir -p .claude/commands .claude/skills memory
+cp catalog/speckit-extensions/commands/*.md .claude/commands/
+cp -r catalog/skills/* .claude/skills/
+cat catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
+rm -rf temp-catalog
+
+# 自動実行
+claude --dangerously-skip-permissions -p "/speckit.specify 図書館貸出管理アプリを作りたい。..."
+claude --dangerously-skip-permissions -p --continue "/speckit.plan"
+claude --dangerously-skip-permissions -p --continue "/speckit.tasks"
+claude --dangerously-skip-permissions -p --continue "/speckit.implement"
+```
+
+> **メリット**:
+> - Claude がブランチ作成・ファイル上書きしても、影響範囲はコンテナ内のみ
+> - 最悪でも `git reset` で即復旧可能
+> - ホスト環境を汚さない
 
 ---
 
