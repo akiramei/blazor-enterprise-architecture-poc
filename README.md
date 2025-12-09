@@ -211,14 +211,15 @@ specify init . --ai claude
 # カタログを追加（/tmp を経由して権限問題を回避）
 git clone https://github.com/akiramei/blazor-enterprise-architecture-poc /tmp/temp-catalog
 cp -r /tmp/temp-catalog/catalog ./catalog
+cp -r /tmp/temp-catalog/docs ./docs
 mkdir -p .claude/commands .claude/skills memory
 cp /tmp/temp-catalog/catalog/speckit-extensions/commands/*.md .claude/commands/
 cp -r /tmp/temp-catalog/catalog/skills/* .claude/skills/
 cat /tmp/temp-catalog/catalog/speckit-extensions/constitution-additions.md >> memory/constitution.md
 rm -rf /tmp/temp-catalog
 
-# 自動実行
-claude --dangerously-skip-permissions -p "/speckit.specify 図書館貸出管理アプリを作りたい。..."
+# 自動実行（詳細仕様ファイルを使用）
+claude --dangerously-skip-permissions -p "/speckit.specify $(cat docs/samples/library-loan-system-requirements.md)"
 claude --dangerously-skip-permissions -p --continue "/speckit.plan"
 claude --dangerously-skip-permissions -p --continue "/speckit.tasks"
 claude --dangerously-skip-permissions -p --continue "/speckit.implement"
