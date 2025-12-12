@@ -27,7 +27,7 @@ namespace Application.Features.Enable2FA;
 /// リカバリーコードは平文で返却されるが、DB保存時はBCryptでハッシュ化される。
 /// ユーザーに一度だけ表示し、安全に保存させる必要がある。
 /// </summary>
-public class Enable2FACommandHandler
+public sealed class Enable2FACommandHandler
     : CommandPipeline<Enable2FACommand, Enable2FAResult>
 {
     private readonly UserManager<ApplicationUser> _userManager;

@@ -19,7 +19,7 @@ namespace Application.Features.SearchProducts;
 /// - After: 約70行 (検索ロジックのみ)
 /// - 削減率: 39%
 /// </summary>
-public class SearchProductsQueryHandler
+public sealed class SearchProductsQueryHandler
     : QueryPipeline<SearchProductsQuery, PagedResult<ProductDto>>
 {
     private readonly IProductReadRepository _readRepository;

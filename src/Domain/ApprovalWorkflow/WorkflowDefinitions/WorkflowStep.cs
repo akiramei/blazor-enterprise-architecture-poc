@@ -15,7 +15,7 @@ namespace Domain.ApprovalWorkflow.WorkflowDefinitions;
 /// - ステップ1: Manager（上長）が承認
 /// - ステップ2: Finance（経理）が承認
 /// </summary>
-public class WorkflowStep : Entity
+public sealed class WorkflowStep : Entity
 {
     /// <summary>ステップID</summary>
     public Guid Id { get; private set; }

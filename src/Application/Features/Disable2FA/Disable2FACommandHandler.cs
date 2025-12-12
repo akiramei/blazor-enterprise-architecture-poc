@@ -23,7 +23,7 @@ namespace Application.Features.Disable2FA;
 /// - DbContext.SaveChangesAsync()
 /// 片方が失敗した場合、全体がロールバックされる。
 /// </summary>
-public class Disable2FACommandHandler : CommandPipeline<Disable2FACommand, Unit>
+public sealed class Disable2FACommandHandler : CommandPipeline<Disable2FACommand, Unit>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly PlatformDbContext _dbContext;

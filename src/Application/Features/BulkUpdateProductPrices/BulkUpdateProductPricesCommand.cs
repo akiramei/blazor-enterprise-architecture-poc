@@ -25,7 +25,7 @@ namespace Application.Features.BulkUpdateProductPrices;
 /// - エラーが発生した商品は記録するが、他の商品は処理継続
 /// - 最大更新件数制限（例: 100件）
 /// </summary>
-public record BulkUpdateProductPricesCommand : ICommand<Result<BulkOperationResult>>
+public sealed record BulkUpdateProductPricesCommand : ICommand<Result<BulkOperationResult>>
 {
     public IReadOnlyList<ProductPriceUpdate> Updates { get; init; } = Array.Empty<ProductPriceUpdate>();
 }
@@ -33,7 +33,7 @@ public record BulkUpdateProductPricesCommand : ICommand<Result<BulkOperationResu
 /// <summary>
 /// 商品価格更新情報
 /// </summary>
-public record ProductPriceUpdate(
+public sealed record ProductPriceUpdate(
     Guid ProductId,
     decimal NewPrice,
     int Version

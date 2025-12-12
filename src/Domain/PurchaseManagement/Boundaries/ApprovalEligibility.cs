@@ -4,7 +4,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// 承認資格判定結果（ドメイン知識）
 /// UIが"承認ボタンを活性化すべきか"の根拠を提供する
 /// </summary>
-public record ApprovalEligibility
+public sealed record ApprovalEligibility
 {
     /// <summary>
     /// 承認可能か

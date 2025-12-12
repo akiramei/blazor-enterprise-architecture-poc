@@ -19,7 +19,7 @@ namespace Application.Features.RefreshToken;
 /// - 古いRefresh Tokenの無効化
 /// - 新しいトークンペア生成
 /// </summary>
-public class RefreshTokenCommand : ICommand<Result<RefreshTokenResult>>
+public sealed class RefreshTokenCommand : ICommand<Result<RefreshTokenResult>>
 {
     public string AccessToken { get; init; } = string.Empty;
     public string RefreshToken { get; init; } = string.Empty;
@@ -28,7 +28,7 @@ public class RefreshTokenCommand : ICommand<Result<RefreshTokenResult>>
 /// <summary>
 /// Refresh Token結果
 /// </summary>
-public record RefreshTokenResult(
+public sealed record RefreshTokenResult(
     string AccessToken,
     string RefreshToken,
     DateTime ExpiresAt);

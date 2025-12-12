@@ -27,7 +27,7 @@ namespace Application.Features.RefreshToken;
 /// 5. 新しいトークンペア生成
 /// 6. Refresh Token保存
 /// </summary>
-public class RefreshTokenCommandHandler : CommandPipeline<RefreshTokenCommand, RefreshTokenResult>
+public sealed class RefreshTokenCommandHandler : CommandPipeline<RefreshTokenCommand, RefreshTokenResult>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;

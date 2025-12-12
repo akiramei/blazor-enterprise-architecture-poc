@@ -19,7 +19,7 @@ namespace Application.Features.GetPendingApprovals;
 /// - マルチテナント分離（TenantIdフィルタ必須）
 /// - 承認者IDによるフィルタ（現在のユーザーのみ）
 /// </summary>
-public class GetPendingApprovalsQueryHandler
+public sealed class GetPendingApprovalsQueryHandler
     : QueryPipeline<GetPendingApprovalsQuery, List<PendingApprovalDto>>
 {
     private readonly IDbConnectionFactory _connectionFactory;

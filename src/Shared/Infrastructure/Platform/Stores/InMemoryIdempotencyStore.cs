@@ -72,7 +72,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore, Shared.Applica
             // Return the JSON string as the result
             // Note: The caller is responsible for deserializing if needed
             object? result = record.ResultJson;
-            return Task.FromResult(result);
+            return Task.FromResult<object?>(result);
         }
 
         _logger.LogDebug("処理済みリクエストの結果が見つかりません。[RequestId: {RequestId}]", requestId);

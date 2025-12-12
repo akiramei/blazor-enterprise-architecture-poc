@@ -68,7 +68,6 @@ namespace Application.Api.Auth;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/auth")]
-[AllowAnonymous]  // ❗ 認証不要（ログイン前のユーザーがアクセス）
 public sealed class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -114,6 +113,7 @@ public sealed class AuthController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>Access TokenとRefresh Token、または2FA要求</returns>
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<LoginResponse>> Login(
@@ -141,6 +141,16 @@ public sealed class AuthController : ControllerBase
         }
 
         var value = result.Value;
+        if (value is null)
+        {
+            _logger.LogError("[AuthController] Login succeeded but result.Value was null");
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Title = "Authentication failed",
+                Detail = "Unexpected null result",
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
         return Ok(new LoginResponse
         {
             AccessToken = value.AccessToken,
@@ -165,6 +175,7 @@ public sealed class AuthController : ControllerBase
     /// <param name="cancellationToken">キャンセルトークン</param>
     /// <returns>新しいAccess TokenとRefresh Token</returns>
     [HttpPost("refresh")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<RefreshTokenResponse>> RefreshToken(
@@ -190,6 +201,16 @@ public sealed class AuthController : ControllerBase
         }
 
         var value = result.Value;
+        if (value is null)
+        {
+            _logger.LogError("[AuthController] RefreshToken succeeded but result.Value was null");
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Title = "Token refresh failed",
+                Detail = "Unexpected null result",
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
         return Ok(new RefreshTokenResponse
         {
             AccessToken = value.AccessToken,
@@ -251,6 +272,16 @@ public sealed class AuthController : ControllerBase
         }
 
         var value = result.Value;
+        if (value is null)
+        {
+            _logger.LogError("[AuthController] Enable2FA succeeded but result.Value was null");
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Title = "2FA setup failed",
+                Detail = "Unexpected null result",
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
         return Ok(new Enable2FAResponse(value.SecretKey, value.QrCodeUri, value.RecoveryCodes));
     }
 

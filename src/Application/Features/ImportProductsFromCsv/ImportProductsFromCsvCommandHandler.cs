@@ -33,7 +33,7 @@ namespace Application.Features.ImportProductsFromCsv;
 /// - 最大インポート件数（1,000件）を超えたらエラー
 /// - using でStreamを確実にクローズ
 /// </summary>
-public class ImportProductsFromCsvCommandHandler
+public sealed class ImportProductsFromCsvCommandHandler
     : CommandPipeline<ImportProductsFromCsvCommand, BulkOperationResult>
 {
     private readonly IProductRepository _repository;

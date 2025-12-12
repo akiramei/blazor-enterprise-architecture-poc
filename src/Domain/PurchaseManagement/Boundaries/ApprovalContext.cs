@@ -9,7 +9,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// 【リファクタリング: Type-Safe Boundary】
 /// string[] AllowedActions → BoundaryDecision（型安全な判定結果）
 /// </summary>
-public record ApprovalContext
+public sealed record ApprovalContext
 {
     /// <summary>
     /// 購買申請の基本情報
@@ -72,7 +72,7 @@ public record ApprovalContext
 /// <summary>
 /// ステータス表示情報（UIに依存しないステータスの意味論）
 /// </summary>
-public record StatusDisplayInfo
+public sealed record StatusDisplayInfo
 {
     /// <summary>
     /// ステータスラベル（日本語）

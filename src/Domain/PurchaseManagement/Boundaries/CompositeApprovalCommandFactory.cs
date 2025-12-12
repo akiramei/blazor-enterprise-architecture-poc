@@ -14,7 +14,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// - ドメイン層は統一されたファクトリーを使用
 /// - 新しいコマンドの追加が容易
 /// </summary>
-public class CompositeApprovalCommandFactory : IApprovalCommandFactory
+public sealed class CompositeApprovalCommandFactory : IApprovalCommandFactory
 {
     private readonly IApprovalCommandFactory _approveFactory;
     private readonly IApprovalCommandFactory _rejectFactory;

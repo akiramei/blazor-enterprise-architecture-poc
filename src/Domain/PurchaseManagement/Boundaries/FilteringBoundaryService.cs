@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// <summary>
 /// フィルタリングバウンダリーサービス：ドメインサービスとしてフィルタリングロジックを提供
 /// </summary>
-public class FilteringBoundaryService : IFilteringBoundary
+public sealed class FilteringBoundaryService : IFilteringBoundary
 {
     // ソート可能なフィールド定義
     private static readonly string[] AllowedSortFields =

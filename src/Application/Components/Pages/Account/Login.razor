@@ -139,10 +139,10 @@
 
 @code {
     [SupplyParameterFromForm]
-    private LoginInputModel Input { get; set; } = new();
+    private LoginInputModel? Input { get; set; }
 
     [SupplyParameterFromForm]
-    private TwoFactorInputModel TwoFactorInput { get; set; } = new();
+    private TwoFactorInputModel? TwoFactorInput { get; set; }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
@@ -153,6 +153,12 @@
     private bool useRecoveryCode = false;
     private ApplicationUser? currentUser;
 
+    protected override void OnInitialized()
+    {
+        Input ??= new LoginInputModel();
+        TwoFactorInput ??= new TwoFactorInputModel();
+    }
+
     private async Task OnValidSubmitAsync()
     {
         processing = true;
@@ -160,6 +166,13 @@
 
         try
         {
+            if (Input is null)
+            {
+                ErrorMessage = "入力内容が不正です。もう一度お試しください。";
+                processing = false;
+                return;
+            }
+
             var result = await SignInManager.PasswordSignInAsync(
                 Input.Email,
                 Input.Password,
@@ -208,6 +221,13 @@
 
             Microsoft.AspNetCore.Identity.SignInResult result;
 
+            if (TwoFactorInput is null || Input is null)
+            {
+                ErrorMessage = "二要素認証の入力内容が不正です。もう一度ログインしてください。";
+                requires2FA = false;
+                return;
+            }
+
             if (useRecoveryCode)
             {
                 // リカバリーコードを使用
@@ -246,6 +266,7 @@
     private void ToggleRecoveryCode()
     {
         useRecoveryCode = !useRecoveryCode;
+        if (TwoFactorInput is null) return;
         TwoFactorInput.UseRecoveryCode = useRecoveryCode;
         ErrorMessage = null;
         TwoFactorInput.Code = string.Empty;

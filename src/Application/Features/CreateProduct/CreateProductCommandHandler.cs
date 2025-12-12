@@ -27,7 +27,7 @@ namespace Application.Features.CreateProduct;
 /// - Handler内では取得・保存のオーケストレーションのみ
 /// - DomainExceptionは CommandPipeline.Handle() で Result.Fail に変換される
 /// </summary>
-public class CreateProductCommandHandler
+public sealed class CreateProductCommandHandler
     : CommandPipeline<CreateProductCommand, Guid>
 {
     private readonly IProductRepository _repository;

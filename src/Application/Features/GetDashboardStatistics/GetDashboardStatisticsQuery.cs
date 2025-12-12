@@ -6,7 +6,7 @@ namespace Application.Features.GetDashboardStatistics;
 /// <summary>
 /// ダッシュボード統計情報取得クエリ
 /// </summary>
-public class GetDashboardStatisticsQuery : IQuery<Result<DashboardStatisticsDto>>
+public sealed class GetDashboardStatisticsQuery : IQuery<Result<DashboardStatisticsDto>>
 {
     /// <summary>
     /// 月次統計の取得月数（デフォルト: 12ヶ月）
@@ -27,7 +27,7 @@ public class GetDashboardStatisticsQuery : IQuery<Result<DashboardStatisticsDto>
 /// <summary>
 /// ダッシュボード統計情報DTO
 /// </summary>
-public class DashboardStatisticsDto
+public sealed class DashboardStatisticsDto
 {
     public StatusCountDto StatusCounts { get; init; } = new();
     public List<MonthlyStatisticsDto> MonthlyStatistics { get; init; } = new();
@@ -36,7 +36,7 @@ public class DashboardStatisticsDto
     public OverallSummaryDto OverallSummary { get; init; } = new();
 }
 
-public class StatusCountDto
+public sealed class StatusCountDto
 {
     public int Draft { get; init; }
     public int Submitted { get; init; }
@@ -47,7 +47,7 @@ public class StatusCountDto
     public int PendingTotal => Submitted + InApproval;
 }
 
-public class MonthlyStatisticsDto
+public sealed class MonthlyStatisticsDto
 {
     public string YearMonth { get; init; } = string.Empty;
     public int RequestCount { get; init; }
@@ -57,7 +57,7 @@ public class MonthlyStatisticsDto
     public decimal ApprovalRate => RequestCount > 0 ? (decimal)ApprovedCount / RequestCount * 100 : 0;
 }
 
-public class TopRequestDto
+public sealed class TopRequestDto
 {
     public Guid Id { get; init; }
     public string RequestNumber { get; init; } = string.Empty;
@@ -68,7 +68,7 @@ public class TopRequestDto
     public string Status { get; init; } = string.Empty;
 }
 
-public class DepartmentStatisticsDto
+public sealed class DepartmentStatisticsDto
 {
     public string Department { get; init; } = string.Empty;
     public int RequestCount { get; init; }
@@ -76,7 +76,7 @@ public class DepartmentStatisticsDto
     public decimal AverageAmount => RequestCount > 0 ? TotalAmount / RequestCount : 0;
 }
 
-public class OverallSummaryDto
+public sealed class OverallSummaryDto
 {
     public int TotalRequests { get; init; }
     public decimal TotalAmount { get; init; }

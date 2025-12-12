@@ -52,7 +52,7 @@ public enum ApprovalIntent
 /// <summary>
 /// Intent のメタデータ（表示名、説明、重要度など）
 /// </summary>
-public record IntentMetadata
+public sealed record IntentMetadata
 {
     /// <summary>Intent 種別</summary>
     public required ApprovalIntent Intent { get; init; }

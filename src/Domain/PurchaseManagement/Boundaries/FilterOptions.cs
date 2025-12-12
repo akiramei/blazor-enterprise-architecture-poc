@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// <summary>
 /// フィルターオプション：利用可能なフィルター定義
 /// </summary>
-public record FilterOptions
+public sealed record FilterOptions
 {
     /// <summary>
     /// ステータスフィルターオプション
@@ -21,7 +21,7 @@ public record FilterOptions
 /// <summary>
 /// ステータスフィルターオプション
 /// </summary>
-public record StatusFilterOption
+public sealed record StatusFilterOption
 {
     /// <summary>
     /// ステータス値（null = すべて）
@@ -107,7 +107,7 @@ public record StatusFilterOption
 /// <summary>
 /// ソートオプション
 /// </summary>
-public record SortOptions
+public sealed record SortOptions
 {
     /// <summary>
     /// ソート可能なフィールド
@@ -118,7 +118,7 @@ public record SortOptions
 /// <summary>
 /// ソートオプション（個別フィールド）
 /// </summary>
-public record SortOption
+public sealed record SortOption
 {
     /// <summary>
     /// フィールド名（データベースカラム名）

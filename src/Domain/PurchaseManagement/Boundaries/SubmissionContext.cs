@@ -4,7 +4,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// 提出コンテキスト：UIが"何を見せるべきか"の根拠
 /// 提出画面に表示する情報の完全なスナップショット
 /// </summary>
-public record SubmissionContext
+public sealed record SubmissionContext
 {
     /// <summary>
     /// タイトルが有効か

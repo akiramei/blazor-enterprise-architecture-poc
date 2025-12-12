@@ -24,7 +24,7 @@ namespace Domain.ApprovalWorkflow.Applications;
 /// - Approved/Rejectedの申請は再提出不可
 /// - Returnedの申請はApplicantのみが再提出可能
 /// </summary>
-public class ApprovalApplication : AggregateRoot<Guid>
+public sealed class ApprovalApplication : AggregateRoot<Guid>
 {
     private readonly ApplicationStateMachine _stateMachine = new();
     private readonly List<ApprovalHistoryEntry> _approvalHistory = new();

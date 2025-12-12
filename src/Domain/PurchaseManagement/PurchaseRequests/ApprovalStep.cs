@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests;
 /// <summary>
 /// 承認ステップ（エンティティ）
 /// </summary>
-public class ApprovalStep : Entity
+public sealed class ApprovalStep : Entity
 {
     public Guid Id { get; init; }
     public int StepNumber { get; init; }

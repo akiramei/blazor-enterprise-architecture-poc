@@ -4,7 +4,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// 提出資格判定結果（ドメイン知識）
 /// UIが"提出ボタンを活性化すべきか"の根拠を提供する
 /// </summary>
-public record SubmissionEligibility
+public sealed record SubmissionEligibility
 {
     /// <summary>
     /// 提出可能か

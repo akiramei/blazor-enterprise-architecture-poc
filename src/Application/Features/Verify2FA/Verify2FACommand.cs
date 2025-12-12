@@ -18,7 +18,7 @@ namespace Application.Features.Verify2FA;
 /// 3. Verify2FACommand実行 → TOTPコード検証
 /// 4. 検証成功 → IsTwoFactorEnabled = true
 /// </summary>
-public class Verify2FACommand : ICommand<Result<Unit>>
+public sealed class Verify2FACommand : ICommand<Result<Unit>>
 {
     /// <summary>
     /// 検証対象のユーザーID

@@ -27,7 +27,7 @@ namespace Application.Features.LendBook;
 /// 5. 状態更新（Member.IncrementLoanCount, BookCopy.CheckOut）
 /// 6. 保存
 /// </summary>
-public class LendBookCommandHandler
+public sealed class LendBookCommandHandler
     : CommandPipeline<LendBookCommand, Guid>
 {
     private readonly ILoanRepository _repository;

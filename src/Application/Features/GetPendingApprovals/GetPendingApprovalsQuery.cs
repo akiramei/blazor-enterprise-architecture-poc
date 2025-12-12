@@ -6,7 +6,7 @@ namespace Application.Features.GetPendingApprovals;
 /// <summary>
 /// 承認待ち申請一覧取得クエリ
 /// </summary>
-public class GetPendingApprovalsQuery : IQuery<Result<List<PendingApprovalDto>>>
+public sealed class GetPendingApprovalsQuery : IQuery<Result<List<PendingApprovalDto>>>
 {
     /// <summary>
     /// ページ番号（デフォルト: 1）
@@ -32,7 +32,7 @@ public class GetPendingApprovalsQuery : IQuery<Result<List<PendingApprovalDto>>>
 /// <summary>
 /// 承認待ち申請DTO
 /// </summary>
-public class PendingApprovalDto
+public sealed class PendingApprovalDto
 {
     public Guid PurchaseRequestId { get; init; }
     public string RequestNumber { get; init; } = string.Empty;

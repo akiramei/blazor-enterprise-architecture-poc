@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests.Events;
 /// <summary>
 /// 購買申請がキャンセルされたイベント
 /// </summary>
-public record PurchaseRequestCancelledEvent(
+public sealed record PurchaseRequestCancelledEvent(
     Guid RequestId,
     string RequestNumber,
     Guid RequesterId,

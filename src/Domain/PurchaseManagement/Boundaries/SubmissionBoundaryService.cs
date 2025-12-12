@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// <summary>
 /// 提出バウンダリーサービス：ドメインサービスとして提出ロジックを提供
 /// </summary>
-public class SubmissionBoundaryService : ISubmissionBoundary
+public sealed class SubmissionBoundaryService : ISubmissionBoundary
 {
     // ビジネスルール: 金額上限（100万円）
     private const decimal MaxRequestAmount = 1_000_000m;

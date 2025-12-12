@@ -7,7 +7,7 @@ namespace Application.Features.UpdateProduct;
 /// <summary>
 /// 商品更新Command
 /// </summary>
-public class UpdateProductCommand : ICommand<Result<Unit>>
+public sealed class UpdateProductCommand : ICommand<Result<Unit>>
 {
     public Guid ProductId { get; init; }
     public string Name { get; init; } = string.Empty;

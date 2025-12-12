@@ -23,7 +23,7 @@ namespace Application.Features.GetProducts;
 /// - キャッシュはCachingBehaviorが自動的に処理
 /// - 参照系なので書き込み処理は行わない
 /// </summary>
-public class GetProductsQueryHandler
+public sealed class GetProductsQueryHandler
     : QueryPipeline<GetProductsQuery, IEnumerable<ProductDto>>
 {
     private readonly IProductReadRepository _readRepository;

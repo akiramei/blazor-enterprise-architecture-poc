@@ -22,7 +22,7 @@ namespace Application.Features.ExportProductsToCsv;
 /// - 価格はフォーマット済み文字列ではなく数値で出力（Excelで計算可能にする）
 /// - ステータスは日本語に変換
 /// </summary>
-public class ProductCsvDto
+public sealed class ProductCsvDto
 {
     /// <summary>
     /// 商品ID

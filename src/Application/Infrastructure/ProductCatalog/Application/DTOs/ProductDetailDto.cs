@@ -29,6 +29,7 @@ public sealed record ProductDetailDto
     public string Name { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public decimal Price { get; init; }
+    public string Currency { get; init; } = string.Empty;
     public int Stock { get; init; }
     public string Status { get; init; } = string.Empty;
     public bool IsDeleted { get; init; }
@@ -46,6 +47,7 @@ public sealed record ProductDetailDto
             Name = product.Name,
             Description = product.Description,
             Price = product.Price.Amount,
+            Currency = product.Price.Currency,
             Stock = product.Stock,
             Status = product.Status.ToString(),
             IsDeleted = product.IsDeleted,

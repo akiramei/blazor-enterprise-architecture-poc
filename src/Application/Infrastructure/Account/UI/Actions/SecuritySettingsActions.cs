@@ -55,7 +55,7 @@ public sealed class SecuritySettingsActions
             var command = new Enable2FACommand { UserId = userId };
             var result = await mediator.Send(command, ct);
 
-            if (result.IsSuccess)
+            if (result.IsSuccess && result.Value is not null)
             {
                 _logger.LogInformation("[Actions] Enable2FA succeeded");
                 await _store.SetSetupDataAsync(

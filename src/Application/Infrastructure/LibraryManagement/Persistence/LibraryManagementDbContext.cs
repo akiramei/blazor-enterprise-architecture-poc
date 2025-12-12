@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shared.Domain.Outbox;
 using Shared.Infrastructure.Diagnostics;
+using Shared.Kernel;
 
 namespace Application.Infrastructure.LibraryManagement.Persistence;
 
@@ -47,7 +48,9 @@ public sealed class LibraryManagementDbContext : DbContext
         modelBuilder.Ignore<LoanId>();
         modelBuilder.Ignore<ReservationId>();
 
+        // DomainEvent はエンティティではないので除外
+        modelBuilder.Ignore<DomainEvent>();
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LibraryManagementDbContext).Assembly);
     }
 }
-

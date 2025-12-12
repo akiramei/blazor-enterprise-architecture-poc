@@ -7,7 +7,7 @@ namespace Application.Features.DeleteProduct;
 /// <summary>
 /// 商品削除Command
 /// </summary>
-public class DeleteProductCommand : ICommand<Result<Unit>>
+public sealed class DeleteProductCommand : ICommand<Result<Unit>>
 {
     public Guid ProductId { get; init; }
 

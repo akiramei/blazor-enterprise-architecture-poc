@@ -25,7 +25,6 @@ public sealed class SecuritySettingsStore : IDisposable
     private readonly ILogger<SecuritySettingsStore> _logger;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private CancellationTokenSource? _cts;
 
     private SecuritySettingsState _state = SecuritySettingsState.Empty;
 
@@ -189,16 +188,14 @@ public sealed class SecuritySettingsStore : IDisposable
 
     public void Dispose()
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _gate?.Dispose();
+        _gate.Dispose();
     }
 }
 
 /// <summary>
 /// セキュリティ設定の状態
 /// </summary>
-public record SecuritySettingsState
+public sealed record SecuritySettingsState
 {
     public bool IsEnabled { get; init; }
     public bool IsProcessing { get; init; }

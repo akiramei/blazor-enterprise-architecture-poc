@@ -15,7 +15,6 @@
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.17" />
     <PackageReference Include="Hangfire.Core" Version="1.8.17" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
 
     <!-- MediatR -->
     <PackageReference Include="MediatR" Version="13.1.0" />

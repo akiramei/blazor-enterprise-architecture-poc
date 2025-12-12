@@ -14,7 +14,7 @@ namespace Application.Features.LendBook;
 /// - バーコードが空でないこと
 /// - バーコードの形式が正しいこと（オプション）
 /// </summary>
-public class LendBookCommandValidator : AbstractValidator<LendBookCommand>
+public sealed class LendBookCommandValidator : AbstractValidator<LendBookCommand>
 {
     public LendBookCommandValidator()
     {

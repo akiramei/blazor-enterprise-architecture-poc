@@ -14,7 +14,7 @@ namespace Application.Features.LendBook;
 /// - ICommand<Result<Guid>> を継承
 /// - 戻り値は作成されたエンティティのID
 /// </summary>
-public class LendBookCommand : ICommand<Result<Guid>>
+public sealed class LendBookCommand : ICommand<Result<Guid>>
 {
     /// <summary>
     /// 会員バーコード

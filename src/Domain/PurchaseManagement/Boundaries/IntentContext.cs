@@ -14,7 +14,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 ///
 /// を決定できる。UIは「承認」「却下」といった技術的なコマンド名を知る必要がない。
 /// </summary>
-public record IntentContext
+public sealed record IntentContext
 {
     /// <summary>現在の申請（DTO版では不要のためnullable）</summary>
     public PurchaseRequest? Request { get; init; }
@@ -48,7 +48,7 @@ public record IntentContext
 /// <summary>
 /// 実行可能なIntent（メタデータ + 有効性判定）
 /// </summary>
-public record AvailableIntent
+public sealed record AvailableIntent
 {
     /// <summary>Intent種別</summary>
     public required ApprovalIntent Intent { get; init; }

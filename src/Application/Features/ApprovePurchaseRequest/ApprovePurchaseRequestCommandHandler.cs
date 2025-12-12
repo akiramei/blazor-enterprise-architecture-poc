@@ -20,7 +20,7 @@ namespace Application.Features.ApprovePurchaseRequest;
 /// - ログ出力: LoggingBehaviorが処理
 /// - エラーハンドリング: CommandPipeline基底クラスが処理
 /// </summary>
-public class ApprovePurchaseRequestCommandHandler
+public sealed class ApprovePurchaseRequestCommandHandler
     : CommandPipeline<ApprovePurchaseRequestCommand, Unit>
 {
     private readonly IPurchaseRequestRepository _repository;

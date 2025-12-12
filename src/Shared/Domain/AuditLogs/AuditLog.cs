@@ -22,7 +22,7 @@ namespace Shared.Domain.AuditLogs;
 /// - IAuditableCommandマーカーインターフェースで記録対象を指定
 /// - Correlation IDによる分散トレーシング対応
 /// </summary>
-public class AuditLog
+public sealed class AuditLog
 {
     /// <summary>
     /// 監査ログID

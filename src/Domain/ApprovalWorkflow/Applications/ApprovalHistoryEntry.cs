@@ -15,7 +15,7 @@ namespace Domain.ApprovalWorkflow.Applications;
 /// 不変条件:
 /// - 承認履歴は不変。後から上書きしない（Append Only）
 /// </summary>
-public class ApprovalHistoryEntry : Entity
+public sealed class ApprovalHistoryEntry : Entity
 {
     /// <summary>履歴ID</summary>
     public Guid Id { get; private set; }

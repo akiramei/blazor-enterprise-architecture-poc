@@ -18,7 +18,7 @@ namespace Application.Features.GetProductById;
 /// - After: 約30行 (クエリロジックのみ)
 /// - 削減率: 54%
 /// </summary>
-public class GetProductByIdQueryHandler
+public sealed class GetProductByIdQueryHandler
     : QueryPipeline<GetProductByIdQuery, ProductDetailDto>
 {
     private readonly IProductReadRepository _readRepository;

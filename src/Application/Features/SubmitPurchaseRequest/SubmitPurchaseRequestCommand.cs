@@ -6,7 +6,7 @@ namespace Application.Features.SubmitPurchaseRequest;
 /// <summary>
 /// 購買申請提出コマンド
 /// </summary>
-public class SubmitPurchaseRequestCommand : ICommand<Result<Guid>>
+public sealed class SubmitPurchaseRequestCommand : ICommand<Result<Guid>>
 {
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
@@ -16,7 +16,7 @@ public class SubmitPurchaseRequestCommand : ICommand<Result<Guid>>
 /// <summary>
 /// 購買申請明細DTO
 /// </summary>
-public record PurchaseRequestItemDto(
+public sealed record PurchaseRequestItemDto(
     Guid ProductId,
     string ProductName,
     decimal UnitPrice,

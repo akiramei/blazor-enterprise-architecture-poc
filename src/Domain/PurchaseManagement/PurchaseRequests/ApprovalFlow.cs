@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests;
 /// <summary>
 /// 承認フロー定義（ValueObject）
 /// </summary>
-public class ApprovalFlow : ValueObject
+public sealed class ApprovalFlow : ValueObject
 {
     public IReadOnlyList<ApprovalFlowStep> Steps { get; }
 
@@ -80,7 +80,7 @@ public class ApprovalFlow : ValueObject
 /// <summary>
 /// 承認フローのステップ定義
 /// </summary>
-public record ApprovalFlowStep(
+public sealed record ApprovalFlowStep(
     int StepNumber,
     Guid ApproverId,
     string ApproverName,

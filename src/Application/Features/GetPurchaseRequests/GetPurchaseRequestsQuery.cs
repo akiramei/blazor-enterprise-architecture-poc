@@ -6,7 +6,7 @@ namespace Application.Features.GetPurchaseRequests;
 /// <summary>
 /// 購買申請一覧取得クエリ
 /// </summary>
-public class GetPurchaseRequestsQuery : IQuery<Result<List<PurchaseRequestListItemDto>>>
+public sealed class GetPurchaseRequestsQuery : IQuery<Result<List<PurchaseRequestListItemDto>>>
 {
     public int? Status { get; init; }
     public int PageNumber { get; init; } = 1;
@@ -18,7 +18,7 @@ public class GetPurchaseRequestsQuery : IQuery<Result<List<PurchaseRequestListIt
 /// <summary>
 /// 購買申請一覧項目DTO
 /// </summary>
-public class PurchaseRequestListItemDto
+public sealed class PurchaseRequestListItemDto
 {
     public Guid Id { get; init; }
     public string RequestNumber { get; init; } = string.Empty;

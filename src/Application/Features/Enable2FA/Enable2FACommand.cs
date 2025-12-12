@@ -7,7 +7,7 @@ namespace Application.Features.Enable2FA;
 /// 二要素認証（2FA）有効化コマンド
 /// TOTP秘密鍵生成、リカバリーコード生成、DB保存を実行
 /// </summary>
-public class Enable2FACommand : ICommand<Result<Enable2FAResult>>
+public sealed class Enable2FACommand : ICommand<Result<Enable2FAResult>>
 {
     /// <summary>
     /// 2FAを有効化するユーザーID
@@ -18,7 +18,7 @@ public class Enable2FACommand : ICommand<Result<Enable2FAResult>>
 /// <summary>
 /// 2FA有効化結果
 /// </summary>
-public record Enable2FAResult(
+public sealed record Enable2FAResult(
     /// <summary>
     /// TOTP秘密鍵（Base32エンコード）
     /// ユーザーに一度だけ表示し、認証アプリに登録させる

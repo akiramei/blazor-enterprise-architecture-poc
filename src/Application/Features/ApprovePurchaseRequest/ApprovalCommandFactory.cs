@@ -5,7 +5,7 @@ namespace Application.Features.ApprovePurchaseRequest;
 /// <summary>
 /// 承認コマンドファクトリー（Intent→Command変換）
 /// </summary>
-public class ApprovalCommandFactory : IApprovalCommandFactory
+public sealed class ApprovalCommandFactory : IApprovalCommandFactory
 {
     public object CreateApproveCommand(Guid requestId, string comment, string idempotencyKey)
     {

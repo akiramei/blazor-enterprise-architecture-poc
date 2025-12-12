@@ -20,7 +20,7 @@ namespace Application.Features.GetDashboardStatistics;
 /// - 各クエリで独立したDBコネクション使用（コネクション競合回避）
 /// - インデックス活用（TenantId, Status, SubmittedAt）
 /// </summary>
-public class GetDashboardStatisticsQueryHandler
+public sealed class GetDashboardStatisticsQueryHandler
     : QueryPipeline<GetDashboardStatisticsQuery, DashboardStatisticsDto>
 {
     private readonly IDbConnectionFactory _connectionFactory;

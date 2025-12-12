@@ -30,7 +30,7 @@ namespace Application.Features.ExportProductsToCsv;
 /// - CSV設定: ヘッダーあり、カルチャは日本語
 /// - MemoryStream は using で確実に解放
 /// </summary>
-public class ExportProductsToCsvQueryHandler : QueryPipeline<ExportProductsToCsvQuery, byte[]>
+public sealed class ExportProductsToCsvQueryHandler : QueryPipeline<ExportProductsToCsvQuery, byte[]>
 {
     private readonly IProductReadRepository _readRepository;
     private const int MaxExportCount = 10000;

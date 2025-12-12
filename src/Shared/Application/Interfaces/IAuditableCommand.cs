@@ -43,7 +43,7 @@ public interface IAuditableCommand
 /// <param name="EntityType">エンティティ型（例: Product, Order）</param>
 /// <param name="EntityId">エンティティID</param>
 /// <param name="AdditionalData">追加データ（任意、JSON形式で保存される）</param>
-public record AuditInfo(
+public sealed record AuditInfo(
     string Action,
     string EntityType,
     string EntityId,

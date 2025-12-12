@@ -22,7 +22,7 @@ namespace Application.Features.Verify2FA;
 /// - 秘密鍵はEnable2FA時にDB保存されているため、
 ///   このHandlerでは検証のみに集中
 /// </summary>
-public class Verify2FACommandHandler : CommandPipeline<Verify2FACommand, Unit>
+public sealed class Verify2FACommandHandler : CommandPipeline<Verify2FACommand, Unit>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITotpService _totpService;

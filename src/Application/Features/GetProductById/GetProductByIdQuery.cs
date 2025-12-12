@@ -8,7 +8,7 @@ namespace Application.Features.GetProductById;
 /// <summary>
 /// 商品単一取得Query
 /// </summary>
-public class GetProductByIdQuery : IQuery<Result<ProductDetailDto>>, ICacheableQuery
+public sealed class GetProductByIdQuery : IQuery<Result<ProductDetailDto>>, ICacheableQuery
 {
     public Guid ProductId { get; init; }
 

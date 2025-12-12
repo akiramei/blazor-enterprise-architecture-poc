@@ -16,7 +16,7 @@ namespace Domain.ApprovalWorkflow.WorkflowDefinitions;
 /// - ステップ番号は1から連続していること
 /// - 最低1つのステップが必要
 /// </summary>
-public class WorkflowDefinition : AggregateRoot<Guid>
+public sealed class WorkflowDefinition : AggregateRoot<Guid>
 {
     private readonly List<WorkflowStep> _steps = new();
 

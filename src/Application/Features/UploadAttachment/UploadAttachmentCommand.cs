@@ -6,7 +6,7 @@ namespace Application.Features.UploadAttachment;
 /// <summary>
 /// 購買申請に添付ファイルをアップロードするコマンド
 /// </summary>
-public class UploadAttachmentCommand : ICommand<Result<Guid>>
+public sealed class UploadAttachmentCommand : ICommand<Result<Guid>>
 {
     /// <summary>
     /// 購買申請ID

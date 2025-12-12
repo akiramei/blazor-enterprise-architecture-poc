@@ -21,7 +21,7 @@ namespace Application.Features.DeleteProduct;
 /// - After: 約40行 (ビジネスロジックのみ)
 /// - 削減率: 53%
 /// </summary>
-public class DeleteProductCommandHandler
+public sealed class DeleteProductCommandHandler
     : CommandPipeline<DeleteProductCommand, Unit>
 {
     private readonly IProductRepository _repository;

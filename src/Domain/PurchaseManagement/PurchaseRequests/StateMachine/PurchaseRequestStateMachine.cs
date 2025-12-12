@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests.StateMachine;
 /// <summary>
 /// 購買申請の状態遷移ロジック
 /// </summary>
-public class PurchaseRequestStateMachine : IStateMachine<PurchaseRequestStatus>
+public sealed class PurchaseRequestStateMachine : IStateMachine<PurchaseRequestStatus>
 {
     // 許可された状態遷移の定義
     private static readonly Dictionary<PurchaseRequestStatus, List<PurchaseRequestStatus>> _allowedTransitions = new()

@@ -10,12 +10,12 @@ namespace Application.Features.GetPurchaseRequestById;
 /// 【パターン: Entity直接返却（Boundary活用のため）】
 /// UI層でバウンダリーを活用するため、DTOではなくエンティティを返す
 /// </summary>
-public record GetPurchaseRequestByIdQuery(Guid Id) : IQuery<Result<PurchaseRequest>>;
+public sealed record GetPurchaseRequestByIdQuery(Guid Id) : IQuery<Result<PurchaseRequest>>;
 
 /// <summary>
 /// 購買申請詳細DTO
 /// </summary>
-public class PurchaseRequestDetailDto
+public sealed class PurchaseRequestDetailDto
 {
     public Guid Id { get; init; }
     public string RequestNumber { get; init; } = string.Empty;
@@ -35,7 +35,7 @@ public class PurchaseRequestDetailDto
     public List<ApprovalStepDto> ApprovalSteps { get; init; } = new();
 }
 
-public class PurchaseRequestItemDto
+public sealed class PurchaseRequestItemDto
 {
     public Guid ProductId { get; init; }
     public string ProductName { get; init; } = string.Empty;
@@ -45,7 +45,7 @@ public class PurchaseRequestItemDto
     public string Currency { get; init; } = "JPY";
 }
 
-public class ApprovalStepDto
+public sealed class ApprovalStepDto
 {
     public int StepNumber { get; init; }
     public Guid ApproverId { get; init; }

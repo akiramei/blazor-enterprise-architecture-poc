@@ -14,7 +14,7 @@ namespace Domain.ApprovalWorkflow.Applications.StateMachine;
 /// - Returned → Submitted（再提出）
 /// - Approved/Rejected → 終端状態（遷移なし）
 /// </summary>
-public class ApplicationStateMachine : IStateMachine<ApplicationStatus>
+public sealed class ApplicationStateMachine : IStateMachine<ApplicationStatus>
 {
     // 許可された状態遷移の定義
     private static readonly Dictionary<ApplicationStatus, List<ApplicationStatus>> _allowedTransitions = new()

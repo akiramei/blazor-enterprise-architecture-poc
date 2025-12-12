@@ -27,7 +27,7 @@ namespace Application.Features.ImportProductsFromCsv;
 /// - メモリ効率のためストリーム処理を使用
 /// - 最大インポート件数制限（例: 1,000件）
 /// </summary>
-public record ImportProductsFromCsvCommand : ICommand<Result<BulkOperationResult>>
+public sealed record ImportProductsFromCsvCommand : ICommand<Result<BulkOperationResult>>
 {
     public Stream CsvStream { get; init; } = Stream.Null;
 }
@@ -35,7 +35,7 @@ public record ImportProductsFromCsvCommand : ICommand<Result<BulkOperationResult
 /// <summary>
 /// CSVインポート用DTO
 /// </summary>
-public class ProductCsvImportDto
+public sealed class ProductCsvImportDto
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

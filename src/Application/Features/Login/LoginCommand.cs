@@ -16,7 +16,7 @@ namespace Application.Features.Login;
 /// - 2FA検証（TOTP/RecoveryCode）
 /// - JWT Token生成
 /// </summary>
-public class LoginCommand : ICommand<Result<LoginResult>>
+public sealed class LoginCommand : ICommand<Result<LoginResult>>
 {
     public string Email { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
@@ -27,7 +27,7 @@ public class LoginCommand : ICommand<Result<LoginResult>>
 /// <summary>
 /// ログイン結果
 /// </summary>
-public record LoginResult
+public sealed record LoginResult
 {
     public string? AccessToken { get; init; }
     public string? RefreshToken { get; init; }

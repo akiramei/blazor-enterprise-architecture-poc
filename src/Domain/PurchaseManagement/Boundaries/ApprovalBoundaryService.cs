@@ -11,7 +11,7 @@ namespace Domain.PurchaseManagement.Boundaries;
 /// CheckEligibility, GetContext の呼び出しを構造化ログで記録
 /// ビジネス指標（拒否率、よく使われるアクション）を可視化可能
 /// </summary>
-public class ApprovalBoundaryService : IApprovalBoundary
+public sealed class ApprovalBoundaryService : IApprovalBoundary
 {
     private readonly IApprovalCommandFactory _commandFactory;
     private readonly ILogger<ApprovalBoundaryService> _logger;

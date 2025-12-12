@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests.Events;
 /// <summary>
 /// 購買申請が承認されたイベント
 /// </summary>
-public record PurchaseRequestApprovedEvent(
+public sealed record PurchaseRequestApprovedEvent(
     Guid RequestId,
     string RequestNumber,
     Guid RequesterId,

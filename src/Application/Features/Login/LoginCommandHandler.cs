@@ -25,7 +25,7 @@ namespace Application.Features.Login;
 /// 5. Refresh Token保存
 /// 6. ロール取得
 /// </summary>
-public class LoginCommandHandler : CommandPipeline<LoginCommand, LoginResult>
+public sealed class LoginCommandHandler : CommandPipeline<LoginCommand, LoginResult>
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -81,12 +81,17 @@ public class LoginCommandHandler : CommandPipeline<LoginCommand, LoginResult>
         if (user.IsTwoFactorEnabled)
         {
             var twoFactorResult = await Verify2FA(user, cmd, ct);
+
             if (!twoFactorResult.IsSuccess)
-                return twoFactorResult;
+            {
+                return Result.Fail<LoginResult>(twoFactorResult.Error ?? "Invalid two-factor authentication code");
+            }
 
             // 2FA要求レスポンス（コード未提供の場合）
             if (twoFactorResult.Value is not null)
-                return twoFactorResult;
+            {
+                return Result.Success(twoFactorResult.Value);
+            }
         }
 
         // 4. JWT Access Token生成
@@ -135,7 +140,7 @@ public class LoginCommandHandler : CommandPipeline<LoginCommand, LoginResult>
         if (string.IsNullOrEmpty(cmd.TwoFactorCode))
         {
             _logger.LogInformation("[LoginHandler] 2FA required. UserId={UserId}", user.Id);
-            return Result.Success(LoginResult.Create2FARequired());
+            return Result.Success<LoginResult?>(LoginResult.Create2FARequired());
         }
 
         // リカバリーコード検証
@@ -143,7 +148,7 @@ public class LoginCommandHandler : CommandPipeline<LoginCommand, LoginResult>
         {
             var verifyResult = await VerifyRecoveryCode(user, cmd.TwoFactorCode, ct);
             if (!verifyResult.IsSuccess)
-                return Result.Fail<LoginResult?>(verifyResult.Error);
+                return Result.Fail<LoginResult?>(verifyResult.Error ?? "Invalid recovery code");
 
             _logger.LogInformation("[LoginHandler] Login with recovery code successful. UserId={UserId}", user.Id);
             return Result.Success<LoginResult?>(null); // 検証成功

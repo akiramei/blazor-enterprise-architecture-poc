@@ -22,7 +22,7 @@ namespace Shared.Infrastructure.Caching;
 /// - パターンマッチングは全キーをスキャンするため、O(N)
 /// - キャッシュエントリが多い場合は遅延の可能性
 /// </summary>
-public class CacheInvalidationService : ICacheInvalidationService
+public sealed class CacheInvalidationService : ICacheInvalidationService
 {
     private readonly IMemoryCache _cache;
     private readonly ILogger<CacheInvalidationService> _logger;
@@ -132,6 +132,7 @@ public class CacheInvalidationService : ICacheInvalidationService
 
                 if (IsPatternMatch(key, pattern))
                 {
+                    if (entry.Key is null) continue;
                     keysToRemove.Add(entry.Key);
                 }
             }
@@ -178,6 +179,7 @@ public class CacheInvalidationService : ICacheInvalidationService
 
             if (IsPatternMatch(key, pattern))
             {
+                if (entry.Key is null) continue;
                 keysToRemove.Add(entry.Key);
             }
         }

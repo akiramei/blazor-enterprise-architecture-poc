@@ -43,7 +43,7 @@ public interface ISubmissionBoundary
 /// <summary>
 /// 購入品目入力（バウンダリー用）
 /// </summary>
-public record PurchaseRequestItemInput(
+public sealed record PurchaseRequestItemInput(
     Guid ProductId,
     string ProductName,
     decimal UnitPrice,

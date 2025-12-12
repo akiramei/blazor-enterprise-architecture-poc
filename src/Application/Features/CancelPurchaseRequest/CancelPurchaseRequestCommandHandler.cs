@@ -14,7 +14,7 @@ namespace Application.Features.CancelPurchaseRequest;
 /// - After: 約30行 (ドメインロジックのみ)
 /// - 削減率: 50%
 /// </summary>
-public class CancelPurchaseRequestCommandHandler
+public sealed class CancelPurchaseRequestCommandHandler
     : CommandPipeline<CancelPurchaseRequestCommand, Unit>
 {
     private readonly IPurchaseRequestRepository _repository;

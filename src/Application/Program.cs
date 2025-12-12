@@ -268,24 +268,30 @@ builder.Services.AddScoped<ProductEditActions>();
 builder.Services.AddScoped<ProductSearchActions>();
 builder.Services.AddScoped<Application.Infrastructure.Account.UI.Actions.SecuritySettingsActions>();
 
-// Outbox Background Service (Outbox Patternによる統合イベント配信)
-builder.Services.AddHostedService<Shared.Infrastructure.Platform.OutboxBackgroundService>();
-
-// Hangfire (Background Job Processing)
-builder.Services.AddHangfire(configuration => configuration
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(options =>
-        options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
-
-// Hangfire Server (Background Job Processor)
-builder.Services.AddHangfireServer(options =>
+// Outbox Background Service (Outbox Patternによる統合イベント配信) - Test環境では無効化
+if (!builder.Environment.IsEnvironment("Test"))
 {
-    options.WorkerCount = Environment.ProcessorCount * 2; // CPU コア数 × 2
-    options.Queues = new[] { "default", "critical", "low" }; // 優先度付きキュー
-    options.ServerName = $"{Environment.MachineName}-{Guid.NewGuid().ToString()[..8]}";
-});
+    builder.Services.AddHostedService<Shared.Infrastructure.Platform.OutboxBackgroundService>();
+}
+
+// Hangfire (Background Job Processing) - Test環境では無効化
+if (!builder.Environment.IsEnvironment("Test"))
+{
+    builder.Services.AddHangfire(configuration => configuration
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(options =>
+            options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+
+    // Hangfire Server (Background Job Processor)
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = Environment.ProcessorCount * 2; // CPU コア数 × 2
+        options.Queues = new[] { "default", "critical", "low" }; // 優先度付きキュー
+        options.ServerName = $"{Environment.MachineName}-{Guid.NewGuid().ToString()[..8]}";
+    });
+}
 
 // Identity Data Seeder
 builder.Services.AddScoped<Shared.Infrastructure.Platform.IdentityDataSeeder>();
@@ -471,11 +477,14 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Hangfire Dashboard (管理者のみアクセス可能)
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
+// Hangfire Dashboard (管理者のみアクセス可能) - Test環境では無効化
+if (!app.Environment.IsEnvironment("Test"))
 {
-    Authorization = new[] { new HangfireAuthorizationFilter() }
-});
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireAuthorizationFilter() }
+    });
+}
 
 app.UseAntiforgery();
 

@@ -8,7 +8,7 @@ namespace Application.Features.GetProducts;
 /// <summary>
 /// 商品一覧取得Query
 /// </summary>
-public class GetProductsQuery : IQuery<Result<IEnumerable<ProductDto>>>, ICacheableQuery
+public sealed class GetProductsQuery : IQuery<Result<IEnumerable<ProductDto>>>, ICacheableQuery
 {
     /// <summary>
     /// キャッシュキー（全商品一覧は固定キー）

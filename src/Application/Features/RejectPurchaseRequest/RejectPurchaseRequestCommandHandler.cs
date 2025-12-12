@@ -15,7 +15,7 @@ namespace Application.Features.RejectPurchaseRequest;
 /// - After: 14行
 /// - 削減率: 80%
 /// </summary>
-public class RejectPurchaseRequestCommandHandler
+public sealed class RejectPurchaseRequestCommandHandler
     : CommandPipeline<RejectPurchaseRequestCommand, Unit>
 {
     private readonly IPurchaseRequestRepository _repository;

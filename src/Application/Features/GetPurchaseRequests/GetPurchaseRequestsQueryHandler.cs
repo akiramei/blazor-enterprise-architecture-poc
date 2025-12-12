@@ -17,7 +17,7 @@ namespace Application.Features.GetPurchaseRequests;
 /// - After: 約130行 (クエリロジックのみ)
 /// - 削減率: 24%
 /// </summary>
-public class GetPurchaseRequestsQueryHandler
+public sealed class GetPurchaseRequestsQueryHandler
     : QueryPipeline<GetPurchaseRequestsQuery, List<PurchaseRequestListItemDto>>
 {
     private readonly IDbConnectionFactory _connectionFactory;

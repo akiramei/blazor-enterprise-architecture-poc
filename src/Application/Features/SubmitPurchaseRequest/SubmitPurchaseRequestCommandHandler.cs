@@ -28,7 +28,7 @@ namespace Application.Features.SubmitPurchaseRequest;
 ///
 /// それ以外の横断的関心事はすべてBehaviorが処理
 /// </summary>
-public class SubmitPurchaseRequestCommandHandler
+public sealed class SubmitPurchaseRequestCommandHandler
     : CommandPipeline<SubmitPurchaseRequestCommand, Guid>
 {
     private readonly IPurchaseRequestRepository _repository;

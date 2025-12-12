@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests;
 /// <summary>
 /// 購買申請番号（ValueObject）
 /// </summary>
-public class PurchaseRequestNumber : ValueObject
+public sealed class PurchaseRequestNumber : ValueObject
 {
     public string Value { get; }
 

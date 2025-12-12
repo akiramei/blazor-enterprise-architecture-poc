@@ -29,7 +29,7 @@ namespace Application.Features.BulkUpdateProductPrices;
 /// - 最大更新件数（100件）チェック
 /// - 成功後に通知サービスを呼ぶ
 /// </summary>
-public class BulkUpdateProductPricesCommandHandler
+public sealed class BulkUpdateProductPricesCommandHandler
     : CommandPipeline<BulkUpdateProductPricesCommand, BulkOperationResult>
 {
     private readonly IProductRepository _repository;

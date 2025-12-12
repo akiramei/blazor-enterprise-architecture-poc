@@ -26,7 +26,7 @@ namespace Application.Features.ExportProductsToCsv;
 /// - ヘッダー行は日本語で出力
 /// - エクスポート上限（例: 10,000件）を設定してメモリ枯渇を防ぐ
 /// </summary>
-public record ExportProductsToCsvQuery : IQuery<Result<byte[]>>
+public sealed record ExportProductsToCsvQuery : IQuery<Result<byte[]>>
 {
     public string? NameFilter { get; init; }
     public decimal? MinPrice { get; init; }

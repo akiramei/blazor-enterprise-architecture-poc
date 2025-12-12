@@ -12,7 +12,7 @@ namespace Application.Features.GetPurchaseRequestById;
 /// UI層でバウンダリーを活用するため、DTOではなくエンティティを返す
 /// バウンダリーがUIメタデータを提供するため、QueryHandlerでのDTO変換は不要
 /// </summary>
-public class GetPurchaseRequestByIdQueryHandler
+public sealed class GetPurchaseRequestByIdQueryHandler
     : QueryPipeline<GetPurchaseRequestByIdQuery, PurchaseRequest>
 {
     private readonly IPurchaseRequestRepository _repository;

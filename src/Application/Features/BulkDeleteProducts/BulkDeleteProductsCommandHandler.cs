@@ -105,7 +105,7 @@ public sealed class BulkDeleteProductsCommandHandler
                     errors.Add($"商品 {productId}: {ex.Message}");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // 予期しないエラー
                 failedCount++;

@@ -7,7 +7,7 @@ namespace Application.Features.RejectPurchaseRequest;
 /// <summary>
 /// 購買申請却下コマンド
 /// </summary>
-public class RejectPurchaseRequestCommand : ICommand<Result<Unit>>
+public sealed class RejectPurchaseRequestCommand : ICommand<Result<Unit>>
 {
     public Guid RequestId { get; init; }
     public string Reason { get; init; } = string.Empty;

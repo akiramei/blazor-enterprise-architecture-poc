@@ -18,7 +18,7 @@ namespace Application.Features.Disable2FA;
 /// 4. TwoFactorEnabledAt = null
 /// 5. リカバリーコード全削除
 /// </summary>
-public class Disable2FACommand : ICommand<Result<Unit>>
+public sealed class Disable2FACommand : ICommand<Result<Unit>>
 {
     /// <summary>
     /// 無効化対象のユーザーID

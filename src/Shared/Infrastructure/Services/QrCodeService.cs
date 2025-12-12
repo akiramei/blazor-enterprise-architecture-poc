@@ -28,7 +28,7 @@ namespace Shared.Infrastructure.Services;
 /// - 最大長を超える場合は拒否
 /// - QRCoder例外を適切に処理
 /// </summary>
-public class QrCodeService : IQrCodeService
+public sealed class QrCodeService : IQrCodeService
 {
     /// <summary>
     /// QRコードに埋め込めるコンテンツの最大文字数

@@ -27,7 +27,6 @@ public sealed class OutboxBackgroundService : BackgroundService
     private readonly ILogger<OutboxBackgroundService> _logger;
     private readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
     private readonly int _batchSize = 20;
-    private readonly int _maxRetryCount = 3;
 
     public OutboxBackgroundService(
         IServiceProvider serviceProvider,

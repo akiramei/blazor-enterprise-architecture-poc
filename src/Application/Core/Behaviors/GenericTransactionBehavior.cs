@@ -52,7 +52,7 @@ namespace Application.Core.Behaviors;
 /// </summary>
 /// <typeparam name="TRequest">リクエスト型 (ICommand)</typeparam>
 /// <typeparam name="TResponse">レスポンス型 (Result)</typeparam>
-public class GenericTransactionBehavior<TRequest, TResponse>
+public sealed class GenericTransactionBehavior<TRequest, TResponse>
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : ICommand<TResponse>
     where TResponse : Result
@@ -261,7 +261,7 @@ public interface IBoundedContextResolver
 /// <summary>
 /// BC→DbContext型のマッピングを保持する実装
 /// </summary>
-public class BoundedContextResolver : IBoundedContextResolver
+public sealed class BoundedContextResolver : IBoundedContextResolver
 {
     private readonly Dictionary<string, Type> _mappings;
 

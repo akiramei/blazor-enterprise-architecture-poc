@@ -5,7 +5,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests;
 /// <summary>
 /// 購買申請明細
 /// </summary>
-public class PurchaseRequestItem : Entity
+public sealed class PurchaseRequestItem : Entity
 {
     public Guid Id { get; init; }
     public Guid ProductId { get; init; }

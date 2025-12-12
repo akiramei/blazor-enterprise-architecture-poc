@@ -25,7 +25,7 @@ namespace Application.Features.UploadAttachment;
 /// - ファイル保存失敗: Result.Fail で返却（CommandPipelineが処理）
 /// - DomainException: CommandPipelineが自動的にResult.Failに変換
 /// </summary>
-public class UploadAttachmentCommandHandler
+public sealed class UploadAttachmentCommandHandler
     : CommandPipeline<UploadAttachmentCommand, Guid>
 {
     private readonly IPurchaseRequestRepository _repository;

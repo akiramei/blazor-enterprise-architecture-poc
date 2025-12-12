@@ -23,7 +23,7 @@ namespace Application.Features.UpdateProduct;
 /// - After: 約70行 (ビジネスロジックのみ)
 /// - 削減率: 39%
 /// </summary>
-public class UpdateProductCommandHandler
+public sealed class UpdateProductCommandHandler
     : CommandPipeline<UpdateProductCommand, Unit>
 {
     private readonly IProductRepository _repository;

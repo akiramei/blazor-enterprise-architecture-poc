@@ -8,7 +8,7 @@ namespace Domain.PurchaseManagement.PurchaseRequests;
 /// <summary>
 /// 購買申請（集約ルート）
 /// </summary>
-public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
+public sealed class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
 {
     private readonly PurchaseRequestStateMachine _stateMachine = new();
     private readonly List<ApprovalStep> _approvalSteps = new();

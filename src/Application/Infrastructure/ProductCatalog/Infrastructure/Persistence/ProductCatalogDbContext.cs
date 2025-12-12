@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Domain.ProductCatalog.Products;
 using Shared.Domain.Outbox;
 using Shared.Infrastructure.Diagnostics;
+using Shared.Kernel;
 
 namespace ProductCatalog.Shared.Infrastructure.Persistence;
 
@@ -80,6 +81,9 @@ public sealed class ProductCatalogDbContext : DbContext
         // （EF CoreがAggregateRoot<TId>のジェネリック型パラメータをエンティティと誤認識するのを防ぐ）
         modelBuilder.Ignore<ProductId>();
         modelBuilder.Ignore<ProductImageId>();
+
+        // DomainEvent はエンティティではないので除外
+        modelBuilder.Ignore<DomainEvent>();
 
         // ProductCatalog BC のConfiguration適用
         // ProductCatalog.Shared.Infrastructure.Persistence アセンブリから設定を読み込む

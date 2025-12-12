@@ -7,7 +7,7 @@ namespace Application.Features.ApprovePurchaseRequest;
 /// <summary>
 /// 購買申請承認コマンド
 /// </summary>
-public class ApprovePurchaseRequestCommand : ICommand<Result<Unit>>
+public sealed class ApprovePurchaseRequestCommand : ICommand<Result<Unit>>
 {
     public Guid RequestId { get; init; }
     public string Comment { get; init; } = string.Empty;

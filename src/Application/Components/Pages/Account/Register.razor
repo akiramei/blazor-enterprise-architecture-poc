@@ -73,13 +73,24 @@
 
 @code {
     [SupplyParameterFromForm]
-    private RegisterInputModel Input { get; set; } = new();
+    private RegisterInputModel? Input { get; set; }
 
     private string? ErrorMessage { get; set; }
     private bool RegistrationSucceeded { get; set; }
 
+    protected override void OnInitialized()
+    {
+        Input ??= new RegisterInputModel();
+    }
+
     private async Task OnValidSubmitAsync()
     {
+        if (Input is null)
+        {
+            ErrorMessage = "入力内容が不正です。もう一度お試しください。";
+            return;
+        }
+
         var user = new global::Shared.Domain.Identity.ApplicationUser
         {
             UserName = Input.Email,
