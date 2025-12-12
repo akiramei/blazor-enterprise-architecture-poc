@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using PurchaseManagement.Shared.Application;
+using Domain.PurchaseManagement;
 using Domain.PurchaseManagement.PurchaseRequests;
 
 namespace PurchaseManagement.Infrastructure.Persistence.Repositories;
@@ -72,6 +73,15 @@ public sealed class EfPurchaseRequestRepository : IPurchaseRequestRepository
             _context.PurchaseRequests.Update(purchaseRequest);
         }
 
+        // SaveChanges is handled by TransactionBehavior
+    }
+
+    /// <summary>
+    /// 添付ファイルを追加
+    /// </summary>
+    public async Task AddAttachmentAsync(PurchaseRequestAttachment attachment, CancellationToken cancellationToken)
+    {
+        await _context.PurchaseRequestAttachments.AddAsync(attachment, cancellationToken);
         // SaveChanges is handled by TransactionBehavior
     }
 }

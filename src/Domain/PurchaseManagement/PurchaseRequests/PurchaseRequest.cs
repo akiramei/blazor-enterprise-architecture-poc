@@ -37,7 +37,10 @@ public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
 
     // 承認情報
     public IReadOnlyList<ApprovalStep> ApprovalSteps => _approvalSteps.AsReadOnly();
-    public ApprovalStep? CurrentApprovalStep => _approvalSteps.FirstOrDefault(s => s.IsPending);
+    public ApprovalStep? CurrentApprovalStep => _approvalSteps
+        .Where(s => s.IsPending)
+        .OrderBy(s => s.StepNumber)
+        .FirstOrDefault();
 
     // 明細
     public IReadOnlyList<PurchaseRequestItem> Items => _items.AsReadOnly();
@@ -191,8 +194,16 @@ public class PurchaseRequest : AggregateRoot<Guid>, IMultiTenant
             ));
         }
 
+        // 状態遷移: Draft → Submitted → PendingFirstApproval
         Status = PurchaseRequestStatus.Submitted;
         SubmittedAt = DateTime.UtcNow;
+
+        // 承認フローがある場合、1次承認待ちに遷移
+        if (_approvalSteps.Count > 0)
+        {
+            _stateMachine.ValidateTransition(Status, PurchaseRequestStatus.PendingFirstApproval);
+            Status = PurchaseRequestStatus.PendingFirstApproval;
+        }
 
         // Domain Event発行
         RaiseDomainEvent(new PurchaseRequestSubmittedEvent(

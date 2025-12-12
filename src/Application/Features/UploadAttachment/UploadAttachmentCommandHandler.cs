@@ -85,11 +85,11 @@ public class UploadAttachmentCommandHandler
             return Result.Fail<Guid>($"ファイルの保存に失敗しました: {ex.Message}");
         }
 
-        // 5. PurchaseRequestに添付ファイルを追加
+        // 5. PurchaseRequestに添付ファイルを追加（メモリ上のリスト）
         purchaseRequest.AddAttachment(attachment);
 
-        // 6. 永続化
-        await _repository.SaveAsync(purchaseRequest, ct);
+        // 6. 添付ファイルを永続化（独立エンティティとして保存）
+        await _repository.AddAttachmentAsync(attachment, ct);
 
         return Result.Success(attachment.Id);
     }

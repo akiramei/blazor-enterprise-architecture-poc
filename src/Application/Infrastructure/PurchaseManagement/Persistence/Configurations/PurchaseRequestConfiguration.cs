@@ -32,9 +32,7 @@ public sealed class PurchaseRequestConfiguration : IEntityTypeConfiguration<Purc
     {
         builder.ToTable("PurchaseRequests");
 
-        // 公開プロパティを無視（privateフィールドを直接マッピングするため）
-        builder.Ignore(pr => pr.ApprovalSteps);
-        builder.Ignore(pr => pr.Items);
+        // 計算プロパティを無視
         builder.Ignore(pr => pr.TotalAmount);
         builder.Ignore(pr => pr.CurrentApprovalStep);
         builder.Ignore(pr => pr.DomainEvents); // Entity base class property
@@ -152,6 +150,11 @@ public sealed class PurchaseRequestConfiguration : IEntityTypeConfiguration<Purc
                 .HasMaxLength(2000);
         });
 
+        // バッキングフィールドを使用してApprovalStepsをロード
+        // （プロパティがAsReadOnly()を返すため、明示的な設定が必要）
+        builder.Navigation(pr => pr.ApprovalSteps)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
         // 子エンティティ: PurchaseRequestItem（親子関係）
         builder.OwnsMany(pr => pr.Items, itemBuilder =>
         {
@@ -205,6 +208,10 @@ public sealed class PurchaseRequestConfiguration : IEntityTypeConfiguration<Purc
                     .IsRequired();
             });
         });
+
+        // バッキングフィールドを使用してItemsをロード
+        builder.Navigation(pr => pr.Items)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
 
         // インデックス
         builder.HasIndex(pr => pr.TenantId)

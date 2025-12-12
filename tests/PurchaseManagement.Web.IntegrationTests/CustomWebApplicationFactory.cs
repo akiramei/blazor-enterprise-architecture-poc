@@ -1,5 +1,7 @@
-﻿using GetPurchaseRequestById.Application;
-using GetPurchaseRequests.Application;
+﻿using Application.Features.GetPurchaseRequestById;
+using Application.Features.GetPurchaseRequests;
+using Application.Infrastructure.LibraryManagement.Persistence;
+using ApprovalWorkflow.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -13,6 +15,7 @@ using ProductCatalog.Shared.Infrastructure.Persistence;
 using PurchaseManagement.Infrastructure.Persistence;
 using PurchaseManagement.Shared.Application;
 using PurchaseManagement.Web.IntegrationTests.TestDoubles;
+using Shared.Abstractions;
 using Shared.Application;
 using Shared.Infrastructure.Platform.Persistence;
 
@@ -34,6 +37,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _productCatalogConnection;
     private readonly SqliteConnection _platformConnection;
     private readonly SqliteConnection _purchaseManagementConnection;
+    private readonly SqliteConnection _libraryManagementConnection;
+    private readonly SqliteConnection _approvalWorkflowConnection;
 
     public CustomWebApplicationFactory()
     {
@@ -46,6 +51,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         _purchaseManagementConnection = new SqliteConnection("DataSource=:memory:");
         _purchaseManagementConnection.Open();
+
+        _libraryManagementConnection = new SqliteConnection("DataSource=:memory:");
+        _libraryManagementConnection.Open();
+
+        _approvalWorkflowConnection = new SqliteConnection("DataSource=:memory:");
+        _approvalWorkflowConnection.Open();
 
         // データベーススキーマを初期化
         InitializeDatabase();
@@ -85,6 +96,28 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         using (var context = new PurchaseManagementDbContext(
             purchaseManagementOptions,
+            dummyAppContext,
+            dummyEnvironment))
+        {
+            context.Database.EnsureCreated();
+        }
+
+        // LibraryManagementDbContext のスキーマ作成
+        var libraryManagementOptions = new DbContextOptionsBuilder<LibraryManagementDbContext>()
+            .UseSqlite(_libraryManagementConnection)
+            .Options;
+        var libraryLogger = NullLogger<LibraryManagementDbContext>.Instance;
+        using (var context = new LibraryManagementDbContext(libraryManagementOptions, libraryLogger))
+        {
+            context.Database.EnsureCreated();
+        }
+
+        // ApprovalWorkflowDbContext のスキーマ作成
+        var approvalWorkflowOptions = new DbContextOptionsBuilder<ApprovalWorkflowDbContext>()
+            .UseSqlite(_approvalWorkflowConnection)
+            .Options;
+        using (var context = new ApprovalWorkflowDbContext(
+            approvalWorkflowOptions,
             dummyAppContext,
             dummyEnvironment))
         {
@@ -134,10 +167,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll(typeof(DbContextOptions<ProductCatalogDbContext>));
             services.RemoveAll(typeof(DbContextOptions<PlatformDbContext>));
             services.RemoveAll(typeof(DbContextOptions<PurchaseManagementDbContext>));
+            services.RemoveAll(typeof(DbContextOptions<LibraryManagementDbContext>));
+            services.RemoveAll(typeof(DbContextOptions<ApprovalWorkflowDbContext>));
 
             services.RemoveAll(typeof(ProductCatalogDbContext));
             services.RemoveAll(typeof(PlatformDbContext));
             services.RemoveAll(typeof(PurchaseManagementDbContext));
+            services.RemoveAll(typeof(LibraryManagementDbContext));
+            services.RemoveAll(typeof(ApprovalWorkflowDbContext));
 
             // SQLite In-Memory でDbContextを再登録
             services.AddDbContext<ProductCatalogDbContext>(options =>
@@ -158,13 +195,25 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.AmbientTransactionWarning));
             });
 
+            services.AddDbContext<LibraryManagementDbContext>(options =>
+            {
+                options.UseSqlite(_libraryManagementConnection)
+                       .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.AmbientTransactionWarning));
+            });
+
+            services.AddDbContext<ApprovalWorkflowDbContext>(options =>
+            {
+                options.UseSqlite(_approvalWorkflowConnection)
+                       .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.AmbientTransactionWarning));
+            });
+
             // Dapper 誤使用防止：ThrowingConnectionFactory を登録
             services.RemoveAll<IDbConnectionFactory>();
             services.AddSingleton<IDbConnectionFactory, ThrowingConnectionFactory>();
 
             // Dapper ハンドラを EF Core ハンドラに置き換え
-            services.RemoveAll<IRequestHandler<GetPurchaseRequestByIdQuery, Result<PurchaseRequestDetailDto?>>>();
-            services.AddScoped<IRequestHandler<GetPurchaseRequestByIdQuery, Result<PurchaseRequestDetailDto?>>, EfGetPurchaseRequestByIdHandler>();
+            services.RemoveAll<IRequestHandler<GetPurchaseRequestByIdQuery, Result<Domain.PurchaseManagement.PurchaseRequests.PurchaseRequest>>>();
+            services.AddScoped<IRequestHandler<GetPurchaseRequestByIdQuery, Result<Domain.PurchaseManagement.PurchaseRequests.PurchaseRequest>>, EfGetPurchaseRequestByIdHandler>();
 
             services.RemoveAll<IRequestHandler<GetPurchaseRequestsQuery, Result<List<PurchaseRequestListItemDto>>>>();
             services.AddScoped<IRequestHandler<GetPurchaseRequestsQuery, Result<List<PurchaseRequestListItemDto>>>, EfGetPurchaseRequestsHandler>();
@@ -172,8 +221,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // ApprovalFlowService をテスト用に置き換え（固定のApproverIdを使用）
             services.RemoveAll<PurchaseManagement.Shared.Application.IApprovalFlowService>();
             services.AddScoped<PurchaseManagement.Shared.Application.IApprovalFlowService, TestApprovalFlowService>();
+
+            // FileStorageService をテスト用に置き換え
+            services.RemoveAll<IFileStorageService>();
+            services.AddSingleton<IFileStorageService, TestFileStorageService>();
+
+            // Rate Limitingは Program.cs で Test環境では無効化されるため、テスト側での追加登録は不要
         });
-    }
+	    }
 
     /// <summary>
     /// TenantId を null に設定したファクトリーを返す（セキュリティテスト用）
@@ -243,6 +298,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             _productCatalogConnection?.Dispose();
             _platformConnection?.Dispose();
             _purchaseManagementConnection?.Dispose();
+            _libraryManagementConnection?.Dispose();
+            _approvalWorkflowConnection?.Dispose();
         }
         base.Dispose(disposing);
     }

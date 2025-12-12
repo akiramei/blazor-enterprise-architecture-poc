@@ -1,4 +1,4 @@
-﻿using GetPurchaseRequests.Application;
+﻿using Application.Features.GetPurchaseRequests;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PurchaseManagement.Infrastructure.Persistence;
@@ -35,11 +35,6 @@ public sealed class EfGetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRe
                 queryable = queryable.Where(pr => (int)pr.Status == query.Status.Value);
             }
 
-            if (query.RequesterId.HasValue)
-            {
-                queryable = queryable.Where(pr => pr.RequesterId == query.RequesterId.Value);
-            }
-
             // ソート
             queryable = query.SortBy switch
             {
@@ -55,9 +50,6 @@ public sealed class EfGetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRe
                 "TotalAmount" => query.Ascending
                     ? queryable.OrderBy(pr => pr.Items.Sum(i => i.Amount.Amount))
                     : queryable.OrderByDescending(pr => pr.Items.Sum(i => i.Amount.Amount)),
-                "SubmittedAt" => query.Ascending
-                    ? queryable.OrderBy(pr => pr.SubmittedAt)
-                    : queryable.OrderByDescending(pr => pr.SubmittedAt),
                 _ => query.Ascending
                     ? queryable.OrderBy(pr => pr.CreatedAt)
                     : queryable.OrderByDescending(pr => pr.CreatedAt)
@@ -71,14 +63,10 @@ public sealed class EfGetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRe
                 {
                     pr.Id,
                     RequestNumber = pr.RequestNumber.Value,
-                    pr.RequesterId,
                     pr.RequesterName,
                     pr.Title,
                     Status = (int)pr.Status,
                     pr.CreatedAt,
-                    pr.SubmittedAt,
-                    pr.ApprovedAt,
-                    pr.RejectedAt,
                     TotalAmount = pr.Items.Sum(i => i.Amount.Amount),
                     Currency = pr.Items.Any() ? pr.Items.First().Amount.Currency : "JPY",
                     ApprovalStepCount = pr.ApprovalSteps.Count,
@@ -91,15 +79,11 @@ public sealed class EfGetPurchaseRequestsHandler : IRequestHandler<GetPurchaseRe
                 {
                     Id = item.Id,
                     RequestNumber = item.RequestNumber,
-                    RequesterId = item.RequesterId,
                     RequesterName = item.RequesterName,
                     Title = item.Title,
                     Status = item.Status,
                     StatusName = GetStatusName(item.Status),
                     CreatedAt = item.CreatedAt,
-                    SubmittedAt = item.SubmittedAt,
-                    ApprovedAt = item.ApprovedAt,
-                    RejectedAt = item.RejectedAt,
                     TotalAmount = item.TotalAmount,
                     Currency = item.Currency,
                     ApprovalStepCount = item.ApprovalStepCount,

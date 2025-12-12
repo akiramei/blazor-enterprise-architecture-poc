@@ -1,3 +1,4 @@
+using Domain.PurchaseManagement;
 using Domain.PurchaseManagement.PurchaseRequests;
 
 namespace PurchaseManagement.Shared.Application;
@@ -9,4 +10,5 @@ public interface IPurchaseRequestRepository
 {
     Task<PurchaseRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task SaveAsync(PurchaseRequest purchaseRequest, CancellationToken cancellationToken);
+    Task AddAttachmentAsync(PurchaseRequestAttachment attachment, CancellationToken cancellationToken);
 }

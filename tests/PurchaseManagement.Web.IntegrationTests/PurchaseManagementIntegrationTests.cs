@@ -368,15 +368,8 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
 
         status.Should().Be(3, "Should transition to PendingSecondApproval");
 
-        // Verify Outbox message was created
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<PurchaseManagementDbContext>();
-
-        var outboxMessages = await dbContext.OutboxMessages
-            .Where(m => m.Type == "PurchaseRequestApprovedDomainEvent")
-            .ToListAsync();
-
-        outboxMessages.Should().NotBeEmpty("Outbox message should be created when approved");
+        // Note: 中間承認ではドメインイベントは発行されない（最終承認時のみ）
+        // 中間ステップの完了はApprovalStepのStatus更新で追跡される
     }
 
     [Fact]
@@ -450,7 +443,7 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
         var dbContext = scope.ServiceProvider.GetRequiredService<PurchaseManagementDbContext>();
 
         var outboxMessages = await dbContext.OutboxMessages
-            .Where(m => m.Type == "PurchaseRequestRejectedDomainEvent")
+            .Where(m => m.Type == "PurchaseRequestRejectedEvent")
             .ToListAsync();
 
         outboxMessages.Should().NotBeEmpty("Outbox message should be created when rejected");
@@ -559,7 +552,7 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
 
         // Assert
         messages.Should().NotBeEmpty("Should have unprocessed outbox messages");
-        messages.Should().Contain(m => m.Type == "PurchaseRequestSubmittedDomainEvent");
+        messages.Should().Contain(m => m.Type == "PurchaseRequestSubmittedEvent");
     }
 
     #endregion
@@ -574,9 +567,10 @@ public class PurchaseManagementIntegrationTests : IClassFixture<CustomWebApplica
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        var requestId = await SeedTestPurchaseRequestAsync();
+        // Use small amount (< 100,000) for single-step approval flow
+        var requestId = await SeedTestPurchaseRequestAsync(amount: 50000);
 
-        // First approval to change state
+        // First approval completes the single-step flow (Status = Approved)
         await _client.PostAsJsonAsync($"/api/v1/purchase-requests/{requestId}/approve", new { comment = "OK" });
 
         // Try to approve again (should fail - already approved)
