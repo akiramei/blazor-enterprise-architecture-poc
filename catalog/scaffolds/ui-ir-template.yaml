@@ -1,0 +1,445 @@
+# catalog/scaffolds/ui-ir-template.yaml
+# UI Intermediate Representation (UI-IR)
+# Purpose: Bridge ICONIX Boundary -> High-quality UI generation (MudBlazor)
+
+id: ui-ir-template
+version: 0.1.0
+name: UI Intermediate Representation Template
+category: scaffold
+intent: AIがUI生成時に「UX品質を担保するための中間表現」。boundary-pattern/spec-templateを補完し、情報優先度・操作頻度・確認要否などを定量化する。
+
+ui_ir:
+  version: "0.1"
+  description: >
+    UI-IR is a UI intermediate representation optimized for LLM-driven UI generation.
+    It encodes priorities, frequency, safety, and UX constraints so the generated UI is not "flat".
+
+# -----------------------------------------------------------------------------
+# Enumerations (MUST use these values)
+# -----------------------------------------------------------------------------
+enums:
+  importance: [Critical, Primary, Secondary, Reference]
+  action_priority: [Primary, Secondary, Tertiary]
+  frequency: [VeryHigh, High, Medium, Low, Rare]
+  reversibility: [Reversible, PartiallyReversible, Irreversible]
+  error_cost: [Negligible, Low, Medium, High, Critical]
+  confirmation_level: [None, Simple, Detailed, DoubleConfirm]
+
+  layout_kind:
+    information_blocks: [table, card, list, inline, alert, tabs, accordion]
+    forms: [single_column, two_column, wizard, inline]
+
+  field_type: [text, multiline, number, select, multiselect, date, datetime, checkbox, toggle, file, search]
+
+  # Navigation and data binding enums
+  navigation_type: [push, replace, dialog, modal]
+  caching_strategy: [none, memory, etag, localStorage]
+  severity: [High, Medium, Low, Info]
+
+  data_binding:
+    source_kind: [Query, Command, LocalState]
+    refresh_mode: [OnLoad, OnAction, Polling]
+    validation_mode: [Client, Server, Both]
+
+# -----------------------------------------------------------------------------
+# Component mapping (MudBlazor)
+# -----------------------------------------------------------------------------
+component_mapping:
+  # Note: Keys in frequency-specific mappings use enum values exactly (case-sensitive)
+  actions:
+    Primary:
+      default: 'MudButton(Variant="Filled", Color="Primary")'
+      VeryHigh: 'MudButton(Variant="Filled", Color="Primary", Size="Large")'
+    Secondary:
+      default: 'MudButton(Variant="Outlined")'
+    Tertiary:
+      default: 'MudButton(Variant="Text")'
+      Rare: 'MudMenuItem'
+    danger_overrides:
+      # Applied when is_destructive: true OR error_cost is High/Critical
+      High: 'MudButton(Variant="Filled", Color="Error")'
+      Critical: 'MudButton(Variant="Filled", Color="Error", Size="Large")'
+
+  information_blocks:
+    Critical: 'MudAlert(Severity="Warning")'
+    Primary: 'MudPaper(Elevation="1")'
+    Secondary: 'MudPaper(Outlined="true")'
+    Reference: 'MudExpansionPanels()'
+    layouts:
+      table: 'MudDataGrid'
+      card: 'MudCard'
+      list: 'MudList'
+      tabs: 'MudTabs'
+      accordion: 'MudExpansionPanels'
+      alert: 'MudAlert'
+      inline: 'MudStack'
+
+  form_fields:
+    text: 'MudTextField'
+    multiline: 'MudTextField(Lines="4")'
+    number: 'MudNumericField'
+    select: 'MudSelect'
+    multiselect: 'MudSelect(MultiSelection="true")'
+    date: 'MudDatePicker'
+    datetime: 'MudDatePicker'
+    checkbox: 'MudCheckBox'
+    toggle: 'MudSwitch'
+    file: 'MudFileUpload'
+    search: 'MudAutocomplete'
+
+# -----------------------------------------------------------------------------
+# Derivation rules (these MUST be applied by generators)
+# -----------------------------------------------------------------------------
+rules:
+  # Single primary action rule
+  primary_action_uniqueness:
+    must_have_exactly_one: true
+    message: "Each screen MUST have exactly one Primary action."
+
+  # Confirmation level auto-derivation
+  confirmation_level_derivation:
+    algorithm: |
+      if error_cost in [Negligible, Low] and reversibility == Reversible:
+        confirmation_level = None
+      elif error_cost == Medium:
+        confirmation_level = Simple
+      elif error_cost == High:
+        confirmation_level = Detailed
+      elif error_cost == Critical or reversibility == Irreversible:
+        confirmation_level = DoubleConfirm
+    examples:
+      - input: { error_cost: Low, reversibility: Reversible }
+        output: { confirmation_level: None }
+      - input: { error_cost: High, reversibility: PartiallyReversible }
+        output: { confirmation_level: Detailed }
+      - input: { error_cost: Medium, reversibility: Reversible }
+        output: { confirmation_level: Simple }
+      - input: { error_cost: Low, reversibility: Irreversible }
+        output: { confirmation_level: DoubleConfirm }
+
+  # Placement rules (prevent "flat" UI)
+  placement:
+    critical_first_view:
+      must_be_visible_without_scrolling: true
+    primary_action_prominence:
+      must_be_above_fold: true
+      must_be_single_visual_dominant: true
+    high_frequency_reachability:
+      description: "VeryHigh/High actions MUST be reachable within one interaction from default screen state."
+      max_clicks: 1
+
+  # Boundary decision wiring rule
+  boundary_decision_binding:
+    description: "Actions SHOULD reference boundary decisions (Entity.CanXxx()) to control enabled/disabled."
+    require_ref_when_available: true
+
+  # Destructive action styling rule
+  destructive_action_styling:
+    description: "Actions with is_destructive: true MUST use danger_overrides styling."
+    algorithm: |
+      if is_destructive == true:
+        use component_mapping.actions.danger_overrides[error_cost]
+      elif error_cost in [High, Critical]:
+        use component_mapping.actions.danger_overrides[error_cost]
+
+# -----------------------------------------------------------------------------
+# UX review (self-checklist & scoring rubric)
+# -----------------------------------------------------------------------------
+ux_review:
+  mandatory_checks:
+    - id: UX-001
+      statement: "Primary アクションは画面に1つのみか"
+      severity: High
+    - id: UX-002
+      statement: "Irreversible または error_cost>=High のアクションに確認があるか（派生ルール一致）"
+      severity: High
+    - id: UX-003
+      statement: "Critical importance の情報がファーストビューに表示されるか"
+      severity: High
+    - id: UX-004
+      statement: "境界の意思決定（Entity.CanXxx()）がUIのdisabled等に反映されているか"
+      severity: Medium
+    - id: UX-005
+      statement: "VeryHigh/High の操作が1クリック以内で到達できるか"
+      severity: Medium
+
+  scoring:
+    weights:
+      discoverability: 0.30
+      safety: 0.25
+      efficiency: 0.25
+      consistency: 0.20
+    scale: "0..5"
+    guidance:
+      5: "Excellent - minimal friction, safe defaults, consistent patterns"
+      3: "OK - usable but some friction or minor inconsistencies"
+      1: "Poor - confusing, unsafe, or inefficient"
+
+# -----------------------------------------------------------------------------
+# Schema template (Fill this per screen)
+# -----------------------------------------------------------------------------
+schema:
+  screen:
+    id: ""                 # e.g., "product.search"
+    name: ""               # e.g., "Product Search"
+    purpose: ""            # user-facing purpose sentence
+    primary_user_intent: ""# e.g., "Find a product quickly and open details"
+    personas: []           # optional: ["Librarian", "Admin"]
+    entry_conditions: []   # optional: ["UserAuthenticated"]
+    exit_conditions: []    # optional: ["NavigatedToProductDetail"]
+    notes: ""              # optional
+
+  navigation:
+    routes:
+      - from_screen_id: ""
+        to_screen_id: ""
+        trigger: ""        # action_id or event
+        type: ""           # "push" | "replace" | "dialog"
+    breadcrumbs: []        # optional
+    deep_links: []         # optional
+
+  data:
+    bindings:
+      - id: ""                       # "products.search"
+        source_kind: "Query"         # Query | Command | LocalState
+        source_ref: ""               # e.g., "SearchProductsQuery"
+        refresh_mode: "OnLoad"       # OnLoad | OnAction | Polling
+        refresh_trigger_action_id: ""# optional
+        validation_mode: "Both"      # Client | Server | Both
+        performance_expectation_ms: 300 # optional guideline (UX constraints)
+        caching: ""                  # optional "none|memory|etag"
+
+  information_blocks:
+    - id: ""                 # "blk-results"
+      name: ""
+      importance: "Primary"  # Critical|Primary|Secondary|Reference
+      layout: "table"        # table|card|list|inline|alert|tabs|accordion
+      data_binding_id: ""    # link to data.bindings.id
+      visible_conditions: [] # optional: ["HasResults"]
+      fields:
+        - label: ""
+          value_ref: ""      # e.g., "product.name"
+          format: ""         # optional: currency/date/etc
+      interactions:
+        - type: ""           # e.g., "row_click"
+          action_id: ""      # link to action
+
+  form_fields:
+    layout: "two_column"     # single_column|two_column|wizard|inline
+    fields:
+      - id: ""               # "fld-query"
+        label: ""
+        type: "text"         # enums.field_type
+        required: false
+        placeholder: ""
+        help_text: ""
+        value_binding_ref: "" # e.g., "SearchCriteria.Query"
+        validation:
+          - rule: ""          # e.g., "maxLength:100"
+            message: ""
+        component_hint: ""    # optional Mud override / e.g., "MudAutocomplete"
+
+  main_actions:
+    - id: ""                  # "act-search"
+      name: ""                # button label
+      intent: ""              # e.g., "Search" | "Create" | "Delete"
+      is_destructive: false   # ★ Explicit flag for destructive operations (Delete, Remove, Cancel, etc.)
+      priority: "Primary"     # Primary|Secondary|Tertiary
+      frequency: "High"       # VeryHigh|High|Medium|Low|Rare
+      reversibility: "Reversible"
+      error_cost: "Low"
+      confirmation_level: ""  # MUST be derivation output unless overridden with reason
+      confirmation_override_reason: "" # optional
+      disabled_when:
+        - condition: ""       # e.g., "!Product.CanDelete()"
+          boundary_decision_ref: "" # e.g., "Product.CanDelete()"
+      executes:
+        - type: "Command"     # Command|Navigation|LocalEvent
+          ref: ""             # e.g., "SearchProductsCommand"
+      success_feedback: ""    # e.g., "Snackbar"
+      failure_feedback: ""    # e.g., "MudAlert"
+      component_hint: ""      # optional override
+
+  secondary_actions:
+    - id: ""
+      name: ""
+      intent: ""
+      is_destructive: false   # ★ Explicit flag for destructive operations
+      priority: "Secondary"
+      frequency: "Medium"
+      reversibility: "Reversible"
+      error_cost: "Low"
+      confirmation_level: ""
+      executes:
+        - type: "LocalEvent"
+          ref: ""
+      component_hint: ""
+
+  ux_constraints:
+    first_paint_target_ms: 300
+    action_response_target_ms: 500
+    max_initial_scroll: 0
+    accessibility:
+      keyboard_navigation: true
+      aria_labels_required: true
+    i18n:
+      supported_locales: ["ja-JP"]
+    telemetry:
+      track_actions: true
+      track_errors: true
+
+# -----------------------------------------------------------------------------
+# Example: ProductSearch (usage example)
+# -----------------------------------------------------------------------------
+examples:
+  - screen:
+      id: "product.search"
+      name: "Product Search"
+      purpose: "商品を検索して詳細を開く"
+      primary_user_intent: "最短で商品を見つけ、詳細へ移動する"
+      personas: ["User"]
+      entry_conditions: ["UserAuthenticated"]
+      exit_conditions: ["NavigatedToProductDetail"]
+      notes: "検索は高頻度。結果はテーブル表示が最適。"
+
+    data:
+      bindings:
+        - id: "products.search"
+          source_kind: "Query"
+          source_ref: "SearchProductsQuery"
+          refresh_mode: "OnAction"
+          refresh_trigger_action_id: "act-search"
+          validation_mode: "Both"
+          performance_expectation_ms: 300
+          caching: "etag"
+
+    form_fields:
+      layout: "two_column"
+      fields:
+        - id: "fld-query"
+          label: "キーワード"
+          type: "search"
+          required: false
+          placeholder: "商品名 / SKU"
+          help_text: "部分一致で検索できます"
+          value_binding_ref: "SearchCriteria.Query"
+          validation:
+            - rule: "maxLength:100"
+              message: "100文字以内で入力してください"
+          component_hint: "MudAutocomplete"
+
+    information_blocks:
+      - id: "blk-results"
+        name: "検索結果"
+        importance: "Primary"
+        layout: "table"
+        data_binding_id: "products.search"
+        fields:
+          - label: "商品名"
+            value_ref: "product.name"
+          - label: "SKU"
+            value_ref: "product.sku"
+          - label: "在庫"
+            value_ref: "product.stock"
+        interactions:
+          - type: "row_click"
+            action_id: "act-open-detail"
+
+    main_actions:
+      - id: "act-search"
+        name: "検索"
+        intent: "Search"
+        priority: "Primary"
+        frequency: "VeryHigh"
+        reversibility: "Reversible"
+        error_cost: "Low"
+        confirmation_level: "None"
+        executes:
+          - type: "Command"
+            ref: "SearchProductsCommand"
+        success_feedback: "Snackbar"
+        failure_feedback: "MudAlert"
+        component_hint: 'MudButton(Variant="Filled", Color="Primary", Size="Large")'
+
+    secondary_actions:
+      - id: "act-open-detail"
+        name: "詳細を開く"
+        intent: "Navigate"
+        priority: "Secondary"
+        frequency: "High"
+        reversibility: "Reversible"
+        error_cost: "Low"
+        confirmation_level: "None"
+        executes:
+          - type: "Navigation"
+            ref: "product.detail/{id}"
+        component_hint: "row_click"
+
+    ux_constraints:
+      first_paint_target_ms: 300
+      action_response_target_ms: 500
+      max_initial_scroll: 0
+      accessibility:
+        keyboard_navigation: true
+        aria_labels_required: true
+      i18n:
+        supported_locales: ["ja-JP"]
+      telemetry:
+        track_actions: true
+        track_errors: true
+
+# -----------------------------------------------------------------------------
+# AI Guidance
+# -----------------------------------------------------------------------------
+ai_guidance:
+  when_to_use:
+    - "ICONIX Boundary から UI を生成する際"
+    - "既存画面の UX 品質を評価・改善する際"
+    - "MudBlazor コンポーネントの選択に迷った際"
+
+  generation_workflow:
+    step1:
+      name: "UI-IR作成"
+      description: "ICONIX Boundary（Intent, Entity.CanXxx()）からUI-IRを記述"
+    step2:
+      name: "ワイヤーフレーム生成"
+      description: "UI-IR の rules セクションと ux_review セクションを厳守してテキストワイヤーフレームを出力"
+    step3:
+      name: "UX自己評価"
+      description: "ux_review.mandatory_checks を満たすか検査。違反があれば修正"
+    step4:
+      name: "MudBlazor実装"
+      description: "component_mapping に従って Razor コンポーネントを生成"
+
+  critical_rules:
+    - "Primary アクションは画面に1つのみ"
+    - "confirmation_level は derivation rules から自動算出（オーバーライド時は理由を明記）"
+    - "Critical importance の情報はファーストビューに配置"
+    - "Entity.CanXxx() がある場合は disabled_when で参照"
+    - "削除・キャンセル等の破壊的操作は is_destructive: true を明示"
+
+  common_mistakes:
+    - mistake: "全てのアクションを Primary にする"
+      solution: "Primary は画面の主目的を達成する1アクションのみ。他は Secondary/Tertiary"
+    - mistake: "confirmation_level を手動で決める"
+      solution: "derivation rules を適用。オーバーライドには理由が必要"
+    - mistake: "error_cost=High なのに確認ダイアログがない"
+      solution: "derivation rules で Detailed 以上が必須"
+    - mistake: "VeryHigh 操作がメニュー内に隠れている"
+      solution: "max_clicks: 1 ルールに違反。プライマリボタンとして配置"
+    - mistake: "削除ボタンに is_destructive フラグを設定しない"
+      solution: "Delete, Remove, Cancel, Reject 等の破壊的操作は is_destructive: true を明示。danger_overrides でスタイルが自動適用される"
+
+# -----------------------------------------------------------------------------
+# Changelog
+# -----------------------------------------------------------------------------
+changelog:
+  - version: 0.1.0
+    date: 2025-12-13
+    changes:
+      - "初版リリース"
+      - "ICONIXバウンダリーからUI生成への橋渡しとして設計"
+      - "MudBlazor固定のコンポーネントマッピング"
+      - "confirmation_level 自動算出ルール"
+      - "UXレビューチェックリスト"
+      - "ProductSearch の使用例"

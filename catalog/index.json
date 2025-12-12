@@ -450,6 +450,17 @@
       "scope": "project-wide"
     },
     {
+      "id": "ui-ir-template",
+      "name": "UI Intermediate Representation Template",
+      "category": "scaffold",
+      "version": "0.1.0",
+      "file": "scaffolds/ui-ir-template.yaml",
+      "intent": "AIがUI生成時にUX品質を担保するための中間表現。情報優先度・操作頻度・確認要否などを定量化し、MudBlazorコンポーネントへの自動マッピングを提供",
+      "tags": ["scaffold", "ui-ir", "mudblazor", "ux", "ai-ui-generation", "confirmation-level"],
+      "stability": "beta",
+      "scope": "project-wide"
+    },
+    {
       "id": "metrics-behavior",
       "name": "MetricsBehavior",
       "category": "pipeline-behavior",

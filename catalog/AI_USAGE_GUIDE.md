@@ -183,6 +183,77 @@ AIは実装/計画を開始する前に、必ず以下の順序で要求文を�
 
 **重要**: Boundaryは「最初に設計する」ものであり、「後から追加する」ものではありません。
 
+---
+
+## 🎨 UI-IR（UI中間表現）によるUI生成
+
+> **参照**: `catalog/scaffolds/ui-ir-template.yaml`
+
+**ICONIXのBoundaryから高品質なUIを生成するための中間表現です。**
+
+### なぜUI-IRが必要か
+
+Boundaryは「正しいが無機質」であり、AIには以下の情報が不足しています：
+
+| 不足している情報 | 結果 |
+|-----------------|------|
+| 情報の「優先度」 | 画面がフラットで重要度不明 |
+| 操作の「頻度」 | 毎日使う操作と年1回操作が同列 |
+| 操作の「重さ」 | 確認ダイアログが過剰/不足 |
+| 非機能UX制約 | 反応速度への配慮がない |
+
+### UI生成ワークフロー（4ステップ）
+
+```
+1. UI-IR作成
+   ICONIX Boundary（Intent, Entity.CanXxx()）からUI-IRを記述
+   ↓
+2. ワイヤーフレーム生成
+   UI-IR の rules セクションと ux_review セクションを厳守してテキストワイヤーフレームを出力
+   ↓
+3. UX自己評価
+   ux_review.mandatory_checks を満たすか検査。違反があれば修正
+   ↓
+4. MudBlazor実装
+   component_mapping に従って Razor コンポーネントを生成
+```
+
+### UI-IRの主要セクション
+
+| セクション | 目的 |
+|-----------|------|
+| `enums` | 列挙値の定義（AIのブレ防止） |
+| `component_mapping` | MudBlazorコンポーネントへの直接マッピング |
+| `rules` | 確認レベル自動計算、配置ルール |
+| `ux_review` | 自己評価チェックリスト |
+| `schema` | 画面定義テンプレート |
+| `examples` | ProductSearchの使用例 |
+
+### confirmation_level 自動計算（★重要）
+
+**AIはこのルールを厳守すること：**
+
+```python
+if error_cost in [Negligible, Low] and reversibility == Reversible:
+  confirmation_level = None
+elif error_cost == Medium:
+  confirmation_level = Simple
+elif error_cost == High:
+  confirmation_level = Detailed
+elif error_cost == Critical or reversibility == Irreversible:
+  confirmation_level = DoubleConfirm
+```
+
+### UX必須チェックリスト
+
+```
+□ Primary アクションは画面に1つのみか
+□ Irreversible または error_cost>=High のアクションに確認があるか
+□ Critical importance の情報がファーストビューに表示されるか
+□ Entity.CanXxx() がUIのdisabled等に反映されているか
+□ VeryHigh/High の操作が1クリック以内で到達できるか
+```
+
 ### クイックスタート
 
 1. **まず `catalog/index.json` を読む**
