@@ -15,25 +15,25 @@
     </div>
     <div class="card-body">
         <div class="mb-3">
-            <label for="memberId" class="form-label">会員ID</label>
+            <label for="memberBarcode" class="form-label">会員バーコード</label>
             <input type="text"
-                   id="memberId"
+                   id="memberBarcode"
                    class="form-control"
-                   placeholder="会員IDを入力"
-                   value="@Store.State.MemberId"
-                   @onchange="OnMemberIdChanged"
+                   placeholder="会員バーコードを入力"
+                   value="@Store.State.MemberBarcode"
+                   @onchange="OnMemberBarcodeChanged"
                    disabled="@Store.State.IsLoading" />
             <div class="form-text">※ 本来は会員検索から選択</div>
         </div>
 
         <div class="mb-3">
-            <label for="bookCopyId" class="form-label">蔵書ID</label>
+            <label for="bookCopyBarcode" class="form-label">蔵書バーコード</label>
             <input type="text"
-                   id="bookCopyId"
+                   id="bookCopyBarcode"
                    class="form-control"
-                   placeholder="蔵書IDを入力"
-                   value="@Store.State.BookCopyId"
-                   @onchange="OnBookCopyIdChanged"
+                   placeholder="蔵書バーコードを入力"
+                   value="@Store.State.BookCopyBarcode"
+                   @onchange="OnBookCopyBarcodeChanged"
                    disabled="@Store.State.IsLoading" />
             <div class="form-text">※ 本来は検索結果から選択</div>
         </div>
@@ -93,22 +93,18 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task OnMemberIdChanged(ChangeEventArgs e)
+    private async Task OnMemberBarcodeChanged(ChangeEventArgs e)
     {
         var value = e.Value?.ToString() ?? string.Empty;
-        if (Guid.TryParse(value, out var memberId))
-        {
-            await Actions.OnMemberSelectedAsync(memberId);
-        }
+        if (!string.IsNullOrWhiteSpace(value))
+            await Actions.OnMemberSelectedAsync(value);
     }
 
-    private async Task OnBookCopyIdChanged(ChangeEventArgs e)
+    private async Task OnBookCopyBarcodeChanged(ChangeEventArgs e)
     {
         var value = e.Value?.ToString() ?? string.Empty;
-        if (Guid.TryParse(value, out var bookCopyId))
-        {
-            await Actions.OnBookSelectedAsync(bookCopyId);
-        }
+        if (!string.IsNullOrWhiteSpace(value))
+            await Actions.OnBookSelectedAsync(value);
     }
 
     private async Task OnReserveClicked()

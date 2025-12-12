@@ -74,9 +74,7 @@ public class Disable2FACommandHandler : CommandPipeline<Disable2FACommand, Unit>
             return Result.Fail<Unit>($"2FAの無効化に失敗しました: {errors}");
         }
 
-        // 6. DbContext保存
-        // トランザクション境界：GenericTransactionBehaviorが自動的にCommit/Rollback
-        await _dbContext.SaveChangesAsync(ct);
+        // 6. DbContext保存は TransactionBehavior が自動で実行
 
         return Result.Success(Unit.Value);
     }

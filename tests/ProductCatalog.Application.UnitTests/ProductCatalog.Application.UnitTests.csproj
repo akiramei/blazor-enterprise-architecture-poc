@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -24,19 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ProductCatalog\Shared\Domain\Products\ProductCatalog.Shared.Domain.Products.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Shared\Application\ProductCatalog.Shared.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\CreateProduct\Application\CreateProduct.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\GetProducts\Application\GetProducts.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\GetProductById\Application\GetProductById.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\UpdateProduct\Application\UpdateProduct.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\DeleteProduct\Application\DeleteProduct.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\SearchProducts\Application\SearchProducts.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\BulkDeleteProducts\Application\BulkDeleteProducts.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\BulkUpdateProductPrices\Application\BulkUpdateProductPrices.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\ImportProductsFromCsv\Application\ImportProductsFromCsv.Application.csproj" />
-    <ProjectReference Include="..\..\src\ProductCatalog\Features\ExportProductsToCsv\Application\ExportProductsToCsv.Application.csproj" />
-    <ProjectReference Include="..\..\src\Shared\Application\Shared.Application.csproj" />
+    <ProjectReference Include="..\..\src\Application\Application.csproj" />
   </ItemGroup>
 
 </Project>

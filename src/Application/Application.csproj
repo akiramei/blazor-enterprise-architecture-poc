@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Application</RootNamespace>
@@ -15,7 +15,7 @@
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.17" />
     <PackageReference Include="Hangfire.Core" Version="1.8.17" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
 
     <!-- MediatR -->
     <PackageReference Include="MediatR" Version="13.1.0" />
@@ -25,11 +25,11 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.8.0" />
 
     <!-- Entity Framework Core -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
 
     <!-- Dapper -->
     <PackageReference Include="Dapper" Version="2.1.66" />
@@ -45,11 +45,8 @@
     <PackageReference Include="QRCoder" Version="1.6.0" />
 
     <!-- ASP.NET Core Identity -->
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
-
-    <!-- SignalR -->
-    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
 
     <!-- Prometheus -->
     <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.0" />

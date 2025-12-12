@@ -104,8 +104,7 @@ public class LoginCommandHandler : CommandPipeline<LoginCommand, LoginResult>
         // 6. ユーザーロール取得
         var roles = await _userManager.GetRolesAsync(user);
 
-        // トランザクション境界：GenericTransactionBehaviorが自動的にCommit/Rollback
-        await _dbContext.SaveChangesAsync(ct);
+        // トランザクション境界：Platform TransactionBehavior が自動的に SaveChanges/Commit/Rollback
 
         _logger.LogInformation("[LoginHandler] Login successful. UserId={UserId}, Email={Email}",
             user.Id, user.Email);

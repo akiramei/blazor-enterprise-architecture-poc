@@ -21,6 +21,16 @@ This ensures:
 
 ---
 
+## Step 0: Unsupported Intents Scan (MANDATORY)
+
+**Before generating tasks, scan `unsupported_intents`.**
+
+1. Read: `catalog/index.json` → `ai_decision_matrix.unsupported_intents`
+2. If the user request contains matching keywords (通知/メール/バッチ/PDF等), **STOP** and ask for infra/library prerequisites.
+3. Resume tasks generation only after prerequisites are clarified.
+
+---
+
 ## タスク分解のルール
 
 タスクを生成する際は、以下のルールに従うこと：

@@ -28,21 +28,21 @@ public sealed class ReserveBookPageActions
     }
 
     /// <summary>
-    /// 会員選択時
+    /// 会員バーコード入力時
     /// </summary>
-    public async Task OnMemberSelectedAsync(Guid memberId)
+    public async Task OnMemberSelectedAsync(string memberBarcode)
     {
-        _logger.LogInformation("会員選択: {MemberId}", memberId);
-        await _store.SetMemberIdAsync(memberId);
+        _logger.LogInformation("会員選択: {MemberBarcode}", memberBarcode);
+        await _store.SetMemberBarcodeAsync(memberBarcode);
     }
 
     /// <summary>
-    /// 本選択時
+    /// 蔵書バーコード入力時
     /// </summary>
-    public async Task OnBookSelectedAsync(Guid bookCopyId)
+    public async Task OnBookSelectedAsync(string bookCopyBarcode)
     {
-        _logger.LogInformation("本選択: {BookCopyId}", bookCopyId);
-        await _store.SetBookCopyIdAsync(bookCopyId);
+        _logger.LogInformation("本選択: {BookCopyBarcode}", bookCopyBarcode);
+        await _store.SetBookCopyBarcodeAsync(bookCopyBarcode);
     }
 
     /// <summary>
@@ -51,9 +51,9 @@ public sealed class ReserveBookPageActions
     public async Task OnReserveClickedAsync(CancellationToken ct = default)
     {
         _logger.LogInformation(
-            "予約実行: 会員={MemberId}, 蔵書={BookCopyId}",
-            _store.State.MemberId,
-            _store.State.BookCopyId);
+            "予約実行: 会員={MemberBarcode}, 蔵書={BookCopyBarcode}",
+            _store.State.MemberBarcode,
+            _store.State.BookCopyBarcode);
 
         var result = await _store.ReserveAsync(ct);
 

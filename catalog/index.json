@@ -53,6 +53,15 @@
       "step4": "実装フェーズ: IMPLEMENTATION_GUIDE.md に従ってコードを生成"
     }
   },
+  "ai_bootstrap": {
+    "description": "AIが実装/計画を開始する前の必須スキャン順序（運用ガードレール）",
+    "scan_order": [
+      "1. unsupported_intents のキーワードを最初にスキャン → 該当なら primary 選択より先に止まって確認",
+      "2. planning_required_conditions をチェック → 計画フェーズが必要なら planning に遷移",
+      "3. ai_decision_matrix で primary（pattern_category/Feature/Query/Behavior）を選択",
+      "4. 選択したパターンYAMLの ai_selection_hints / dependencies / conflicts を確認"
+    ]
+  },
   "planning_required_conditions": {
     "description": "計画フェーズが必要かどうかを判断する条件。実装開始前に必ず確認すること。",
     "requires_planning": {
@@ -1080,6 +1089,114 @@
       "step3": "該当カテゴリ内でパターンを検索",
       "step4": "パターンのai_selection_hintsで最終確認",
       "step5": "confidence > 0.8 なら採用、そうでなければユーザーに確認"
+    },
+    "tie_breakers": [
+      {
+        "when": "要求に「空き」「利用可能」「未割当」「存在しない/NOT EXISTS」「〜がない」「除外」等の否定条件が含まれる、または characteristics に struct:multi-aggregate が含まれる、または「サブクエリ/3テーブル以上の結合」が必要だと明言されている",
+        "prefer": "complex-query-service",
+        "over": ["feature-search-entity", "query-get-list", "query-get-by-period", "query-get-by-id"],
+        "reason": "NOT EXISTS/空き検索/複雑結合などクエリ複雑性が主な判断軸。単純なWHERE条件のみなら feature-search-entity または query-* を優先する"
+      },
+      {
+        "when": "要求に「検索画面」「フィルタ/絞り込み」「ソート」「ページング」「条件入力フォーム」等のUI要件が含まれる",
+        "prefer": "feature-search-entity",
+        "over": ["query-get-list", "query-get-by-period", "query-get-by-id"],
+        "reason": "検索条件UIと状態管理(Store/Actions)を含む垂直スライスが必要"
+      },
+      {
+        "when": "要求が「APIで全件取得したい」「バックエンド側で一覧が必要」「ドロップダウン用データが欲しい」等の非UI/参照用途で、検索UIや画面の言及がない",
+        "prefer": "query-get-list",
+        "over": ["feature-search-entity"],
+        "reason": "UI込みの垂直スライスが不要な純粋な参照用途はQueryパターンで十分"
+      },
+      {
+        "when": "要求に「一覧を表示したい」「一覧画面」「〜を見たい」など表示/UI意図があるが、検索UI（絞り込み/ページング等）の必要性が不明",
+        "prefer": "feature-search-entity",
+        "over": ["query-get-list"],
+        "reason": "「表示したい」はUIを含む意図。検索UI不要なら後続の質問で query-get-list に寄せる"
+      },
+      {
+        "when": "要求に「承認」「稟議」「申請」「ワークフロー」等が含まれる、または characteristics に domain:workflow が含まれる",
+        "prefer": "feature-approval-workflow",
+        "over": ["feature-create-entity", "feature-update-entity", "feature-delete-entity", "domain-state-machine"],
+        "reason": "承認ライフサイクルと履歴/認可/監査が本体。CRUDはワークフロー内部のサブスライスとして扱う"
+      },
+      {
+        "when": "要求に特定ファイル名/クラス名が含まれ、「だけ/のみ/修正/変更/最適化」といった部分修正の語がある",
+        "prefer": "layer-element（該当レイヤ要素）",
+        "over": ["feature-slice"],
+        "reason": "新規スライス追加ではなく既存要素の局所修正と解釈する"
+      },
+      {
+        "when": "要求に「すべて/全体/共通/横断的」などシステム全体への適用が含まれる",
+        "prefer": "pipeline-behavior（該当behavior）",
+        "over": ["feature-slice", "layer-element"],
+        "reason": "個別機能ではなく横断的関心事の追加として扱う"
+      },
+      {
+        "when": "要求に「重複/引当/残高確認」など事前条件チェックがあり、特に「〜してから〜」のように事前検証が明示されていて、同時実行防止の語が無い",
+        "prefer": "domain-validation-service",
+        "over": ["concurrency-control"],
+        "reason": "複数集約に跨るビジネス前提条件の検証が主目的"
+      },
+      {
+        "when": "要求に「同時に〜されると困る」「ダブルブッキング」「排他」「ロックして防ぎたい」等の同時実行/競合防止が明示されている",
+        "prefer": "concurrency-control",
+        "over": ["domain-validation-service"],
+        "reason": "技術的な同時実行制御が主目的。必要に応じて domain-validation-service を併用する"
+      }
+    ],
+    "clarifying_questions": {
+      "list_or_search_ui": {
+        "question": "一覧は「単純表示」だけですか？それとも「条件検索/絞り込み/ページング付きの検索画面」が必要ですか？",
+        "if_simple_list": "query-get-list",
+        "if_search_ui": "feature-search-entity",
+        "note": "迷う場合はまず質問して確定する"
+      },
+      "approval_scope": {
+        "question": "承認は複数段階（課長→部長→…）ですか？単一承認だけですか？",
+        "if_multi_step": "feature-approval-workflow（標準）",
+        "if_single_step": "feature-approval-workflow（承認ステップ1で簡易化）"
+      },
+      "conflict_vs_concurrency": {
+        "question": "競合/重複チェックは「複数集約に跨る前提条件の検証」ですか？それとも「同時更新の競合を技術的に防ぐ」必要がありますか？",
+        "if_business_precondition": "domain-validation-service",
+        "if_technical_concurrency": "concurrency-control（必要に応じて domain-validation-service も併用）"
+        ,
+        "skip_if_phrases": ["してから", "事前に", "同時に", "ダブルブッキング", "排他"],
+        "note": "「〜してから〜」は事前検証、「同時に〜されると」は同時実行制御が明確なため質問不要"
+      },
+      "feature_or_patch": {
+        "question": "これは新しい機能（垂直スライス追加）ですか？それとも既存の特定ファイル/要素の修正ですか？",
+        "if_new_feature": "feature-slice（CRUD/検索/承認など該当Feature）",
+        "if_existing_fix": "layer-element"
+      },
+      "perf_scope": {
+        "question": "高速化/キャッシュは特定のQuery/画面だけに効かせたいですか？それとも全Command/Queryに横断適用しますか？",
+        "if_specific": "追加パターンとして caching-behavior を適用",
+        "if_system_wide": "caching-behavior（primary: pipeline-behavior）"
+      }
+    },
+    "unsupported_intents": {
+      "description": "カタログに primary が無い要求。AI は無理にパターンを当てはめず、レッドフラグとして止まって確認すること。",
+      "intents": [
+        {
+          "keywords": ["通知", "メール", "リマインダー", "アラート", "送信", "配信"],
+          "action": "通知の種類とインフラ構成を確認（SMTP / SendGrid / 内製 / Push / SignalR 等）。構成が確定したら個別実装。",
+          "reason": "外部サービスや運用基盤に強く依存し、プロジェクトごとに実装が変わるため"
+        },
+        {
+          "keywords": ["バッチ", "定期実行", "スケジューラ", "ジョブ", "夜間処理", "cron"],
+          "action": "スケジューラ選定を確認（Hangfire / Quartz / Azure Functions / cron 等）。選定後に個別実装。",
+          "reason": "実行基盤と運用要件に依存するため"
+        },
+        {
+          "keywords": ["PDF出力", "帳票", "印刷", "レポート出力"],
+          "action": "帳票/レンダリング手段を確認（QuestPDF / iText / ブラウザ印刷 / 外部帳票サービス 等）。選定後に個別実装。",
+          "reason": "ライブラリ/フォーマット/法規対応などの前提がプロジェクト依存のため"
+        }
+      ],
+      "fallback_action": "カタログ外と判断し、必要な前提をユーザーに確認してから進める"
     },
     "fallback_strategy": "判断に迷った場合は feature-slice をデフォルトで選択（垂直スライスが基本）"
   },

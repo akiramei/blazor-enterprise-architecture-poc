@@ -88,9 +88,7 @@ public class Enable2FACommandHandler
             return Result.Fail<Enable2FAResult>($"ユーザー情報の更新に失敗しました: {errors}");
         }
 
-        // 8. DbContext保存
-        // トランザクション境界：GenericTransactionBehaviorが自動的にCommit/Rollback
-        await _dbContext.SaveChangesAsync(ct);
+        // 8. DbContext保存は TransactionBehavior が自動で実行
 
         // 9. 結果返却（リカバリーコードは平文で返す）
         return Result.Success(new Enable2FAResult(secretKey, qrCodeUri, recoveryCodes));

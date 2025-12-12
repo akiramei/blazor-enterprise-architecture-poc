@@ -36,20 +36,20 @@ public sealed class ReserveBookStore
     public event Func<Task>? OnChangeAsync;
 
     /// <summary>
-    /// 会員IDを設定
+    /// 会員バーコードを設定
     /// </summary>
-    public async Task SetMemberIdAsync(Guid memberId)
+    public async Task SetMemberBarcodeAsync(string memberBarcode)
     {
-        _state = _state with { MemberId = memberId };
+        _state = _state with { MemberBarcode = memberBarcode };
         await NotifyStateChangedAsync();
     }
 
     /// <summary>
-    /// 蔵書IDを設定
+    /// 蔵書バーコードを設定
     /// </summary>
-    public async Task SetBookCopyIdAsync(Guid bookCopyId)
+    public async Task SetBookCopyBarcodeAsync(string bookCopyBarcode)
     {
-        _state = _state with { BookCopyId = bookCopyId };
+        _state = _state with { BookCopyBarcode = bookCopyBarcode };
         await NotifyStateChangedAsync();
     }
 
@@ -65,8 +65,8 @@ public sealed class ReserveBookStore
         {
             var command = new ReserveBookCommand
             {
-                MemberId = _state.MemberId!.Value,
-                BookCopyId = _state.BookCopyId!.Value
+                MemberBarcode = _state.MemberBarcode!,
+                BookCopyBarcode = _state.BookCopyBarcode!
             };
 
             var result = await _mediator.Send(command, ct);
@@ -78,8 +78,8 @@ public sealed class ReserveBookStore
                     IsLoading = false,
                     LastReservationId = result.Value,
                     SuccessMessage = "予約を受け付けました。順番が来たらメールでお知らせします。",
-                    MemberId = null,
-                    BookCopyId = null
+                    MemberBarcode = null,
+                    BookCopyBarcode = null
                 };
             }
             else
@@ -129,8 +129,8 @@ public sealed class ReserveBookStore
 /// </summary>
 public sealed record ReserveBookState
 {
-    public Guid? MemberId { get; init; }
-    public Guid? BookCopyId { get; init; }
+    public string? MemberBarcode { get; init; }
+    public string? BookCopyBarcode { get; init; }
     public bool IsLoading { get; init; }
     public string? ErrorMessage { get; init; }
     public string? SuccessMessage { get; init; }
@@ -139,6 +139,6 @@ public sealed record ReserveBookState
     public static ReserveBookState Empty => new();
 
     public bool CanSubmit => !IsLoading
-        && MemberId.HasValue
-        && BookCopyId.HasValue;
+        && !string.IsNullOrWhiteSpace(MemberBarcode)
+        && !string.IsNullOrWhiteSpace(BookCopyBarcode);
 }

@@ -26,6 +26,14 @@ You **MUST** consider the user input before proceeding (if not empty).
 > **Skills ヒント**: 実装時に `vsa-implementation-guard` の知識が自動的に適用される可能性があります。
 > SaveChangesAsync 禁止、Result<T> パターン強制などの禁止事項は Skills が提供します。
 
+### Step 0.0: Unsupported Intents Scan (FIRST)
+
+**MUST scan unsupported_intents BEFORE quoting patterns.**
+
+1. Read: `catalog/index.json` → `ai_decision_matrix.unsupported_intents`
+2. If the request contains matching keywords (通知/メール/バッチ/PDF等), **STOP** and ask for infra/library prerequisites.
+3. Continue Phase 0 only after prerequisites are clarified.
+
 ### Why This Phase Exists
 
 ```

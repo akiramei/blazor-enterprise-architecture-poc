@@ -85,6 +85,20 @@ dotnet new classlib --framework net10.0 -n MyLib
 
 ---
 
+## ✅ 実装前スキャン順序（運用ガードレール）
+
+AIは実装/計画を開始する前に、必ず以下の順序で要求文をスキャンしてください。
+
+1. **unsupported_intents を最初にスキャン**
+   - 要求文に「通知/メール/リマインダー/バッチ/定期実行/PDF/帳票」等のキーワードがあれば、
+     primary 選択より先に `catalog/index.json` の `unsupported_intents` を確認する。
+   - 該当したら **止まってユーザーに前提（インフラ/ライブラリ/運用）を確認**する。
+2. その後 `ai_decision_matrix` で primary を選択する。
+
+詳細な順序は `catalog/index.json` の `ai_bootstrap.scan_order` を正本とする。
+
+---
+
 ## 🚨 計画フェーズの必読パターン（CRITICAL）
 
 **UIがある機能を計画する前に、以下のパターンを必ず読んでください。**

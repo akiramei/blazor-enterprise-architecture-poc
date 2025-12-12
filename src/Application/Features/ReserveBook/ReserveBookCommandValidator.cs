@@ -13,12 +13,12 @@ public sealed class ReserveBookCommandValidator : AbstractValidator<ReserveBookC
 {
     public ReserveBookCommandValidator()
     {
-        RuleFor(x => x.MemberId)
+        RuleFor(x => x.MemberBarcode)
             .NotEmpty()
-            .WithMessage("会員IDは必須です");
+            .WithMessage("会員バーコードは必須です");
 
-        RuleFor(x => x.BookCopyId)
+        RuleFor(x => x.BookCopyBarcode)
             .NotEmpty()
-            .WithMessage("蔵書IDは必須です");
+            .WithMessage("蔵書バーコードは必須です");
     }
 }

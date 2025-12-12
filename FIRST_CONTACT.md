@@ -38,6 +38,10 @@ cp catalog/consumer-example/templates/AI_WORKFLOW.md.template docs/AI_WORKFLOW.m
 cp catalog/consumer-example/templates/AI_PROMPTS.md.template docs/AI_PROMPTS.md
 cp catalog/consumer-example/templates/CATALOG_VERSION.md.template docs/CATALOG_VERSION.md
 cp catalog/consumer-example/templates/SPEC_SLICE.yaml.template specs/_template.yaml
+
+# spec-kit コマンド拡張をインストール（Claude Code等の /speckit.* で使用）
+mkdir -p .claude/commands
+cp catalog/speckit-extensions/commands/*.md .claude/commands/
 ```
 
 ---

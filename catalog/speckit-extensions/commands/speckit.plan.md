@@ -104,6 +104,27 @@ You **MUST** consider the user input before proceeding (if not empty).
 > 可能性があります。Feature Slices、Query Patterns、Domain Patterns の選択基準は
 > Skills が提供します。
 
+#### 0.5.0: Unsupported Intents Scan (FIRST - NEW)
+
+**MUST scan unsupported_intents BEFORE pattern selection.**
+
+1. Read `catalog/index.json` の `ai_decision_matrix.unsupported_intents`
+2. 要求文に該当キーワードがあれば **STOP**
+3. ユーザーにインフラ前提を確認してから続行
+
+**該当キーワード例**:
+- 通知/メール/リマインダー → SMTP等の選定を確認
+- バッチ/定期実行/ジョブ → スケジューラ選定を確認
+- PDF/帳票/印刷 → 帳票ライブラリ選定を確認
+
+**STOP時の出力**:
+⚠️ カタログ外機能を検出しました。
+- 検出キーワード: {keyword}
+- 必要な確認: {action from unsupported_intents}
+- 続行前に上記を明確にしてください。
+
+#### 0.5.1: Read catalog index (renamed from 1.)
+
 1. **Read catalog index**:
    ```
    Read: catalog/index.json

@@ -8,7 +8,7 @@ namespace Application.Features.ReserveBook;
 ///
 /// 【SPEC準拠】
 /// - actor: Member（会員）
-/// - boundary.input: book_id（予約対象の本のID）
+/// - boundary.input: member_barcode, book_copy_barcode（バーコード入力）
 ///
 /// 【カタログパターン: feature-create-entity】
 /// - ICommand<Result<Guid>> を実装
@@ -17,12 +17,12 @@ namespace Application.Features.ReserveBook;
 public sealed record ReserveBookCommand : ICommand<Result<Guid>>
 {
     /// <summary>
-    /// 会員ID
+    /// 会員バーコード
     /// </summary>
-    public required Guid MemberId { get; init; }
+    public required string MemberBarcode { get; init; } = string.Empty;
 
     /// <summary>
-    /// 予約対象の蔵書ID
+    /// 予約対象の蔵書バーコード
     /// </summary>
-    public required Guid BookCopyId { get; init; }
+    public required string BookCopyBarcode { get; init; } = string.Empty;
 }

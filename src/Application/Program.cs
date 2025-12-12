@@ -27,6 +27,7 @@ using Serilog;
 using Shared.Infrastructure.Platform.Persistence;
 using PurchaseManagement.Infrastructure;
 using ApprovalWorkflow.Infrastructure;
+using Application.Infrastructure.LibraryManagement;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Application.Middleware;
@@ -85,9 +86,11 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infras
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.CachingBehavior<,>));        // 5. Caching (Query)
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.AuditLogBehavior<,>));       // 6. AuditLog (Command) - 監査ログ記録
 // 7. Transaction (Command) - BC固有
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PurchaseManagement.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
-builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ApprovalWorkflow.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+	builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ProductCatalog.Shared.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+	builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PurchaseManagement.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+	builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ApprovalWorkflow.Infrastructure.Persistence.Behaviors.TransactionBehavior<,>));
+	builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Application.Infrastructure.LibraryManagement.Persistence.Behaviors.TransactionBehavior<,>));
+	builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Application.Infrastructure.Platform.Persistence.Behaviors.TransactionBehavior<,>));
 
 // Authorization
 builder.Services.AddAuthorization();
@@ -142,15 +145,21 @@ if (!builder.Environment.IsEnvironment("Test"))
     builder.Services.AddDbContext<PurchaseManagement.Infrastructure.Persistence.PurchaseManagementDbContext>(options =>
         options.UseNpgsql(connectionString));
 
-    builder.Services.AddDbContext<ApprovalWorkflow.Infrastructure.Persistence.ApprovalWorkflowDbContext>(options =>
-        options.UseNpgsql(connectionString));
-}
+	    builder.Services.AddDbContext<ApprovalWorkflow.Infrastructure.Persistence.ApprovalWorkflowDbContext>(options =>
+	        options.UseNpgsql(connectionString));
+
+	    builder.Services.AddDbContext<Application.Infrastructure.LibraryManagement.Persistence.LibraryManagementDbContext>(options =>
+	        options.UseNpgsql(connectionString));
+	}
 
 // PurchaseManagement BC Services (Repository, Domain Services)
 builder.Services.AddPurchaseManagementServices(builder.Configuration);
 
-// ApprovalWorkflow BC Services (Repository, Boundary Services)
-builder.Services.AddApprovalWorkflowServices(builder.Configuration);
+	// ApprovalWorkflow BC Services (Repository, Boundary Services)
+	builder.Services.AddApprovalWorkflowServices(builder.Configuration);
+
+	// LibraryManagement BC Services (Repository)
+	builder.Services.AddLibraryManagementServices(builder.Configuration);
 
 // ASP.NET Core Identity（本番用認証・認可）
 // Identity は技術的関心事なので PlatformDbContext を使用

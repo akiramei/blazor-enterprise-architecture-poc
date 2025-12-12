@@ -101,8 +101,7 @@ public class RefreshTokenCommandHandler : CommandPipeline<RefreshTokenCommand, R
 
         _dbContext.RefreshTokens.Add(newRefreshToken);
 
-        // トランザクション境界：GenericTransactionBehaviorが自動的にCommit/Rollback
-        await _dbContext.SaveChangesAsync(ct);
+        // トランザクション境界：Platform TransactionBehavior が自動的に SaveChanges/Commit/Rollback
 
         _logger.LogInformation("[RefreshTokenHandler] Token refresh successful. UserId={UserId}", user.Id);
 

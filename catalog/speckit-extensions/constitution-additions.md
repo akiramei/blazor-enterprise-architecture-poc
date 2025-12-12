@@ -227,7 +227,7 @@ Plan フェーズで ExpiresAt を定義した場合：
 
 このカタログで使用する技術スタック：
 
-- .NET 8 / C# 12
+- .NET 10 (LTS) / C# 13
 - Blazor Server (InteractiveServer)
 - Entity Framework Core
 - MediatR (CQRS)
