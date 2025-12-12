@@ -78,6 +78,7 @@ builder.Services.AddValidatorsFromAssemblies(new[]
 });
 
 // Pipeline Behaviors（登録順序が重要！）
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.ExceptionHandlingBehavior<,>)); // 0. ExceptionHandling - 例外をResultに変換
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.MetricsBehavior<,>));        // 0. Metrics - 全体の実行時間を計測
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.LoggingBehavior<,>));        // 1. Logging
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(Shared.Infrastructure.Behaviors.ValidationBehavior<,>));     // 2. Validation
