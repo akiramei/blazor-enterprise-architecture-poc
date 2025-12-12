@@ -1,4 +1,6 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.PurchaseRequests;
+
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// フィルターオプション：利用可能なフィルター定義

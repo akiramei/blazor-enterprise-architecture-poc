@@ -1,6 +1,6 @@
 using Shared.Kernel;
 
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 提出バウンダリーサービス：ドメインサービスとして提出ロジックを提供

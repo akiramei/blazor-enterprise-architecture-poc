@@ -1,4 +1,4 @@
-using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.Boundaries;
 
 namespace Application.Features.ApprovePurchaseRequest;
 

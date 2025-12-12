@@ -1,6 +1,7 @@
+using Domain.PurchaseManagement.PurchaseRequests;
 using Shared.Kernel;
 
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// バウンダリー判定結果

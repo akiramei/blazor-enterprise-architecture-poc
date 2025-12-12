@@ -1,4 +1,6 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.PurchaseRequests;
+
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// フィルタリングバウンダリー：一覧表示の契約

@@ -1,6 +1,6 @@
 using Application.Core.Commands;
 using Domain.PurchaseManagement.PurchaseRequests;
-using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.Boundaries;
 using MediatR;
 using PurchaseManagement.Shared.Application;
 using Shared.Application;

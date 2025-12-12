@@ -1,4 +1,4 @@
-namespace Domain.ApprovalWorkflow.Applications.Boundaries;
+namespace Domain.ApprovalWorkflow.Boundaries;
 
 /// <summary>
 /// 申請に対する操作の意図

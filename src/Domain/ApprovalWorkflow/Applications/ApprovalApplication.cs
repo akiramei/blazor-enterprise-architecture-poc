@@ -1,4 +1,4 @@
-using Domain.ApprovalWorkflow.Applications.Boundaries;
+using Domain.ApprovalWorkflow.Boundaries;
 using Domain.ApprovalWorkflow.Applications.Events;
 using Domain.ApprovalWorkflow.Applications.StateMachine;
 using Domain.ApprovalWorkflow.WorkflowDefinitions;

@@ -1,6 +1,6 @@
 ﻿using FluentAssertions;
 using Domain.PurchaseManagement.PurchaseRequests;
-using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.Boundaries;
 using Shared.Kernel;
 
 namespace PurchaseManagement.Domain.UnitTests.Boundaries;

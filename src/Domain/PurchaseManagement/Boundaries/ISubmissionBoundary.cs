@@ -1,4 +1,4 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 提出バウンダリー：提出操作の意図契約

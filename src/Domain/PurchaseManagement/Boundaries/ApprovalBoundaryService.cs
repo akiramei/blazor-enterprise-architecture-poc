@@ -1,7 +1,8 @@
+using Domain.PurchaseManagement.PurchaseRequests;
 using Microsoft.Extensions.Logging;
 using Shared.Kernel;
 
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 承認バウンダリーサービス：ドメインサービスとして承認ロジックを提供

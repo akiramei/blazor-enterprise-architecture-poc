@@ -1,4 +1,4 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 複合承認コマンドファクトリー：承認と却下の両方のコマンドを生成

@@ -1,4 +1,6 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.PurchaseRequests;
+
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 承認バウンダリー：承認操作の意図契約

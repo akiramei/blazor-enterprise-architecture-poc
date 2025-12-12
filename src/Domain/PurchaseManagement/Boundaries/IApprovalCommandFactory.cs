@@ -1,4 +1,4 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 承認コマンドファクトリー：Intent→Command変換の責務

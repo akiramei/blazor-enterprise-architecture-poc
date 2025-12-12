@@ -1,4 +1,4 @@
-namespace Domain.ApprovalWorkflow.Applications.Boundaries;
+namespace Domain.ApprovalWorkflow.Boundaries;
 
 /// <summary>
 /// Boundary判定結果

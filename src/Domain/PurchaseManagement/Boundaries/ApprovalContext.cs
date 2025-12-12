@@ -1,4 +1,6 @@
-namespace Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.PurchaseRequests;
+
+namespace Domain.PurchaseManagement.Boundaries;
 
 /// <summary>
 /// 承認コンテキスト：UIが"何を見せるべきか"の根拠

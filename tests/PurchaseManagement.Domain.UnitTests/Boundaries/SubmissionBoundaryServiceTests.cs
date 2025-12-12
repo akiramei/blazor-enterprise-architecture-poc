@@ -1,5 +1,5 @@
 ﻿using FluentAssertions;
-using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.Boundaries;
 
 namespace PurchaseManagement.Domain.UnitTests.Boundaries;
 

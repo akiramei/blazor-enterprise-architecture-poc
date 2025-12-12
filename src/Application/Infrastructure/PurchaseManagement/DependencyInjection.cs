@@ -5,7 +5,7 @@ using PurchaseManagement.Infrastructure.Persistence;
 using PurchaseManagement.Infrastructure.Persistence.Repositories;
 using PurchaseManagement.Infrastructure.Services;
 using PurchaseManagement.Shared.Application;
-using Domain.PurchaseManagement.PurchaseRequests.Boundaries;
+using Domain.PurchaseManagement.Boundaries;
 
 namespace PurchaseManagement.Infrastructure;
 

@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ApprovalWorkflow.Infrastructure.Persistence.Repositories;
 using ApprovalWorkflow.Infrastructure.Services;
 using Domain.ApprovalWorkflow.Applications;
-using Domain.ApprovalWorkflow.Applications.Boundaries;
+using Domain.ApprovalWorkflow.Boundaries;
 using Domain.ApprovalWorkflow.WorkflowDefinitions;
 
 namespace ApprovalWorkflow.Infrastructure;

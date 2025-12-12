@@ -1,6 +1,6 @@
 using Application.Core.Commands;
 using Domain.ApprovalWorkflow.Applications;
-using Domain.ApprovalWorkflow.Applications.Boundaries;
+using Domain.ApprovalWorkflow.Boundaries;
 using Domain.ApprovalWorkflow.WorkflowDefinitions;
 using MediatR;
 using Shared.Application;

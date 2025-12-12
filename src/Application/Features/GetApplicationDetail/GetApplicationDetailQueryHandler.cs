@@ -1,6 +1,6 @@
 using Application.Core.Queries;
 using Domain.ApprovalWorkflow.Applications;
-using Domain.ApprovalWorkflow.Applications.Boundaries;
+using Domain.ApprovalWorkflow.Boundaries;
 using Domain.ApprovalWorkflow.WorkflowDefinitions;
 using Shared.Application;
 using Shared.Application.Interfaces;
