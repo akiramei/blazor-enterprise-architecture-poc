@@ -4,6 +4,54 @@
 
 ---
 
+## 🔧 ランタイム要件（RUNTIME REQUIREMENTS）
+
+> **重要**: このカタログは特定の .NET バージョンを前提としています。
+> AIはこのバージョンを**必ず使用**し、勝手に別バージョンを選択しないでください。
+
+| 項目 | 値 |
+|------|-----|
+| **ターゲットフレームワーク** | `net10.0` |
+| **必要なSDKバージョン** | `10.0.100` 以上 |
+| **サポート期限** | 2028年11月14日（LTS） |
+
+### プロジェクト作成コマンド
+
+```bash
+# Blazor プロジェクト作成
+dotnet new blazor --framework net10.0 -n MyApp
+
+# クラスライブラリ作成
+dotnet new classlib --framework net10.0 -n MyLib
+```
+
+### パッケージバージョン選択
+
+```xml
+<!-- ✅ 正しい: .NET 10 対応バージョンを使用 -->
+<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+<PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
+
+<!-- ❌ 誤り: 古いバージョンを使用 -->
+<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+```
+
+### AIへの注意事項
+
+```
+⚠️ 禁止事項:
+- 「デフォルトの .NET バージョンを使用する」という判断
+- 「ユーザーの環境に合わせて net8.0 を使用する」という判断
+- パッケージバージョンを確認せずに古いバージョンを使用
+
+✅ 必須事項:
+- 常に net10.0 を使用
+- パッケージは 10.x バージョンを選択
+- バージョン情報は catalog/index.json の runtime_requirements を参照
+```
+
+---
+
 ## 🚨 実装前に必ず読むこと（MUST READ）
 
 **独自実装による手戻りを防ぐため、以下の手順を必ず実行してください。**
@@ -706,5 +754,5 @@ AIがカタログを参照する際は、**必ずタグ固定**してくださ�
 
 ---
 
-**最終更新: 2025-12-07**
-**カタログバージョン: v2025.12.07**
+**最終更新: 2025-12-12**
+**カタログバージョン: v2025.12.12.1**

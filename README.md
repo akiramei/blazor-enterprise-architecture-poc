@@ -19,7 +19,7 @@
    # Windows (PowerShell)
    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
-3. **.NET 9 SDK**: https://dotnet.microsoft.com/download
+3. **.NET 10 SDK**: https://dotnet.microsoft.com/download/dotnet/10.0
 
 ### Step 1: spec-kit をインストール
 
@@ -137,7 +137,7 @@ dotnet run --project Application
 ### Containerfile
 
 ```Dockerfile
-FROM mcr.microsoft.com/dotnet/sdk:9.0
+FROM mcr.microsoft.com/dotnet/sdk:10.0
 
 RUN apt-get update && apt-get install -y git curl ca-certificates sudo && rm -rf /var/lib/apt/lists/*
 
@@ -321,7 +321,7 @@ Claude Code は `.claude/skills/` を自動検出し、`/speckit.plan`, `/specki
 ## 🎯 このカタログでできること
 
 - **20+ の実装パターン**を提供（CRUD、検索、状態管理、認証など）
-- **Blazor Server + .NET 9** のエンタープライズアプリを生成
+- **Blazor Server + .NET 10 (LTS)** のエンタープライズアプリを生成
 - **MediatR (CQRS)** による Command/Query 分離
 - **Pipeline Behaviors** で検証・トランザクション・ログを自動化
 
@@ -395,8 +395,8 @@ cd src/Application && dotnet run
 
 | 項目 | 値 |
 |------|-----|
-| .NET | 9.0 |
-| カタログバージョン | v2025.12.06 |
+| .NET | 10.0 (LTS) |
+| カタログバージョン | v2025.12.12.1 |
 | パターン数 | 23 |
 
 ### アーキテクチャドキュメント

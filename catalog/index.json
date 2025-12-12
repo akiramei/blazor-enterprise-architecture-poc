@@ -1,10 +1,17 @@
 {
   "$schema": "consumer-example/patterns.manifest.schema.json",
-  "version": "v2025.11.27.3",
-  "last_updated": "2025-11-27",
-  "changelog_summary": "計画フェーズへの導線強化（planning_required_conditions, pre_implementation_check追加）",
+  "version": "v2025.12.12.1",
+  "last_updated": "2025-12-12",
+  "changelog_summary": ".NET バージョン明記（runtime_requirements追加）、AIの判断ブレを防止",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
+  "runtime_requirements": {
+    "dotnet_version": "net10.0",
+    "dotnet_sdk_minimum": "10.0.100",
+    "support_until": "2028-11-14",
+    "note": ".NET 10 LTS（Long-Term Support）を使用。AIはこのバージョンを必ず使用すること。",
+    "ai_instruction": "プロジェクト作成時は dotnet new blazor --framework net10.0 を使用。パッケージバージョンは 10.x を選択。"
+  },
   "phase_guidance": {
     "description": "計画フェーズと実装フェーズでのカタログの使い分け",
     "phases": {
