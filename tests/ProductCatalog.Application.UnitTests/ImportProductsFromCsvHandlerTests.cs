@@ -1,8 +1,7 @@
 ﻿using System.Text;
 using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
-using ImportProductsFromCsv.Application;
+using Application.Features.ImportProductsFromCsv;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
@@ -10,16 +9,13 @@ namespace ProductCatalog.Application.UnitTests;
 public class ImportProductsFromCsvHandlerTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
-    private readonly Mock<ILogger<ImportProductsFromCsvHandler>> _loggerMock;
-    private readonly ImportProductsFromCsvHandler _handler;
+    private readonly ImportProductsFromCsvCommandHandler _handler;
 
     public ImportProductsFromCsvHandlerTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
-        _loggerMock = new Mock<ILogger<ImportProductsFromCsvHandler>>();
-        _handler = new ImportProductsFromCsvHandler(
-            _repositoryMock.Object,
-            _loggerMock.Object);
+        _handler = new ImportProductsFromCsvCommandHandler(
+            _repositoryMock.Object);
     }
 
     [Fact]
@@ -31,7 +27,7 @@ public class ImportProductsFromCsvHandlerTests
 商品B,説明B,2000,JPY,20";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -53,7 +49,7 @@ public class ImportProductsFromCsvHandlerTests
         var csvContent = @"Name,Description,Price,Currency,Stock";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -74,7 +70,7 @@ public class ImportProductsFromCsvHandlerTests
         }
 
         var stream = CreateStreamFromString(csvBuilder.ToString());
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -96,7 +92,7 @@ public class ImportProductsFromCsvHandlerTests
 商品E,説明E,4000,JPY,40";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -120,7 +116,7 @@ public class ImportProductsFromCsvHandlerTests
 ,説明,1000,JPY,10";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -141,7 +137,7 @@ public class ImportProductsFromCsvHandlerTests
 商品B,説明,-100,JPY,20";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -161,7 +157,7 @@ public class ImportProductsFromCsvHandlerTests
 商品A,説明,1000,JPY,-10";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -181,7 +177,7 @@ public class ImportProductsFromCsvHandlerTests
 商品A,説明,1000,,10";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         var savedProduct = (Product?)null;
         _repositoryMock
@@ -208,7 +204,7 @@ public class ImportProductsFromCsvHandlerTests
 商品C,説明,0,JPY,30";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -228,7 +224,7 @@ public class ImportProductsFromCsvHandlerTests
 商品B,説明,2000,JPY,20";
 
         var stream = CreateStreamFromString(csvContent);
-        var command = new ImportProductsFromCsvCommand(stream);
+        var command = new ImportProductsFromCsvCommand { CsvStream = stream };
 
         var saveCount = 0;
         _repositoryMock

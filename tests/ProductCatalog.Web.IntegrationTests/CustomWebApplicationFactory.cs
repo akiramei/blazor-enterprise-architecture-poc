@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using Application.Infrastructure.LibraryManagement.Persistence;
+using ApprovalWorkflow.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -27,6 +29,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _productCatalogConnection;
     private readonly SqliteConnection _platformConnection;
     private readonly SqliteConnection _purchaseManagementConnection;
+    private readonly SqliteConnection _libraryManagementConnection;
+    private readonly SqliteConnection _approvalWorkflowConnection;
 
     public CustomWebApplicationFactory()
     {
@@ -39,6 +43,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         _purchaseManagementConnection = new SqliteConnection("DataSource=:memory:");
         _purchaseManagementConnection.Open();
+
+        _libraryManagementConnection = new SqliteConnection("DataSource=:memory:");
+        _libraryManagementConnection.Open();
+
+        _approvalWorkflowConnection = new SqliteConnection("DataSource=:memory:");
+        _approvalWorkflowConnection.Open();
 
         // データベーススキーマを初期化
         InitializeDatabase();
@@ -74,6 +84,28 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         var dummyEnvironment = new DummyWebHostEnvironment();
         using (var context = new PurchaseManagementDbContext(
             purchaseManagementOptions,
+            dummyAppContext,
+            dummyEnvironment))
+        {
+            context.Database.EnsureCreated();
+        }
+
+        // LibraryManagementDbContext のスキーマ作成
+        var libraryManagementOptions = new DbContextOptionsBuilder<LibraryManagementDbContext>()
+            .UseSqlite(_libraryManagementConnection)
+            .Options;
+        var libraryLogger = NullLogger<LibraryManagementDbContext>.Instance;
+        using (var context = new LibraryManagementDbContext(libraryManagementOptions, libraryLogger))
+        {
+            context.Database.EnsureCreated();
+        }
+
+        // ApprovalWorkflowDbContext のスキーマ作成
+        var approvalWorkflowOptions = new DbContextOptionsBuilder<ApprovalWorkflowDbContext>()
+            .UseSqlite(_approvalWorkflowConnection)
+            .Options;
+        using (var context = new ApprovalWorkflowDbContext(
+            approvalWorkflowOptions,
             dummyAppContext,
             dummyEnvironment))
         {
@@ -123,9 +155,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll(typeof(DbContextOptions<ProductCatalogDbContext>));
             services.RemoveAll(typeof(DbContextOptions<PlatformDbContext>));
             services.RemoveAll(typeof(DbContextOptions<PurchaseManagementDbContext>));
+            services.RemoveAll(typeof(DbContextOptions<LibraryManagementDbContext>));
+            services.RemoveAll(typeof(DbContextOptions<ApprovalWorkflowDbContext>));
             services.RemoveAll(typeof(ProductCatalogDbContext));
             services.RemoveAll(typeof(PlatformDbContext));
             services.RemoveAll(typeof(PurchaseManagementDbContext));
+            services.RemoveAll(typeof(LibraryManagementDbContext));
+            services.RemoveAll(typeof(ApprovalWorkflowDbContext));
 
             // SQLite In-Memory でDbContextを再登録
             services.AddDbContext<ProductCatalogDbContext>(options =>
@@ -146,6 +182,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                        .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.AmbientTransactionWarning));
             });
 
+            services.AddDbContext<LibraryManagementDbContext>(options =>
+            {
+                options.UseSqlite(_libraryManagementConnection)
+                       .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.AmbientTransactionWarning));
+            });
+
+            services.AddDbContext<ApprovalWorkflowDbContext>(options =>
+            {
+                options.UseSqlite(_approvalWorkflowConnection)
+                       .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.AmbientTransactionWarning));
+            });
+
             // Dapper 誤使用防止：ThrowingConnectionFactory を登録
             services.RemoveAll<IDbConnectionFactory>();
             services.AddSingleton<IDbConnectionFactory, ThrowingConnectionFactory>();
@@ -153,14 +201,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // テスト用のEF Core実装のリポジトリを登録
             services.RemoveAll<ProductCatalog.Shared.Application.IProductReadRepository>();
             services.AddScoped<ProductCatalog.Shared.Application.IProductReadRepository, ProductCatalog.Web.IntegrationTests.TestDoubles.EfProductReadRepository>();
-        });
-    }
+
+	            // Rate Limitingは Program.cs で Test環境では無効化されるため、テスト側での追加登録は不要
+	        });
+	    }
 
     /// <summary>
     /// Identityデータをシード（スキーマは既にコンストラクタで作成済み）
     /// </summary>
     public async Task InitializeDatabaseAsync()
     {
+        // .NET 10+: WebApplicationFactory.Services を直接使用（Server.Host は非推奨）
         using var scope = Services.CreateScope();
         var serviceProvider = scope.ServiceProvider;
 
@@ -176,6 +227,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             _productCatalogConnection?.Dispose();
             _platformConnection?.Dispose();
             _purchaseManagementConnection?.Dispose();
+            _libraryManagementConnection?.Dispose();
+            _approvalWorkflowConnection?.Dispose();
         }
         base.Dispose(disposing);
     }

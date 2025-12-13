@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
-using ExportProductsToCsv.Application;
+using Application.Features.ExportProductsToCsv;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using Domain.ProductCatalog.Products;
@@ -13,16 +12,13 @@ namespace ProductCatalog.Application.UnitTests;
 public class ExportProductsToCsvHandlerTests
 {
     private readonly Mock<IProductReadRepository> _readRepositoryMock;
-    private readonly Mock<ILogger<ExportProductsToCsvHandler>> _loggerMock;
-    private readonly ExportProductsToCsvHandler _handler;
+    private readonly ExportProductsToCsvQueryHandler _handler;
 
     public ExportProductsToCsvHandlerTests()
     {
         _readRepositoryMock = new Mock<IProductReadRepository>();
-        _loggerMock = new Mock<ILogger<ExportProductsToCsvHandler>>();
-        _handler = new ExportProductsToCsvHandler(
-            _readRepositoryMock.Object,
-            _loggerMock.Object);
+        _handler = new ExportProductsToCsvQueryHandler(
+            _readRepositoryMock.Object);
     }
 
     [Fact]
@@ -43,11 +39,13 @@ public class ExportProductsToCsvHandlerTests
             PageSize = 10000
         };
 
-        var query = new ExportProductsToCsvQuery(
-            NameFilter: null,
-            MinPrice: null,
-            MaxPrice: null,
-            Status: null);
+        var query = new ExportProductsToCsvQuery
+        {
+            NameFilter = null,
+            MinPrice = null,
+            MaxPrice = null,
+            Status = null
+        };
 
         _readRepositoryMock
             .Setup(r => r.SearchAsync(
@@ -90,11 +88,13 @@ public class ExportProductsToCsvHandlerTests
             PageSize = 10001
         };
 
-        var query = new ExportProductsToCsvQuery(
-            NameFilter: null,
-            MinPrice: null,
-            MaxPrice: null,
-            Status: null);
+        var query = new ExportProductsToCsvQuery
+        {
+            NameFilter = null,
+            MinPrice = null,
+            MaxPrice = null,
+            Status = null
+        };
 
         _readRepositoryMock
             .Setup(r => r.SearchAsync(
@@ -134,11 +134,13 @@ public class ExportProductsToCsvHandlerTests
             PageSize = 10000
         };
 
-        var query = new ExportProductsToCsvQuery(
-            NameFilter: null,
-            MinPrice: null,
-            MaxPrice: null,
-            Status: ProductStatus.Published);
+        var query = new ExportProductsToCsvQuery
+        {
+            NameFilter = null,
+            MinPrice = null,
+            MaxPrice = null,
+            Status = ProductStatus.Published
+        };
 
         _readRepositoryMock
             .Setup(r => r.SearchAsync(
@@ -181,7 +183,13 @@ public class ExportProductsToCsvHandlerTests
             PageSize = 10000
         };
 
-        var query = new ExportProductsToCsvQuery(null, null, null, null);
+        var query = new ExportProductsToCsvQuery
+        {
+            NameFilter = null,
+            MinPrice = null,
+            MaxPrice = null,
+            Status = null
+        };
 
         _readRepositoryMock
             .Setup(r => r.SearchAsync(
@@ -211,7 +219,13 @@ public class ExportProductsToCsvHandlerTests
     public async Task Handle_ShouldReturnFailure_WhenRepositoryThrowsException()
     {
         // Arrange
-        var query = new ExportProductsToCsvQuery(null, null, null, null);
+        var query = new ExportProductsToCsvQuery
+        {
+            NameFilter = null,
+            MinPrice = null,
+            MaxPrice = null,
+            Status = null
+        };
 
         _readRepositoryMock
             .Setup(r => r.SearchAsync(
@@ -246,11 +260,13 @@ public class ExportProductsToCsvHandlerTests
             PageSize = 10000
         };
 
-        var query = new ExportProductsToCsvQuery(
-            NameFilter: "テスト",
-            MinPrice: 1000,
-            MaxPrice: 5000,
-            Status: ProductStatus.Published);
+        var query = new ExportProductsToCsvQuery
+        {
+            NameFilter = "テスト",
+            MinPrice = 1000,
+            MaxPrice = 5000,
+            Status = ProductStatus.Published
+        };
 
         _readRepositoryMock
             .Setup(r => r.SearchAsync(

@@ -1,7 +1,6 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
-using GetProductById.Application;
+using Application.Features.GetProductById;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 
@@ -10,16 +9,13 @@ namespace ProductCatalog.Application.UnitTests;
 public class GetProductByIdHandlerTests
 {
     private readonly Mock<IProductReadRepository> _readRepositoryMock;
-    private readonly Mock<ILogger<GetProductByIdHandler>> _loggerMock;
-    private readonly GetProductByIdHandler _handler;
+    private readonly GetProductByIdQueryHandler _handler;
 
     public GetProductByIdHandlerTests()
     {
         _readRepositoryMock = new Mock<IProductReadRepository>();
-        _loggerMock = new Mock<ILogger<GetProductByIdHandler>>();
-        _handler = new GetProductByIdHandler(
-            _readRepositoryMock.Object,
-            _loggerMock.Object);
+        _handler = new GetProductByIdQueryHandler(
+            _readRepositoryMock.Object);
     }
 
     [Fact]
@@ -39,7 +35,7 @@ public class GetProductByIdHandlerTests
             Images = Array.Empty<ProductImageDto>()
         };
 
-        var query = new GetProductByIdQuery(productId);
+        var query = new GetProductByIdQuery { ProductId = productId };
 
         _readRepositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -80,7 +76,7 @@ public class GetProductByIdHandlerTests
             }
         };
 
-        var query = new GetProductByIdQuery(productId);
+        var query = new GetProductByIdQuery { ProductId = productId };
 
         _readRepositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -102,7 +98,7 @@ public class GetProductByIdHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var query = new GetProductByIdQuery(productId);
+        var query = new GetProductByIdQuery { ProductId = productId };
 
         _readRepositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -133,7 +129,7 @@ public class GetProductByIdHandlerTests
             Images = Array.Empty<ProductImageDto>()
         };
 
-        var query = new GetProductByIdQuery(productId);
+        var query = new GetProductByIdQuery { ProductId = productId };
 
         _readRepositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -165,7 +161,7 @@ public class GetProductByIdHandlerTests
             Images = Array.Empty<ProductImageDto>()
         };
 
-        var query = new GetProductByIdQuery(productId);
+        var query = new GetProductByIdQuery { ProductId = productId };
 
         _readRepositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -196,7 +192,7 @@ public class GetProductByIdHandlerTests
             Version = 1,
             Images = Array.Empty<ProductImageDto>()
         };
-        var query = new GetProductByIdQuery(productId);
+        var query = new GetProductByIdQuery { ProductId = productId };
 
         _readRepositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))

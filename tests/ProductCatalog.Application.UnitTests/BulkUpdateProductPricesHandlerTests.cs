@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
-using BulkUpdateProductPrices.Application;
+using Application.Features.BulkUpdateProductPrices;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
@@ -12,18 +11,15 @@ public class BulkUpdateProductPricesHandlerTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
     private readonly Mock<IProductNotificationService> _notificationMock;
-    private readonly Mock<ILogger<BulkUpdateProductPricesHandler>> _loggerMock;
-    private readonly BulkUpdateProductPricesHandler _handler;
+    private readonly BulkUpdateProductPricesCommandHandler _handler;
 
     public BulkUpdateProductPricesHandlerTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
         _notificationMock = new Mock<IProductNotificationService>();
-        _loggerMock = new Mock<ILogger<BulkUpdateProductPricesHandler>>();
-        _handler = new BulkUpdateProductPricesHandler(
+        _handler = new BulkUpdateProductPricesCommandHandler(
             _repositoryMock.Object,
-            _notificationMock.Object,
-            _loggerMock.Object);
+            _notificationMock.Object);
     }
 
     [Fact]
@@ -42,7 +38,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId2, 2500, (int)product2.Version)
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))
@@ -72,7 +68,7 @@ public class BulkUpdateProductPricesHandlerTests
     public async Task Handle_ShouldReturnFailure_WhenUpdatesIsEmpty()
     {
         // Arrange
-        var command = new BulkUpdateProductPricesCommand(new List<ProductPriceUpdate>());
+        var command = new BulkUpdateProductPricesCommand { Updates = new List<ProductPriceUpdate>() };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -90,7 +86,7 @@ public class BulkUpdateProductPricesHandlerTests
             .Select(i => new ProductPriceUpdate(Guid.NewGuid(), 1000, 1))
             .ToList();
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -115,7 +111,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId2, 2500, 1) // 存在しない商品
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))
@@ -146,7 +142,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId, 1500, (int)product.Version + 1) // Version不一致
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId), It.IsAny<CancellationToken>()))
@@ -175,7 +171,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId, 400, (int)product.Version) // 60%値下げ（制限超過）
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId), It.IsAny<CancellationToken>()))
@@ -204,7 +200,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId, 600, (int)product.Version) // 40%値下げ（制限内）
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId), It.IsAny<CancellationToken>()))
@@ -236,7 +232,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId2, 2500, (int)product2.Version)
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))
@@ -266,7 +262,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId, 1500, 1)
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -297,7 +293,7 @@ public class BulkUpdateProductPricesHandlerTests
             new(productId3, 3500, (int)product3.Version)
         };
 
-        var command = new BulkUpdateProductPricesCommand(updates);
+        var command = new BulkUpdateProductPricesCommand { Updates = updates };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))

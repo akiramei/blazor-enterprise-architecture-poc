@@ -26,26 +26,36 @@ namespace ProductCatalog.Web.IntegrationTests;
 /// - SQLite In-Memoryデータベースを使用（高速・独立性）
 /// - Outboxメッセージの永続化確認（トランザクション保証）
 /// </summary>
-public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
+public class ProductCatalogIntegrationTests : IAsyncLifetime, IDisposable
 {
-    private readonly CustomWebApplicationFactory _factory;
-    private readonly HttpClient _client;
+    private CustomWebApplicationFactory _factory = null!;
+    private HttpClient _client = null!;
     private readonly TestConfiguration.TestCredentials _testCredentials;
 
-    public ProductCatalogIntegrationTests(CustomWebApplicationFactory factory)
+    public ProductCatalogIntegrationTests()
     {
-        _factory = factory;
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false // Disable auto redirect to test HTTP status codes properly
-        });
-
         // テスト認証情報を取得（環境変数または設定ファイルから）
         _testCredentials = TestConfiguration.GetTestCredentials();
     }
 
     public async Task InitializeAsync()
     {
+        // 各テストで新しいファクトリを作成
+        _factory = new CustomWebApplicationFactory();
+
+        try
+        {
+            // CreateClient はサーバー起動をトリガーする
+            _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                AllowAutoRedirect = false // Disable auto redirect to test HTTP status codes properly
+            });
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"CreateClient failed: {ex.GetType().Name}: {ex.Message}", ex);
+        }
+
         // データベーススキーマとシードデータを初期化
         await _factory.InitializeDatabaseAsync();
     }
@@ -53,6 +63,12 @@ public class ProductCatalogIntegrationTests : IClassFixture<CustomWebApplication
     public Task DisposeAsync()
     {
         return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _client?.Dispose();
+        _factory?.Dispose();
     }
 
     #region Authentication Tests

@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
-using DeleteProduct.Application;
+using Application.Features.DeleteProduct;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
@@ -12,18 +11,15 @@ public class DeleteProductHandlerTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
     private readonly Mock<IProductNotificationService> _notificationMock;
-    private readonly Mock<ILogger<DeleteProductHandler>> _loggerMock;
-    private readonly DeleteProductHandler _handler;
+    private readonly DeleteProductCommandHandler _handler;
 
     public DeleteProductHandlerTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
         _notificationMock = new Mock<IProductNotificationService>();
-        _loggerMock = new Mock<ILogger<DeleteProductHandler>>();
-        _handler = new DeleteProductHandler(
+        _handler = new DeleteProductCommandHandler(
             _repositoryMock.Object,
-            _notificationMock.Object,
-            _loggerMock.Object);
+            _notificationMock.Object);
     }
 
     [Fact]
@@ -32,7 +28,7 @@ public class DeleteProductHandlerTests
         // Arrange
         var productId = Guid.NewGuid();
         var product = Product.Create("商品", "説明", new Money(1000, "JPY"), 0);
-        var command = new DeleteProductCommand(productId);
+        var command = new DeleteProductCommand { ProductId = productId };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -53,7 +49,7 @@ public class DeleteProductHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var command = new DeleteProductCommand(productId);
+        var command = new DeleteProductCommand { ProductId = productId };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -74,7 +70,7 @@ public class DeleteProductHandlerTests
         // Arrange
         var productId = Guid.NewGuid();
         var product = Product.Create("商品", "説明", new Money(1000, "JPY"), 10);
-        var command = new DeleteProductCommand(productId);
+        var command = new DeleteProductCommand { ProductId = productId };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))

@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Common;
 using Shared.Application.Interfaces;
-using SearchProducts.Application;
+using Application.Features.SearchProducts;
 using ProductCatalog.Shared.Application;
 using ProductCatalog.Shared.Application.DTOs;
 using Domain.ProductCatalog.Products;
@@ -13,16 +12,13 @@ namespace ProductCatalog.Application.UnitTests;
 public class SearchProductsHandlerTests
 {
     private readonly Mock<IProductReadRepository> _readRepositoryMock;
-    private readonly Mock<ILogger<SearchProductsHandler>> _loggerMock;
-    private readonly SearchProductsHandler _handler;
+    private readonly SearchProductsQueryHandler _handler;
 
     public SearchProductsHandlerTests()
     {
         _readRepositoryMock = new Mock<IProductReadRepository>();
-        _loggerMock = new Mock<ILogger<SearchProductsHandler>>();
-        _handler = new SearchProductsHandler(
-            _readRepositoryMock.Object,
-            _loggerMock.Object);
+        _handler = new SearchProductsQueryHandler(
+            _readRepositoryMock.Object);
     }
 
     [Fact]
@@ -440,6 +436,6 @@ public class SearchProductsHandlerTests
 
         // Assert
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be("商品検索中にエラーが発生しました");
+        result.Error.Should().Contain("クエリ実行エラー");
     }
 }

@@ -74,6 +74,7 @@ public class EfProductReadRepository : IProductReadRepository
             Name = product.Name,
             Description = product.Description,
             Price = product.Price.Amount,
+            Currency = product.Price.Currency,
             Stock = product.Stock,
             Status = product.Status.ToString(),
             IsDeleted = product.IsDeleted,

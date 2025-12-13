@@ -4,7 +4,7 @@ namespace Shared.Kernel;
 /// ドメインエラー: ビジネスルール違反やドメイン制約違反を表現
 /// DomainExceptionとは異なり、Result<T>パターンで使用する
 /// </summary>
-public record DomainError
+public sealed record DomainError
 {
     /// <summary>
     /// エラーコード（機械可読）

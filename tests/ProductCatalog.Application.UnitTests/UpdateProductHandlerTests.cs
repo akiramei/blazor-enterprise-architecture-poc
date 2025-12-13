@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
-using UpdateProduct.Application;
+using Application.Features.UpdateProduct;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
@@ -13,20 +12,17 @@ public class UpdateProductHandlerTests
     private readonly Mock<IProductRepository> _repositoryMock;
     private readonly Mock<IProductNotificationService> _notificationMock;
     private readonly Mock<ICacheInvalidationService> _cacheInvalidationMock;
-    private readonly Mock<ILogger<UpdateProductHandler>> _loggerMock;
-    private readonly UpdateProductHandler _handler;
+    private readonly UpdateProductCommandHandler _handler;
 
     public UpdateProductHandlerTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
         _notificationMock = new Mock<IProductNotificationService>();
         _cacheInvalidationMock = new Mock<ICacheInvalidationService>();
-        _loggerMock = new Mock<ILogger<UpdateProductHandler>>();
-        _handler = new UpdateProductHandler(
+        _handler = new UpdateProductCommandHandler(
             _repositoryMock.Object,
             _notificationMock.Object,
-            _cacheInvalidationMock.Object,
-            _loggerMock.Object);
+            _cacheInvalidationMock.Object);
     }
 
     [Fact]
@@ -35,13 +31,15 @@ public class UpdateProductHandlerTests
         // Arrange
         var productId = Guid.NewGuid();
         var product = Product.Create("元の商品名", "元の説明", new Money(1000, "JPY"), 10);
-        var command = new UpdateProductCommand(
-            productId,
-            "新しい商品名",
-            "新しい説明",
-            2000,
-            20,
-            product.Version);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "新しい商品名",
+            Description = "新しい説明",
+            Price = 2000,
+            Stock = 20,
+            Version = product.Version
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -65,13 +63,15 @@ public class UpdateProductHandlerTests
     {
         // Arrange
         var productId = Guid.NewGuid();
-        var command = new UpdateProductCommand(
-            productId,
-            "商品名",
-            "説明",
-            1000,
-            10,
-            1);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "商品名",
+            Description = "説明",
+            Price = 1000,
+            Stock = 10,
+            Version = 1
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -92,13 +92,15 @@ public class UpdateProductHandlerTests
         // Arrange
         var productId = Guid.NewGuid();
         var product = Product.Create("商品", "説明", new Money(1000, "JPY"), 10);
-        var command = new UpdateProductCommand(
-            productId,
-            "新しい商品名",
-            "新しい説明",
-            2000,
-            20,
-            product.Version + 1); // Version不一致
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "新しい商品名",
+            Description = "新しい説明",
+            Price = 2000,
+            Stock = 20,
+            Version = product.Version + 1 // Version不一致
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -123,13 +125,15 @@ public class UpdateProductHandlerTests
         // 商品を公開状態にする
         product.Publish();
 
-        var command = new UpdateProductCommand(
-            productId,
-            "商品",
-            "説明",
-            400, // 60%値下げ（1000 -> 400）
-            10,
-            product.Version);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "商品",
+            Description = "説明",
+            Price = 400, // 60%値下げ（1000 -> 400）
+            Stock = 10,
+            Version = product.Version
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -154,13 +158,15 @@ public class UpdateProductHandlerTests
         // 商品を公開状態にする
         product.Publish();
 
-        var command = new UpdateProductCommand(
-            productId,
-            "商品",
-            "説明",
-            600, // 40%値下げ（1000 -> 600）OK
-            10,
-            product.Version);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "商品",
+            Description = "説明",
+            Price = 600, // 40%値下げ（1000 -> 600）OK
+            Stock = 10,
+            Version = product.Version
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -181,13 +187,15 @@ public class UpdateProductHandlerTests
         // Arrange
         var productId = Guid.NewGuid();
         var product = Product.Create("商品", "説明", new Money(1000, "JPY"), 10);
-        var command = new UpdateProductCommand(
-            productId,
-            "", // 空の名前
-            "説明",
-            1000,
-            10,
-            product.Version);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "", // 空の名前
+            Description = "説明",
+            Price = 1000,
+            Stock = 10,
+            Version = product.Version
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -208,13 +216,15 @@ public class UpdateProductHandlerTests
         // Arrange
         var productId = Guid.NewGuid();
         var product = Product.Create("商品", "説明", new Money(1000, "JPY"), 10);
-        var command = new UpdateProductCommand(
-            productId,
-            "商品",
-            "説明",
-            1000,
-            -5, // 負の在庫
-            product.Version);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Name = "商品",
+            Description = "説明",
+            Price = 1000,
+            Stock = -5, // 負の在庫
+            Version = product.Version
+        };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))

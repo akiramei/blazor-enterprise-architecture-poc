@@ -1,9 +1,8 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Application.Interfaces;
 using Shared.Kernel;
-using BulkDeleteProducts.Application;
+using Application.Features.BulkDeleteProducts;
 using Domain.ProductCatalog.Products;
 
 namespace ProductCatalog.Application.UnitTests;
@@ -12,18 +11,15 @@ public class BulkDeleteProductsHandlerTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
     private readonly Mock<IProductNotificationService> _notificationMock;
-    private readonly Mock<ILogger<BulkDeleteProductsHandler>> _loggerMock;
-    private readonly BulkDeleteProductsHandler _handler;
+    private readonly BulkDeleteProductsCommandHandler _handler;
 
     public BulkDeleteProductsHandlerTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
         _notificationMock = new Mock<IProductNotificationService>();
-        _loggerMock = new Mock<ILogger<BulkDeleteProductsHandler>>();
-        _handler = new BulkDeleteProductsHandler(
+        _handler = new BulkDeleteProductsCommandHandler(
             _repositoryMock.Object,
-            _notificationMock.Object,
-            _loggerMock.Object);
+            _notificationMock.Object);
     }
 
     [Fact]
@@ -38,7 +34,7 @@ public class BulkDeleteProductsHandlerTests
         var product2 = Product.Create("商品2", "説明2", new Money(2000, "JPY"), 0);
         var product3 = Product.Create("商品3", "説明3", new Money(3000, "JPY"), 0);
 
-        var command = new BulkDeleteProductsCommand(new[] { productId1, productId2, productId3 });
+        var command = new BulkDeleteProductsCommand { ProductIds = new[] { productId1, productId2, productId3 } };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))
@@ -76,7 +72,7 @@ public class BulkDeleteProductsHandlerTests
         var productId1 = Guid.NewGuid();
         var productId2 = Guid.NewGuid();
 
-        var command = new BulkDeleteProductsCommand(new[] { productId1, productId2 });
+        var command = new BulkDeleteProductsCommand { ProductIds = new[] { productId1, productId2 } };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.IsAny<ProductId>(), It.IsAny<CancellationToken>()))
@@ -110,7 +106,7 @@ public class BulkDeleteProductsHandlerTests
         var product2 = Product.Create("商品2", "説明2", new Money(2000, "JPY"), 10); // 在庫あり（削除不可）
         var product3 = Product.Create("商品3", "説明3", new Money(3000, "JPY"), 0);  // 削除可能
 
-        var command = new BulkDeleteProductsCommand(new[] { productId1, productId2, productId3 });
+        var command = new BulkDeleteProductsCommand { ProductIds = new[] { productId1, productId2, productId3 } };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))
@@ -149,7 +145,7 @@ public class BulkDeleteProductsHandlerTests
     public async Task Handle_ShouldReturnFailure_WhenProductIdsIsEmpty()
     {
         // Arrange
-        var command = new BulkDeleteProductsCommand(Array.Empty<Guid>());
+        var command = new BulkDeleteProductsCommand { ProductIds = Array.Empty<Guid>() };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -166,7 +162,7 @@ public class BulkDeleteProductsHandlerTests
     {
         // Arrange
         var productIds = Enumerable.Range(0, 101).Select(_ => Guid.NewGuid()).ToArray();
-        var command = new BulkDeleteProductsCommand(productIds);
+        var command = new BulkDeleteProductsCommand { ProductIds = productIds };
 
         // Act
         var result = await _handler.Handle(command, CancellationToken.None);
@@ -189,7 +185,7 @@ public class BulkDeleteProductsHandlerTests
         var product1 = Product.Create("商品1", "説明1", new Money(1000, "JPY"), 0);
         var product3 = Product.Create("商品3", "説明3", new Money(3000, "JPY"), 0);
 
-        var command = new BulkDeleteProductsCommand(new[] { productId1, productId2, productId3 });
+        var command = new BulkDeleteProductsCommand { ProductIds = new[] { productId1, productId2, productId3 } };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))
@@ -229,7 +225,7 @@ public class BulkDeleteProductsHandlerTests
         var product3 = Product.Create("商品3", "説明3", new Money(3000, "JPY"), 5);  // 失敗（在庫あり）
         var product4 = Product.Create("商品4", "説明4", new Money(4000, "JPY"), 0);  // 成功
 
-        var command = new BulkDeleteProductsCommand(new[] { productId1, productId2, productId3, productId4 });
+        var command = new BulkDeleteProductsCommand { ProductIds = new[] { productId1, productId2, productId3, productId4 } };
 
         _repositoryMock
             .Setup(r => r.GetAsync(It.Is<ProductId>(id => id.Value == productId1), It.IsAny<CancellationToken>()))

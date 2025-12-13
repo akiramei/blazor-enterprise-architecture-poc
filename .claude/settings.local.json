@@ -58,7 +58,16 @@
       "Bash(python:*)",
       "Bash(git push:*)",
       "Bash(dotnet ef migrations add:*)",
-      "Bash(dotnet ef migrations:*)"
+      "Bash(dotnet ef migrations:*)",
+      "Bash(grep:*)",
+      "Bash(python3:*)",
+      "Bash(uv tool install:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(cat:*)",
+      "Bash(git -C \"C:/Users/akira/source/repos/VSASample\" add catalog/skills/)",
+      "Bash(git -C \"C:/Users/akira/source/repos/VSASample\" diff --cached --stat)",
+      "Bash(git -C \"C:/Users/akira/source/repos/VSASample\" log -3 --oneline)",
+      "Bash(git -C \"C:/Users/akira/source/repos/VSASample\" commit -m \"$(cat <<''EOF''\nfeat: Skills 導入 - vsa-implementation-guard\n\nClaude Code の Skills 機能を活用して、実装ミスの自動防止を導入。\n\n## 追加ファイル\n\n- catalog/skills/vsa-implementation-guard/SKILL.md\n  - Skill 定義（name, description, allowed-tools）\n  - 禁止事項（SaveChangesAsync、BoundaryService の業務ロジック等）\n  - 必須パターン（Result<T>、Scoped 登録等）\n\n- catalog/skills/vsa-implementation-guard/common-mistakes-summary.md\n  - COMMON_MISTAKES.md の要約版\n  - 実装前チェックリスト\n  - ドッグフーディングで発見されたミス\n\n## Skills の効果\n\n- C# コード生成・修正時に、Claude が自動的にこの Skill を発見\n- COMMON_MISTAKES.md の知識が自動適用される\n- 禁止事項を実装前に想起させる\n\n## 配置場所\n\ncatalog/skills/ に配置することで、カタログのベンダリング時に\n一緒にコピーされる。\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
