@@ -1,8 +1,8 @@
 {
   "$schema": "consumer-example/patterns.manifest.schema.json",
-  "version": "v2025.12.12.1",
-  "last_updated": "2025-12-12",
-  "changelog_summary": ".NET バージョン明記（runtime_requirements追加）、AIの判断ブレを防止",
+  "version": "v2025.12.13.1",
+  "last_updated": "2025-12-13",
+  "changelog_summary": "UI-IR vNext導入（成熟度ベースのUI語彙制約）、ui-ir-schema/lint-rules追加、ui-maturityパターン追加",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "runtime_requirements": {
@@ -453,12 +453,54 @@
       "id": "ui-ir-template",
       "name": "UI Intermediate Representation Template",
       "category": "scaffold",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "file": "scaffolds/ui-ir-template.yaml",
       "intent": "AIがUI生成時にUX品質を担保するための中間表現。情報優先度・操作頻度・確認要否などを定量化し、MudBlazorコンポーネントへの自動マッピングを提供",
       "tags": ["scaffold", "ui-ir", "mudblazor", "ux", "ai-ui-generation", "confirmation-level"],
       "stability": "beta",
       "scope": "project-wide"
+    },
+    {
+      "id": "ui-ir-schema",
+      "name": "UI-IR JSON Schema",
+      "category": "scaffold",
+      "version": "0.2.0",
+      "file": "scaffolds/ui-ir-schema.yaml",
+      "intent": "UI-IR vNextのJSON Schema。成熟度制約（view→stability必須、boundary/entity→上位widget禁止）をif/thenで定義",
+      "tags": ["scaffold", "ui-ir", "json-schema", "maturity", "validation"],
+      "stability": "beta",
+      "scope": "project-wide"
+    },
+    {
+      "id": "ui-ir-lint-rules",
+      "name": "UI-IR Lint Rules (CEL)",
+      "category": "scaffold",
+      "version": "0.1.0",
+      "file": "scaffolds/ui-ir-lint-rules.yaml",
+      "intent": "CELベースのUI-IR Lintルール。成熟度超過、排他性違反、孤立ブロック等を検出",
+      "tags": ["scaffold", "ui-ir", "cel", "lint", "maturity", "validation"],
+      "stability": "beta",
+      "scope": "project-wide"
+    },
+    {
+      "id": "concern-switch",
+      "name": "関心領域切替パターン",
+      "category": "ui-pattern",
+      "version": "0.1.0",
+      "file": "patterns/ui-maturity/concern-switch.yaml",
+      "intent": "同一対象の複数関心領域を成熟度に応じて切り替え表示（boundary→inline-sections、entity→accordion、view→tab）",
+      "tags": ["ui-pattern", "ui-maturity", "concern", "tab", "accordion", "mudblazor"],
+      "stability": "beta"
+    },
+    {
+      "id": "collection-browse",
+      "name": "コレクション閲覧パターン",
+      "category": "ui-pattern",
+      "version": "0.1.0",
+      "file": "patterns/ui-maturity/collection-browse.yaml",
+      "intent": "エンティティ一覧を成熟度に応じて表示（boundary→simple-list、entity→data-grid、view→master-detail）",
+      "tags": ["ui-pattern", "ui-maturity", "collection", "list", "grid", "master-detail", "mudblazor"],
+      "stability": "beta"
     },
     {
       "id": "metrics-behavior",
@@ -742,7 +784,7 @@
       "id": "boundary-pattern",
       "name": "Boundary Pattern (Intent-Boundary分離)",
       "category": "domain-pattern",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "file": "patterns/boundary-pattern.yaml",
       "intent": "ユーザーとシステムの接点（操作可否判定）をドメイン層に配置し、UIから業務ルールを分離",
       "tags": ["boundary", "intent", "domain", "ui-separation", "business-rule"],

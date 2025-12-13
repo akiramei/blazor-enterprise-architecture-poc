@@ -1,0 +1,145 @@
+# catalog/patterns/ui-maturity/concern-switch.yaml
+# UI Pattern: Concern Switch
+# Purpose: Switch between multiple concerns of the same subject
+
+id: concern-switch
+version: "0.1.0"
+name: "関心領域切替"
+name_en: "Concern Switch"
+category: ui-pattern
+condition_language: CEL
+
+description: |
+  同一対象（Aggregate Root）の複数関心領域を切り替えて表示するパターン。
+  成熟度に応じて使用できるウィジェットが変化する。
+
+intent: |
+  ユーザーが1つのエンティティの異なる側面（関心領域）を
+  効率的に閲覧・操作できるようにする。
+
+when_to_use:
+  - "1つの Aggregate Root に複数の関心領域がある"
+  - "関心領域間の同時表示が不要または非効率"
+  - "画面の縦スクロールを抑えたい"
+
+prerequisites:
+  - "structure.concerns が2つ以上定義されている"
+  - "concerns に exclusivity=true が1つ以上ある"
+
+# ---------------------------------------------------------------------------
+# Maturity Variants (CEL conditions)
+# ---------------------------------------------------------------------------
+maturity_variants:
+  boundary:
+    description: "Intent中心・曖昧な段階"
+    widget: inline-sections
+    condition: 'screen.maturity.level == "boundary"'
+    mudblazor: "MudStack + MudPaper"
+    layout_hint: |
+      - 各 concern を MudPaper で囲む
+      - 順序は importance 順
+      - 折りたたみなし（常に展開）
+    rationale: |
+      モデルが曖昧な段階では、全ての concern を同時に見せる方が安全。
+      ユーザーが何を見たいか分からない段階でナビゲーションを強制しない。
+
+  entity:
+    description: "Entity属性・操作が明確な段階"
+    widget: accordion
+    condition: 'screen.maturity.level == "entity"'
+    mudblazor: "MudExpansionPanels"
+    layout_hint: |
+      - 各 concern を MudExpansionPanel として配置
+      - デフォルト展開は importance=Critical/Primary のみ
+      - 1つ展開すると他が閉じる（排他モード）
+    rationale: |
+      属性が明確になったので、ユーザーは目的の情報を理解できる。
+      アコーディオンで縦スクロールを削減しつつ、全体像も把握可能。
+
+  view:
+    description: "View確定・責務が明確な段階"
+    widget: tab
+    condition: |
+      screen.maturity.level == "view" &&
+      size(filter(screen.structure.concerns, c, c.exclusivity == true)) >= 2 &&
+      screen.maturity.stability.concerns_unchanged_since != null
+    mudblazor: "MudTabs"
+    layout_hint: |
+      - 各 concern を MudTabPanel として配置
+      - タブ順序は importance 順
+      - アクティブタブは最も importance の高い concern
+      - セカンダリアクションはタブ内に配置
+    rationale: |
+      関心領域が安定し、排他性が確定している。
+      タブは最も効率的なナビゲーションを提供する。
+    requirements:
+      - "stability.concerns_unchanged_since が設定されていること"
+      - "exclusivity=true の concern が2つ以上あること"
+
+# ---------------------------------------------------------------------------
+# Examples
+# ---------------------------------------------------------------------------
+examples:
+  - name: "書籍詳細画面"
+    subject: "Book"
+    concerns:
+      - id: overview
+        name: "基本情報"
+        exclusivity: false
+      - id: lending
+        name: "貸出履歴"
+        exclusivity: true
+      - id: reservations
+        name: "予約状況"
+        exclusivity: true
+    progression:
+      boundary: "3つのセクションを縦に並べる"
+      entity: "アコーディオンで折りたたみ可能に"
+      view: "タブで切り替え（貸出履歴と予約状況は排他）"
+
+  - name: "顧客詳細画面"
+    subject: "Customer"
+    concerns:
+      - id: profile
+        name: "プロファイル"
+        exclusivity: false
+      - id: orders
+        name: "注文履歴"
+        exclusivity: true
+        comparability:
+          mode: rows
+          key: orderDate
+      - id: payments
+        name: "支払い履歴"
+        exclusivity: true
+    progression:
+      boundary: "全情報を縦に展開"
+      entity: "アコーディオンで注文/支払いを折りたたみ"
+      view: "タブで注文/支払いを切り替え"
+
+# ---------------------------------------------------------------------------
+# AI Guidance
+# ---------------------------------------------------------------------------
+ai_guidance:
+  generation_rules:
+    - "成熟度を確認し、対応する widget を選択"
+    - "view 以外で tab を選択しない"
+    - "exclusivity=true が2つ未満の場合、このパターンは不適切"
+
+  common_mistakes:
+    - mistake: "entity レベルで tab を使う"
+      solution: "accordion を使用。tab は view レベルでのみ許可"
+    - mistake: "exclusivity が定義されていない concerns に適用"
+      solution: "exclusivity=true の concerns が2つ以上必要"
+    - mistake: "view レベルだが stability がない"
+      solution: "stability.concerns_unchanged_since を設定してから tab を使用"
+
+  decision_tree: |
+    1. concerns >= 2 か？
+       No → このパターンは不適切
+    2. exclusivity=true >= 2 か？
+       No → 排他切替は不要（inline-sections で十分）
+    3. maturity.level は何か？
+       boundary → inline-sections
+       entity → accordion
+       view → tab（stability 要確認）

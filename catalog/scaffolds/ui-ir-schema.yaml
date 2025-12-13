@@ -1,0 +1,315 @@
+# catalog/scaffolds/ui-ir-schema.yaml
+# UI-IR vNext JSON Schema
+# Purpose: Validate UI-IR documents with maturity-based constraints
+
+id: ui-ir-schema
+name: "UI-IR JSON Schema"
+category: scaffold
+version: "0.2.0"
+intent: "UI-IR vNextのJSON Schema。成熟度制約（view→stability必須、boundary/entity→上位widget禁止）をif/thenで定義"
+
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "UI-IR vNext"
+description: |
+  UI Intermediate Representation with maturity-based UI vocabulary constraints.
+  Ensures UI quality is enforced at the schema level before lint rules apply.
+
+type: object
+required: [screen]
+
+definitions:
+  # Maturity levels
+  maturity_level:
+    type: string
+    enum: [boundary, entity, view]
+    description: |
+      boundary: Intent-centric, ambiguous (Flow/Section/Card only)
+      entity: Attributes confirmed (+ Grid/Accordion)
+      view: Responsibilities fixed (+ Tab/Master-Detail)
+
+  # Comparability modes
+  comparability_mode:
+    type: string
+    enum: [rows, columns, time]
+    description: |
+      rows: Compare multiple rows (e.g., loan history)
+      columns: Compare attributes side-by-side
+      time: Before/after comparison
+
+  # Concern definition
+  concern:
+    type: object
+    required: [id, name, blocks]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        pattern: "^[a-z][a-z0-9-]*$"
+        description: "Unique identifier for this concern"
+      name:
+        type: string
+        minLength: 1
+        description: "Display name for this concern"
+      blocks:
+        type: array
+        items:
+          type: string
+        minItems: 1
+        description: "References to information_blocks.id"
+      exclusivity:
+        type: boolean
+        default: false
+        description: "If true, should not be displayed simultaneously with other exclusive concerns"
+      comparability:
+        type: object
+        additionalProperties: false
+        properties:
+          mode:
+            $ref: "#/definitions/comparability_mode"
+          key:
+            type: string
+            description: "Key field for comparison (e.g., loanDate)"
+
+  # Override definition
+  override:
+    type: object
+    required: [allow_widget, reason, approved_by, violation_id, scope]
+    additionalProperties: false
+    properties:
+      allow_widget:
+        type: string
+        description: "Widget to allow despite maturity constraints"
+      reason:
+        type: string
+        minLength: 10
+        description: "Justification for this override"
+      approved_by:
+        type: string
+        minLength: 1
+        description: "Approver (e.g., UX, Tech Lead)"
+      approved_at:
+        type: string
+        format: date
+        description: "Date of approval"
+      violation_id:
+        type: string
+        pattern: "^[A-Z]+-[0-9]+$"
+        description: "ID of the lint rule being waived"
+      scope:
+        type: string
+        enum: [screen, concern, block]
+        description: "Scope of this override"
+
+  # Information block definition
+  information_block:
+    type: object
+    required: [id, name, importance]
+    additionalProperties: true
+    properties:
+      id:
+        type: string
+        pattern: "^[a-z][a-z0-9_-]*$"
+      name:
+        type: string
+      importance:
+        type: string
+        enum: [Critical, Primary, Secondary, Reference]
+      layout:
+        type: string
+        enum: [table, card, list, inline, alert, tabs, accordion]
+      type:
+        type: string
+        enum: [key-value, status, timeline, form, list, table]
+
+  # Widgets by maturity level
+  boundary_widgets:
+    type: string
+    enum: [inline-sections, card, list, flow, simple-list]
+
+  entity_widgets:
+    type: string
+    enum: [inline-sections, card, list, flow, simple-list, accordion, data-grid, grouping]
+
+  view_widgets:
+    type: string
+    enum: [inline-sections, card, list, flow, simple-list, accordion, data-grid, grouping, tab, master-detail, stepper]
+
+  # Upper-level widgets (view only)
+  upper_widgets:
+    type: string
+    enum: [tab, master-detail, stepper]
+
+properties:
+  screen:
+    type: object
+    required: [id, name, maturity, structure, uiPolicy, information_blocks]
+    additionalProperties: true
+    properties:
+      id:
+        type: string
+        pattern: "^[a-z]+\\.[a-z][a-z0-9-]*$"
+        description: "Screen identifier (e.g., book.detail, product.search)"
+
+      name:
+        type: string
+        minLength: 1
+        description: "Human-readable screen name"
+
+      purpose:
+        type: string
+        description: "User-facing purpose sentence"
+
+      primary_user_intent:
+        type: string
+        description: "Primary user goal on this screen"
+
+      maturity:
+        type: object
+        required: [level]
+        additionalProperties: false
+        properties:
+          level:
+            $ref: "#/definitions/maturity_level"
+          gate_evidence:
+            type: object
+            additionalProperties: false
+            properties:
+              boundary_to_entity:
+                type: array
+                items:
+                  type: string
+                description: "Evidence for entity-level maturity"
+              entity_to_view:
+                type: array
+                items:
+                  type: string
+                description: "Evidence for view-level maturity"
+          stability:
+            type: object
+            additionalProperties: false
+            properties:
+              concerns_unchanged_since:
+                type: ["string", "null"]
+                description: "Plan reference where concerns stabilized"
+              routes_unchanged_since:
+                type: ["string", "null"]
+                description: "Plan reference where routes stabilized"
+              main_actions_complete:
+                type: boolean
+                description: "All main actions have corresponding CanXxx()"
+
+      structure:
+        type: object
+        required: [subject, concerns]
+        additionalProperties: false
+        properties:
+          subject:
+            type: string
+            description: "Primary subject (Aggregate Root)"
+          concerns:
+            type: array
+            items:
+              $ref: "#/definitions/concern"
+            minItems: 1
+
+      uiPolicy:
+        type: object
+        additionalProperties: false
+        properties:
+          allowed_patterns:
+            type: array
+            items:
+              type: string
+            description: "Allowed UI patterns (e.g., ConcernSwitch)"
+          allowed_affordances:
+            type: array
+            items:
+              type: string
+            description: "Allowed affordances (e.g., exclusive-switch)"
+          allowed_widgets:
+            type: array
+            items:
+              type: string
+            description: "Allowed widget types"
+          denied_widgets:
+            type: array
+            items:
+              type: string
+            description: "Explicitly denied widget types"
+
+      uiPolicyOverrides:
+        type: array
+        items:
+          $ref: "#/definitions/override"
+        description: "Approved exceptions to maturity constraints"
+
+      information_blocks:
+        type: array
+        items:
+          $ref: "#/definitions/information_block"
+        minItems: 1
+
+      # Existing UI-IR fields (from v0.1)
+      form_fields:
+        type: object
+      main_actions:
+        type: array
+      secondary_actions:
+        type: array
+      data:
+        type: object
+      navigation:
+        type: object
+      ux_constraints:
+        type: object
+
+# Conditional constraints
+allOf:
+  # Constraint 1: view level requires stability
+  - if:
+      required: [screen]
+      properties:
+        screen:
+          required: [maturity]
+          properties:
+            maturity:
+              required: [level]
+              properties:
+                level:
+                  const: view
+    then:
+      properties:
+        screen:
+          properties:
+            maturity:
+              required: [stability]
+              properties:
+                stability:
+                  required: [concerns_unchanged_since]
+                  properties:
+                    concerns_unchanged_since:
+                      type: string
+                      minLength: 1
+
+  # Constraint 2: boundary/entity levels cannot use upper widgets
+  - if:
+      required: [screen]
+      properties:
+        screen:
+          required: [maturity]
+          properties:
+            maturity:
+              required: [level]
+              properties:
+                level:
+                  enum: [boundary, entity]
+    then:
+      properties:
+        screen:
+          properties:
+            uiPolicy:
+              properties:
+                allowed_widgets:
+                  items:
+                    not:
+                      enum: [tab, master-detail, stepper]

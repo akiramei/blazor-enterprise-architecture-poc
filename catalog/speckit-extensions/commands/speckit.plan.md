@@ -302,7 +302,115 @@ UI-IR phase: run=false (layer=backend, boundary=false, ui_fr=false)
 
 ```
 Read: catalog/scaffolds/ui-ir-template.yaml
+Read: catalog/scaffolds/ui-ir-schema.yaml
+Read: catalog/scaffolds/ui-ir-lint-rules.yaml
 ```
+
+#### 1.4.2.5 UI Maturity Assessment (vNext)
+
+**目的**: モデルの成熟度を判定し、許可される UI 語彙を決定する
+
+> **設計思想**: モデルが語っていないことを、UI が先取りしてはいけない。
+> 成熟度に応じて UI 語彙を制限することで、AI 生成の破綻を防ぐ。
+
+##### Step 1: 成熟度ゲート判定
+
+| Gate | 条件 | チェック項目 |
+|------|------|-------------|
+| boundary→entity | Entity 属性確定 | data-model.md に属性定義あり |
+| boundary→entity | 入力項目確定 | form_fields が埋まっている |
+| entity→view | 関心領域安定 | concerns が前回 plan から変更なし |
+| entity→view | 状態遷移確定 | Entity.CanXxx() が全操作に対応 |
+
+**判定アルゴリズム**:
+```
+if 属性未確定:
+  level = boundary
+elif concerns 未安定:
+  level = entity
+elif stability 証拠あり:
+  level = view
+else:
+  level = entity
+```
+
+##### Step 2: uiPolicy 自動設定（defaults 注入）
+
+成熟度に応じて `maturity_defaults` を `uiPolicy` に物理的に注入：
+
+```yaml
+# boundary の場合
+uiPolicy:
+  allowed_widgets: [inline-sections, card, list, flow, simple-list]
+  denied_widgets: [tab, master-detail, stepper, accordion, data-grid]
+
+# entity の場合
+uiPolicy:
+  allowed_widgets: [inline-sections, card, list, flow, simple-list, accordion, data-grid, grouping]
+  denied_widgets: [tab, master-detail, stepper]
+
+# view の場合（stability 必須）
+uiPolicy:
+  allowed_widgets: [全て許可]
+  denied_widgets: []
+  # 注意: stability.concerns_unchanged_since が必須
+```
+
+##### Step 3: structure 構築
+
+concerns を定義し、information_blocks と紐付け：
+
+```yaml
+structure:
+  subject: "{Aggregate Root}"
+  concerns:
+    - id: overview
+      name: "基本情報"
+      blocks: [blk-core]
+      exclusivity: false
+    - id: history
+      name: "履歴"
+      blocks: [blk-history]
+      exclusivity: true
+      comparability:
+        mode: rows
+        key: createdAt
+```
+
+- 各 concern の `exclusivity` を評価
+- `comparability` があれば mode と key を設定
+- information_blocks への参照を設定
+
+##### Step 4: Lint 実行
+
+```
+ui-ir-lint --schema ui-ir-schema.yaml --rules ui-ir-lint-rules.yaml screen.ui-ir.yaml
+```
+
+**出力形式**:
+```
+UI-IR lint: status=pass, rules_checked=8, violations=0
+UI-IR lint: status=fail, rules_checked=8, violations=2 (MATURITY-001, BLOCK-002)
+UI-IR lint: status=pass_with_waivers, rules_checked=8, waivers=1 (MATURITY-001)
+```
+
+**Lint ルール一覧**:
+
+| ID | 名称 | Severity |
+|----|------|----------|
+| MATURITY-001 | 成熟度超過 | error |
+| MATURITY-002 | 安定性未達で view | error |
+| STRUCTURE-001 | 排他性違反 | error |
+| STRUCTURE-002 | 比較性違反 | warning |
+| STRUCTURE-003 | 排他 concern のブロック共有 | warning |
+| BLOCK-001 | 孤立ブロック | warning |
+| BLOCK-002 | 参照切れ | error |
+| OVERRIDE-001 | 未承認 override | error |
+| OVERRIDE-002 | violation_id なし override | error |
+
+**エラー時の対応**:
+- error があれば自己修正または uiPolicyOverrides で waive
+- waive には approved_by（承認者）が必須
 
 #### 1.4.3 画面ごとに UI-IR スキーマ填充
 
@@ -334,8 +442,9 @@ elif error_cost == Critical or reversibility == Irreversible:
 
 #### 1.4.5 UX 自己評価
 
-ux_review.mandatory_checks 全5項目を検証：
+ux_review.mandatory_checks 全10項目を検証：
 
+**基本チェック（v0.1）**:
 ```
 □ UX-001: Primary アクションは画面に1つのみか
 □ UX-002: Irreversible/error_cost>=High に確認があるか
@@ -344,7 +453,17 @@ ux_review.mandatory_checks 全5項目を検証：
 □ UX-005: VeryHigh/High 操作が1クリック以内か
 ```
 
+**成熟度チェック（vNext）**:
+```
+□ UX-006: maturity.level に対して allowed_widgets が適切か
+□ UX-007: view レベルの場合、stability.concerns_unchanged_since が設定されているか
+□ UX-008: exclusivity=true の concern が複数ある場合、exclusive-switch が許可されているか
+□ UX-009: comparability が定義されている concern に対して comparison affordance が許可されているか
+□ UX-010: information_blocks がすべて concerns から参照されているか
+```
+
 違反があれば UI-IR を自己修正。
+成熟度違反（UX-006〜010）は ui-ir-lint-rules.yaml の Lint ルールでも検証される。
 
 #### 1.4.6 出力
 
@@ -353,10 +472,25 @@ ux_review.mandatory_checks 全5項目を検証：
 ```markdown
 ## UI-IR Summary
 
-| Screen | Primary Action | Confirmation | Notes |
-|--------|---------------|--------------|-------|
-| ProductSearch | 検索 | None | - |
-| ProductDelete | 削除 | DoubleConfirm | 破壊的操作 |
+| Screen | Maturity | Primary Action | Confirmation | Lint Status |
+|--------|----------|---------------|--------------|-------------|
+| ProductSearch | entity | 検索 | None | pass |
+| ProductDelete | entity | 削除 | DoubleConfirm | pass |
+| BookDetail | view | 表示 | None | pass_with_waivers |
+
+### Maturity Assessment
+
+| Screen | Level | Gate Evidence | Stability |
+|--------|-------|---------------|-----------|
+| ProductSearch | entity | form_fields 定義済み | - |
+| BookDetail | view | concerns 安定 | plan#3 |
+
+### Lint Results
+
+| Screen | Status | Violations | Waivers |
+|--------|--------|------------|---------|
+| ProductSearch | pass | 0 | 0 |
+| BookDetail | pass_with_waivers | 0 | 1 (MATURITY-001) |
 
 詳細: specs/{feature}/{slice}.ui-ir.yaml
 ```
@@ -367,7 +501,7 @@ ux_review.mandatory_checks 全5項目を検証：
 specs/{feature}/{slice}.ui-ir.yaml
 ```
 
-**Output**: Plan with UI-IR Summary section, separate .ui-ir.yaml file
+**Output**: Plan with UI-IR Summary section (including Maturity Assessment), separate .ui-ir.yaml file
 
 ### Phase 1.5: Design-Level COMMON_MISTAKES Check (CRITICAL - AUTO)
 

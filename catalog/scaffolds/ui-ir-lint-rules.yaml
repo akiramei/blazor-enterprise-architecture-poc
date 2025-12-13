@@ -1,0 +1,294 @@
+# catalog/scaffolds/ui-ir-lint-rules.yaml
+# UI-IR Lint Rules (CEL-based)
+# Purpose: Validate UI-IR documents beyond JSON Schema constraints
+
+id: ui-ir-lint-rules
+name: "UI-IR Lint Rules (CEL)"
+category: scaffold
+version: "0.1.0"
+intent: "CELベースのUI-IR Lintルール。成熟度超過、排他性違反、孤立ブロック等を検出"
+evaluation_language: CEL
+description: |
+  These rules complement JSON Schema validation by enforcing
+  semantic constraints that require cross-field logic.
+
+  CEL dialect: Uses `!= null` instead of `has()` for portability.
+
+# Override index determination rules
+override_matching:
+  description: |
+    To determine which override waives a violation:
+    1. violation_id must match
+    2. allow_widget must include the violating widget
+    3. scope must match the violation target
+    4. approved_by must be non-empty
+    The first matching override is used.
+  algorithm: |
+    for i, o in screen.uiPolicyOverrides:
+      if o.violation_id == violation.rule_id &&
+         o.allow_widget in violation.widgets &&
+         o.scope == violation.scope &&
+         o.approved_by != "":
+        return i
+    return -1
+
+rules:
+  # === MATURITY RULES ===
+
+  - id: MATURITY-001
+    name: "Maturity level exceeded"
+    name_ja: "成熟度超過"
+    severity: error
+    category: maturity
+    description: |
+      Upper-level widgets (tab, master-detail, stepper) are only allowed
+      at view maturity level. This prevents premature UI complexity.
+    condition: |
+      screen.maturity.level != "view" &&
+      screen.uiPolicy != null &&
+      screen.uiPolicy.allowed_widgets != null &&
+      size(filter(screen.uiPolicy.allowed_widgets, w,
+           w in ["tab", "master-detail", "stepper"])) > 0
+    waive_condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.violation_id == "MATURITY-001" &&
+             o.approved_by != "" &&
+             o.scope == "screen")
+    message: "maturity.level が view でないのに上位 widget を許可しています"
+    message_en: "Upper-level widgets are allowed but maturity.level is not 'view'"
+    fix_hint: |
+      Either:
+      1. Remove upper widgets from allowed_widgets
+      2. Increase maturity level to 'view' with stability evidence
+      3. Add an approved override with justification
+
+  - id: MATURITY-002
+    name: "View level without stability"
+    name_ja: "安定性未達で view"
+    severity: error
+    category: maturity
+    description: |
+      View maturity level requires concerns to be stable.
+      stability.concerns_unchanged_since must reference a plan.
+    condition: |
+      screen.maturity.level == "view" &&
+      (screen.maturity.stability == null ||
+       screen.maturity.stability.concerns_unchanged_since == null ||
+       screen.maturity.stability.concerns_unchanged_since == "")
+    waive_condition: null
+    message: "view レベルには concerns の安定性（stability）が必要です"
+    message_en: "View level requires stability.concerns_unchanged_since"
+    fix_hint: |
+      Add stability evidence:
+      maturity:
+        stability:
+          concerns_unchanged_since: "plan#3"
+
+  # === STRUCTURE RULES ===
+
+  - id: STRUCTURE-001
+    name: "Exclusivity without affordance"
+    name_ja: "排他性違反"
+    severity: error
+    category: structure
+    description: |
+      When multiple concerns have exclusivity=true, the UI needs
+      a way to switch between them (exclusive-switch affordance).
+    condition: |
+      size(filter(screen.structure.concerns, c, c.exclusivity == true)) >= 2 &&
+      (screen.uiPolicy == null ||
+       screen.uiPolicy.allowed_affordances == null ||
+       !("exclusive-switch" in screen.uiPolicy.allowed_affordances))
+    waive_condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.violation_id == "STRUCTURE-001" && o.approved_by != "")
+    message: "exclusivity=true が複数あるのに exclusive-switch が許可されていません"
+    message_en: "Multiple exclusive concerns without exclusive-switch affordance"
+    fix_hint: |
+      Add to uiPolicy.allowed_affordances: ["exclusive-switch"]
+
+  - id: STRUCTURE-002
+    name: "Comparability without affordance"
+    name_ja: "比較性違反"
+    severity: warning
+    category: structure
+    description: |
+      When a concern has comparability defined, the UI should support
+      comparison display (comparison affordance).
+    condition: |
+      exists(screen.structure.concerns, c, c.comparability != null) &&
+      (screen.uiPolicy == null ||
+       screen.uiPolicy.allowed_affordances == null ||
+       !("comparison" in screen.uiPolicy.allowed_affordances))
+    waive_condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.violation_id == "STRUCTURE-002" && o.approved_by != "")
+    message: "comparability が定義されているのに comparison が許可されていません"
+    message_en: "Comparability defined but comparison affordance not allowed"
+    fix_hint: |
+      Add to uiPolicy.allowed_affordances: ["comparison"]
+
+  - id: STRUCTURE-003
+    name: "Exclusive concerns sharing blocks"
+    name_ja: "排他 concern のブロック共有"
+    severity: warning
+    category: structure
+    description: |
+      When exclusive concerns share the same information block,
+      it may indicate a design issue (the block should probably be
+      in a non-exclusive concern or split).
+    condition: |
+      exists(screen.structure.concerns, c1,
+             c1.exclusivity == true &&
+             exists(screen.structure.concerns, c2,
+                    c2.exclusivity == true &&
+                    c1.id != c2.id &&
+                    exists(c1.blocks, b1, b1 in c2.blocks)))
+    waive_condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.violation_id == "STRUCTURE-003" && o.approved_by != "")
+    message: "排他的な concerns 間で同一ブロックを共有しています"
+    message_en: "Exclusive concerns share information blocks"
+    fix_hint: |
+      Either:
+      1. Move shared block to a non-exclusive concern
+      2. Split the block for each concern
+      3. Add an override if intentional
+
+  # === BLOCK RULES ===
+
+  - id: BLOCK-001
+    name: "Orphan block"
+    name_ja: "孤立ブロック"
+    severity: warning
+    category: block
+    description: |
+      An information block exists but is not referenced by any concern.
+      This may indicate incomplete structure definition or unused block.
+    condition: |
+      exists(screen.information_blocks, b,
+             !exists(screen.structure.concerns, c, b.id in c.blocks))
+    waive_condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.violation_id == "BLOCK-001" &&
+             o.scope == "block" &&
+             o.approved_by != "")
+    message: "information_block がどの concern にも属していません"
+    message_en: "Information block not referenced by any concern"
+    fix_hint: |
+      Either:
+      1. Add the block ID to a concern's blocks array
+      2. Remove the unused block
+      3. Add a scope=block override if intentionally orphaned
+
+  - id: BLOCK-002
+    name: "Dangling reference"
+    name_ja: "参照切れ"
+    severity: error
+    category: block
+    description: |
+      A concern references a block ID that doesn't exist in
+      information_blocks. This will cause runtime errors.
+    condition: |
+      exists(screen.structure.concerns, c,
+             exists(c.blocks, bid,
+                    !exists(screen.information_blocks, b, b.id == bid)))
+    waive_condition: null
+    message: "structure.concerns.blocks に存在しない information_block を参照しています"
+    message_en: "Concern references non-existent information block"
+    fix_hint: |
+      Either:
+      1. Add the missing block to information_blocks
+      2. Remove the invalid block reference from the concern
+
+  # === OVERRIDE RULES ===
+
+  - id: OVERRIDE-001
+    name: "Unapproved override"
+    name_ja: "未承認 override"
+    severity: error
+    category: override
+    description: |
+      All overrides must have an approver. Anonymous overrides
+      are not allowed for audit purposes.
+    condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.approved_by == null || o.approved_by == "")
+    waive_condition: null
+    message: "override には approved_by が必要です"
+    message_en: "Override requires approved_by field"
+    fix_hint: |
+      Add approved_by to the override:
+      uiPolicyOverrides:
+        - allow_widget: tab
+          approved_by: "UX"  # Add this
+
+  - id: OVERRIDE-002
+    name: "Override without violation ID"
+    name_ja: "violation_id なし override"
+    severity: error
+    category: override
+    description: |
+      Overrides must specify which rule they are waiving.
+    condition: |
+      exists(screen.uiPolicyOverrides, o,
+             o.violation_id == null || o.violation_id == "")
+    waive_condition: null
+    message: "override には violation_id が必要です"
+    message_en: "Override requires violation_id field"
+    fix_hint: |
+      Add violation_id to the override:
+      uiPolicyOverrides:
+        - violation_id: "MATURITY-001"  # Add this
+
+# Output format specification
+output_format:
+  description: |
+    Lint results are returned in this format.
+    status: pass | fail | pass_with_waivers
+
+  schemas:
+    success:
+      status: "pass"
+      rules_checked: 9
+      violations: []
+
+    failure:
+      status: "fail"
+      rules_checked: 9
+      violations:
+        - rule_id: "MATURITY-001"
+          severity: "error"
+          message: "..."
+          location: "screen.uiPolicy.allowed_widgets"
+          widgets: ["tab"]
+          scope: "screen"
+
+    waived:
+      status: "pass_with_waivers"
+      rules_checked: 9
+      violations:
+        - rule_id: "MATURITY-001"
+          severity: "waived"
+          message: "..."
+          location: "screen.uiPolicy.allowed_widgets"
+          waived_by:
+            override_index: 0
+            reason: "concerns が 4 つあり縦スクロールが過大"
+            approved_by: "UX"
+
+# Rule summary by category
+summary:
+  maturity:
+    - MATURITY-001: "Upper widgets require view level"
+    - MATURITY-002: "View requires stability"
+  structure:
+    - STRUCTURE-001: "Exclusive concerns need switch affordance"
+    - STRUCTURE-002: "Comparable concerns need comparison affordance"
+    - STRUCTURE-003: "Exclusive concerns sharing blocks"
+  block:
+    - BLOCK-001: "Orphan blocks"
+    - BLOCK-002: "Dangling references"
+  override:
+    - OVERRIDE-001: "Unapproved overrides"
+    - OVERRIDE-002: "Missing violation_id"

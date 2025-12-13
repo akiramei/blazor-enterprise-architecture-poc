@@ -287,13 +287,143 @@ elif error_cost == Critical or reversibility == Irreversible:
 
 ### UX必須チェックリスト
 
+**基本チェック（v0.1）**:
 ```
-□ Primary アクションは画面に1つのみか
-□ Irreversible または error_cost>=High のアクションに確認があるか
-□ Critical importance の情報がファーストビューに表示されるか
-□ Entity.CanXxx() がUIのdisabled等に反映されているか
-□ VeryHigh/High の操作が1クリック以内で到達できるか
+□ UX-001: Primary アクションは画面に1つのみか
+□ UX-002: Irreversible または error_cost>=High のアクションに確認があるか
+□ UX-003: Critical importance の情報がファーストビューに表示されるか
+□ UX-004: Entity.CanXxx() がUIのdisabled等に反映されているか
+□ UX-005: VeryHigh/High の操作が1クリック以内で到達できるか
 ```
+
+**成熟度チェック（vNext）**:
+```
+□ UX-006: maturity.level に対して allowed_widgets が適切か
+□ UX-007: view レベルの場合、stability が設定されているか
+□ UX-008: exclusivity=true の concern が複数ある場合、exclusive-switch が許可されているか
+□ UX-009: comparability がある concern に comparison affordance があるか
+□ UX-010: 全ての information_blocks が concerns から参照されているか
+```
+
+---
+
+### UI Maturity Assessment（vNext）
+
+> **参照**: `catalog/scaffolds/ui-ir-schema.yaml`, `catalog/scaffolds/ui-ir-lint-rules.yaml`
+
+**設計思想**: モデルが語っていないことを、UI が先取りしてはいけない。
+
+#### なぜ成熟度が必要か
+
+| 問題 | 原因 | 結果 |
+|------|------|------|
+| Boundary に Intent しかないのに Tab を決める | 関心事の分割根拠がない | 後で全面作り直し |
+| 属性未確定なのに Data Grid を使う | 列定義できない | フラットなリストに戻す |
+| concerns が安定していないのに Master-Detail | 責務が変わる | レイアウト崩壊 |
+
+#### 成熟度レベル（3段階）
+
+| Level | 説明 | 許可される Widget |
+|-------|------|------------------|
+| **boundary** | Intent中心・曖昧 | inline-sections, card, list, flow, simple-list |
+| **entity** | Entity属性・操作明確 | + accordion, data-grid, grouping |
+| **view** | View確定・責務明確 | + tab, master-detail, stepper |
+
+#### 成熟度判定アルゴリズム
+
+```
+if 属性未確定:
+  level = boundary
+elif concerns 未安定:
+  level = entity
+elif stability.concerns_unchanged_since != null:
+  level = view
+else:
+  level = entity
+```
+
+#### ゲート条件
+
+| Gate | 条件 | チェック項目 |
+|------|------|-------------|
+| boundary→entity | Entity 属性確定 | data-model.md に属性定義あり |
+| boundary→entity | 入力項目確定 | form_fields が埋まっている |
+| entity→view | 関心領域安定 | concerns が前回 plan から変更なし |
+| entity→view | 状態遷移確定 | Entity.CanXxx() が全操作に対応 |
+
+#### structure セクション
+
+concerns（関心領域）を定義し、information_blocks と紐付け：
+
+```yaml
+structure:
+  subject: "Book"                    # Aggregate Root
+  concerns:
+    - id: overview
+      name: "基本情報"
+      blocks: [blk-book-core]
+      exclusivity: false
+    - id: lending
+      name: "貸出履歴"
+      blocks: [blk-lending-history]
+      exclusivity: true
+      comparability:
+        mode: rows                   # rows | columns | time
+        key: loanDate
+```
+
+- **exclusivity**: true の場合、他の排他的 concern と同時表示しない
+- **comparability**: 比較表示が必要な場合に定義
+
+#### uiPolicy（UI語彙制限）
+
+成熟度に応じて自動設定される：
+
+```yaml
+# entity レベルの例
+uiPolicy:
+  allowed_widgets: [inline-sections, card, list, flow, simple-list, accordion, data-grid, grouping]
+  denied_widgets: [tab, master-detail, stepper]
+  allowed_affordances: [navigation, comparison, bulk-action]
+```
+
+#### uiPolicyOverrides（例外承認）
+
+成熟度制約を超えた Widget を使用する場合は、承認が必要：
+
+```yaml
+uiPolicyOverrides:
+  - allow_widget: tab
+    reason: "concerns が 4 つあり縦スクロールが過大"
+    approved_by: "UX"
+    approved_at: "2025-12-13"
+    violation_id: "MATURITY-001"
+    scope: screen
+```
+
+#### Lint ルール
+
+CEL ベースの Lint ルールで自動検証：
+
+| ID | 名称 | Severity |
+|----|------|----------|
+| MATURITY-001 | 成熟度超過 | error |
+| MATURITY-002 | 安定性未達で view | error |
+| STRUCTURE-001 | 排他性違反 | error |
+| STRUCTURE-002 | 比較性違反 | warning |
+| BLOCK-001 | 孤立ブロック | warning |
+| BLOCK-002 | 参照切れ | error |
+
+#### 成熟度別パターンカタログ
+
+> **参照**: `catalog/patterns/ui-maturity/`
+
+| パターン | boundary | entity | view |
+|---------|----------|--------|------|
+| **concern-switch** | inline-sections | accordion | tab |
+| **collection-browse** | simple-list | data-grid | master-detail |
+
+---
 
 ### クイックスタート
 
@@ -880,5 +1010,6 @@ AIがカタログを参照する際は、**必ずタグ固定**してくださ�
 
 ---
 
-**最終更新: 2025-12-12**
-**カタログバージョン: v2025.12.12.1**
+**最終更新: 2025-12-13**
+**カタログバージョン: v2025.12.13.1**
+**UI-IR バージョン: v0.2.0（Maturity-based constraints）**

@@ -1,0 +1,155 @@
+# catalog/patterns/ui-maturity/index.yaml
+# UI Maturity Patterns Index
+# Purpose: Maturity-based UI pattern catalog for vNext
+
+id: ui-maturity-index
+version: "0.1.0"
+name: "成熟度別UIパターンカタログ"
+name_en: "UI Maturity Patterns Catalog"
+category: pattern-index
+condition_language: CEL
+
+description: |
+  モデルの成熟度（boundary → entity → view）に応じて
+  許可される UI ウィジェットを段階的に解放するパターンカタログ。
+
+  これにより、情報が足りない段階で具体UIを選ぶ破綻を防ぐ。
+
+# ---------------------------------------------------------------------------
+# Pattern Catalog
+# ---------------------------------------------------------------------------
+patterns:
+  - id: concern-switch
+    name: "関心領域切替"
+    file: "concern-switch.yaml"
+    description: "同一対象の複数関心領域を切り替えて表示"
+    maturity_widgets:
+      boundary: inline-sections
+      entity: accordion
+      view: tab
+
+  - id: collection-browse
+    name: "コレクション閲覧"
+    file: "collection-browse.yaml"
+    description: "エンティティのコレクションを閲覧・操作"
+    maturity_widgets:
+      boundary: simple-list
+      entity: data-grid
+      view: master-detail
+
+# ---------------------------------------------------------------------------
+# Maturity Level Reference
+# ---------------------------------------------------------------------------
+maturity_levels:
+  boundary:
+    description: "Intent中心・曖昧"
+    allowed_widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+    characteristics:
+      - "ユーザーの意図（Intent）が主"
+      - "属性や操作が不明確"
+      - "関心領域の分割根拠がない"
+    gate_to_next:
+      - "data-model.md で Entity 属性確定"
+      - "form_fields 全項目定義済み"
+
+  entity:
+    description: "Entity属性・操作明確"
+    allowed_widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+      - accordion
+      - data-grid
+      - grouping
+    characteristics:
+      - "Entity の属性が確定"
+      - "入力項目が明確"
+      - "操作（Command）が定義済み"
+    gate_to_next:
+      - "concerns が前回 plan から変更なし"
+      - "Entity.CanXxx() が全操作に対応"
+      - "状態遷移が確定"
+
+  view:
+    description: "View確定・責務明確"
+    allowed_widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+      - accordion
+      - data-grid
+      - grouping
+      - tab
+      - master-detail
+      - stepper
+    characteristics:
+      - "関心領域（concerns）が安定"
+      - "状態遷移が確定"
+      - "画面責務が固定化"
+    requirement: "stability.concerns_unchanged_since が必須"
+
+# ---------------------------------------------------------------------------
+# Widget Classification
+# ---------------------------------------------------------------------------
+widget_classification:
+  lower_level:
+    description: "全成熟度で使用可能"
+    widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+
+  mid_level:
+    description: "entity 以上で使用可能"
+    widgets:
+      - accordion
+      - data-grid
+      - grouping
+
+  upper_level:
+    description: "view のみで使用可能"
+    widgets:
+      - tab
+      - master-detail
+      - stepper
+    requirements:
+      - "stability 証拠が必要"
+      - "override で例外可能（approved_by 必須）"
+
+# ---------------------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------------------
+usage:
+  pattern_selection: |
+    1. 画面の主目的を特定
+       - 関心領域切替 → concern-switch
+       - 一覧閲覧 → collection-browse
+
+    2. 成熟度を判定
+       - 属性未確定 → boundary
+       - 属性確定・concerns未安定 → entity
+       - concerns安定・stability証拠あり → view
+
+    3. パターンYAMLの該当variant を参照
+       - widget, mudblazor, layout_hint を取得
+
+    4. UI-IR に反映
+       - uiPolicy.allowed_widgets に追加
+       - structure.concerns を構築
+
+  lint_integration: |
+    ui-ir-lint-rules.yaml と連携:
+    - MATURITY-001: 上位widget禁止違反
+    - STRUCTURE-001: 排他性違反
+    - STRUCTURE-002: 比較性違反

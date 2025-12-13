@@ -1,0 +1,212 @@
+# catalog/patterns/ui-maturity/collection-browse.yaml
+# UI Pattern: Collection Browse
+# Purpose: Browse and operate on a collection of entities
+
+id: collection-browse
+version: "0.1.0"
+name: "コレクション閲覧"
+name_en: "Collection Browse"
+category: ui-pattern
+condition_language: CEL
+
+description: |
+  エンティティのコレクション（一覧）を表示し、閲覧・操作するパターン。
+  成熟度に応じて使用できるウィジェットが変化する。
+
+intent: |
+  ユーザーがエンティティの一覧を効率的に閲覧し、
+  目的のエンティティを素早く見つけて操作できるようにする。
+
+when_to_use:
+  - "エンティティの一覧表示が必要"
+  - "検索・フィルタリング・ソートが想定される"
+  - "一覧から詳細への遷移がある"
+
+prerequisites:
+  - "Query が定義されている（SearchXxxQuery, GetXxxListQuery）"
+  - "一覧表示に必要な属性が確定している"
+
+# ---------------------------------------------------------------------------
+# Maturity Variants (CEL conditions)
+# ---------------------------------------------------------------------------
+maturity_variants:
+  boundary:
+    description: "Intent中心・曖昧な段階"
+    widget: simple-list
+    condition: 'screen.maturity.level == "boundary"'
+    mudblazor: "MudList"
+    layout_hint: |
+      - シンプルなリスト表示
+      - 各アイテムは MudListItem
+      - クリックで詳細へ遷移
+      - ソート・フィルタは未実装
+    rationale: |
+      属性が不明確な段階では、最小限の一覧表示で十分。
+      複雑なグリッドは属性が確定してから導入する。
+    features:
+      - "基本的なリスト表示"
+      - "クリックで遷移"
+
+  entity:
+    description: "Entity属性・操作が明確な段階"
+    widget: data-grid
+    condition: 'screen.maturity.level == "entity"'
+    mudblazor: "MudDataGrid"
+    layout_hint: |
+      - MudDataGrid で表形式表示
+      - ソート・フィルタ列を有効化
+      - ページネーションを追加
+      - 行クリックで詳細へ遷移
+    rationale: |
+      属性が確定したので、表形式で効率的に比較・閲覧できる。
+      ソート・フィルタで目的のエンティティを素早く発見。
+    features:
+      - "表形式表示"
+      - "ソート・フィルタ"
+      - "ページネーション"
+      - "行選択"
+
+  view:
+    description: "View確定・責務が明確な段階"
+    widget: master-detail
+    condition: |
+      screen.maturity.level == "view" &&
+      screen.maturity.stability.routes_unchanged_since != null
+    mudblazor: "MudDataGrid + MudDrawer"
+    layout_hint: |
+      - 左: MudDataGrid で一覧
+      - 右: MudDrawer または右パネルで詳細
+      - 一覧選択で詳細が即座に更新
+      - 詳細編集後に一覧も即時反映
+    rationale: |
+      画面責務が確定し、一覧と詳細の関係が固定化されている。
+      Master-Detail で画面遷移なしに効率的な操作を提供。
+    features:
+      - "Master-Detail レイアウト"
+      - "インライン詳細表示"
+      - "即時反映"
+      - "Saved Views（オプション）"
+    requirements:
+      - "stability.routes_unchanged_since が設定されていること"
+      - "詳細表示の内容が安定していること"
+
+# ---------------------------------------------------------------------------
+# Examples
+# ---------------------------------------------------------------------------
+examples:
+  - name: "商品検索画面"
+    subject: "Product"
+    attributes:
+      - "name"
+      - "sku"
+      - "price"
+      - "stock"
+    progression:
+      boundary: "MudList で商品名のみ表示"
+      entity: "MudDataGrid で全属性表示、ソート・フィルタ可能"
+      view: "Master-Detail で選択商品の詳細を右パネルに表示"
+
+  - name: "注文一覧画面"
+    subject: "Order"
+    attributes:
+      - "orderNumber"
+      - "customerName"
+      - "totalAmount"
+      - "status"
+      - "orderDate"
+    progression:
+      boundary: "MudList で注文番号と顧客名のみ"
+      entity: "MudDataGrid で全属性、ステータスでフィルタ可能"
+      view: "Master-Detail で注文明細を即座に表示"
+
+# ---------------------------------------------------------------------------
+# Widget Mappings
+# ---------------------------------------------------------------------------
+widget_mappings:
+  simple-list:
+    component: "MudList"
+    props:
+      Dense: true
+      Clickable: true
+    item_component: "MudListItem"
+    interactions:
+      - type: "item_click"
+        action: "Navigate to detail"
+
+  data-grid:
+    component: "MudDataGrid"
+    props:
+      Dense: true
+      Hover: true
+      Striped: true
+      Filterable: true
+      SortMode: "Multiple"
+    features:
+      pagination:
+        component: "MudDataGridPager"
+        default_page_size: 25
+      filtering:
+        component: "FilterDefinition"
+        operators: ["contains", "equals", "startsWith", "endsWith"]
+      sorting:
+        enabled: true
+        default_sort: "importance DESC"
+    interactions:
+      - type: "row_click"
+        action: "Navigate to detail or open drawer"
+      - type: "row_select"
+        action: "Enable bulk actions"
+
+  master-detail:
+    layout: "horizontal"
+    master:
+      component: "MudDataGrid"
+      width: "60%"
+    detail:
+      component: "MudDrawer"
+      anchor: "End"
+      width: "40%"
+      props:
+        Elevation: 2
+        ClipMode: "Docked"
+    interactions:
+      - type: "master_select"
+        action: "Load detail data"
+      - type: "detail_save"
+        action: "Refresh master row"
+
+# ---------------------------------------------------------------------------
+# AI Guidance
+# ---------------------------------------------------------------------------
+ai_guidance:
+  generation_rules:
+    - "成熟度を確認し、対応する widget を選択"
+    - "view 以外で master-detail を選択しない"
+    - "属性が不明確な場合は simple-list から開始"
+
+  common_mistakes:
+    - mistake: "boundary レベルで MudDataGrid を使う"
+      solution: "属性が不明確なので MudList を使用"
+    - mistake: "entity レベルで master-detail を使う"
+      solution: "data-grid のみ。master-detail は view レベルで解禁"
+    - mistake: "view レベルだが routes の stability がない"
+      solution: "stability.routes_unchanged_since を設定してから master-detail を使用"
+    - mistake: "一覧の属性が確定していないのに data-grid を使う"
+      solution: "まず simple-list で始め、属性確定後に data-grid へ移行"
+
+  decision_tree: |
+    1. コレクション表示が必要か？
+       No → このパターンは不適切
+    2. maturity.level は何か？
+       boundary → simple-list
+       entity → data-grid
+       view → master-detail（routes stability 要確認）
+    3. 比較表示（comparability）が必要か？
+       Yes → data-grid 以上を推奨（entity レベル以上）
+    4. インライン編集が必要か？
+       Yes → view レベルの master-detail を推奨
+
+  performance_tips:
+    - "大量データ（1000件超）は必ずサーバーサイドページネーション"
+    - "初期表示は25件程度に制限"
+    - "フィルタはデバウンス処理を入れる（300ms）"

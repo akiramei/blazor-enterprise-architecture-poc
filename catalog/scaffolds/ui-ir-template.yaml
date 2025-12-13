@@ -1,9 +1,13 @@
 # catalog/scaffolds/ui-ir-template.yaml
 # UI Intermediate Representation (UI-IR)
 # Purpose: Bridge ICONIX Boundary -> High-quality UI generation (MudBlazor)
+#
+# vNext (v0.2.0): Maturity-based UI vocabulary constraints
+# - Model maturity (boundary → entity → view) controls allowed UI widgets
+# - Prevents premature UI complexity based on model concreteness
 
 id: ui-ir-template
-version: 0.1.0
+version: 0.2.0
 name: UI Intermediate Representation Template
 category: scaffold
 intent: AIがUI生成時に「UX品質を担保するための中間表現」。boundary-pattern/spec-templateを補完し、情報優先度・操作頻度・確認要否などを定量化する。
@@ -40,6 +44,18 @@ enums:
     source_kind: [Query, Command, LocalState]
     refresh_mode: [OnLoad, OnAction, Polling]
     validation_mode: [Client, Server, Both]
+
+  # vNext: Maturity-based enums
+  maturity_level: [boundary, entity, view]
+  comparability_mode: [rows, columns, time]
+  override_scope: [screen, concern, block]
+
+  # Widget classification by maturity level
+  widgets:
+    boundary: [inline-sections, card, list, flow, simple-list]
+    entity: [inline-sections, card, list, flow, simple-list, accordion, data-grid, grouping]
+    view: [inline-sections, card, list, flow, simple-list, accordion, data-grid, grouping, tab, master-detail, stepper]
+    upper_only: [tab, master-detail, stepper]  # view level only
 
 # -----------------------------------------------------------------------------
 # Component mapping (MudBlazor)
@@ -143,6 +159,99 @@ rules:
         use component_mapping.actions.danger_overrides[error_cost]
 
 # -----------------------------------------------------------------------------
+# vNext: Maturity defaults (injected at Template generation time)
+# -----------------------------------------------------------------------------
+maturity_defaults:
+  description: |
+    These defaults are PHYSICALLY EMBEDDED into the generated UI-IR at Template time.
+    This makes the UI-IR self-contained and reviewable without external reference.
+    Injection happens during spec-kit plan → UI-IR generation.
+
+  boundary:
+    allowed_widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+    denied_widgets:
+      - tab
+      - master-detail
+      - stepper
+      - accordion
+      - data-grid
+    allowed_affordances:
+      - navigation
+    allowed_patterns:
+      - FlowLayout
+
+  entity:
+    allowed_widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+      - accordion
+      - data-grid
+      - grouping
+    denied_widgets:
+      - tab
+      - master-detail
+      - stepper
+    allowed_affordances:
+      - navigation
+      - comparison
+      - bulk-action
+    allowed_patterns:
+      - FlowLayout
+      - ConcernSwitch
+      - CollectionBrowse
+
+  view:
+    allowed_widgets:
+      - inline-sections
+      - card
+      - list
+      - flow
+      - simple-list
+      - accordion
+      - data-grid
+      - grouping
+      - tab
+      - master-detail
+      - stepper
+    denied_widgets: []
+    allowed_affordances:
+      - navigation
+      - comparison
+      - bulk-action
+      - exclusive-switch
+      - progressive-input
+    allowed_patterns:
+      - FlowLayout
+      - ConcernSwitch
+      - CollectionBrowse
+      - MasterDetail
+    requires:
+      - "stability.concerns_unchanged_since != null"
+
+  injection_rules:
+    description: |
+      When generating UI-IR, the generator MUST:
+      1. Determine maturity.level from model concreteness
+      2. Copy the corresponding defaults into uiPolicy
+      3. Set denied_widgets based on maturity level
+      4. The output UI-IR contains the full uiPolicy (not just a reference)
+    algorithm: |
+      level = screen.maturity.level
+      defaults = maturity_defaults[level]
+      screen.uiPolicy.allowed_widgets = defaults.allowed_widgets
+      screen.uiPolicy.denied_widgets = defaults.denied_widgets
+      screen.uiPolicy.allowed_affordances = defaults.allowed_affordances
+      screen.uiPolicy.allowed_patterns = defaults.allowed_patterns
+
+# -----------------------------------------------------------------------------
 # UX review (self-checklist & scoring rubric)
 # -----------------------------------------------------------------------------
 ux_review:
@@ -162,6 +271,28 @@ ux_review:
     - id: UX-005
       statement: "VeryHigh/High の操作が1クリック以内で到達できるか"
       severity: Medium
+
+    # vNext: Maturity-based checks
+    - id: UX-006
+      statement: "maturity.level に対して allowed_widgets が適切か（上位widget禁止ルール）"
+      severity: High
+      vNext: true
+    - id: UX-007
+      statement: "view レベルの場合、stability.concerns_unchanged_since が設定されているか"
+      severity: High
+      vNext: true
+    - id: UX-008
+      statement: "exclusivity=true の concern が複数ある場合、exclusive-switch が許可されているか"
+      severity: Medium
+      vNext: true
+    - id: UX-009
+      statement: "comparability が定義されている concern に対して comparison affordance が許可されているか"
+      severity: Medium
+      vNext: true
+    - id: UX-010
+      statement: "information_blocks がすべて concerns から参照されているか（孤立ブロック検出）"
+      severity: Low
+      vNext: true
 
   scoring:
     weights:
@@ -188,6 +319,46 @@ schema:
     entry_conditions: []   # optional: ["UserAuthenticated"]
     exit_conditions: []    # optional: ["NavigatedToProductDetail"]
     notes: ""              # optional
+
+  # ---------------------------------------------------------------------------
+  # vNext: Maturity-based constraints (v0.2.0)
+  # ---------------------------------------------------------------------------
+  maturity:
+    level: "entity"                    # boundary | entity | view
+    gate_evidence:
+      boundary_to_entity:              # Evidence for entity-level maturity
+        - "data-model.md で Entity 属性確定"
+        - "form_fields 全項目定義済み"
+      entity_to_view: []               # Evidence for view-level maturity
+    stability:
+      concerns_unchanged_since: null   # Plan reference (e.g., "plan#3") - REQUIRED for view level
+      routes_unchanged_since: null     # Plan reference for route stability
+      main_actions_complete: false     # All main actions have corresponding CanXxx()
+
+  structure:
+    subject: ""                        # Primary subject (Aggregate Root)
+    concerns:
+      - id: ""                         # e.g., "overview"
+        name: ""                       # e.g., "基本情報"
+        blocks: []                     # References to information_blocks.id
+        exclusivity: false             # If true, should not be displayed simultaneously with other exclusive concerns
+        comparability:                 # Optional: comparison display support
+          mode: ""                     # rows | columns | time
+          key: ""                      # Key field for comparison (e.g., "loanDate")
+
+  uiPolicy:
+    allowed_patterns: []               # e.g., ["ConcernSwitch", "CollectionBrowse"]
+    allowed_affordances: []            # e.g., ["exclusive-switch", "comparison"]
+    allowed_widgets: []                # e.g., ["accordion", "data-grid"]
+    denied_widgets: []                 # e.g., ["tab", "master-detail"]
+
+  uiPolicyOverrides:
+    - allow_widget: ""                 # Widget to allow despite maturity constraints
+      reason: ""                       # Justification (min 10 chars)
+      approved_by: ""                  # Approver (e.g., "UX", "Tech Lead")
+      approved_at: ""                  # Date of approval (YYYY-MM-DD)
+      violation_id: ""                 # ID of the lint rule being waived (e.g., "MATURITY-001")
+      scope: ""                        # screen | concern | block
 
   navigation:
     routes:
@@ -396,6 +567,72 @@ ai_guidance:
     - "ICONIX Boundary から UI を生成する際"
     - "既存画面の UX 品質を評価・改善する際"
     - "MudBlazor コンポーネントの選択に迷った際"
+    - "モデルの成熟度に応じてUI表現を段階化する際（vNext）"
+
+  # vNext: Maturity-based generation workflow
+  maturity_based_generation:
+    principle: |
+      モデルの具体度（成熟度）に応じて、UI表現の抽象度を段階的に下げる。
+      これにより、情報が足りない段階で具体UIを選ぶ破綻を防ぐ。
+
+    why_this_matters:
+      - "Boundary が Intent 中心の段階で Tab 構成を決めると、関心事の分割根拠がない"
+      - "モデルが具体化するほど「排他性」「比較性」が確定する"
+      - "Tab が成立する条件は「同一対象」「複数の関心事」「同時表示しない合理性」"
+
+    maturity_levels:
+      boundary:
+        description: "Intent中心・曖昧"
+        allowed_ui: "Flow / Section / Card"
+        characteristics:
+          - "ユーザーの意図（Intent）が主"
+          - "属性や操作が不明確"
+        example_condition: "Boundary に Intent しか定義されていない"
+
+      entity:
+        description: "Entity属性・操作明確"
+        allowed_ui: "+ Grid / Accordion / Grouping"
+        characteristics:
+          - "Entity の属性が確定"
+          - "入力項目が明確"
+          - "操作（Command）が定義済み"
+        example_condition: "data-model.md に属性定義があり、form_fields が埋まっている"
+
+      view:
+        description: "View確定・責務明確"
+        allowed_ui: "+ Tab / Master-Detail / Stepper"
+        characteristics:
+          - "関心領域（concerns）が安定"
+          - "状態遷移が確定"
+          - "画面責務が固定化"
+        example_condition: "concerns が前回 plan から変更なし、Entity.CanXxx() が全操作に対応"
+        requirement: "stability.concerns_unchanged_since が必須"
+
+    generation_steps:
+      - step: 1
+        name: "成熟度判定"
+        action: "モデルの具体度から maturity.level を決定"
+        rules:
+          - "属性未確定 → boundary"
+          - "属性確定・concerns未安定 → entity"
+          - "concerns安定・stability証拠あり → view"
+
+      - step: 2
+        name: "defaults 注入"
+        action: "maturity_defaults[level] を uiPolicy にコピー"
+        note: "出力 UI-IR は自己完結（外部参照なし）"
+
+      - step: 3
+        name: "structure 構築"
+        action: "concerns を定義し、information_blocks と紐付け"
+        rules:
+          - "各 concern の exclusivity を評価"
+          - "comparability があれば mode と key を設定"
+
+      - step: 4
+        name: "Lint 実行"
+        action: "ui-ir-lint-rules.yaml に基づき検証"
+        output: "pass | fail | pass_with_waivers"
 
   output_philosophy:
     principle: >
@@ -453,10 +690,44 @@ ai_guidance:
     - mistake: "削除ボタンに is_destructive フラグを設定しない"
       solution: "Delete, Remove, Cancel, Reject 等の破壊的操作は is_destructive: true を明示。danger_overrides でスタイルが自動適用される"
 
+    # vNext: Maturity-related mistakes
+    - mistake: "boundary/entity レベルで Tab を使用する"
+      solution: "Tab は view レベルでのみ許可。boundary/entity では accordion や inline-sections を使用"
+      vNext: true
+    - mistake: "view レベルなのに stability が未設定"
+      solution: "view レベルには concerns_unchanged_since が必須。plan 参照を設定する"
+      vNext: true
+    - mistake: "exclusivity=true の concern が複数あるのに exclusive-switch を許可しない"
+      solution: "排他的関心領域が複数ある場合、uiPolicy.allowed_affordances に 'exclusive-switch' を追加"
+      vNext: true
+    - mistake: "comparability を定義したのに comparison affordance がない"
+      solution: "比較表示が必要な concern には uiPolicy.allowed_affordances に 'comparison' を追加"
+      vNext: true
+    - mistake: "information_block が concerns から参照されていない（孤立ブロック）"
+      solution: "全ての information_blocks は最低1つの concern から参照されるべき。不要なら削除、意図的なら override を追加"
+      vNext: true
+    - mistake: "uiPolicyOverrides に approved_by がない"
+      solution: "全ての override には承認者（approved_by）が必須。監査のため空欄禁止"
+      vNext: true
+
 # -----------------------------------------------------------------------------
 # Changelog
 # -----------------------------------------------------------------------------
 changelog:
+  - version: 0.2.0
+    date: 2025-12-13
+    changes:
+      - "vNext: 成熟度（maturity）ベースのUI語彙制約を導入"
+      - "maturity セクション追加（level, gate_evidence, stability）"
+      - "structure セクション追加（subject, concerns with exclusivity/comparability）"
+      - "uiPolicy セクション追加（allowed_patterns/affordances/widgets, denied_widgets）"
+      - "uiPolicyOverrides セクション追加（例外承認システム）"
+      - "maturity_defaults 定義（boundary/entity/view ごとのデフォルト値）"
+      - "UX review に成熟度チェック（UX-006〜UX-010）を追加"
+      - "AI guidance に maturity_based_generation ワークフローを追加"
+      - "common_mistakes に成熟度関連のミスを追加"
+      - "enums に maturity_level, comparability_mode, override_scope, widgets を追加"
+
   - version: 0.1.0
     date: 2025-12-13
     changes:

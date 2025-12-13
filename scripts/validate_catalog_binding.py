@@ -31,20 +31,25 @@ def load_valid_pattern_ids(catalog_dir: Path) -> set[str]:
     if index_path.exists():
         try:
             data = json.loads(index_path.read_text(encoding="utf-8"))
-            # patterns 配列から id を抽出
-            for category_key in ["kernel", "scaffolds", "behaviors", "queries", "feature_slices", "ui_patterns", "advanced", "domain_patterns"]:
-                patterns = data.get("categories", {}).get(category_key, {}).get("patterns", [])
-                for p in patterns:
+            # Top-level patterns 配列から id を抽出（正本）
+            for p in data.get("patterns", []):
+                pid = p.get("id")
+                if pid:
+                    ids.add(pid)
+
+            # categories 配下にも patterns がある場合は収集（後方互換）
+            for category in (data.get("categories") or {}).values():
+                for p in category.get("patterns", []) if isinstance(category, dict) else []:
                     pid = p.get("id")
                     if pid:
                         ids.add(pid)
         except (json.JSONDecodeError, KeyError) as e:
             print(f"[WARN] Failed to parse {index_path}: {e}", file=sys.stderr)
 
-    # patterns/*.yaml から id を収集（バックアップ）
+    # patterns/**/*.yaml から id を収集（バックアップ）
     patterns_dir = catalog_dir / "patterns"
     if patterns_dir.exists():
-        for yaml_file in patterns_dir.glob("*.yaml"):
+        for yaml_file in patterns_dir.rglob("*.yaml"):
             # ファイル名から ID を推測（xxx.yaml -> xxx）
             # 実際の YAML パース無しで簡易的に取得
             stem = yaml_file.stem
@@ -73,10 +78,17 @@ def collect_used_pattern_ids_from_manifests(manifests_dir: Path) -> list[tuple[P
     for manifest in manifests_dir.rglob("*.yaml"):
         try:
             content = manifest.read_text(encoding="utf-8")
-            # pattern_selection セクションの id を抽出
+            # from_catalog のリスト要素のみを対象（catalog.id 等のメタ情報は除外）
             # 例: - id: feature-create-entity
-            for match in re.finditer(r'^\s*-?\s*id:\s*["\']?([a-z0-9-]+)["\']?\s*$', content, re.MULTILINE):
+            for match in re.finditer(r'^\s*-\s*id:\s*["\']?([a-z0-9-]+)["\']?\s*$', content, re.MULTILINE):
                 ids.append((manifest, match.group(1)))
+
+            # supplemental_guidance / creative_boundary で使われる pattern_id/provider も収集
+            for match in re.finditer(r'^\s*pattern_id:\s*["\']?([a-z0-9-]+)["\']?\s*$', content, re.MULTILINE):
+                ids.append((manifest, match.group(1)))
+            for match in re.finditer(r'^\s*provider:\s*["\']?([a-z0-9-]+)["\']?\s*$', content, re.MULTILINE):
+                ids.append((manifest, match.group(1)))
+
             # from_catalog セクションも確認
             for match in re.finditer(r'from_catalog:\s*\[([^\]]+)\]', content):
                 items = match.group(1).split(',')
