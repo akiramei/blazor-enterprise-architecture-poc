@@ -218,6 +218,47 @@ Boundaryは「正しいが無機質」であり、AIには以下の情報が不�
    component_mapping に従って Razor コンポーネントを生成
 ```
 
+### spec-kit 統合ワークフロー
+
+spec-kit を使用する場合、UI-IR は以下のフェーズで生成・参照されます：
+
+```
+/speckit.plan
+  ├── Phase 0.5: Catalog Pattern Selection
+  ├── Phase 1: Design & Contracts
+  ├── Phase 1.4: UI-IR Generation ← UI-IR 生成
+  │     ├── UI-IR スキーマ填充
+  │     ├── Derivation Rules 適用
+  │     ├── UX 自己評価
+  │     └── 出力: plan.md 要約 + .ui-ir.yaml
+  ├── Phase 1.5: Design-Level COMMON_MISTAKES Check
+  └── Phase 1.75: Spec/Plan Consistency Check
+
+/speckit.implement
+  ├── Step 0.4: Load UI-IR ← UI-IR 参照
+  │     └── component_mapping, confirmation_level 参照
+  ├── Phase 1: Implementation Plan
+  ├── Phase 2: Implementation
+  └── Phase 3: vsa-ui-enhancer (オプション)
+```
+
+**出力形式**:
+- **plan.md に要約**: UI-IR Summary セクション
+- **別ファイルに詳細**: `specs/{feature}/{slice}.ui-ir.yaml`
+
+### UI 出力思想
+
+> **重要**: UI は「完成品」ではなく「組み替え可能な構造」として出力する。
+
+| AI の責務 | 人間の責務 |
+|----------|----------|
+| 必要な入力項目が漏れていない | 配置の好み |
+| 操作がユースケースを完全にカバー | 情緒的な分かりやすさ |
+| 状態遷移とUIが矛盾しない | 強調・省略のバランス |
+| エラーケースが露出している | 組織文化への適合 |
+
+レイアウト指定は「推奨」であり「強制」ではない。
+
 ### UI-IRの主要セクション
 
 | セクション | 目的 |

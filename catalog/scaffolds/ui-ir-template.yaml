@@ -194,7 +194,7 @@ schema:
       - from_screen_id: ""
         to_screen_id: ""
         trigger: ""        # action_id or event
-        type: ""           # "push" | "replace" | "dialog"
+        type: ""           # push | replace | dialog | modal (enums.navigation_type)
     breadcrumbs: []        # optional
     deep_links: []         # optional
 
@@ -207,7 +207,7 @@ schema:
         refresh_trigger_action_id: ""# optional
         validation_mode: "Both"      # Client | Server | Both
         performance_expectation_ms: 300 # optional guideline (UX constraints)
-        caching: ""                  # optional "none|memory|etag"
+        caching: ""                  # none | memory | etag | localStorage (enums.caching_strategy)
 
   information_blocks:
     - id: ""                 # "blk-results"
@@ -396,6 +396,29 @@ ai_guidance:
     - "ICONIX Boundary から UI を生成する際"
     - "既存画面の UX 品質を評価・改善する際"
     - "MudBlazor コンポーネントの選択に迷った際"
+
+  output_philosophy:
+    principle: >
+      UI-IR は「完成したUI」ではなく「組み替え可能な構造」を出力する。
+      AI は論理的完全性（機能・要素の網羅性）を担保し、
+      レイアウトの最終調整は人間に委ねる。
+
+    ai_responsibility:
+      - 必要な入力項目が漏れていない
+      - 操作がユースケースを完全にカバーしている
+      - 状態遷移とUIが矛盾しない
+      - エラーケースが露出している
+
+    human_responsibility:
+      - 配置の好み
+      - 情緒的な分かりやすさ
+      - 強調・省略のバランス
+      - 組織文化への適合
+
+    layout_flexibility:
+      - レイアウト指定は「推奨」であり「強制」ではない
+      - importance/priority は参考情報として提供
+      - component_hint は上書き可能
 
   generation_workflow:
     step1:

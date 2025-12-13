@@ -132,6 +132,37 @@ Quote at least 3 relevant items:
 > - Value Objectの比較はインスタンス同士で行う
 ```
 
+### Step 0.4: Load UI-IR (UI がある場合)
+
+**条件**: `specs/{feature}/{slice}.ui-ir.yaml` が存在する場合のみ実行
+
+UI-IR が存在する場合、以下を読み込む：
+
+```
+Read: specs/{feature}/{slice}.ui-ir.yaml
+Read: catalog/scaffolds/ui-ir-template.yaml (component_mapping 参照)
+```
+
+**UI-IR から抽出する情報**:
+
+| セクション | 実装への適用 |
+|-----------|-------------|
+| main_actions.priority | MudButton の Variant/Color 決定 |
+| main_actions.confirmation_level | MudDialog/MudMessageBox 要否 |
+| main_actions.disabled_when | Entity.CanXxx() 参照パターン |
+| main_actions.is_destructive | danger_overrides（Color="Error"）適用 |
+| form_fields.type | MudBlazor フィールドコンポーネント選択 |
+| information_blocks.importance | 配置優先度の参考 |
+
+**レイアウトの位置付け**:
+
+UI-IR のレイアウト指定は「推奨」であり「強制」ではない。
+機能と要素の完全性を優先し、配置は人間が調整可能とする。
+
+**UI-IR がない場合**: このステップをスキップして Phase 1 へ進む
+
+> **参照**: UI 強化時の入力要件は `catalog/skills/vsa-ui-enhancer/input-requirements.md` を参照
+
 ---
 
 ## Phase 1: Implementation Plan

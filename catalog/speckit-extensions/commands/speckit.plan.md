@@ -268,6 +268,107 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **ルール**: Query の意味（semantic）を plan で明示し、使用すべき Repository メソッドを指定する。
 
+### Phase 1.4: UI-IR Schema Generation (UI がある場合のみ)
+
+**目的**: Boundary から UI 中間表現を生成し、画面品質を設計段階で保証する
+
+> **思想**: UI は「完成品」ではなく「組み替え可能な構造」として出力する。
+> AI は論理的完全性を担保し、レイアウトは人間に委ねる。
+
+#### 1.4.1 UI-IR 生成条件チェック
+
+以下の**いずれか**の条件を満たす場合に実行：
+
+| 条件 | 判定方法 |
+|------|---------|
+| Spec に UI 層が含まれる | `characteristics` に `layer:ui` または `layer:full-slice` がある |
+| Boundary セクションが存在 | Plan の Boundary セクションに Intent が定義されている |
+| UI 関連の FR がある | Spec の FR に「画面」「一覧」「フォーム」「ボタン」等の記述がある |
+
+**追加条件**（上記を満たした上で）：
+- Entity.CanXxx() メソッドが設計されている（disabled_when に必要）
+
+**条件を満たさない場合**: このフェーズをスキップして Phase 1.5 へ進む
+
+**判定ログ出力**（1行形式）:
+```
+UI-IR phase: run=true (layer=ui, boundary=true, ui_fr=true)
+UI-IR phase: run=false (layer=backend, boundary=false, ui_fr=false)
+```
+
+> **参照**: UI-IR 実装時の入力要件は `catalog/skills/vsa-ui-enhancer/input-requirements.md` を参照
+
+#### 1.4.2 UI-IR テンプレート読み込み
+
+```
+Read: catalog/scaffolds/ui-ir-template.yaml
+```
+
+#### 1.4.3 画面ごとに UI-IR スキーマ填充
+
+各画面について以下を定義：
+
+| セクション | 内容 |
+|-----------|------|
+| screen | id, name, primary_user_intent |
+| data.bindings | Query/Command マッピング |
+| main_actions | priority, frequency, error_cost, is_destructive |
+| secondary_actions | 補助操作 |
+| information_blocks | 表示情報の優先度 |
+| form_fields | 入力項目（該当する場合） |
+
+#### 1.4.4 Derivation Rules 適用
+
+confirmation_level を自動算出：
+
+```
+if error_cost in [Negligible, Low] and reversibility == Reversible:
+  confirmation_level = None
+elif error_cost == Medium:
+  confirmation_level = Simple
+elif error_cost == High:
+  confirmation_level = Detailed
+elif error_cost == Critical or reversibility == Irreversible:
+  confirmation_level = DoubleConfirm
+```
+
+#### 1.4.5 UX 自己評価
+
+ux_review.mandatory_checks 全5項目を検証：
+
+```
+□ UX-001: Primary アクションは画面に1つのみか
+□ UX-002: Irreversible/error_cost>=High に確認があるか
+□ UX-003: Critical importance がファーストビューにあるか
+□ UX-004: Entity.CanXxx() が UI の disabled に反映されているか
+□ UX-005: VeryHigh/High 操作が1クリック以内か
+```
+
+違反があれば UI-IR を自己修正。
+
+#### 1.4.6 出力
+
+**plan.md に要約セクション追加**:
+
+```markdown
+## UI-IR Summary
+
+| Screen | Primary Action | Confirmation | Notes |
+|--------|---------------|--------------|-------|
+| ProductSearch | 検索 | None | - |
+| ProductDelete | 削除 | DoubleConfirm | 破壊的操作 |
+
+詳細: specs/{feature}/{slice}.ui-ir.yaml
+```
+
+**別ファイル出力**:
+
+```
+specs/{feature}/{slice}.ui-ir.yaml
+```
+
+**Output**: Plan with UI-IR Summary section, separate .ui-ir.yaml file
+
 ### Phase 1.5: Design-Level COMMON_MISTAKES Check (CRITICAL - AUTO)
 
 **This check is MANDATORY and runs AUTOMATICALLY after Phase 1.**
