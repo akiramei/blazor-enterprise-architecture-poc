@@ -71,6 +71,8 @@ policy_boundaries:
     # 各値でのシナリオ
     scenarios:
       - value: "{enum_value_1}"
+        # シナリオの前提（省略可）
+        precondition: "{前提条件}"
         expected:
           result: "success"  # success | failure
           behavior: "{期待動作の説明}"
@@ -84,6 +86,7 @@ policy_boundaries:
               field: "{field}"
               value: "{expected_value}"
       - value: "{enum_value_2}"
+        precondition: "{前提条件}"
         expected:
           result: "failure"
           behavior: "{期待動作の説明}"
@@ -133,9 +136,9 @@ minimal_set:
     - "E2E-B2"
   # テスト数の目安
   target_count:
-    e2e_flows: 2-3      # 状態遷移フロー数
-    policy_boundaries: 2-4  # ポリシー境界テスト数
-    invariants: 3-5     # 不変条件チェック数
+    e2e_flows: "2-3"          # 状態遷移フロー数
+    policy_boundaries: "2-4"  # ポリシー境界テスト数
+    invariants: "3-5"         # 不変条件チェック数
 
 # ---
 # 生成対象（Generation Targets）- 将来用

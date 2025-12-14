@@ -165,11 +165,11 @@ decisions.yaml（Layer 1/2/3）
   │              │
   │              └─→ C. 不変条件（domain_rules.type=invariant）
   │
-  └─ Layer 3 → 記録のみ
-                 ↓
-            e2e-spec.yaml
-                 ↓
-            E2Eテスト実装（Playwright等）
+  └─ Layer 3 → 記録のみ（背景・リスク・例外）
+                 │
+                 └─→ decisions/policy/command-spec を束ねて e2e-spec.yaml を作成
+                         ↓
+                    E2Eテスト実装（Playwright等）
 ```
 
 ---
