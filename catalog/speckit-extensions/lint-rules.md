@@ -360,7 +360,11 @@ library_policy:
 
 ### L601: 未離散化キーワードの検出
 
-**対象**: spec.yaml, decisions.yaml の `original_text`, `question`
+**対象**:
+- spec.yaml（全文）
+- decisions.yaml の `question`, `options`, `selected`
+
+> **注意**: `original_text` は「元の曖昧な表現」を保存するため、検出対象に含めない。
 
 **ルール**: 以下のキーワードが残っている場合は fail
 
@@ -401,7 +405,7 @@ description: "適切な期間内に処理する"  # L601 違反
 
 ---
 
-### L602: WAIVED の理由欠落
+### L602: waiver の理由欠落
 
 **対象**: decisions.yaml
 

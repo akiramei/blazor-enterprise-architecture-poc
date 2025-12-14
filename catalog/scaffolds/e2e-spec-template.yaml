@@ -1,0 +1,322 @@
+# E2E Spec Template
+#
+# 目的: E2Eテスト仕様を定義するテンプレート（量子化フレームワークと連携）
+#
+# バージョン: v1.0.0
+# 作成日: 2025-12-15
+#
+# 使用方法:
+#   1. decisions.yaml / policy.yaml / command-spec.yaml を作成
+#   2. この形式で e2e-spec.yaml を作成
+#   3. E2Eテスト実装（Playwright等）の入力として使用
+#
+# 配置場所:
+#   specs/{feature}/{slice}.e2e-spec.yaml
+#
+# 関連ドキュメント:
+#   - ../speckit-extensions/e2e-testing-guide.md
+#   - ./command-spec-template.yaml
+#   - ./policy-template.yaml
+
+schema_version: "1.0.0"
+
+# メタデータ
+metadata:
+  feature: "{feature_name}"         # 例: Loan, Reservation
+  slice: "{slice_name}"             # 例: LoanManagement
+  generated_from:
+    decisions: "specs/{feature}/{slice}.decisions.yaml"
+    policy: "specs/{feature}/{slice}.policy.yaml"
+    command_spec: "specs/{feature}/{slice}.command-spec.yaml"
+
+# ---
+# A. 状態遷移の骨（State Transition Flows）
+# ---
+# 長い業務フローの「骨」をテストする
+# 導出元: command-spec.yaml の state_transitions
+state_transition_flows:
+  - id: "E2E-A{n}"
+    name: "{フロー名}"
+    description: "{フローの説明}"
+    priority: "required"  # required | recommended | optional
+    # フローのステップ
+    steps:
+      - action: "{CommandName}"
+        from_state: "{State}"
+        to_state: "{State}"
+        # 期待される結果（省略可）
+        expected:
+          result: "success"  # success | failure
+          message: "{期待メッセージ}"
+      # 複数ステップを連結
+      - action: "{NextCommandName}"
+        from_state: "{State}"
+        to_state: "{State}"
+    # このフローに関連する command-spec.yaml の参照
+    derived_from:
+      - state_transitions: ["T1", "T2"]
+
+# ---
+# B. ポリシー境界（Policy Boundaries）
+# ---
+# policy.yaml の値で結果が変わる「境界」をテストする
+# 導出元: policy.yaml の enum フィールド
+policy_boundaries:
+  - id: "E2E-B{n}"
+    name: "{境界テスト名}"
+    description: "{テストの説明}"
+    priority: "required"  # required | recommended | optional
+    # テスト対象のポリシーキー
+    policy_key: "{domain}_policy.{category}.{setting}"
+    # 各値でのシナリオ
+    scenarios:
+      - value: "{enum_value_1}"
+        expected:
+          result: "success"  # success | failure
+          behavior: "{期待動作の説明}"
+          # 検証ポイント（省略可）
+          assertions:
+            - type: "ui_element"
+              selector: "[data-testid='{id}']"
+              state: "visible"  # visible | hidden | disabled
+            - type: "domain_state"
+              entity: "{Entity}"
+              field: "{field}"
+              value: "{expected_value}"
+      - value: "{enum_value_2}"
+        expected:
+          result: "failure"
+          behavior: "{期待動作の説明}"
+          error_code: "{ERROR_CODE}"
+    # pairwise 適用時のヒント（省略可）
+    pairwise_hint:
+      combine_with: []  # 他の policy_key との組み合わせ
+      max_combinations: 6  # 最大組み合わせ数
+
+# ---
+# C. 不変条件（Invariants）
+# ---
+# E2E後に必ず検査する「安全柵」
+# 導出元: command-spec.yaml の domain_rules（type: invariant）
+invariants:
+  - id: "E2E-C{n}"
+    description: "{不変条件の説明}"
+    priority: "required"  # required | recommended | optional
+    # 検査タイミング
+    check_after:
+      - "E2E-A1"  # 特定のフロー後
+      - "E2E-B1"  # 特定の境界テスト後
+      - "all"     # すべてのE2E後
+    # 検査方法
+    check:
+      type: "sql_query"  # sql_query | api_call | domain_assertion
+      # sql_query の場合
+      query: |
+        SELECT COUNT(*) FROM {table}
+        WHERE {condition}
+      expected: 0  # 期待する結果
+    # 対応する command-spec.yaml の参照
+    derived_from:
+      domain_rules: ["R1"]
+
+# ---
+# 推奨最小セット（Minimal Set）
+# ---
+# このスライスで必須のE2Eテストセット
+minimal_set:
+  required:
+    - "E2E-A1"  # 最も基本的なフロー
+    - "E2E-B1"  # 最も影響が大きいポリシー境界
+    - "E2E-C1"  # 最も重要な不変条件
+  recommended:
+    - "E2E-A2"
+    - "E2E-B2"
+  # テスト数の目安
+  target_count:
+    e2e_flows: 2-3      # 状態遷移フロー数
+    policy_boundaries: 2-4  # ポリシー境界テスト数
+    invariants: 3-5     # 不変条件チェック数
+
+# ---
+# 生成対象（Generation Targets）- 将来用
+# ---
+# このスキーマからテストコードを生成する場合の設定
+generation_targets:
+  playwright:
+    enabled: false  # 将来の自動生成用
+    output: "tests/{Feature}.E2ETests/"
+    template: "playwright-from-e2e-spec"
+
+# ============================================================
+# 使用例
+# ============================================================
+example:
+  metadata:
+    feature: "Loan"
+    slice: "LoanManagement"
+    generated_from:
+      decisions: "specs/loan/loan-management.decisions.yaml"
+      policy: "specs/loan/loan-management.policy.yaml"
+      command_spec: "specs/loan/loan-management.command-spec.yaml"
+
+  state_transition_flows:
+    - id: E2E-A1
+      name: "Happy path: 貸出→返却"
+      description: "最も基本的な貸出・返却フロー"
+      priority: required
+      steps:
+        - action: CreateLoan
+          from_state: Available
+          to_state: OnLoan
+          expected:
+            result: success
+        - action: ReturnLoan
+          from_state: OnLoan
+          to_state: Available
+          expected:
+            result: success
+      derived_from:
+        state_transitions: [T1, T2]
+
+    - id: E2E-A2
+      name: "予約→Ready→貸出フロー"
+      description: "予約者が Ready 状態から貸出するフロー"
+      priority: required
+      steps:
+        - action: CreateReservation
+          from_state: OnLoan
+          to_state: Reserved
+          expected:
+            result: success
+        - action: ReturnLoan
+          from_state: OnLoan
+          to_state: Available
+          expected:
+            result: success
+            message: "予約者に Ready 通知"
+        - action: CreateLoan
+          from_state: Ready
+          to_state: OnLoan
+          expected:
+            result: success
+      derived_from:
+        state_transitions: [T3, T2, T4]
+
+  policy_boundaries:
+    - id: E2E-B1
+      name: "延滞ブロック境界"
+      description: "延滞者への貸出可否をポリシーで切り替え"
+      priority: required
+      policy_key: library_policy.loan.overdue_enforcement
+      scenarios:
+        - value: HARD
+          expected:
+            result: failure
+            behavior: "延滞者は貸出拒否"
+            error_code: MEMBER_BLOCKED
+            assertions:
+              - type: ui_element
+                selector: "[data-testid='error-message']"
+                state: visible
+        - value: SOFT
+          expected:
+            result: success
+            behavior: "貸出成功 + 警告表示"
+            assertions:
+              - type: ui_element
+                selector: "[data-testid='warning-message']"
+                state: visible
+        - value: NONE
+          expected:
+            result: success
+            behavior: "通常通り貸出"
+      pairwise_hint:
+        combine_with: []
+        max_combinations: 3
+
+    - id: E2E-B2
+      name: "予約上限境界"
+      description: "予約上限に達した場合の動作"
+      priority: recommended
+      policy_key: library_policy.reservation.max_active_per_member
+      scenarios:
+        - value: 3
+          expected:
+            result: success
+            behavior: "3件目まで予約可能"
+        - value: 3
+          precondition: "既に3件予約済み"
+          expected:
+            result: failure
+            behavior: "4件目は予約拒否"
+            error_code: RESERVATION_LIMIT_EXCEEDED
+
+  invariants:
+    - id: E2E-C1
+      description: "同一 Copy に2つの未返却 Loan が存在しない"
+      priority: required
+      check_after: [E2E-A1, E2E-A2]
+      check:
+        type: sql_query
+        query: |
+          SELECT CopyId, COUNT(*) as LoanCount
+          FROM Loans
+          WHERE ReturnedAt IS NULL
+          GROUP BY CopyId
+          HAVING COUNT(*) > 1
+        expected: 0
+      derived_from:
+        domain_rules: [R1]
+
+    - id: E2E-C2
+      description: "Ready 状態の予約があるなら Copy は Reserved"
+      priority: required
+      check_after: [E2E-A2]
+      check:
+        type: sql_query
+        query: |
+          SELECT r.Id
+          FROM Reservations r
+          JOIN Copies c ON r.CopyId = c.Id
+          WHERE r.Status = 'Ready'
+            AND c.Status != 'Reserved'
+        expected: 0
+      derived_from:
+        domain_rules: [R2]
+
+    - id: E2E-C3
+      description: "予約の Position が一意で連続"
+      priority: required
+      check_after: [all]
+      check:
+        type: sql_query
+        query: |
+          SELECT BookId, Position, COUNT(*) as Cnt
+          FROM Reservations
+          WHERE Status = 'Waiting'
+          GROUP BY BookId, Position
+          HAVING COUNT(*) > 1
+        expected: 0
+      derived_from:
+        domain_rules: [R3]
+
+  minimal_set:
+    required:
+      - E2E-A1
+      - E2E-A2
+      - E2E-B1
+      - E2E-C1
+      - E2E-C2
+      - E2E-C3
+    recommended:
+      - E2E-B2
+    target_count:
+      e2e_flows: 2
+      policy_boundaries: 2
+      invariants: 3
+
+  generation_targets:
+    playwright:
+      enabled: false
+      output: "tests/Loan.E2ETests/"
+      template: "playwright-from-e2e-spec"

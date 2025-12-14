@@ -2,9 +2,9 @@
 
 > **目的**: 曖昧な仕様に遭遇した際の対処フローと意思決定記録（Layer 1/2/3）の方法を定義する
 >
-> **バージョン**: v2.1.0
+> **バージョン**: v2.2.0
 > **作成日**: 2025-12-09
-> **更新日**: 2025-12-14
+> **更新日**: 2025-12-15
 
 ---
 
@@ -19,6 +19,7 @@
 - **出力先（output_target）**を明確にし、policy/validator/domain に落とす
 - **L6xx（未離散化検証）**で工程抜けを fail として検出する
 - **decisions diff** をレビューの主戦場にする（PRテンプレート連携）
+- **E2Eテスト**と接続し、少数・高価値なテストを導出する（→ `e2e-testing-guide.md`）
 
 ---
 
@@ -91,7 +92,14 @@ discretization-questions.yaml で質問生成
 lint-rules.md（L6xx → L1xx..L5xx）
   ↓
 Spec.Assumptions に反映（SSOT維持）
+  ↓
+{slice}.e2e-spec.yaml（E2Eテスト仕様）
+  ├─ A. state_transition_flows（状態遷移の骨）
+  ├─ B. policy_boundaries（ポリシー境界）
+  └─ C. invariants（不変条件）
 ```
+
+詳細は `e2e-testing-guide.md` を参照。
 
 ---
 
@@ -115,6 +123,13 @@ Spec.Assumptions に反映（SSOT維持）
 - 形式: `catalog/scaffolds/command-spec-template.yaml`
 - 配置: `specs/{feature}/{slice}.command-spec.yaml`
 - 目的: Layer 2 を **Validator / Entity.CanXxx() / Result.Failure** に直結させる
+
+### e2e-spec.yaml（E2Eテスト仕様）
+
+- 形式: `catalog/scaffolds/e2e-spec-template.yaml`
+- 配置: `specs/{feature}/{slice}.e2e-spec.yaml`
+- 目的: 量子化成果物から **少数・高価値なE2Eテスト** を導出する
+- 詳細: `e2e-testing-guide.md`
 
 ---
 
@@ -242,6 +257,8 @@ public sealed class Xxx
 - `../scaffolds/decisions-template.yaml` - 意思決定スキーマ（Layer 3 拡張含む）
 - `../scaffolds/policy-template.yaml` - Layer 1 → policy DSL
 - `../scaffolds/command-spec-template.yaml` - Layer 2 → Validator/CanXxx 直結
+- `../scaffolds/e2e-spec-template.yaml` - E2Eテスト仕様テンプレート
+- `e2e-testing-guide.md` - E2Eテストと量子化フレームワークの統合ガイド
 - `lint-rules.md` - 破綻検知（L6xx〜L5xx）
 - `undiscretized-detection.md` - 未離散化検出ガイド
 - `spec-plan-consistency.md` - SSOT ルール定義
@@ -253,6 +270,7 @@ public sealed class Xxx
 
 | バージョン | 日付 | 変更内容 |
 |-----------|------|---------|
+| v2.2.0 | 2025-12-15 | E2Eテストガイド（e2e-testing-guide.md）への参照追加、統合フローにe2e-spec.yaml追加 |
 | v2.1.0 | 2025-12-14 | command-spec 追加、decisions diff の判断基準（互換性/移行/レビュー観点）追加 |
 | v2.0.0 | 2025-12-14 | 3層アーキテクチャ + 7±2 ルール + policy/lint 統合フローを追加 |
 | v1.0.0 | 2025-12-09 | 初版リリース |
