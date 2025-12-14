@@ -1,0 +1,555 @@
+# ============================================================================
+# decisions-template.yaml
+# 離散化された意思決定を記録するスキーマ
+# ============================================================================
+#
+# 目的:
+#   自然言語の要求仕様に内包された曖昧さを「意思決定」として離散化し、
+#   追跡可能な形式で記録する。
+#
+# 背景:
+#   DSLは「記述の曖昧さ」を解決するが、以下の曖昧さは解決しない:
+#   - 語彙の曖昧さ（「適切」「早い」「十分」）
+#   - 境界の曖昧さ（どこまでやる？例外は？）
+#   - 価値判断の曖昧さ（何を優先する？）
+#
+#   このスキーマは、これらの曖昧さを「決定ポイント」として明示化し、
+#   選択肢から選択することで離散化する。
+#
+# 配置場所:
+#   specs/{feature}/{slice}.decisions.yaml
+#
+# 関連ドキュメント:
+#   - catalog/speckit-extensions/decision-guide.md
+#   - catalog/speckit-extensions/discretization-questions.yaml
+#   - catalog/speckit-extensions/undiscretized-detection.md
+#   - catalog/speckit-extensions/lint-rules.md
+#   - catalog/scaffolds/policy-template.yaml
+#
+# ============================================================================
+
+id: decisions-template
+version: 2.1.0
+name: 意思決定テンプレート（離散化スキーマ）
+category: scaffold
+intent: 要求仕様の曖昧さを意思決定として離散化し、追跡可能にする
+
+# ============================================================================
+# 3層アーキテクチャ（AI追従型・仕様量子化）
+# ============================================================================
+#
+# AIに一気に高精度を要求しない代わりに、壊れにくい層から積み上げる。
+#
+# Layer 1: コア離散（AIが最も得意）
+#   - 状態機械（State）
+#   - 役割（Role）
+#   - 許可/禁止（Allow/Deny）
+#   - 例外カテゴリ（Exception Type）
+#   - 主要制約（Must / MustNot）
+#   → 出力: policy DSL（設定値中心のYAML）
+#
+# Layer 2: ルール化（条件→結果）
+#   - `if <condition> then <action>` の形に落とす
+#   - 条件はなるべく「単純な述語のAND」に限定
+#   → 出力: ルールエンジン / Validator
+#
+# Layer 3: ニュアンス保管（AIの自動実装の入力にしない）
+#   - "なぜそう決めたか"の rationale
+#   - 代替案と却下理由
+#   - 未決事項（Decision Log）
+#   → 出力: なし（将来の高精度化用のトラック）
+#
+# ============================================================================
+
+# ============================================================================
+# 7±2 ルール（認知負荷とAI能力の制約）
+# ============================================================================
+#
+# 1概念あたりの段階数は 3〜7 に抑える。
+# 多すぎると境界が崩れ、AIが誤解しやすくなる。
+#
+# 例:
+#   OK: NONE / SOFT / HARD（3段階）
+#   OK: LOW / MEDIUM / HIGH / CRITICAL（4段階）
+#   NG: 10段階以上の細かい分類
+#
+# このルールは以下に適用される:
+#   - options（選択肢）: 最大7個
+#   - policy_levels.levels: 最大7段階
+#   - exception_types: 最大7種類
+#
+# ============================================================================
+
+# ============================================================================
+# スキーマ定義
+# ============================================================================
+
+schema:
+  meta:
+    description: メタ情報
+    fields:
+      feature:
+        type: string
+        required: true
+        description: 機能名
+      slice:
+        type: string
+        required: true
+        description: スライス名
+      spec_path:
+        type: string
+        required: true
+        description: 対応するspec.yamlへの相対パス
+      created_at:
+        type: datetime
+        required: true
+        description: 作成日時
+      updated_at:
+        type: datetime
+        required: false
+        description: 更新日時
+      author:
+        type: string
+        required: true
+        description: 決定者（human / ai+human-review）
+
+  decisions:
+    description: 離散化された意思決定のリスト
+    type: array
+    items:
+      id:
+        type: string
+        required: true
+        description: 決定ポイントID（D1, D2, ...）
+      layer:
+        type: enum
+        required: true
+        values:
+          - 1  # コア離散（状態、役割、許可/禁止）→ policy DSL へ出力
+          - 2  # ルール化（if/then）→ Validator へ出力
+          - 3  # ニュアンス保管（rationale）→ AI入力にしない
+        description: |
+          3層アーキテクチャのどの層に属するか
+          Layer 1: AIが最も得意。enum/固定値として policy DSL に出力
+          Layer 2: 条件→結果のルール。Validator や判定ロジックに出力
+          Layer 3: 根拠・代替案。将来の高精度化用に保管のみ
+      category:
+        type: enum
+        required: true
+        values:
+          - vocabulary      # 語彙の曖昧さ（「適切」「早い」等）
+          - boundary        # 境界の曖昧さ（範囲、閾値）
+          - value_judgment  # 価値判断の曖昧さ（優先順位）
+          - description     # 記述の曖昧さ（主語抜け等）
+        description: 曖昧さの種類
+      original_text:
+        type: string
+        required: true
+        description: 元の曖昧な表現（specからの引用）
+      question:
+        type: string
+        required: true
+        description: 離散化のための質問
+      options:
+        type: array
+        required: true
+        max_items: 7  # 7±2ルール: 最大7個
+        description: 選択肢のリスト（7±2ルール: 最大7個）
+      selected:
+        type: string
+        required: true
+        description: 選択された値
+      rationale:
+        type: string
+        required: true
+        description: 選択の根拠（Layer 3 として保管）
+      alternatives:
+        type: array
+        required: false
+        description: 検討した代替案と却下理由（Layer 3 として保管）
+      # =====================================================================
+      # Layer 3 拡張フィールド（監査ログとして今すぐ価値が出る）
+      # =====================================================================
+      risk:
+        type: string
+        required: false
+        description: |
+          この決定に伴うリスク（Layer 3 として保管）
+          例: "閾値を短くすると誤検知が増える可能性"
+      impact:
+        type: string
+        required: false
+        description: |
+          この決定の影響範囲（Layer 3 として保管）
+          例: "全会員の貸出フローに影響"
+      fallback:
+        type: string
+        required: false
+        description: |
+          迷ったらどちらに倒すか（Layer 3 として保管）
+          例: "安全側（HARD）に倒す"
+      waiver:
+        type: object
+        required: false
+        description: |
+          L601（未離散化キーワード）を意図的にスキップする場合の記録
+        fields:
+          rule:
+            type: string
+            description: スキップするルールID（例: L601）
+          reason:
+            type: string
+            required: true
+            description: スキップの理由（必須）
+          owner:
+            type: string
+            description: 決定者（human / ai+human-review）
+          expires:
+            type: date
+            description: 再検討期限（YYYY-MM-DD）
+      spec_reflection:
+        type: enum
+        required: true
+        values:
+          - pending         # Spec未反映
+          - reflected       # Spec反映済み
+          - not_required    # Spec反映不要（実装時のみ影響）
+        description: Specへの反映状態
+      output_target:
+        type: enum
+        required: false
+        values:
+          - policy_dsl      # policy.yaml に出力
+          - validator       # FluentValidation に出力
+          - domain_logic    # Entity.CanXxx() に出力
+          - none            # 出力なし（Layer 3）
+        description: この決定の出力先（layer から自動推定可能）
+
+  policy_levels:
+    description: 連続的な運用判断を段階に離散化（Layer 1 の出力対象）
+    type: array
+    layer: 1  # 常に Layer 1（コア離散）として policy DSL に出力
+    items:
+      name:
+        type: string
+        required: true
+        description: ポリシー名
+      description:
+        type: string
+        required: false
+        description: ポリシーの説明
+      levels:
+        type: array
+        required: true
+        max_items: 7  # 7±2ルール: 最大7段階
+        description: 段階のリスト（7±2ルール: 最大7段階）
+      default:
+        type: string
+        required: true
+        description: デフォルト値
+      rationale:
+        type: string
+        required: true
+        description: デフォルト選択の根拠
+      override_rules:
+        type: array
+        required: false
+        description: 上書きルール（誰が、どこまで変更可能か）
+
+  priority_rules:
+    description: 衝突時の優先順位ルール
+    type: array
+    items:
+      context:
+        type: string
+        required: true
+        description: 衝突が発生する文脈
+      order:
+        type: array
+        required: true
+        description: 優先順位（先頭が最優先）
+      rationale:
+        type: string
+        required: false
+        description: 優先順位の根拠
+
+  exception_types:
+    description: 例外の型化（羅列ではなく分類）（Layer 1 の出力対象）
+    type: array
+    layer: 1  # 常に Layer 1（コア離散）として policy DSL に出力
+    max_items: 7  # 7±2ルール: 最大7種類
+    items:
+      type:
+        type: string
+        required: true
+        description: 例外の型名（AUTH, VALIDATION, CONFLICT等）
+      description:
+        type: string
+        required: true
+        description: 例外の説明
+      handling:
+        type: string
+        required: true
+        description: 処理方法
+
+# ============================================================================
+# テンプレート
+# ============================================================================
+
+template: |
+  # Decisions: {機能名} / {スライス名}
+
+  ## Meta
+
+  meta:
+    feature: "{機能名}"
+    slice: "{スライス名}"
+    spec_path: "./{スライス名}.spec.yaml"
+    created_at: "{作成日時}"
+    author: "ai+human-review"
+
+  ## Decisions（意思決定）
+
+  decisions:
+    - id: D1
+      layer: {1 | 2 | 3}  # 1=コア離散, 2=ルール化, 3=ニュアンス
+      category: {vocabulary | boundary | value_judgment | description}
+      original_text: "{元の曖昧な表現}"
+      question: "{離散化のための質問}"
+      options:  # 7±2ルール: 最大7個
+        - "{選択肢1}"
+        - "{選択肢2}"
+        - "{選択肢3}"
+      selected: "{選択された値}"
+      rationale: "{選択の根拠}"
+      alternatives:  # Layer 3 として保管（optional）
+        - option: "{代替案}"
+          rejected_reason: "{却下理由}"
+      # Layer 3 拡張（監査ログ）
+      risk: "{この決定に伴うリスク}"
+      impact: "{この決定の影響範囲}"
+      fallback: "{迷ったらどちらに倒すか}"
+      spec_reflection: pending
+      output_target: {policy_dsl | validator | domain_logic | none}
+
+  ## Policy Levels（ポリシー段階）
+
+  policy_levels:
+    - name: "{ポリシー名}"
+      description: "{ポリシーの説明}"
+      levels:
+        - NONE
+        - SOFT
+        - HARD
+      default: HARD
+      rationale: "{デフォルト選択の根拠}"
+      override_rules:
+        - role: librarian
+          max_level: SOFT
+        - role: admin
+          max_level: NONE
+
+  ## Priority Rules（優先順位ルール）
+
+  priority_rules:
+    - context: "{衝突が発生する文脈}"
+      order:
+        - "{最優先}"
+        - "{次点}"
+        - "{最後}"
+      rationale: "{優先順位の根拠}"
+
+  ## Exception Types（例外の型）
+
+  exception_types:
+    - type: "{例外の型名}"
+      description: "{例外の説明}"
+      handling: "{処理方法}"
+
+# ============================================================================
+# 使用例（図書館システム: 延滞者の貸出制御）
+# ============================================================================
+
+example:
+  meta:
+    feature: "Loan"
+    slice: "OverdueControl"
+    spec_path: "./OverdueControl.spec.yaml"
+    created_at: "2025-12-14T10:00:00Z"
+    author: "ai+human-review"
+
+  decisions:
+    - id: D1
+      layer: 1  # コア離散 → policy DSL へ
+      category: boundary
+      original_text: "延滞している利用者には、新しい本を貸し出さない"
+      question: "延滞と判定する閾値は？"
+      options:
+        - "1日以上"
+        - "7日以上"
+        - "30日以上"
+      selected: "7日以上"
+      rationale: "図書館の延滞処理業務サイクルが週次のため"
+      # Layer 3 拡張（監査ログ）
+      risk: "閾値を短くすると、軽微な遅延でも貸出禁止になり利用者体験が悪化"
+      impact: "全会員の貸出フローに影響"
+      fallback: "迷った場合は7日（業務サイクルに合わせる）"
+      spec_reflection: reflected
+      output_target: policy_dsl
+
+    - id: D2
+      layer: 1  # コア離散 → policy DSL へ
+      category: vocabulary
+      original_text: "柔軟に対応できるようにしたい"
+      question: "「柔軟」の具体的な意味は？"
+      options:
+        - "警告のみで貸出可能"
+        - "職員が解除可能"
+        - "管理者のみ解除可能"
+      selected: "職員が解除可能"
+      rationale: "現場の判断を尊重しつつ、一定の制約を維持"
+      alternatives:
+        - option: "システム管理者のみ解除可能"
+          rejected_reason: "現場の運用負荷が高くなる"
+      # Layer 3 拡張（監査ログ）
+      risk: "職員の裁量が大きすぎると、ルールが形骸化する可能性"
+      impact: "職員の操作権限、監査ログの設計に影響"
+      fallback: "迷った場合は厳格側（管理者のみ）に倒す"
+      spec_reflection: reflected
+      output_target: policy_dsl
+
+    - id: D3
+      layer: 2  # ルール化 → Validator / domain_logic へ
+      category: boundary
+      original_text: "ただし、状況によっては"
+      question: "例外を認める条件は？"
+      options:
+        - "資料種別による（児童書等）"
+        - "利用者区分による（研究者等）"
+        - "職員の手動判断"
+        - "上記すべて"
+      selected: "上記すべて"
+      rationale: "複数の例外ルートを設け、柔軟性を確保"
+      # Layer 3 拡張（監査ログ）
+      risk: "例外ルートが多すぎると、優先順位の衝突が発生しやすい"
+      impact: "例外判定ロジック（Entity.CanXxx）の複雑化"
+      fallback: "迷った場合は例外を認めない（厳格側）"
+      spec_reflection: reflected
+      output_target: domain_logic
+
+  policy_levels:
+    - name: overdue_action
+      description: "延滞時の貸出制御レベル"
+      levels:
+        - NONE      # 制限なし
+        - SOFT      # 警告のみ
+        - HARD      # 貸出不可
+      default: HARD
+      rationale: "未返却本の増加を防ぐため、デフォルトは厳格"
+      override_rules:
+        - role: librarian
+          max_level: SOFT
+          description: "図書館員は警告レベルまで緩和可能"
+        - role: admin
+          max_level: NONE
+          description: "管理者は完全解除可能"
+
+  priority_rules:
+    - context: "基本ルールと例外が衝突した場合"
+      order:
+        - HARD
+        - SOFT
+        - NONE
+      rationale: "より厳格なルールが優先される"
+
+    - context: "複数の例外条件が該当した場合"
+      order:
+        - "user_role"      # 利用者区分
+        - "material_type"  # 資料種別
+        - "manual_override" # 手動解除
+      rationale: "利用者の特権を最優先"
+
+  exception_types:
+    - type: MATERIAL_TYPE
+      description: "資料種別による例外"
+      handling: "児童書は SOFT に緩和"
+    - type: USER_ROLE
+      description: "利用者区分による例外"
+      handling: "研究者は SOFT に緩和"
+    - type: MANUAL_OVERRIDE
+      description: "職員による手動解除"
+      handling: "解除理由の記録必須"
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_use:
+    - "spec.yaml に曖昧な表現がある場合"
+    - "連続的な値を離散化する必要がある場合"
+    - "優先順位や衝突ルールを定義する必要がある場合"
+    - "例外を型化・分類する必要がある場合"
+
+  workflow:
+    - step: 1
+      action: "spec.yaml を読み、曖昧な表現を特定"
+      tool: "undiscretized-detection.md のシグナルを参照"
+    - step: 2
+      action: "曖昧さの種類を分類（vocabulary/boundary/value_judgment/description）"
+      tool: "decision-guide.md の Step 1 を参照"
+    - step: 3
+      action: "離散化質問を作成"
+      tool: "discretization-questions.yaml を参照"
+    - step: 4
+      action: "選択肢を列挙し、決定を記録"
+      output: "{slice}.decisions.yaml"
+    - step: 5
+      action: "決定をspec.yamlのAssumptionsに反映"
+      verification: "spec_reflection を reflected に更新"
+
+  common_mistakes:
+    - mistake: "曖昧な表現をそのまま decisions に記録"
+      severity: high
+      solution: "元の曖昧な表現を original_text に、離散化後の選択を selected に記録"
+
+    - mistake: "rationale を省略"
+      severity: critical
+      solution: "すべての決定に根拠を記録。将来の変更時に必要"
+
+    - mistake: "spec への反映を忘れる"
+      severity: high
+      solution: "spec_reflection で反映状態を追跡"
+
+    - mistake: "優先順位ルールを定義しない"
+      severity: medium
+      solution: "衝突が発生しうる場合は priority_rules を必ず定義"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 2.1.0
+    date: 2025-12-14
+    changes:
+      - "Layer 3 拡張フィールド追加: risk, impact, fallback"
+      - "waiver フィールド追加（L601 スキップ時の理由記録）"
+      - "監査ログとしての即時活用を想定"
+
+  - version: 2.0.0
+    date: 2025-12-14
+    changes:
+      - "3層アーキテクチャの導入（Layer 1/2/3）"
+      - "layer フィールドを decisions に追加"
+      - "7±2ルールの制約を追加（options, levels, exception_types）"
+      - "output_target フィールドを追加（policy_dsl/validator/domain_logic/none）"
+      - "alternatives フィールドを追加（Layer 3 保管用）"
+      - "lint-rules.md, policy-template.yaml との連携"
+
+  - version: 1.0.0
+    date: 2025-12-14
+    changes:
+      - "初版リリース"
+      - "曖昧さの4分類に基づくスキーマ設計"
+      - "policy_levels, priority_rules, exception_types を追加"

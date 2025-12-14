@@ -1,0 +1,267 @@
+# Command Spec Template
+#
+# 目的: Layer 2（ルール化）を Validator / Entity.CanXxx() に直結させる離散仕様
+#
+# バージョン: v1.0.0
+# 作成日: 2025-12-14
+#
+# 使用方法:
+#   1. decisions.yaml で Layer 2 の決定を行う
+#   2. この形式で command-spec.yaml を作成
+#   3. Validator / Entity.CanXxx() / テストを生成
+#
+# 配置場所:
+#   specs/{feature}/{slice}.command-spec.yaml
+#
+# 関連ドキュメント:
+#   - ../speckit-extensions/decision-guide.md
+#   - ./decisions-template.yaml
+#   - ./policy-template.yaml
+
+schema_version: "1.0.0"
+
+# メタデータ
+metadata:
+  feature: "{feature_name}"         # 例: Reservation
+  slice: "{slice_name}"             # 例: CreateReservation
+  command_type: "command"           # command | query
+  generated_from: "decisions.yaml"  # 参照元
+
+# Layer 1 からの入力（policy.yaml の値を参照）
+policy_bindings:
+  # policy.yaml から取得する設定値
+  # 例:
+  # - key: reservation.max_active_per_member
+  #   from: library_policy.reservation.max_active_per_member
+  #   type: integer
+  - key: "{policy_key}"
+    from: "{policy_path}"
+    type: "{type}"  # integer | string | boolean | enum
+
+# 前提条件（Preconditions）
+# → Validator に変換される
+preconditions:
+  # 各前提条件を列挙
+  # 条件は「単純な述語のAND」に限定（ORや入れ子は避ける）
+  - id: P1
+    description: "{前提条件の説明}"
+    # 検証対象のフィールド
+    field: "{field_name}"
+    # 検証ルール（FluentValidation にマッピング）
+    rule:
+      type: "{rule_type}"  # not_empty | max_length | range | enum | custom
+      # rule_type ごとのパラメータ
+      # not_empty: {} （パラメータなし）
+      # max_length: { max: 100 }
+      # range: { min: 1, max: 10 }
+      # enum: { values: [A, B, C] }
+      # custom: { validator: "{ValidatorClassName}" }
+    # 違反時のエラー
+    on_failure:
+      error_code: "{ERROR_CODE}"     # 例: VALIDATION_ERROR
+      message: "{エラーメッセージ}"
+    # 対応する decisions.yaml の ID
+    decision_ref: "{D1}"
+
+# 状態遷移（State Transitions）
+# → Entity.CanXxx() に変換される
+state_transitions:
+  - id: T1
+    description: "{遷移の説明}"
+    # 現在の状態（許可される状態を列挙）
+    from_states:
+      - "{CurrentState1}"
+      - "{CurrentState2}"
+    # 遷移先の状態
+    to_state: "{NextState}"
+    # 遷移条件（省略可）
+    guard:
+      # 単純な条件式（ANDのみ）
+      conditions:
+        - field: "{field}"
+          operator: "{eq|ne|gt|lt|ge|le|in|not_in}"
+          value: "{value}"
+    # 遷移不可時のエラー
+    on_denied:
+      error_code: "{STATE_TRANSITION_DENIED}"
+      message: "{現在の状態では実行できません}"
+    # 対応する decisions.yaml の ID
+    decision_ref: "{D2}"
+
+# 失敗理由（Failure Reasons）
+# → Result.Failure() / BoundaryDecision.Deny() に変換される
+failure_reasons:
+  # 7±2 ルール: 最大7種類に抑える
+  - id: F1
+    code: "{ERROR_CODE}"
+    category: "{VALIDATION|AUTH|STATE|CONFLICT|RESOURCE|BUSINESS}"
+    message_template: "{メッセージテンプレート with {placeholder}}"
+    # 使用される箇所
+    used_in:
+      - preconditions: [P1]      # 省略可
+      - state_transitions: [T1]  # 省略可
+    decision_ref: "{D3}"
+
+# ドメインルール（Business Rules）
+# → Entity.CanXxx() または DomainService に変換される
+domain_rules:
+  - id: R1
+    description: "{ビジネスルールの説明}"
+    # ルールの種類
+    type: "{invariant|constraint|policy}"
+    # if-then 形式のルール
+    when:
+      # 条件（ANDのみ）
+      - field: "{field}"
+        operator: "{operator}"
+        value: "{value}"
+    then:
+      action: "{allow|deny|require}"
+      # deny/require の場合のエラー
+      on_failure:
+        error_code: "{ERROR_CODE}"
+        message: "{メッセージ}"
+    # 優先順位（衝突時の勝者決定用）
+    priority: 100  # 小さいほど優先
+    decision_ref: "{D4}"
+
+# 生成対象（Generation Targets）
+# このスキーマから自動生成されるファイル
+generation_targets:
+  validator:
+    enabled: true
+    output: "src/Application/Features/{Feature}/{Slice}CommandValidator.cs"
+    template: "validator-from-command-spec"
+  entity_methods:
+    enabled: true
+    output: "src/Domain/{BC}/{Aggregate}/{Entity}.cs"
+    methods:
+      - "CanXxx"  # 生成する CanXxx メソッド名
+    template: "entity-canxxx-from-command-spec"
+  tests:
+    enabled: true
+    output: "tests/{Feature}/{Slice}/"
+    types:
+      - unit        # 単体テスト
+      - integration # 統合テスト
+    template: "tests-from-command-spec"
+
+# ---
+# 使用例
+# ---
+example:
+  metadata:
+    feature: "Reservation"
+    slice: "CreateReservation"
+    command_type: "command"
+    generated_from: "specs/reservation/create.decisions.yaml"
+
+  policy_bindings:
+    - key: max_active_reservations
+      from: library_policy.reservation.max_active_per_member
+      type: integer
+    - key: overdue_block
+      from: library_policy.loan.overdue_enforcement
+      type: enum
+
+  preconditions:
+    - id: P1
+      description: "書籍IDは必須"
+      field: "bookId"
+      rule:
+        type: not_empty
+      on_failure:
+        error_code: VALIDATION_ERROR
+        message: "書籍IDを指定してください"
+      decision_ref: null
+
+    - id: P2
+      description: "予約上限を超えていない"
+      field: "memberId"
+      rule:
+        type: custom
+        validator: "ActiveReservationCountValidator"
+      on_failure:
+        error_code: RESERVATION_LIMIT_EXCEEDED
+        message: "予約上限（{max_active_reservations}件）に達しています"
+      decision_ref: D1
+
+  state_transitions:
+    - id: T1
+      description: "コピーが貸出中または予約中のみ予約可能"
+      from_states:
+        - OnLoan
+        - Reserved
+      to_state: Reserved
+      guard:
+        conditions:
+          - field: available_copies
+            operator: eq
+            value: 0
+      on_denied:
+        error_code: COPY_AVAILABLE
+        message: "貸出可能なコピーがあります。予約ではなく貸出してください"
+      decision_ref: D2
+
+  failure_reasons:
+    - id: F1
+      code: VALIDATION_ERROR
+      category: VALIDATION
+      message_template: "{field}は必須です"
+      used_in:
+        - preconditions: [P1]
+      decision_ref: null
+
+    - id: F2
+      code: RESERVATION_LIMIT_EXCEEDED
+      category: BUSINESS
+      message_template: "予約上限（{limit}件）に達しています"
+      used_in:
+        - preconditions: [P2]
+      decision_ref: D1
+
+    - id: F3
+      code: MEMBER_BLOCKED
+      category: AUTH
+      message_template: "延滞により貸出・予約が禁止されています"
+      used_in:
+        - domain_rules: [R1]
+      decision_ref: D3
+
+  domain_rules:
+    - id: R1
+      description: "延滞中の会員は予約不可（HARDモードの場合）"
+      type: policy
+      when:
+        - field: member.has_overdue
+          operator: eq
+          value: true
+        - field: overdue_block
+          operator: eq
+          value: HARD
+      then:
+        action: deny
+        on_failure:
+          error_code: MEMBER_BLOCKED
+          message: "延滞により貸出・予約が禁止されています"
+      priority: 100
+      decision_ref: D3
+
+  generation_targets:
+    validator:
+      enabled: true
+      output: "src/Application/Features/Reservation/CreateReservationCommandValidator.cs"
+      template: "validator-from-command-spec"
+    entity_methods:
+      enabled: true
+      output: "src/Domain/Library/Reservation/Member.cs"
+      methods:
+        - "CanReserve"
+      template: "entity-canxxx-from-command-spec"
+    tests:
+      enabled: true
+      output: "tests/Reservation/CreateReservation/"
+      types:
+        - unit
+        - integration
+      template: "tests-from-command-spec"

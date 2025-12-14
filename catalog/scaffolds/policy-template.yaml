@@ -1,0 +1,290 @@
+# ============================================================================
+# policy-template.yaml
+# Layer 1（コア離散）を設定値中心のDSLとして出力するテンプレート
+# ============================================================================
+#
+# 目的:
+#   decisions.yaml の Layer 1 決定を、AIが安定して処理できる
+#   設定値中心のYAML（policy DSL）として出力する。
+#
+# 背景:
+#   AIは以下が得意:
+#   - 列挙・分類（enum）
+#   - if/then ルール（条件が単純なほど強い）
+#   - テーブル化・スキーマ化
+#
+#   このテンプレートは、decisions.yaml の Layer 1 をこれらの形式に変換し、
+#   AIが誤解しにくい「確定した設定値」として保存する。
+#
+# 配置場所:
+#   specs/{feature}/{slice}.policy.yaml
+#
+# 関連ドキュメント:
+#   - catalog/scaffolds/decisions-template.yaml
+#   - catalog/speckit-extensions/lint-rules.md
+#
+# ============================================================================
+
+id: policy-template
+version: 1.0.0
+name: ポリシーテンプレート（Layer 1 出力形式）
+category: scaffold
+intent: decisions.yaml の Layer 1 を設定値中心のDSLとして出力
+
+# ============================================================================
+# 設計原則
+# ============================================================================
+#
+# 1. enum 中心
+#    - bool/int/string 自由入力を避け、enum を使う
+#    - AIは有限集合の選択に強い
+#
+# 2. 7±2 ルール遵守
+#    - 1カテゴリあたりの設定項目は 7 以下
+#    - 1設定あたりの選択肢も 7 以下
+#
+# 3. フラット構造
+#    - ネストは最大2階層まで（domain_policy.category.setting）
+#    - 深いネストはAIの誤解を招く
+#
+# 4. 未決は書かない
+#    - TBD や null は使わない
+#    - 未決事項は decisions.yaml の Layer 3 に保管
+#
+# ============================================================================
+
+# ============================================================================
+# スキーマ定義
+# ============================================================================
+
+schema:
+  meta:
+    description: メタ情報
+    fields:
+      domain:
+        type: string
+        required: true
+        description: ドメイン名（例: library, ecommerce）
+      feature:
+        type: string
+        required: true
+        description: 機能名
+      decisions_path:
+        type: string
+        required: true
+        description: 元の decisions.yaml への相対パス
+      generated_at:
+        type: datetime
+        required: true
+        description: 生成日時
+      generated_from:
+        type: array
+        required: true
+        description: 元の決定ポイントIDリスト（D1, D2, ...）
+
+  # ============================================================================
+  # ドメイン固有ポリシー
+  # ============================================================================
+  #
+  # 構造: {domain}_policy.{category}.{setting}
+  #
+  # 例:
+  #   library_policy:
+  #     loan:
+  #       period_days: 14
+  #       overdue_enforcement: HARD
+  #
+  # ============================================================================
+
+  policy:
+    description: ドメイン固有のポリシー設定
+    structure: "{domain}_policy.{category}.{setting}"
+    categories:
+      - name: "{category}"
+        description: カテゴリの説明
+        settings:
+          - name: "{setting}"
+            type: enum | int | bool
+            values: [...]  # enum の場合
+            default: "{value}"
+            description: 設定の説明
+            source_decision: "D1"  # 元の決定ポイントID
+
+  # ============================================================================
+  # 共通制約（7±2 ルール）
+  # ============================================================================
+
+  constraints:
+    max_categories: 7
+    max_settings_per_category: 7
+    max_enum_values: 7
+    no_tbd: true  # TBD は禁止
+    no_null: true  # null は禁止
+
+# ============================================================================
+# テンプレート
+# ============================================================================
+
+template: |
+  # Policy: {ドメイン名} / {機能名}
+  #
+  # このファイルは decisions.yaml の Layer 1 から自動生成されました。
+  # 手動編集する場合は decisions.yaml も更新してください。
+
+  meta:
+    domain: "{ドメイン名}"
+    feature: "{機能名}"
+    decisions_path: "./{スライス名}.decisions.yaml"
+    generated_at: "{生成日時}"
+    generated_from:
+      - D1
+      - D2
+
+  {domain}_policy:
+    {category}:
+      # {設定の説明}
+      # Source: D1
+      # Values: [VALUE1, VALUE2, VALUE3]
+      {setting}: {VALUE}
+
+# ============================================================================
+# 使用例（図書館システム: 貸出ポリシー）
+# ============================================================================
+
+example:
+  meta:
+    domain: "library"
+    feature: "Loan"
+    decisions_path: "./LendBook.decisions.yaml"
+    generated_at: "2025-12-14T10:00:00Z"
+    generated_from:
+      - D1  # 延滞判定閾値
+      - D2  # 延滞時制御レベル
+      - D3  # 延滞判定方式
+
+  library_policy:
+    loan:
+      # 貸出期間（日数）
+      # Source: 仕様書 L45
+      period_days: 14
+
+      # 停止会員への貸出禁止
+      # Source: 仕様書 L67
+      block_suspended_member: true
+
+      # 延滞時の制御レベル
+      # Source: D2
+      # Values: [NONE, SOFT, HARD]
+      overdue_enforcement: HARD
+
+      # 延滞判定方式
+      # Source: D3
+      # Values: [DYNAMIC, MATERIALIZED]
+      overdue_detection: DYNAMIC
+
+      # 延滞判定閾値（日数）
+      # Source: D1
+      overdue_threshold_days: 7
+
+    reservation:
+      # 予約可能条件（利用可能コピーがない場合のみ）
+      # Source: 仕様書 L89
+      allow_only_if_no_available_copies: true
+
+      # 予約に未返却ローンがないことを要求
+      # Source: D4
+      require_no_open_loans: false
+
+      # キャンセル後のPosition処理
+      # Source: D5
+      # Values: [KEEP_GAPS, RENUMBER]
+      queue_position_strategy: KEEP_GAPS
+
+      # 予約完了時のステータス
+      # Source: D6
+      # Values: [CANCELLED, COMPLETED]
+      complete_as: CANCELLED
+
+    copy_state:
+      # Reserved状態を運用するか
+      # Source: D7
+      use_reserved_state: true
+
+# ============================================================================
+# Layer 1 → policy.yaml 変換ルール
+# ============================================================================
+
+conversion_rules:
+  - from: "decisions[layer=1].selected"
+    to: "policy.{category}.{setting}"
+    mapping:
+      - type: enum
+        rule: "options から selected を選択"
+      - type: int
+        rule: "数値として抽出"
+      - type: bool
+        rule: "true/false に変換"
+
+  - from: "policy_levels[].default"
+    to: "policy.{category}.{policy_name}"
+    mapping:
+      - type: enum
+        rule: "levels から default を選択"
+
+  - from: "exception_types[]"
+    to: "policy.exceptions.{type}"
+    mapping:
+      - type: object
+        rule: "type, handling をそのまま転記"
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_generate:
+    - "decisions.yaml の Layer 1 が確定した後"
+    - "policy.yaml が存在しない場合"
+    - "decisions.yaml が更新された場合（再生成）"
+
+  generation_workflow:
+    - step: 1
+      action: "decisions.yaml を読み込む"
+    - step: 2
+      action: "layer=1 の決定のみを抽出"
+    - step: 3
+      action: "policy_levels, exception_types も抽出"
+    - step: 4
+      action: "このテンプレートに従って policy.yaml を生成"
+    - step: 5
+      action: "lint-rules.md で検証"
+
+  common_mistakes:
+    - mistake: "Layer 2, 3 を policy.yaml に含める"
+      severity: high
+      solution: "Layer 1 のみを出力。Layer 2 は Validator へ、Layer 3 は保管のみ"
+
+    - mistake: "TBD や未決を policy.yaml に書く"
+      severity: critical
+      solution: "未決は decisions.yaml の Layer 3 に保管。policy.yaml は確定値のみ"
+
+    - mistake: "ネストが深すぎる"
+      severity: medium
+      solution: "最大2階層（domain_policy.category.setting）まで"
+
+    - mistake: "7±2 ルール違反"
+      severity: high
+      solution: "カテゴリ、設定項目、enum値はすべて最大7個"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-14
+    changes:
+      - "初版リリース"
+      - "Layer 1 → policy DSL 変換テンプレート"
+      - "7±2 ルール制約の明示"
+      - "AI向けガイダンスの追加"

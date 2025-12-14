@@ -1,209 +1,220 @@
 # Decision Guide: Resolving Ambiguity
 
-> **目的**: 曖昧な仕様に遭遇した際の対処フローと意思決定記録の方法を定義する
+> **目的**: 曖昧な仕様に遭遇した際の対処フローと意思決定記録（Layer 1/2/3）の方法を定義する
 >
-> **バージョン**: v1.0.0
+> **バージョン**: v2.1.0
 > **作成日**: 2025-12-09
+> **更新日**: 2025-12-14
 
 ---
 
-## When Spec is Ambiguous
+## Overview
 
-曖昧な仕様は必ず発生する。重要なのは「曖昧さを無視して進める」のではなく「意思決定として記録し、Spec に反映する」こと。
+曖昧な仕様は必ず発生する。重要なのは「曖昧さを無視して進める」のではなく、**離散化して意思決定として記録し、Spec（SSOT）へ反映する**こと。
 
----
+このガイドは以下を扱う:
 
-## Step 1: Identify Ambiguity Type
-
-| タイプ | 特徴 | 例 | 対処 |
-|--------|------|----|----|
-| **未定義の制約** | 数値・期間が明記されていない | 予約上限が未記載 | デフォルト値を決定し Spec に追記 |
-| **曖昧な表現** | 解釈の余地がある文言 | 「適切な期間」「十分な量」 | /speckit.clarify で確認 |
-| **暗黙の前提** | 業界では当然だが明記されていない | 「通常の業務時間」 | Assumptions に明示化 |
-| **選択肢の未決定** | 複数の実現方法がある | 「通知方法」 | 決定し Unknowns Resolved に記録 |
-| **Optional の扱い** | 実装するか否かが不明 | 「延滞ブロック（optional）」 | MVP 判断を Decision Record に記録 |
+- **3層アーキテクチャ**（Layer 1/2/3）で壊れにくく積み上げる
+- **7±2 ルール**で粒度と選択肢を制限する
+- **出力先（output_target）**を明確にし、policy/validator/domain に落とす
+- **L6xx（未離散化検証）**で工程抜けを fail として検出する
+- **decisions diff** をレビューの主戦場にする（PRテンプレート連携）
 
 ---
 
-## Step 2: Resolution Workflow
+## 3層アーキテクチャ（AI追従型・仕様量子化）
+
+AIに一気に高精度を要求しない代わりに、壊れにくい層から積み上げる。
+
+### Layer 1: コア離散（AIが最も得意）
+
+| 対象 | 説明 | 出力先 |
+|------|------|--------|
+| 状態機械（State） | Available, OnLoan, Overdue 等 | `{slice}.policy.yaml` |
+| 役割（Role） | Member, Librarian, Admin 等 | `{slice}.policy.yaml` |
+| 許可/禁止（Allow/Deny） | 操作の可否 | `{slice}.policy.yaml` |
+| 例外カテゴリ | AUTH, VALIDATION, CONFLICT 等 | `{slice}.policy.yaml` |
+| 主要制約（Must/MustNot） | 不変条件 | `{slice}.policy.yaml` |
+
+**ポイント**: 3〜7値に抑える（7±2ルール）。多すぎると境界が崩れる。
+
+### Layer 2: ルール化（条件→結果）
+
+| 対象 | 説明 | 出力先 |
+|------|------|--------|
+| preconditions | 入力検証・前提条件 | Validator |
+| state_transitions | 状態×操作の可否 | Entity.CanXxx() |
+| failure_reasons | 失敗理由の型 | Result/BoundaryDecision |
+| domain_rules | ビジネスルール（if/then） | domain_logic |
+
+**ポイント**: 条件は「単純な述語のAND」に限定（OR/入れ子は壊れやすい）。
+
+### Layer 3: ニュアンス保管（監査ログ）
+
+| 対象 | 説明 | 出力先 |
+|------|------|--------|
+| rationale | なぜそう決めたか | 記録のみ |
+| alternatives | 代替案と却下理由 | 記録のみ |
+| risk / impact / fallback | 判断の監査ログ（今すぐ価値が出る） | 記録のみ |
+| waiver | L6xx を意図的にスキップする記録 | 記録のみ |
+
+**ポイント**: Layer 3 は AI 自動実装の入力にしない（将来の高精度化用のトラック）。
+
+---
+
+## 7±2 ルール
+
+選択肢・段階・例外は最大7個（3〜7）に抑える。
+
+| 対象 | 最大数 |
+|------|:------:|
+| decisions.options | 7 |
+| policy_levels.levels | 7 |
+| exception_types | 7 |
+| policy categories | 7 |
+| failure_reasons | 7 |
+
+---
+
+## 統合フロー（推奨）
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  1. Spec を読む                                              │
-│       ↓                                                     │
-│  2. 曖昧さを特定                                             │
-│       ↓                                                     │
-│  3. タイプを分類（上記表を参照）                              │
-│       ↓                                                     │
-│  4. 解決方法を選択                                           │
-│       │                                                     │
-│       ├─→ 未定義の制約 → デフォルト値を決定                  │
-│       ├─→ 曖昧な表現 → /speckit.clarify で質問              │
-│       ├─→ 暗黙の前提 → Assumptions に明示化                 │
-│       ├─→ 選択肢の未決定 → 決定し記録                        │
-│       └─→ Optional の扱い → MVP 判断を記録                   │
-│       ↓                                                     │
-│  5. Plan の "Unknowns Resolved" に記録                       │
-│       ↓                                                     │
-│  6. Spec の Assumptions に反映（SSOT 維持）                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Step 3: Documentation Formats
-
-### 3.1 Unknowns Resolved セクション
-
-Plan に以下のセクションを追加:
-
-```markdown
-## Unknowns Resolved
-
-| 項目 | Spec の状態 | 決定 | 理由 | Spec 反映 |
-|------|------------|------|------|:---------:|
-| 予約上限 | 明記なし | 3件 | 図書館業界の標準的な慣行 | Y |
-| Ready 有効期限 | 明記なし | 24時間 | 一般的な取り置き期間 | Y |
-| ページサイズ | 明記なし | 20件 | 一般的なUI慣行 | Y |
-```
-
-### 3.2 Spec Assumptions への反映
-
-```markdown
-# spec.md
-
-## Assumptions
-
-- Maximum active reservations per member is 3 (default limit)
-- Ready reservation expires after 24 hours if not picked up
-- Default page size for list queries is 20 items
-- Business hours are 9:00-18:00 JST on weekdays
-```
-
----
-
-## Optional Rules Handling
-
-### キーワード分類
-
-| キーワード | RFC 準拠 | 意味 | Plan での扱い |
-|-----------|----------|------|--------------|
-| **MUST** | RFC 2119 | 必須 | Guardrails に抽出 |
-| **MUST NOT** | RFC 2119 | 禁止 | Guardrails に抽出 |
-| **SHOULD** | RFC 2119 | 推奨 | 実装する（優先度: 中） |
-| **SHOULD NOT** | RFC 2119 | 非推奨 | 実装しない |
-| **MAY** | RFC 2119 | 任意 | 実装判断を記録 |
-| **optional** | 一般 | 任意 | MVP では見送り可 |
-| **recommended** | 一般 | 推奨 | 実装する（優先度: 中） |
-
-### Decision Record Format
-
-Optional な機能の実装判断は記録する:
-
-```markdown
-## Optional Rule Decisions
-
-| Rule | Spec Location | キーワード | 決定 | 理由 |
-|------|---------------|-----------|------|------|
-| 延滞会員への貸出禁止 | spec.md L132 | optional | MVP 見送り | Spec L234 で明示的に無効化 |
-| メール通知 | spec.md L98 | MAY | MVP 見送り | 外部依存を減らすため |
-| 予約キャンセル通知 | spec.md L156 | SHOULD | 実装する | UX 向上のため |
+spec.yaml
+  ↓  (L6xx: 未離散化検出)
+discretization-questions.yaml で質問生成
+  ↓  (ユーザー回答)
+{slice}.decisions.yaml（layer + output_target + rationale）
+  ├─ Layer 1 → {slice}.policy.yaml（設定値中心DSL）
+  ├─ Layer 2 → {slice}.command-spec.yaml（Validator/CanXxx直結）
+  └─ Layer 3 → 記録のみ（監査ログ）
+  ↓
+lint-rules.md（L6xx → L1xx..L5xx）
+  ↓
+Spec.Assumptions に反映（SSOT維持）
 ```
 
 ---
 
-## Edge Cases Handling
+## ドキュメント / 成果物（SSOT と出力）
 
-### エッジケースの記録フォーマット
+### decisions.yaml（意思決定の記録）
 
-```markdown
-## Edge Cases
+- 形式: `catalog/scaffolds/decisions-template.yaml`
+- 配置: `specs/{feature}/{slice}.decisions.yaml`
+- 必須: `layer`, `options (max 7)`, `selected`, `rationale`
+- 推奨: `output_target`, `alternatives`, `risk/impact/fallback`, `waiver`
 
-| Case | 条件 | 期待動作 | 処理方法 |
-|------|------|----------|----------|
-| 全コピー貸出中に予約 | Available copies = 0 | 予約を受け付ける | FR-017 準拠 |
-| Ready 中に他の会員が返却 | Ready + 別コピー返却 | Ready 予約は維持 | Queue は更新しない |
-| 同時刻に複数予約 | 同一秒に2件の予約 | 先にDBに書き込まれた方が優先 | Position で一意性保証 |
-```
+### policy.yaml（Layer 1 の出力）
 
-### エッジケースの Acceptance Criteria 化
+- 形式: `catalog/scaffolds/policy-template.yaml`
+- 配置: `specs/{feature}/{slice}.policy.yaml`
+- ルール: 確定値のみ（`TBD`/`TODO`/`null`/空文字は禁止）
 
-```markdown
-## Edge Case Acceptance Criteria
+### command-spec.yaml（Layer 2 直結）
 
-### EC-001: 全コピー貸出中の予約
-**Given**: 書籍「ABC」の全コピーが貸出中
-**When**: 会員が「ABC」を予約する
-**Then**: 予約が成功し、Position が付与される
-
-### EC-002: Ready 状態での別コピー返却
-**Given**: 会員 A が Ready 状態の予約を持つ
-**And**: 別の会員 B が同じ書籍のコピーを返却
-**When**: 返却処理が完了
-**Then**: 会員 A の Ready 状態は維持される
-**And**: 返却されたコピーは Available になる（Reserved にならない）
-```
+- 形式: `catalog/scaffolds/command-spec-template.yaml`
+- 配置: `specs/{feature}/{slice}.command-spec.yaml`
+- 目的: Layer 2 を **Validator / Entity.CanXxx() / Result.Failure** に直結させる
 
 ---
 
-## Common Ambiguity Patterns
+## Decisions Diff: 追加/変更の判断基準（PRレビュー用）
 
-### パターン 1: 数値の未指定
+decisions diff は「仕様量子化の差分」であり、レビューの主戦場。
 
-**症状**: 「上限」「期間」「件数」が明記されていない
+### 変更種別と互換性（目安）
 
-**対処**:
-1. ドメイン知識から妥当な値を決定
-2. Unknowns Resolved に記録
-3. Spec.Assumptions に反映
+| 変更種別 | 例 | 影響 | 互換性 |
+|---------|----|------|:------:|
+| Layer 3 のみ | rationale/risk/impact/fallback の追加 | 実装挙動なし | Compatible |
+| Layer 1 の selected 変更 | 閾値 7→14 / enforcement SOFT→HARD | 挙動が変わる | Breaking |
+| Layer 1 options の変更 | 選択肢の統合/分割 | 解釈が変わる可能性 | Depends |
+| Layer 2 preconditions 追加 | 必須項目追加 | 入力が通らなくなる | Breaking |
+| Layer 2 state_transitions 追加/変更 | 状態遷移の許可条件変更 | 操作可否が変わる | Breaking |
+| failure_reasons の追加 | エラー理由の明確化 | 例外/Result の表現が増える | Compatible |
 
-**例**:
-```markdown
-# 曖昧な仕様
-"予約には上限がある"
+### 互換性判定フロー（簡易）
 
-# 解決後
-Unknowns Resolved: 予約上限 → 3件（図書館業界の標準）
-Spec.Assumptions: Maximum active reservations per member is 3
+```
+決定を変更した？
+  ├─ No → 互換性に影響なし
+  └─ Yes
+      ├─ Layer 3 のみ？ → Compatible
+      ├─ Layer 1 (policy) が変わる？ → Breaking（policy.yaml 更新 + 影響説明）
+      └─ Layer 2 (rules) が変わる？ → Depends（入力/操作可否/失敗理由の変化を明示）
 ```
 
-### パターン 2: 状態遷移の未定義
+### 移行手順の記録形式（PR本文に必須）
 
-**症状**: ある状態から別の状態への遷移条件が不明
+互換性のない変更（Breaking）がある場合、PR に以下を記載する:
 
-**対処**:
-1. 状態遷移図を作成
-2. 全ての遷移パスを列挙
-3. 未定義の遷移は「不可」または「追加定義」を決定
-
-**例**:
 ```markdown
-# 曖昧な仕様
-"Ready 状態の予約は貸出される"
+## Migration Notes
 
-# 解決後（状態遷移を明示）
-Ready → Fulfilled: 貸出実行時
-Ready → Cancelled: 期限切れ or 会員キャンセル
-Ready → Waiting: (不可 - 一度 Ready になったら戻らない)
+- Decision: D1 (Layer 1)
+- Change: overdue_threshold_days 7 → 14
+- Impact: 既存ユーザーの貸出可否が変わる可能性
+- Required Updates:
+  - specs/.../{slice}.policy.yaml を再生成
+  - 関連する Validator / CanXxx / テスト を更新
+- Rollback: 元の policy に戻す（D1.selected を 7 に戻す）
 ```
 
-### パターン 3: 権限の未定義
+### レビュー観点（最低限）
 
-**症状**: 誰がその操作を実行できるかが不明
+- decisions.yaml の diff が意図した変更になっているか（穴埋めがないか）
+- L6xx が Pass か（未離散化が残っていないか / waiver の妥当性）
+- Layer 1 変更なら policy.yaml が追随しているか
+- Layer 2 変更なら Validator/CanXxx/FailureReasons が追随しているか
+- Spec.Assumptions に反映されているか（SSOT）
 
-**対処**:
-1. Actor を明示
-2. 操作ごとに権限を定義
-3. Spec に Actor セクションを追加（なければ）
+---
 
-**例**:
-```markdown
-# 曖昧な仕様
-"予約をキャンセルできる"
+## command-spec.yaml（Layer 2 直結）
 
-# 解決後
-- 会員: 自分の予約をキャンセルできる
-- スタッフ: 任意の予約をキャンセルできる（理由記録必須）
+### 概念とマッピング
+
+| command-spec.yaml | 出力 | 目的 |
+|-------------------|------|------|
+| policy_bindings | 定数/設定参照 | Layer 1 の値を Layer 2 で参照 |
+| preconditions | Validator | 入力・前提条件の検証 |
+| state_transitions | Entity.CanXxx() | 状態×操作の許可/禁止 |
+| failure_reasons | Result/BoundaryDecision | 失敗理由を 7±2 で型化 |
+| domain_rules | domain_logic | ビジネスルール（if/then） |
+| generation_targets | 出力パス | 生成ファイルの場所を明示 |
+
+### preconditions → Validator（例）
+
+```csharp
+public sealed class CreateXxxCommandValidator : AbstractValidator<CreateXxxCommand>
+{
+    public CreateXxxCommandValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .WithMessage("Name is required");
+
+        RuleFor(x => x.Count)
+            .InclusiveBetween(1, 7)
+            .WithMessage("Count must be between 1 and 7");
+    }
+}
+```
+
+### state_transitions → Entity.CanXxx()（例）
+
+```csharp
+public sealed class Xxx
+{
+    public BoundaryDecision CanDoXxx(XxxState state)
+    {
+        return state switch
+        {
+            XxxState.Draft => BoundaryDecision.Allow(),
+            _ => BoundaryDecision.Deny("STATE_TRANSITION_DENIED", "現在の状態では実行できません")
+        };
+    }
+}
 ```
 
 ---
@@ -213,45 +224,35 @@ Ready → Waiting: (不可 - 一度 Ready になったら戻らない)
 ### /speckit.clarify との連携
 
 曖昧さが多い場合:
-```
-1. /speckit.clarify で質問を生成
-2. ユーザーの回答を Spec に反映
-3. /speckit.plan で Plan 生成
-4. Unknowns Resolved は最小限になる
-```
-
-### /speckit.plan での自動処理
 
 ```
-1. Spec を読み込む
-2. 曖昧さを検出
-3. ドメイン知識からデフォルト値を提案
-4. Unknowns Resolved セクションを生成
-5. **WARNING**: "These decisions should be reflected in Spec.Assumptions"
+1. undiscretized-detection.md で曖昧さを検出（L6xx）
+2. /speckit.clarify で質問を生成
+3. ユーザーの回答を decisions.yaml に記録（layer 指定）
+4. Layer 1 → policy.yaml を生成
+5. Layer 2 → command-spec.yaml を作成
+6. lint-rules.md で検証
+7. Spec.Assumptions に反映
 ```
-
----
-
-## Checklist
-
-### Plan 作成時
-
-- [ ] 曖昧さを全て特定したか
-- [ ] Unknowns Resolved セクションを作成したか
-- [ ] 各決定に理由を記録したか
-- [ ] Optional の実装判断を記録したか
-- [ ] Edge Cases を列挙したか
-
-### Spec 更新時
-
-- [ ] Unknowns Resolved の決定を Assumptions に追記したか
-- [ ] Optional Rule Decisions の内容を反映したか
-- [ ] Edge Cases に Acceptance Criteria を追加したか
 
 ---
 
 ## Related Documents
 
+- `../scaffolds/decisions-template.yaml` - 意思決定スキーマ（Layer 3 拡張含む）
+- `../scaffolds/policy-template.yaml` - Layer 1 → policy DSL
+- `../scaffolds/command-spec-template.yaml` - Layer 2 → Validator/CanXxx 直結
+- `lint-rules.md` - 破綻検知（L6xx〜L5xx）
+- `undiscretized-detection.md` - 未離散化検出ガイド
 - `spec-plan-consistency.md` - SSOT ルール定義
-- `constitution-additions.md` - Constitution への統合
 - `.claude/commands/speckit.clarify.md` - 仕様の明確化コマンド
+
+---
+
+## 変更履歴
+
+| バージョン | 日付 | 変更内容 |
+|-----------|------|---------|
+| v2.1.0 | 2025-12-14 | command-spec 追加、decisions diff の判断基準（互換性/移行/レビュー観点）追加 |
+| v2.0.0 | 2025-12-14 | 3層アーキテクチャ + 7±2 ルール + policy/lint 統合フローを追加 |
+| v1.0.0 | 2025-12-09 | 初版リリース |

@@ -1,0 +1,394 @@
+# ============================================================================
+# discretization-questions.yaml
+# 離散化質問テンプレート
+# ============================================================================
+#
+# 目的:
+#   曖昧さの種類ごとに、離散化を促すための質問テンプレートを提供する。
+#   AIがspec.yamlを読んだ際に、これらの質問パターンを適用することで
+#   未離散化の箇所を体系的に解決できる。
+#
+# 使用方法:
+#   1. undiscretized-detection.md で曖昧さを検出
+#   2. 曖昧さの種類を分類（vocabulary/boundary/value_judgment/description）
+#   3. このファイルから該当する質問テンプレートを選択
+#   4. 質問に回答し、decisions.yaml に記録
+#
+# 関連ドキュメント:
+#   - catalog/scaffolds/decisions-template.yaml
+#   - catalog/speckit-extensions/decision-guide.md
+#   - catalog/speckit-extensions/undiscretized-detection.md
+#
+# ============================================================================
+
+id: discretization-questions
+version: 1.0.0
+name: 離散化質問テンプレート
+category: speckit-extension
+intent: 曖昧さの種類ごとに離散化を促す質問パターンを提供
+
+# ============================================================================
+# 1. 語彙の曖昧さ（Vocabulary Ambiguity）
+# ============================================================================
+
+vocabulary:
+  description: |
+    「適切」「早い」「十分」など、解釈の余地がある形容詞・副詞に対する
+    離散化質問テンプレート。
+
+    ゴール: 曖昧な語彙を「指標 × 閾値」または「選択肢」に変換する
+
+  patterns:
+    - trigger: "適切な"
+      question_templates:
+        - "「適切」の判定基準は何ですか？"
+        - "「適切」を数値で表すと？（例: 95%以上、3件以下）"
+        - "「適切でない」と判断されるケースは？"
+      output_format:
+        type: threshold_table
+        example:
+          metric: "処理時間"
+          appropriate: "<= 3秒"
+          inappropriate: "> 5秒"
+
+    - trigger: "早い / 迅速に"
+      question_templates:
+        - "「早い」の具体的な目標値は？"
+        - "許容できる最大時間は？"
+        - "測定方法は？（p50, p95, p99）"
+      output_format:
+        type: sla_definition
+        example:
+          p95: "<= 3s"
+          p99: "<= 5s"
+
+    - trigger: "十分な / 十分に"
+      question_templates:
+        - "「十分」の最低ラインは？"
+        - "「不十分」と判断される条件は？"
+      output_format:
+        type: threshold
+        example:
+          minimum: 5
+          unit: "件"
+
+    - trigger: "多い / 少ない"
+      question_templates:
+        - "「多い」と「少ない」の境界値は？"
+        - "具体的な閾値は？"
+      output_format:
+        type: boundary_definition
+        example:
+          few: "<= 3"
+          moderate: "4-10"
+          many: "> 10"
+
+    - trigger: "重要な"
+      question_templates:
+        - "「重要」の定義は？（どの操作が該当する？）"
+        - "重要度をレベル分けするなら？"
+      output_format:
+        type: category_list
+        example:
+          critical: ["削除", "権限変更", "金銭操作"]
+          high: ["作成", "更新"]
+          normal: ["参照"]
+
+    - trigger: "定期的に"
+      question_templates:
+        - "具体的な頻度は？（毎日、毎週、毎月）"
+        - "実行タイミングは？（時刻、曜日）"
+      output_format:
+        type: schedule
+        example:
+          frequency: "weekly"
+          day: "Monday"
+          time: "09:00"
+
+# ============================================================================
+# 2. 境界の曖昧さ（Boundary Ambiguity）
+# ============================================================================
+
+boundary:
+  description: |
+    「どこまでやる？」「例外は？」「誰が？」「いつ？」など、
+    スコープや条件の境界が不明確な場合の離散化質問テンプレート。
+
+    ゴール: 境界を明確な条件式または列挙に変換する
+
+  patterns:
+    - trigger: "どこまで / 範囲"
+      question_templates:
+        - "対象範囲の開始条件は？"
+        - "対象範囲の終了条件は？"
+        - "範囲外として除外するものは？"
+      output_format:
+        type: scope_definition
+        example:
+          include: ["在庫あり", "公開中"]
+          exclude: ["廃盤", "非公開"]
+
+    - trigger: "例外 / 特別なケース"
+      question_templates:
+        - "想定される例外は何種類？"
+        - "各例外の発生条件は？"
+        - "例外時の処理方法は？"
+      output_format:
+        type: exception_types
+        example:
+          - type: "USER_ROLE"
+            condition: "研究者"
+            handling: "制限緩和"
+          - type: "MATERIAL_TYPE"
+            condition: "児童書"
+            handling: "警告のみ"
+
+    - trigger: "誰が / アクター"
+      question_templates:
+        - "この操作を実行できるアクターは？"
+        - "アクターごとに権限の違いは？"
+        - "権限の昇格条件は？"
+      output_format:
+        type: actor_permissions
+        example:
+          - actor: "会員"
+            permissions: ["自分の予約をキャンセル"]
+          - actor: "スタッフ"
+            permissions: ["任意の予約をキャンセル"]
+
+    - trigger: "いつ / タイミング"
+      question_templates:
+        - "開始タイミングの条件は？"
+        - "終了タイミングの条件は？"
+        - "有効期間は？"
+      output_format:
+        type: timing_rules
+        example:
+          start: "予約確定時"
+          end: "貸出完了時 or 24時間経過"
+          duration: "24時間"
+
+    - trigger: "閾値 / 上限 / 下限"
+      question_templates:
+        - "閾値の具体的な数値は？"
+        - "閾値を超えた/下回った場合の処理は？"
+        - "閾値の変更権限は誰が持つ？"
+      output_format:
+        type: threshold_rule
+        example:
+          threshold: 7
+          unit: "日"
+          on_exceed: "貸出禁止"
+          configurable_by: "admin"
+
+# ============================================================================
+# 3. 価値判断の曖昧さ（Value Judgment Ambiguity）
+# ============================================================================
+
+value_judgment:
+  description: |
+    「何を優先する？」「バランスよく」など、
+    トレードオフや優先順位が不明確な場合の離散化質問テンプレート。
+
+    ゴール: 優先順位を明示的な順序リストに変換する
+
+  patterns:
+    - trigger: "優先 / 重視"
+      question_templates:
+        - "最も優先すべき価値は？"
+        - "優先順位を列挙すると？"
+        - "優先順位が衝突した場合のルールは？"
+      output_format:
+        type: priority_order
+        example:
+          order:
+            - "security"
+            - "correctness"
+            - "auditability"
+            - "UX"
+            - "cost"
+            - "speed"
+
+    - trigger: "バランス / 両立"
+      question_templates:
+        - "バランスを取る対象は何と何？"
+        - "衝突時の勝者は？"
+        - "「バランスが取れている」状態の定義は？"
+      output_format:
+        type: balance_rule
+        example:
+          targets: ["セキュリティ", "利便性"]
+          conflict_winner: "セキュリティ"
+          balanced_state: "2段階認証は金銭操作のみ"
+
+    - trigger: "柔軟に / 状況に応じて"
+      question_templates:
+        - "「柔軟」の具体的な意味は？"
+        - "柔軟性を発揮する場面は？"
+        - "柔軟性の上限は？（どこまで緩和可能？）"
+      output_format:
+        type: flexibility_levels
+        example:
+          levels:
+            - name: "STRICT"
+              description: "例外なし"
+            - name: "BALANCED"
+              description: "特定条件で緩和"
+            - name: "LENIENT"
+              description: "担当者裁量"
+          default: "BALANCED"
+
+    - trigger: "コスト / パフォーマンス"
+      question_templates:
+        - "コスト上限は？"
+        - "パフォーマンス目標は？"
+        - "コストとパフォーマンスのトレードオフ基準は？"
+      output_format:
+        type: tradeoff_rule
+        example:
+          cost_limit: "月額 $100"
+          performance_target: "p95 < 500ms"
+          tradeoff: "コスト超過時はキャッシュ削減を優先"
+
+# ============================================================================
+# 4. 記述の曖昧さ（Description Ambiguity）
+# ============================================================================
+
+description:
+  description: |
+    主語抜け、参照抜け、矛盾など、
+    記述そのものに問題がある場合の離散化質問テンプレート。
+
+    ゴール: 記述を完全な文（主語・述語・目的語）に補完する
+
+  patterns:
+    - trigger: "主語抜け"
+      question_templates:
+        - "この操作の主語（実行者）は誰？"
+        - "複数の候補がいる場合、どのアクターを想定？"
+      output_format:
+        type: subject_clarification
+        example:
+          original: "予約をキャンセルできる"
+          clarified: "会員は自分の予約をキャンセルできる"
+          actor: "会員"
+
+    - trigger: "目的語抜け"
+      question_templates:
+        - "この操作の対象は何？"
+        - "対象の範囲は？（全件？特定条件？）"
+      output_format:
+        type: object_clarification
+        example:
+          original: "検索できる"
+          clarified: "会員は貸出可能な書籍を検索できる"
+          object: "貸出可能な書籍"
+
+    - trigger: "参照抜け"
+      question_templates:
+        - "「これ」「それ」が指すものは？"
+        - "参照先のドキュメントは？"
+      output_format:
+        type: reference_clarification
+        example:
+          original: "上記のルールに従う"
+          clarified: "DR-001（延滞ルール）に従う"
+          reference: "DR-001"
+
+    - trigger: "矛盾"
+      question_templates:
+        - "A と B のどちらが正しい？"
+        - "矛盾する記述のうち、優先すべきは？"
+        - "矛盾が発生する条件は？（両方正しい場合）"
+      output_format:
+        type: contradiction_resolution
+        example:
+          statement_a: "予約は3件まで"
+          statement_b: "研究者は無制限"
+          resolution: "研究者は例外として無制限。一般会員は3件まで"
+
+# ============================================================================
+# 質問生成ガイドライン
+# ============================================================================
+
+guidelines:
+  question_design:
+    - "Yes/No で答えられる質問は避ける（選択肢を提示する）"
+    - "抽象的な質問は避ける（具体的な例を含める）"
+    - "1つの質問で1つの決定ポイントに絞る"
+    - "回答が decisions.yaml に記録できる形式になるよう設計"
+
+  option_design:
+    - "選択肢は3-5個が適切"
+    - "選択肢は相互排他的であること"
+    - "「その他」は最後の手段（まず選択肢を網羅する）"
+    - "業界標準や一般的な慣行を選択肢に含める"
+
+  follow_up:
+    - "選択後に「なぜその選択？」（rationale）を必ず確認"
+    - "選択が他の決定に影響する場合、連鎖質問を準備"
+
+# ============================================================================
+# AI向けガイダンス
+# ============================================================================
+
+ai_guidance:
+  usage_flow:
+    - step: 1
+      action: "spec.yaml を読み、曖昧な表現を特定"
+    - step: 2
+      action: "曖昧さの種類を分類（vocabulary/boundary/value_judgment/description）"
+    - step: 3
+      action: "このファイルから該当する質問テンプレートを選択"
+    - step: 4
+      action: "質問をユーザーに提示（/speckit.clarify または直接質問）"
+    - step: 5
+      action: "回答を decisions.yaml に記録"
+    - step: 6
+      action: "必要に応じて spec.yaml の Assumptions に反映"
+
+  trigger_detection:
+    - "このファイルの trigger キーワードを正規表現として使用"
+    - "完全一致ではなく、意味的に近い表現も対象にする"
+    - "日本語と英語の両方のキーワードをチェック"
+
+  example_interaction: |
+    ## 例: 延滞者の貸出制御
+
+    ### 入力（spec.yaml の一部）
+    ```
+    延滞している利用者には、新しい本を貸し出さないようにする。
+    ただし、状況によっては柔軟に対応できるようにしたい。
+    ```
+
+    ### 検出された曖昧さ
+    1. 「延滞」→ boundary（閾値未定義）
+    2. 「柔軟に」→ value_judgment（優先順位未定義）
+
+    ### 生成される質問
+    1. 「延滞と判定する閾値は？」
+       - 選択肢: [1日以上, 7日以上, 30日以上]
+    2. 「『柔軟』の具体的な意味は？」
+       - 選択肢: [警告のみ, 職員が解除可能, 管理者のみ解除可能]
+
+    ### 出力（decisions.yaml）
+    ```yaml
+    decisions:
+      - id: D1
+        category: boundary
+        question: "延滞と判定する閾値は？"
+        selected: "7日以上"
+        rationale: "週次業務サイクルに合わせる"
+    ```
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-14
+    changes:
+      - "初版リリース"
+      - "曖昧さの4分類に対応した質問テンプレート"
+      - "AI向けガイダンスを追加"
