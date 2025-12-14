@@ -405,3 +405,10 @@ appsettings.Test.Local.json
 
 # AI coding assistant tool-specific folders
 .serena/
+
+# Claude Code / .NET CLI temporary folders
+.dotnet/
+.dotnet_cli_home/
+.home/
+.nuget/
+NuGet.Config
