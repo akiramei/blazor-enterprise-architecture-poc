@@ -1,0 +1,80 @@
+id: layer-ui-hosting-separation
+version: 1.0.0
+name: Host/UI Separation (Hosting vs Presentation)
+category: layer-element
+intent: ホスティング責務（Program/DI/ミドルウェア）とUI責務（Razor/画面）を分離し、UIを交換可能にする
+description: |
+  UIプロジェクトが「エントリーポイント（Program.cs）」と「プレゼンテーション（Razor/画面）」を同居させると、
+  UIの交換可能性（Blazor → MAUI/Console等）を阻害し、責務が曖昧になります。
+
+  このパターンは、Webホスト（Host）とUI（Presentation）をプロジェクト単位で分離し、
+  依存関係を一方向に固定します。
+
+layer: UI
+
+responsibility:
+  host_web:
+    - エントリーポイント（Program.cs）
+    - DI/ミドルウェア/認証認可/DB設定
+    - BackgroundService/スケジューラ/Hangfire 等のホスティング
+    - API（Controller/Minimal API）公開
+  ui_blazor:
+    - Razorコンポーネント（Components/）
+    - 画面（Features/*/*.razor）
+    - UI状態管理（Store/PageActions）
+    - UI-IRに基づくUI構築（UI-IR Gate準拠）
+
+recommended_structure:
+  solution_layout: |
+    src/
+    ├── Host.Web/           # エントリーポイント（Program.cs）
+    ├── UI.Blazor/          # Razor Class Library（UIのみ）
+    ├── Domain/{BC}/
+    ├── Shared/
+    └── Kernel/
+  project_naming:
+    host: "Host.Web / WebHost / WebApp（エントリーポイントを含むことが明確な名称）"
+    ui: "UI.Blazor / Ui.Blazor（UI技術が分かる名称）"
+
+dependency_rules:
+  allowed:
+    - from: "Host.Web"
+      to:
+        - "UI.Blazor"
+        - "Domain.{BC}"
+        - "Shared.Application"
+        - "Shared.Infrastructure"
+        - "Kernel"
+    - from: "UI.Blazor"
+      to:
+        - "Domain.{BC}"
+        - "Shared.Application"
+        - "Kernel"
+  forbidden:
+    - from: "UI.Blazor"
+      to:
+        - "Host.Web"
+      reason: "UIはホストを参照しない（UI交換可能性のため）"
+
+guidelines:
+  - rule: "Program.cs は Host.Web にのみ存在させる"
+    rationale: "UIプロジェクトをエントリーポイントにしない"
+  - rule: "UI.Blazor はミドルウェア/DB接続/外部I/O構成を持たない"
+    rationale: "ホスティング責務をHostへ集約"
+  - rule: "UIは Result/BoundaryDecision を表示するだけ"
+    rationale: "操作可否判定はBoundary（Domain）で行う"
+
+ai_guidance:
+  when_to_use:
+    - "ホスティングとUIが同一プロジェクトに混在している"
+    - "UI交換可能性（Blazor→別UI）を担保したい"
+    - "Program.cs をUIプロジェクトから分離したい"
+  when_not_to_use:
+    - "PoCでプロジェクト分割コストが許容できない（短期）"
+    - "単一アプリでUI交換の要件がない（ただし将来拡張の妨げになり得る）"
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-14
+    changes:
+      - "BACKLOG-002 対応として初版作成"

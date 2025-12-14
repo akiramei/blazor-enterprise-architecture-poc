@@ -4,13 +4,13 @@
 # このパターンに従うことで、プロジェクト間の一貫性が保証される
 
 id: project-structure
-version: 1.0.0
+version: 1.1.0
 name: "Project Structure (VSA Standard)"
 category: scaffold
 intent: "新規プロジェクトの標準構造を定義し、一貫性のあるソリューションを生成する"
 
 # ============================================================================
-# プロジェクト構成（5プロジェクト構成）
+# プロジェクト構成（5プロジェクト構成 + Host/UI分離オプション）
 # ============================================================================
 
 projects:
@@ -91,6 +91,36 @@ projects:
       bc_infrastructure: "Infrastructure/{BC}/"
       components: "Components/"
 
+optional_projects:
+  - name: "{SolutionName}.Host.Web"
+    path: "src/Host.Web"
+    type: "web-host"
+    optional: true
+    purpose: "エントリーポイント（Program.cs）+ DI/ミドルウェア/DB設定（ホスティング責務）"
+    references:
+      - "{SolutionName}.UI.Blazor"
+      - "{SolutionName}.Domain.{BC}"
+      - "{SolutionName}.Kernel"
+      - "{SolutionName}.Shared.Application"
+      - "{SolutionName}.Shared.Infrastructure"
+    notes:
+      - "BACKLOG-002: Host/UI責務分離（layer-ui-hosting-separation）"
+      - "API/BackgroundService 等のホスティング要素もここに配置"
+
+  - name: "{SolutionName}.UI.Blazor"
+    path: "src/UI.Blazor"
+    type: "ui-rcl"
+    optional: true
+    purpose: "Razor Class Library（プレゼンテーション責務のみ）"
+    references:
+      - "{SolutionName}.Domain.{BC}"
+      - "{SolutionName}.Kernel"
+      - "{SolutionName}.Shared.Application"
+    structure:
+      features_ui: "Features/{Feature}/*.razor"
+      components: "Components/"
+      ui_infrastructure: "Infrastructure/*/UI/"
+
 # ============================================================================
 # ディレクトリ構造（完全版）
 # ============================================================================
@@ -112,7 +142,7 @@ directory_structure: |
   │   │   └── Infrastructure/
   │   │       └── {SolutionName}.Shared.Infrastructure.csproj
   │   │
-  │   └── Application/
+  │   └── Application/                 # Legacy（Host/UI同居の5プロジェクト構成）
   │       └── {SolutionName}.Application.csproj
   │           │
   │           ├── Features/{Feature}/
@@ -135,6 +165,15 @@ directory_structure: |
   │               │   └── Home.razor            # 複数機能で使う基盤ページ
   │               └── Shared/
   │                   └── ErrorDisplay.razor    # BC横断コンポーネント
+  │
+  ├── src/
+  │   ├── Host.Web/                    # 推奨（Host/UI分離）
+  │   │   └── {SolutionName}.Host.Web.csproj
+  │   │       └── Program.cs
+  │   └── UI.Blazor/                   # 推奨（Host/UI分離）
+  │       └── {SolutionName}.UI.Blazor.csproj
+  │           ├── Components/
+  │           └── Features/{Feature}/
 
 # ============================================================================
 # 依存関係ルール
@@ -144,6 +183,10 @@ dependency_rules:
   allowed:
     - from: "Application"
       to: ["Domain.{BC}", "Kernel", "Shared.Application", "Shared.Infrastructure"]
+    - from: "Host.Web"
+      to: ["UI.Blazor", "Domain.{BC}", "Kernel", "Shared.Application", "Shared.Infrastructure"]
+    - from: "UI.Blazor"
+      to: ["Domain.{BC}", "Kernel", "Shared.Application"]
     - from: "Shared.Infrastructure"
       to: ["Shared.Application", "Kernel"]
     - from: "Shared.Application"
@@ -163,6 +206,9 @@ dependency_rules:
     - from: "Shared.*"
       to: ["Domain.{BC}"]
       reason: "SharedはBC非依存。ドメインを知ってはならない"
+    - from: "UI.Blazor"
+      to: ["Host.Web"]
+      reason: "UIはホストを参照しない（UI交換可能性のため）"
 
 # ============================================================================
 # UI配置ルール

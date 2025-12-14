@@ -132,9 +132,44 @@ Quote at least 3 relevant items:
 > - Value Objectの比較はインスタンス同士で行う
 ```
 
-### Step 0.4: Load UI-IR (UI がある場合)
+### Step 0.4: Load UI-IR (UI がある場合) - CRITICAL GATE
 
-**条件**: `specs/{feature}/{slice}.ui-ir.yaml` が存在する場合のみ実行
+**このステップは UI 実装がある場合の必須ゲートです。**
+
+#### 0.4.1 UI-IR 存在チェック
+
+1. plan.md の Boundary セクションを確認
+2. tasks.md に UI 実装タスクがあるか確認
+3. `specs/{feature}/{slice}.ui-ir.yaml` が存在するか確認
+
+**判定表**:
+
+| Boundary あり | UI タスクあり | UI-IR あり | アクション |
+|:------------:|:------------:|:---------:|-----------|
+| ✅ | ✅ | ✅ | UI-IR を読み込んで続行 |
+| ✅ | ✅ | ❌ | **ERROR**: UI-IR が欠落。`/speckit.plan` を再実行 |
+| ✅ | ❌ | ❌ | UI なしと判断。Phase 1 へ進む |
+| ❌ | ✅ | ❌ | **WARNING**: Boundary 未定義で UI 実装。plan 確認を推奨 |
+| ❌ | ❌ | ❌ | UI なし。Phase 1 へ進む |
+
+**ERROR 時の出力**:
+```
+❌ UI-IR Gate Failed
+
+Boundary セクションと UI タスクが存在しますが、UI-IR ファイルがありません。
+これは plan フェーズで UI-IR 生成がスキップされた可能性があります。
+
+対処方法:
+1. `/speckit.plan` を再実行して UI-IR を生成
+2. または、手動で specs/{feature}/{slice}.ui-ir.yaml を作成
+
+UI-IR 欠落による影響:
+- confirmation_level の自動算出が行われない
+- disabled_when と Entity.CanXxx() の紐付けが不明確になる
+- MudBlazor コンポーネント選択が一貫しなくなる
+```
+
+#### 0.4.2 UI-IR 読み込み
 
 UI-IR が存在する場合、以下を読み込む：
 
@@ -153,13 +188,20 @@ Read: catalog/scaffolds/ui-ir-template.yaml (component_mapping 参照)
 | main_actions.is_destructive | danger_overrides（Color="Error"）適用 |
 | form_fields.type | MudBlazor フィールドコンポーネント選択 |
 | information_blocks.importance | 配置優先度の参考 |
+| maturity.level | 許可される UI ウィジェット制約 |
+| uiPolicy.denied_widgets | 使用禁止の UI パターン |
 
 **レイアウトの位置付け**:
 
 UI-IR のレイアウト指定は「推奨」であり「強制」ではない。
 機能と要素の完全性を優先し、配置は人間が調整可能とする。
 
-**UI-IR がない場合**: このステップをスキップして Phase 1 へ進む
+**成熟度制約の遵守**:
+
+UI-IR の `maturity.level` と `uiPolicy.denied_widgets` は遵守すること：
+- `boundary` レベル: Tab, Master-Detail, Stepper は使用禁止
+- `entity` レベル: Tab, Master-Detail, Stepper は使用禁止
+- `view` レベル: 全ウィジェット使用可能
 
 > **参照**: UI 強化時の入力要件は `catalog/skills/vsa-ui-enhancer/input-requirements.md` を参照
 

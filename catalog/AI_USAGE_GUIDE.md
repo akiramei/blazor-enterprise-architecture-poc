@@ -191,6 +191,20 @@ AIは実装/計画を開始する前に、必ず以下の順序で要求文を�
 
 **ICONIXのBoundaryから高品質なUIを生成するための中間表現です。**
 
+---
+
+## 🧩 Host/UI 分離（ホスティング vs プレゼンテーション）
+
+UIプロジェクトが `Program.cs`（ホスティング）と Razor（プレゼンテーション）を同居させると、
+UI交換可能性（Blazor → MAUI/Console等）を阻害し、責務が曖昧になります。
+
+**推奨**: Host と UI をプロジェクト分割し、依存関係を一方向に固定します。
+
+- Host: `src/Host.Web/`（Program.cs、DI、ミドルウェア、DB設定）
+- UI: `src/UI.Blazor/`（Razor Class Library、画面/コンポーネント/Store/PageActions）
+
+参照: `catalog/layers/layer-ui-hosting-separation.yaml`
+
 ### なぜUI-IRが必要か
 
 Boundaryは「正しいが無機質」であり、AIには以下の情報が不足しています：

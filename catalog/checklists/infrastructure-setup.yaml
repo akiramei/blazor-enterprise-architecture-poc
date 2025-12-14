@@ -1,0 +1,343 @@
+id: infrastructure-setup
+version: 1.0.0
+name: Infrastructure Setup Checklist
+category: checklist
+intent: インフラ設定の整合性を実装前に検証するチェックリスト
+
+description: |
+  開発途中で発生しやすいインフラ設定の不整合を検出するためのチェックリスト。
+  ドッグフーディング（Library8プロジェクト）で発見された問題を基に作成。
+
+  主な検出対象:
+  - DB設定の不整合（プロバイダーと接続文字列）
+  - 静的アセット設定の欠落
+  - 必須フォルダの不在
+
+trigger_conditions:
+  - "新規プロジェクト作成時"
+  - "Blazor Web Appテンプレート使用時"
+  - "DbContext設定変更時"
+  - "NuGetパッケージ追加/変更時"
+
+checks:
+  # ========================================
+  # Database Configuration
+  # ========================================
+  - id: CHK-DB-001
+    name: db_provider_matches_connection_string
+    category: database
+    severity: critical
+    description: |
+      DbContext設定のプロバイダーと接続文字列が一致することを確認。
+      SQLite設定なのにSQL Server接続文字列を使用している等の不整合を検出。
+
+    detection:
+      files_to_check:
+        - "src/**/DependencyInjection.cs"
+        - "src/**/Program.cs"
+        - "appsettings.json"
+        - "appsettings.*.json"
+
+      patterns:
+        sqlite:
+          provider_pattern: "UseSqlite"
+          connection_string_pattern: "Data Source=.*\\.db"
+          package_required: "Microsoft.EntityFrameworkCore.Sqlite"
+
+        sqlserver:
+          provider_pattern: "UseSqlServer"
+          connection_string_pattern: "Server=|Data Source=.*;"
+          package_required: "Microsoft.EntityFrameworkCore.SqlServer"
+
+        postgres:
+          provider_pattern: "UseNpgsql"
+          connection_string_pattern: "Host=|Server="
+          package_required: "Npgsql.EntityFrameworkCore.PostgreSQL"
+
+    validation_rules:
+      - rule: "プロバイダー設定と接続文字列のパターンが一致すること"
+      - rule: "対応するNuGetパッケージが参照されていること"
+      - rule: "複数のプロバイダーパッケージが混在していないこと"
+
+    error_examples:
+      - scenario: "SQLite設定なのにSQL Server接続文字列"
+        symptom: "実行時エラー: Unable to create a 'DbContext'"
+        cause: "appsettings.jsonがSQL Server用、コードがSQLite用"
+        fix: "どちらかに統一する"
+
+    fix_template: |
+      // SQLiteに統一する場合:
+
+      // 1. appsettings.json
+      {
+        "ConnectionStrings": {
+          "DefaultConnection": "Data Source={app_name}.db"
+        }
+      }
+
+      // 2. DependencyInjection.cs または Program.cs
+      services.AddDbContext<{DbContext}>(options =>
+          options.UseSqlite(connectionString));
+
+      // 3. .csproj - SQLiteパッケージのみ参照
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.0" />
+
+  - id: CHK-DB-002
+    name: db_connection_string_exists
+    category: database
+    severity: critical
+    description: |
+      接続文字列がappsettings.jsonに定義されていることを確認。
+      フォールバックに依存せず、明示的な設定を推奨。
+
+    detection:
+      files_to_check:
+        - "appsettings.json"
+
+      required_keys:
+        - "ConnectionStrings:DefaultConnection"
+
+    error_examples:
+      - scenario: "ConnectionStringsセクションが存在しない"
+        symptom: "null参照エラーまたはフォールバック値使用"
+        fix: "appsettings.jsonにConnectionStringsセクションを追加"
+
+  # ========================================
+  # Static Assets Configuration
+  # ========================================
+  - id: CHK-STATIC-001
+    name: wwwroot_exists_for_web_projects
+    category: static_assets
+    severity: high
+    description: |
+      Blazor/ASP.NET Core Web プロジェクトにwwwrootフォルダが存在することを確認。
+
+    detection:
+      project_types:
+        - "Microsoft.NET.Sdk.Web"
+        - "Microsoft.NET.Sdk.BlazorWebAssembly"
+
+      required_folder: "wwwroot"
+
+    error_examples:
+      - scenario: "wwwrootフォルダが存在しない"
+        symptom: "静的ファイル（CSS/JS）が404エラー"
+        fix: "wwwrootフォルダを作成し、必要なアセットを配置"
+
+    fix_template: |
+      # wwwrootフォルダ構造
+      wwwroot/
+      ├── css/
+      │   └── app.css
+      ├── js/
+      │   └── app.js
+      └── favicon.ico
+
+  - id: CHK-STATIC-002
+    name: static_files_middleware_configured
+    category: static_assets
+    severity: high
+    description: |
+      Program.csで静的ファイルミドルウェアが設定されていることを確認。
+
+    detection:
+      files_to_check:
+        - "src/**/Program.cs"
+
+      required_middleware:
+        - "app.UseStaticFiles()"
+
+    error_examples:
+      - scenario: "UseStaticFiles()が呼ばれていない"
+        symptom: "wwwroot内のファイルにアクセスできない"
+        fix: "Program.csにapp.UseStaticFiles()を追加"
+
+  - id: CHK-STATIC-003
+    name: static_web_assets_enabled
+    category: static_assets
+    severity: medium
+    description: |
+      .csprojでStaticWebAssetsEnabledが有効になっていることを確認。
+      MudBlazor等のライブラリ静的アセットに必要。
+
+    detection:
+      files_to_check:
+        - "**/*.csproj"
+
+      check_patterns:
+        enabled: "<StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>"
+        disabled: "<StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>"
+
+    error_examples:
+      - scenario: "StaticWebAssetsEnabledがfalse"
+        symptom: "MudBlazor等のCSSが読み込まれない"
+        fix: "StaticWebAssetsEnabledをtrueに設定するか削除（デフォルトtrue）"
+
+  # ========================================
+  # MudBlazor Configuration
+  # ========================================
+  - id: CHK-MUD-001
+    name: mudblazor_assets_configured
+    category: ui_framework
+    severity: high
+    description: |
+      MudBlazor使用時に必要な静的アセットが設定されていることを確認。
+
+    detection:
+      precondition:
+        package_installed: "MudBlazor"
+
+      required_in_layout:
+        - pattern: "_content/MudBlazor/MudBlazor.min.css"
+          file: "**/*Layout.razor|**/App.razor|**/_Host.cshtml"
+        - pattern: "_content/MudBlazor/MudBlazor.min.js"
+          file: "**/*Layout.razor|**/App.razor|**/_Host.cshtml"
+
+    alternative_patterns:
+      local_copy:
+        description: "ローカルにコピーして使用する場合"
+        patterns:
+          - "wwwroot/MudBlazor.min.css"
+          - "wwwroot/MudBlazor.min.js"
+
+    error_examples:
+      - scenario: "MudBlazorのCSS/JSがリンクされていない"
+        symptom: "MudBlazorコンポーネントがスタイルなしで表示"
+        fix: "App.razorまたはレイアウトにリンクを追加"
+
+  - id: CHK-MUD-002
+    name: mudblazor_services_registered
+    category: ui_framework
+    severity: high
+    description: |
+      MudBlazor使用時にサービス登録されていることを確認。
+
+    detection:
+      precondition:
+        package_installed: "MudBlazor"
+
+      required_registration:
+        pattern: "services.AddMudServices()"
+        file: "**/Program.cs|**/DependencyInjection.cs"
+
+    error_examples:
+      - scenario: "AddMudServices()が呼ばれていない"
+        symptom: "MudDialogProviderが動作しない、Snackbarが表示されない"
+        fix: "Program.csにbuilder.Services.AddMudServices()を追加"
+
+  # ========================================
+  # Blazor Render Mode
+  # ========================================
+  - id: CHK-BLAZOR-001
+    name: render_mode_consistency
+    category: blazor
+    severity: medium
+    description: |
+      InteractiveServer/InteractiveWebAssemblyモードの一貫性を確認。
+      混在による予期しない動作を防止。
+
+    detection:
+      files_to_check:
+        - "**/*.razor"
+        - "**/App.razor"
+        - "**/Routes.razor"
+
+      patterns_to_check:
+        - "@rendermode InteractiveServer"
+        - "@rendermode InteractiveWebAssembly"
+        - "@rendermode InteractiveAuto"
+        - "RenderModeForPage"
+
+    validation_rules:
+      - rule: "アプリケーション全体で統一されたレンダーモードを使用"
+      - rule: "混在する場合は意図的であることをコメントで明示"
+
+# ========================================
+# Verification Script Template
+# ========================================
+verification_script: |
+  # PowerShell verification script
+  param(
+      [string]$ProjectPath = "."
+  )
+
+  $errors = @()
+  $warnings = @()
+
+  # CHK-DB-001: Check DB provider consistency
+  $csproj = Get-ChildItem -Path $ProjectPath -Filter "*.csproj" -Recurse
+  $hasSqlite = $csproj | Select-String -Pattern "Microsoft.EntityFrameworkCore.Sqlite"
+  $hasSqlServer = $csproj | Select-String -Pattern "Microsoft.EntityFrameworkCore.SqlServer"
+
+  if ($hasSqlite -and $hasSqlServer) {
+      $warnings += "WARNING: Both SQLite and SQL Server packages are referenced"
+  }
+
+  # CHK-STATIC-001: Check wwwroot exists
+  $webProjects = Get-ChildItem -Path $ProjectPath -Filter "*.csproj" -Recurse |
+      Where-Object { (Get-Content $_.FullName) -match "Microsoft.NET.Sdk.Web" }
+
+  foreach ($proj in $webProjects) {
+      $wwwroot = Join-Path $proj.DirectoryName "wwwroot"
+      if (-not (Test-Path $wwwroot)) {
+          $errors += "ERROR: wwwroot not found in $($proj.DirectoryName)"
+      }
+  }
+
+  # Output results
+  if ($errors.Count -gt 0) {
+      Write-Host "=== ERRORS ===" -ForegroundColor Red
+      $errors | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+  }
+
+  if ($warnings.Count -gt 0) {
+      Write-Host "=== WARNINGS ===" -ForegroundColor Yellow
+      $warnings | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+  }
+
+  if ($errors.Count -eq 0 -and $warnings.Count -eq 0) {
+      Write-Host "All infrastructure checks passed!" -ForegroundColor Green
+  }
+
+  exit $errors.Count
+
+ai_guidance:
+  when_to_run:
+    - "新規プロジェクト作成後"
+    - "DBプロバイダー変更時"
+    - "MudBlazor等のUIフレームワーク追加時"
+    - "dotnet runで実行時エラーが発生した時"
+
+  integration_with_planning:
+    - "計画フェーズでインフラ要件を確認"
+    - "tasks.md生成時にインフラチェック項目を含める"
+    - "実装完了後、ビルド前にチェックリストを実行"
+
+  common_mistakes_link:
+    description: "関連するCOMMON_MISTAKESパターン"
+    patterns:
+      - "DB設定不整合 → CHK-DB-001"
+      - "静的ファイル404 → CHK-STATIC-001, CHK-STATIC-002"
+      - "MudBlazorスタイル欠落 → CHK-MUD-001, CHK-MUD-002"
+
+evidence:
+  dogfooding_source: "Library8プロジェクト（図書館貸出管理システム）"
+  discovered_issues:
+    - issue: "SQLite/SQL Server不整合"
+      impact: "実行時エラー"
+      detection_timing: "手動発見（dotnet run時）"
+      prevention: "CHK-DB-001で自動検出可能"
+
+    - issue: "wwwroot不在"
+      impact: "静的ファイル404エラー"
+      detection_timing: "手動発見（ブラウザアクセス時）"
+      prevention: "CHK-STATIC-001で自動検出可能"
+
+metadata:
+  created_from: "Library8ドッグフーディングフィードバック"
+  version_history:
+    - version: "1.0.0"
+      date: "2025-12-14"
+      changes:
+        - "初版作成"
+        - "DB設定、静的アセット、MudBlazor、Blazorレンダーモードのチェック追加"

@@ -372,7 +372,106 @@ SPEC の `boundary` 定義に基づき実装：
 
 ---
 
+## 8. Process Gates（品質ゲート）
+
+プロセスの各段階で品質を保証するためのゲートを定義。
+Library8 ドッグフーディングで発見された問題を防止するために追加。
+
+### ゲート一覧
+
+| Phase | Gate | 検証内容 | 失敗時アクション |
+|-------|------|---------|-----------------|
+| plan → tasks | UI-IR Gate | UI がある場合、UI-IR が生成されているか | ERROR: /speckit.plan 再実行 |
+| tasks → implement | Infra Gate | インフラ設定の整合性 | ERROR: 設定修正 |
+| implement → run | Build Gate | dotnet build が成功するか | ERROR: ビルドエラー修正 |
+| run | Runtime Gate | 実行時エラーがないか | troubleshooting 参照 |
+
+### 8.1 UI-IR Gate（plan → tasks）
+
+**目的**: UI 実装がある場合に UI-IR が生成されていることを保証
+
+**チェック項目**:
+```
+□ plan.md に Boundary セクションがある
+□ Boundary セクションに Intent が定義されている
+□ specs/{feature}/{slice}.ui-ir.yaml が存在する
+□ plan.md に UI-IR Summary セクションがある
+```
+
+**詳細**: `speckit-extensions/commands/speckit.tasks.md` の「UI-IR-to-Task Mapping」を参照
+
+### 8.2 Infrastructure Gate（tasks → implement）
+
+**目的**: 実装前にインフラ設定の整合性を検証
+
+**チェック項目**:
+```
+□ DB プロバイダーと接続文字列が一致
+□ wwwroot フォルダが存在（Web プロジェクトの場合）
+□ UseStaticFiles() が設定されている
+□ MudBlazor 使用時は CSS/JS リンクが存在
+```
+
+**詳細**: `catalog/checklists/infrastructure-setup.yaml` を参照
+
+**自動検証スクリプト**:
+```powershell
+# PowerShell
+.\scripts\Verify-Infrastructure.ps1 -ProjectPath ./src/UI
+
+# Bash
+./scripts/verify-infrastructure.sh ./src/UI
+```
+
+### 8.3 Build Gate（implement → run）
+
+**目的**: 実装後にビルドが成功することを検証
+
+**チェック項目**:
+```
+□ dotnet build が成功
+□ 警告が許容範囲内
+□ nullable 警告が解消されている
+```
+
+**推奨コマンド**:
+```bash
+dotnet build --warnaserror
+```
+
+### 8.4 Runtime Gate（run）
+
+**目的**: 実行時エラーを早期検出
+
+**チェック項目**:
+```
+□ アプリケーションが起動する
+□ 静的ファイルが正しくロードされる
+□ DB 接続が成功する
+□ 主要機能が動作する
+```
+
+**エラー発生時**: `catalog/troubleshooting/blazor-runtime-errors.yaml` を参照
+
+---
+
+## 9. Troubleshooting
+
+実行時エラーが発生した場合は、以下のカタログを参照：
+
+| カテゴリ | ファイル | 内容 |
+|---------|---------|------|
+| Blazor 実行時エラー | `troubleshooting/blazor-runtime-errors.yaml` | DB, 静的ファイル, MediatR 関連 |
+| インフラ設定 | `checklists/infrastructure-setup.yaml` | 設定不整合の検出・修正 |
+
+---
+
 ## バージョン
+
+- **v2.1.0** (2025-12-14): プロセスゲート追加
+  - Process Gates セクションを追加（UI-IR, Infrastructure, Build, Runtime）
+  - Troubleshooting 参照セクションを追加
+  - Library8 ドッグフーディングのフィードバックを反映
 
 - **v2.0.0** (2025-12-06): spec-kit 統合版
   - GitHub spec-kit との統合セットアップ手順を追加

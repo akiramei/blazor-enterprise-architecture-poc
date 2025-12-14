@@ -1,0 +1,492 @@
+id: blazor-runtime-errors
+version: 1.0.0
+name: Blazor Runtime Error Patterns
+category: troubleshooting
+intent: Blazor実行時に発生する一般的なエラーのパターンと解決方法
+
+description: |
+  開発中に遭遇する Blazor/ASP.NET Core の実行時エラーをカタログ化。
+  Library8 プロジェクトのドッグフーディングで発見されたエラーを含む。
+
+errors:
+  # ========================================
+  # Database Configuration Errors
+  # ========================================
+  - id: ERR-DB-001
+    name: DbContext Provider Mismatch
+    category: database
+    severity: critical
+
+    symptoms:
+      - "Unable to create a 'DbContext' of type"
+      - "No database provider has been configured"
+      - "InvalidOperationException: The property cannot be added"
+
+    root_cause: |
+      DbContext に設定されたプロバイダー（UseSqlite, UseSqlServer 等）と
+      接続文字列のフォーマットが一致していない。
+      または、必要な NuGet パッケージがインストールされていない。
+
+    common_scenarios:
+      - scenario: "SQLite 設定だが SQL Server 接続文字列"
+        detail: |
+          Program.cs で UseSqlite() を使用しているが、
+          appsettings.json の接続文字列が "Server=..." 形式になっている。
+
+      - scenario: "テンプレートのデフォルト設定を変更し忘れ"
+        detail: |
+          dotnet new blazor で生成したプロジェクトの接続文字列を
+          SQLite 用に変更していない。
+
+    solution:
+      steps:
+        - step: 1
+          action: "接続文字列を確認"
+          files: ["appsettings.json", "appsettings.Development.json"]
+          check: |
+            SQLite: "Data Source={name}.db"
+            SQL Server: "Server=...;Database=...;..."
+
+        - step: 2
+          action: "プロバイダー設定を確認"
+          files: ["Program.cs", "**/DependencyInjection.cs"]
+          check: |
+            SQLite: options.UseSqlite(...)
+            SQL Server: options.UseSqlServer(...)
+
+        - step: 3
+          action: "NuGet パッケージを確認"
+          command: "dotnet list package | grep EntityFrameworkCore"
+          expected: |
+            SQLite: Microsoft.EntityFrameworkCore.Sqlite
+            SQL Server: Microsoft.EntityFrameworkCore.SqlServer
+
+    prevention:
+      checklist_ref: "catalog/checklists/infrastructure-setup.yaml#CHK-DB-001"
+      recommendation: |
+        プロジェクト初期化時にインフラチェックリストを実行し、
+        DB 設定の一貫性を確認する。
+
+  - id: ERR-DB-002
+    name: Migration Not Applied
+    category: database
+    severity: high
+
+    symptoms:
+      - "SqliteException: no such table"
+      - "Invalid object name"
+      - "The entity type requires a primary key"
+
+    root_cause: |
+      DbContext にエンティティが追加されたが、
+      マイグレーションが作成/適用されていない。
+
+    solution:
+      steps:
+        - step: 1
+          action: "マイグレーション作成"
+          command: "dotnet ef migrations add {MigrationName}"
+
+        - step: 2
+          action: "マイグレーション適用"
+          command: "dotnet ef database update"
+
+    prevention:
+      recommendation: |
+        エンティティ追加後は必ずマイグレーションを作成・適用する。
+        CI/CD でマイグレーション漏れを検出する仕組みを導入。
+
+  # ========================================
+  # Static Asset Errors
+  # ========================================
+  - id: ERR-STATIC-001
+    name: Static Files 404
+    category: static_assets
+    severity: high
+
+    symptoms:
+      - "404 Not Found for CSS/JS files"
+      - "net::ERR_ABORTED 404"
+      - "MudBlazor styles not applied"
+
+    root_cause: |
+      wwwroot フォルダが存在しない、または
+      静的ファイルミドルウェアが設定されていない。
+
+    common_scenarios:
+      - scenario: "wwwroot フォルダ未作成"
+        detail: |
+          UI プロジェクトに wwwroot フォルダが存在しない。
+          Blazor Server テンプレート以外から開始した場合に発生しやすい。
+
+      - scenario: "UseStaticFiles() 未呼び出し"
+        detail: |
+          Program.cs で app.UseStaticFiles() が呼ばれていない。
+
+    solution:
+      steps:
+        - step: 1
+          action: "wwwroot フォルダを作成"
+          command: "mkdir wwwroot"
+
+        - step: 2
+          action: "Program.cs を確認"
+          check: |
+            app.UseStaticFiles(); が存在すること
+
+        - step: 3
+          action: "StaticWebAssets が有効か確認"
+          file: "*.csproj"
+          check: |
+            <StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>
+            （明示的に false になっていないこと）
+
+    prevention:
+      checklist_ref: "catalog/checklists/infrastructure-setup.yaml#CHK-STATIC-001"
+
+  - id: ERR-STATIC-002
+    name: MudBlazor Assets Not Loading
+    category: static_assets
+    severity: high
+
+    symptoms:
+      - "MudBlazor components display without styling"
+      - "Buttons appear as plain HTML"
+      - "Console shows 404 for _content/MudBlazor/*"
+
+    root_cause: |
+      MudBlazor の CSS/JS ファイルがロードされていない。
+      レイアウトまたは App.razor での参照が欠落。
+
+    solution:
+      steps:
+        - step: 1
+          action: "App.razor または Layout に以下を追加"
+          code: |
+            <!-- CSS -->
+            <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
+            <!-- JS (</body> の前) -->
+            <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+
+        - step: 2
+          action: "AddMudServices() を確認"
+          file: "Program.cs"
+          code: |
+            builder.Services.AddMudServices();
+
+    prevention:
+      checklist_ref: "catalog/checklists/infrastructure-setup.yaml#CHK-MUD-001"
+
+  # ========================================
+  # Blazor Render Mode Errors
+  # ========================================
+  - id: ERR-RENDER-001
+    name: InteractiveServer Component Error
+    category: blazor_render
+    severity: medium
+
+    symptoms:
+      - "Cannot provide a value for 'SomeService' - no registered service"
+      - "OnInitializedAsync called twice"
+      - "Component disconnected after navigation"
+
+    root_cause: |
+      InteractiveServer モードと Static Server Rendering (SSR) の
+      混在による DI スコープの問題。
+
+    solution:
+      steps:
+        - step: 1
+          action: "レンダーモードを確認"
+          check: |
+            @rendermode InteractiveServer が適切に設定されているか
+
+        - step: 2
+          action: "Routes.razor を確認"
+          code: |
+            <Routes @rendermode="InteractiveServer" />
+            または
+            <Routes @rendermode="RenderModeForPage" />
+
+  # ========================================
+  # MediatR / Pipeline Errors
+  # ========================================
+  - id: ERR-MEDIATR-001
+    name: Handler Not Found
+    category: mediatr
+    severity: high
+
+    symptoms:
+      - "No handler registered for"
+      - "MediatR.Exceptions.HandlerNotFoundException"
+
+    root_cause: |
+      Handler が DI に登録されていない。
+      AddMediatR() の Assembly スキャンが正しく設定されていない。
+
+    solution:
+      steps:
+        - step: 1
+          action: "AddMediatR の設定を確認"
+          file: "Program.cs または DependencyInjection.cs"
+          code: |
+            services.AddMediatR(cfg => {
+                cfg.RegisterServicesFromAssembly(typeof(SomeHandler).Assembly);
+            });
+
+        - step: 2
+          action: "Handler の実装を確認"
+          check: |
+            IRequestHandler<TRequest, TResponse> を実装しているか
+
+  - id: ERR-MEDIATR-002
+    name: Pipeline Behavior Order Issue
+    category: mediatr
+    severity: medium
+
+    symptoms:
+      - "Validation not running before handler"
+      - "Transaction not committed"
+      - "Unexpected behavior order"
+
+    root_cause: |
+      Pipeline Behavior の登録順序が不適切。
+      Validation → Transaction の順序が守られていない。
+
+    solution:
+      recommended_order: |
+        ValidationBehavior (100)
+        AuthorizationBehavior (200)
+        TransactionBehavior (400)
+        LoggingBehavior (600)
+
+      check: |
+        DI 登録順序を確認。
+        AddTransient<IPipelineBehavior<,>>() の呼び出し順序が
+        実行順序に影響する。
+
+  # ========================================
+  # FluentValidation Errors
+  # ========================================
+  - id: ERR-VALIDATION-001
+    name: Validator Not Invoked
+    category: validation
+    severity: high
+
+    symptoms:
+      - "Invalid data reaches handler"
+      - "Validator seems to be ignored"
+
+    root_cause: |
+      Validator が DI に登録されていない。
+      AddValidatorsFromAssembly() が呼ばれていない。
+
+    solution:
+      steps:
+        - step: 1
+          action: "Validator 登録を確認"
+          code: |
+            services.AddValidatorsFromAssembly(typeof(SomeValidator).Assembly);
+
+        - step: 2
+          action: "ValidationBehavior が登録されているか確認"
+
+  # ========================================
+  # Type System / Naming Conflicts
+  # ========================================
+  - id: ERR-TYPE-001
+    name: Unit Type Ambiguity
+    category: type_system
+    severity: high
+
+    symptoms:
+      - "CS0104: 'Unit' is an ambiguous reference"
+      - "Result.Fail<Unit> でコンパイルエラー"
+
+    root_cause: |
+      MediatR.Unit と Shared.Application.Unit（または他の Unit 型）が
+      名前空間で衝突している。
+
+    solution:
+      steps:
+        - step: 1
+          action: "独自の Unit 型を別名にリネーム"
+          recommendation: |
+            Unit → UnitResult
+            または
+            Unit → VoidResult
+
+        - step: 2
+          action: "完全修飾名を使用"
+          code: |
+            // 曖昧性を回避
+            Result.Fail<Shared.Application.UnitResult>(...)
+
+    prevention:
+      recommendation: |
+        プロジェクト開始時に MediatR.Unit との衝突を避けるため、
+        独自の Unit 型は UnitResult などの別名を使用する。
+
+  - id: ERR-TYPE-002
+    name: TypedId Value Conversion
+    category: type_system
+    severity: medium
+
+    symptoms:
+      - "Cannot implicitly convert type 'BookId' to 'Guid'"
+      - "DTO で Guid を期待しているが Entity は TypedId を返す"
+
+    root_cause: |
+      Domain 層で TypedId（BookId, MemberId 等）を使用しているが、
+      DTO への変換時に .Value プロパティの呼び出しを忘れている。
+
+    solution:
+      code: |
+        // ❌ 間違い
+        dto.Id = entity.Id;
+
+        // ✅ 正しい
+        dto.Id = entity.Id.Value;
+
+    prevention:
+      recommendation: |
+        QueryHandler で DTO にマッピングする際は、
+        TypedId の .Value プロパティを明示的に呼び出す。
+
+  # ========================================
+  # Entity Framework + DDD Mismatch
+  # ========================================
+  - id: ERR-EF-001
+    name: DomainEvent Primary Key Error
+    category: ef_ddd
+    severity: high
+
+    symptoms:
+      - "The entity type 'DomainEvent' requires a primary key"
+      - "Entity.DomainEvents がナビゲーションプロパティとして検出される"
+
+    root_cause: |
+      EF Core が Entity の DomainEvents コレクションを
+      ナビゲーションプロパティとして認識してしまう。
+      DDD パターンの DomainEvent は DB に永続化しないため、
+      EF から除外する必要がある。
+
+    solution:
+      steps:
+        - step: 1
+          action: "OnModelCreating で Ignore 設定"
+          code: |
+            protected override void OnModelCreating(ModelBuilder modelBuilder)
+            {
+                // DomainEvent を EF の追跡から除外
+                modelBuilder.Ignore<DomainEvent>();
+
+                // または基底クラスがある場合
+                modelBuilder.Ignore<IDomainEvent>();
+            }
+
+        - step: 2
+          action: "Entity の DomainEvents プロパティに NotMapped 属性"
+          code: |
+            [NotMapped]
+            public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    prevention:
+      recommendation: |
+        DDD パターンを採用する場合、プロジェクト初期段階で
+        EF の OnModelCreating に Ignore<DomainEvent>() を設定する。
+        これをカタログのスキャフォールドに含める。
+
+  - id: ERR-EF-002
+    name: Repository Method Not Found
+    category: ef_ddd
+    severity: medium
+
+    symptoms:
+      - "IBookRepository does not contain a definition for 'GetByIdForUpdateAsync'"
+      - "Repository インターフェースにメソッドが不足"
+
+    root_cause: |
+      Handler が使用する Repository メソッドが
+      インターフェースに定義されていない。
+      設計と実装の不整合。
+
+    solution:
+      steps:
+        - step: 1
+          action: "Repository インターフェースにメソッドを追加"
+          code: |
+            public interface IBookRepository
+            {
+                Task<Book?> GetByIdAsync(BookId id, CancellationToken ct);
+                Task<Book?> GetByIdForUpdateAsync(BookId id, CancellationToken ct);  // 追加
+            }
+
+    prevention:
+      recommendation: |
+        validation_contract を使用して、Handler が必要とする
+        Repository メソッドを事前に列挙する。
+        speckit.tasks.md の ValidationService タスクテンプレートを参照。
+
+  # ========================================
+  # MudBlazor Component Errors
+  # ========================================
+  - id: ERR-MUD-003
+    name: MudSelect Type Mismatch
+    category: mudblazor
+    severity: medium
+
+    symptoms:
+      - "InvalidCastException in MudSelect"
+      - "MudSelectItem の型と MudSelect の型が不一致"
+      - "Nullable 型と Non-nullable 型の混在"
+
+    root_cause: |
+      MudSelect<T?> と MudSelectItem<T> で型パラメータが一致していない。
+      特に Nullable 型（T?）と Non-nullable 型（T）の混在が原因。
+
+    solution:
+      code: |
+        // ❌ 間違い - 型が不一致
+        <MudSelect T="MemberStatus?" @bind-Value="_status">
+            <MudSelectItem Value="MemberStatus.Active">Active</MudSelectItem>
+        </MudSelect>
+
+        // ✅ 正しい - 両方に同じ型を指定
+        <MudSelect T="MemberStatus?" @bind-Value="_status">
+            <MudSelectItem T="MemberStatus?" Value="MemberStatus.Active">Active</MudSelectItem>
+        </MudSelect>
+
+    prevention:
+      recommendation: |
+        MudBlazor のジェネリックコンポーネント使用時は、
+        親コンポーネントと子コンポーネントの両方に
+        T= で型を明示的に指定する。
+
+ai_guidance:
+  when_to_use:
+    - "dotnet run 実行時にエラーが発生した場合"
+    - "UI が正しく表示されない場合"
+    - "予期しない動作が発生した場合"
+
+  diagnosis_workflow:
+    - step: 1
+      action: "エラーメッセージを確認"
+      hint: "症状から該当エラーパターンを特定"
+
+    - step: 2
+      action: "該当パターンの solution を実行"
+
+    - step: 3
+      action: "prevention の checklist を確認"
+      hint: "再発防止のためのチェック項目を追加"
+
+metadata:
+  created_from: "Library8ドッグフーディングフィードバック"
+  version_history:
+    - version: "1.0.0"
+      date: "2025-12-14"
+      changes:
+        - "初版作成"
+        - "DB設定エラー、静的アセットエラー、MediatRエラーを追加"

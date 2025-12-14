@@ -719,6 +719,17 @@
       "layer": "UI"
     },
     {
+      "id": "layer-ui-hosting-separation",
+      "name": "Host/UI Separation (Hosting vs Presentation)",
+      "category": "layer-element",
+      "version": "1.0.0",
+      "file": "layers/layer-ui-hosting-separation.yaml",
+      "intent": "ホスティング責務（Program/DI/ミドルウェア）とUI責務（Razor/画面）を分離し、UIを交換可能にする",
+      "tags": ["ui", "hosting", "composition-root", "rcl", "solution-structure"],
+      "stability": "stable",
+      "layer": "UI"
+    },
+    {
       "id": "realtime-notification-pattern",
       "name": "Real-time Notification Pattern (SignalR)",
       "category": "ui-pattern",

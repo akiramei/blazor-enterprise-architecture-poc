@@ -95,6 +95,33 @@ For each implementation task, determine:
 
 **警告**: Guardrail が紐付いていないタスクがある場合、エラーとする。
 
+### UI-IR-to-Task Mapping（UIがある場合は必須）
+
+**ルール**: UI-IR が存在する場合、UI 実装タスクは UI-IR を参照すること。
+
+1. **UI-IR 存在チェック**:
+   - `specs/{feature}/{slice}.ui-ir.yaml` が存在するか確認
+   - plan.md に「UI-IR Summary」セクションがあるか確認
+
+2. **UI タスクへの UI-IR 参照追加**:
+   ```markdown
+   ## Task N: {Screen}Page 実装
+
+   **UI-IR Reference:** `specs/{feature}/{slice}.ui-ir.yaml`
+   **Pattern:** boundary-pattern
+
+   **From UI-IR:**
+   > - Primary Action: {action_name} (confirmation: {level})
+   > - Maturity Level: {level}
+   > - is_destructive: {true/false}
+   > - disabled_when: Entity.CanXxx() → UI の disabled 属性
+   ```
+
+3. **UI-IR がない場合の対応**:
+   - **WARNING**: plan.md の Phase 1.4 が実行されたか確認
+   - Boundary セクションがあるのに UI-IR がない → **ERROR**
+   - `/speckit.plan` を再実行して UI-IR を生成
+
 ---
 
 ## Step 3: Generate tasks.md
