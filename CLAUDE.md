@@ -493,7 +493,7 @@ public async Task<BoundaryDecision> ValidatePayAsync(OrderId id, CancellationTok
 - **AI利用ガイド**: `catalog/AI_USAGE_GUIDE.md`
 - **意思決定フロー**: `catalog/DECISION_FLOWCHART.md`
 - **アーキテクチャ詳細**: `docs/blazor-guide-package/docs/`
-- **実装例**: `src/Application/Features/` 配下
+- **実装例**: `src/Application.Features/Features/`（Command/Query/Handler） と `src/UI.Blazor/Features/`（.razor）
 
 ---
 

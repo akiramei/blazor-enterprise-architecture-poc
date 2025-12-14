@@ -219,5 +219,5 @@ characteristics:
 
 - **SPEC**: `specs/loan/LendBook.spec.yaml`
 - **Manifest**: `manifests/loan/LendBook.manifest.yaml`
-- **生成コード**: `src/Application/Features/LendBook/`
+- **生成コード**: `src/Application.Features/Features/LendBook/` と `src/UI.Blazor/Features/LendBook/`
 - **ドメイン**: `src/Domain/LibraryManagement/`

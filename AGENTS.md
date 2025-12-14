@@ -267,13 +267,13 @@ Q1: この.razorは特定の1機能でのみ使うか？
 dotnet build
 
 # 実行
-dotnet run --project src/Application/Application.csproj
+dotnet run --project src/Host.Web/Host.Web.csproj
 
 # テスト
 dotnet test
 
 # EFマイグレーション
-dotnet ef database update --project src/Application
+dotnet ef database update --project src/Host.Web
 ```
 
 ---

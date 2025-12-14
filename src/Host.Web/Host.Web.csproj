@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Application</RootNamespace>
+    <AssemblyName>Application.Host</AssemblyName>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
@@ -54,6 +55,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\UI.Blazor\UI.Blazor.csproj" />
+    <ProjectReference Include="..\Application.Features\Application.Features.csproj" />
+
     <!-- Domain Projects -->
     <ProjectReference Include="..\Domain\ProductCatalog\Domain.ProductCatalog.csproj" />
     <ProjectReference Include="..\Domain\PurchaseManagement\Domain.PurchaseManagement.csproj" />

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Application</RootNamespace>
+    <AssemblyName>Application.UI.Blazor</AssemblyName>
+    <RazorLangVersion>Latest</RazorLangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="13.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application.Features\Application.Features.csproj" />
+
+    <!-- Domain Projects -->
+    <ProjectReference Include="..\Domain\ProductCatalog\Domain.ProductCatalog.csproj" />
+    <ProjectReference Include="..\Domain\PurchaseManagement\Domain.PurchaseManagement.csproj" />
+    <ProjectReference Include="..\Domain\ApprovalWorkflow\Domain.ApprovalWorkflow.csproj" />
+    <ProjectReference Include="..\Domain\LibraryManagement\Domain.LibraryManagement.csproj" />
+
+    <!-- Shared Projects -->
+    <ProjectReference Include="..\Kernel\Kernel.csproj" />
+    <ProjectReference Include="..\Shared\Application\Shared.Application.csproj" />
+    <ProjectReference Include="..\Shared\Infrastructure\Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
+    <ProjectReference Include="..\Shared\Abstractions\Shared.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

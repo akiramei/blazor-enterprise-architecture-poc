@@ -97,7 +97,7 @@
 ```yaml
 id: feature-create-entity
 implementation:
-  file_path: "src/Application/Features/{Feature}/{Feature}Command.cs"
+  file_path: "src/Application.Features/Features/{Feature}/{Feature}Command.cs"
   template: |
     // テンプレートコード
 
@@ -171,7 +171,8 @@ public class BookId : ValueObject
 
 ```
 src/Domain/{BC}/{Aggregate}/  → {BC}.Domain.{Aggregate}
-src/Application/Features/     → Application.Features
+src/Application.Features/Features/  → Application.Features
+src/UI.Blazor/Features/             → Application.Features（UI）
 src/Kernel/                   → Shared.Kernel
 ```
 
@@ -293,7 +294,7 @@ common_mistakes:
 dotnet build
 
 # 特定のプロジェクトのみ
-dotnet build src/Application/Application.csproj
+dotnet build src/Host.Web/Host.Web.csproj
 ```
 
 ---

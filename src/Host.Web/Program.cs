@@ -21,6 +21,7 @@ using ProductCatalog.Shared.Infrastructure.Persistence;
 using ProductCatalog.Shared.Infrastructure.Persistence.Repositories;
 using Application.Services;
 using Application.Components;
+using Application.Routing;
 using ProductCatalog.Shared.UI.Actions;
 using ProductCatalog.Shared.UI.Store;
 using Serilog;
@@ -493,7 +494,7 @@ app.UseStaticFiles();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
-    .AddAdditionalAssemblies(Program.FeatureUIAssemblies);
+    .AddAdditionalAssemblies(RouteAssemblyRegistry.FeatureUIAssemblies);
 
 // SignalR Hub エンドポイント
 app.MapHub<Application.Hubs.ProductHub>("/hubs/products");
@@ -549,44 +550,4 @@ public partial class Program
     {
         return WebApplication.CreateBuilder(args);
     }
-
-    /// <summary>
-    /// Feature UI assemblies for Blazor route discovery.
-    ///
-    /// CRITICAL: Both MapRazorComponents (server-side) and Router component (client-side)
-    /// need this same assembly list to discover @page routes from Feature UI projects.
-    ///
-    /// Without this:
-    /// - MapRazorComponents: Returns 404 for direct URL access (e.g., browser refresh)
-    /// - Router: Can't resolve routes during in-app navigation
-    ///
-    /// VSA Pattern: Each Feature has its own UI assembly with Razor components.
-    /// This array explicitly loads all Feature UI assemblies for route discovery.
-    /// </summary>
-    public static readonly System.Reflection.Assembly[] FeatureUIAssemblies = new[]
-    {
-        // ProductCatalog BC
-        "GetProducts.UI",
-        "GetProductById.UI",
-        "UpdateProduct.UI",
-        "CreateProduct.UI",
-        "DeleteProduct.UI",
-        "SearchProducts.UI",
-        "BulkDeleteProducts.UI",
-        "BulkUpdateProductPrices.UI",
-        "ExportProductsToCsv.UI",
-        "ImportProductsFromCsv.UI",
-
-        // PurchaseManagement BC
-        "SubmitPurchaseRequest.UI",
-        "GetPurchaseRequests.UI",
-        "GetPurchaseRequestById.UI"
-    }
-    .Select(name =>
-    {
-        try { return System.Reflection.Assembly.Load(name); }
-        catch { return null; }
-    })
-    .Where(a => a != null)
-    .ToArray()!;
 }

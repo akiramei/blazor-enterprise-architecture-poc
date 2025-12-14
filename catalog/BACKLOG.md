@@ -72,8 +72,15 @@ src/
 - `catalog/scaffolds/project-structure.yaml` を更新（Host/UI分離オプションを追加）
 - `catalog/layers/layer-ui-hosting-separation.yaml` を追加（ガイドライン/依存関係ルール）
 - `catalog/index.json` にパターン登録（layer-ui-hosting-separation）
+- **コード改修完了** (2025-12-14):
+  - `src/Application` を3プロジェクトに分割
+  - `src/Host.Web/` - ホスティング（Program/DI/ミドルウェア/API/Hub）
+  - `src/UI.Blazor/` - Razor/UI（Components + Features/*.razor + Store/PageActions）
+  - `src/Application.Features/` - Command/Query/Handler/Validator + DTO/IF
+  - ルーティング分離: `RouteAssemblyRegistry.cs` で UI アセンブリを管理
+  - 実行: `dotnet run --project src/Host.Web/Host.Web.csproj`
 
-**ステータス**: 対応済み（カタログ整備）
+**ステータス**: 完了（カタログ整備 + コード改修）
 
 ---
 

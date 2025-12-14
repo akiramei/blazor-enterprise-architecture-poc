@@ -11,7 +11,7 @@
 
 一方、このサンプル実装（VSASample）は現状以下の状態です：
 
-- `src/Application/Application.csproj` が `net8.0`
+- `src/Host.Web/Host.Web.csproj`（旧 `src/Application/Application.csproj`）が `net8.0`
 - EF Core / Blazor / Identity など主要パッケージが 8.x
 - これは過去のサンプル互換のために残っていると推測され、  
   カタログ駆動開発の「再現性」要件と齟齬があります。
@@ -47,7 +47,7 @@
 
 ## 影響範囲
 
-- 全プロジェクト（`src/Application`, `src/Domain/*`, `src/Shared/*`, `src/Kernel`）
+- 全プロジェクト（`src/Host.Web`, `src/UI.Blazor`, `src/Application.Features`, `src/Domain/*`, `src/Shared/*`, `src/Kernel`）
 - EF Core / Identity / Hangfire / Serilog / SignalR など主要依存
 - テストプロジェクト（`tests/`）の SDK/依存
 

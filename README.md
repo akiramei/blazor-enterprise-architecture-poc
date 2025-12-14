@@ -385,7 +385,7 @@ podman run -d --name postgres-productcatalog \
 
 # ビルド＆実行
 dotnet build
-cd src/Application && dotnet run
+cd src/Host.Web && dotnet run
 
 # ブラウザで https://localhost:5001 を開く
 # ログイン: admin@example.com / Admin@123

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Application</RootNamespace>
+    <AssemblyName>Application.Features</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="13.1.0" />
+    <PackageReference Include="FluentValidation" Version="11.8.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.8.0" />
+    <PackageReference Include="CsvHelper" Version="33.1.0" />
+    <PackageReference Include="Dapper" Version="2.1.66" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Domain Projects -->
+    <ProjectReference Include="..\Domain\ProductCatalog\Domain.ProductCatalog.csproj" />
+    <ProjectReference Include="..\Domain\PurchaseManagement\Domain.PurchaseManagement.csproj" />
+    <ProjectReference Include="..\Domain\ApprovalWorkflow\Domain.ApprovalWorkflow.csproj" />
+    <ProjectReference Include="..\Domain\LibraryManagement\Domain.LibraryManagement.csproj" />
+
+    <!-- Shared Projects -->
+    <ProjectReference Include="..\Kernel\Kernel.csproj" />
+    <ProjectReference Include="..\Shared\Application\Shared.Application.csproj" />
+    <ProjectReference Include="..\Shared\Domain\Shared.Domain.csproj" />
+    <ProjectReference Include="..\Shared\Infrastructure\Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\Shared\Infrastructure\Platform\Shared.Infrastructure.Platform.csproj" />
+    <ProjectReference Include="..\Shared\Abstractions\Shared.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
