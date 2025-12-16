@@ -58,9 +58,61 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. Generate and dispatch research agents
 3. Consolidate findings in research.md
 
-### Phase 0.25: Guardrails Extraction (CRITICAL)
+### Phase 0.25: Guardrails Integration (CRITICAL)
 
-**This phase extracts business rules that MUST NOT be violated.**
+**This phase integrates guardrails from guardrails.yaml file.**
+
+> **詳細**: `catalog/speckit-extensions/commands/speckit.guardrails.md` を参照
+
+#### 0.25.0 guardrails.yaml 読み込み（先行フェーズで生成済みの場合）
+
+**前提**: `/speckit.guardrails` が先行実行されている場合、`specs/{feature}/{slice}.guardrails.yaml` が存在する。
+
+```
+1. Check if specs/{feature}/{slice}.guardrails.yaml exists
+2. If exists → Load and integrate into plan
+3. If not exists → Extract from SPEC (legacy mode, see below)
+```
+
+**guardrails.yaml が存在する場合**:
+
+```
+Read: specs/{feature}/{slice}.guardrails.yaml
+
+Integration:
+1. canonical_routes → Plan の Guardrails セクションに「正解経路」として引用
+2. forbidden_actions → Plan の制約として明記
+3. spec_derived_guardrails → GR-XXX として列挙
+4. acceptance_criteria → Plan のテスト要件に反映
+```
+
+**出力フォーマット（guardrails.yaml 統合時）**:
+
+```markdown
+## Guardrails (from guardrails.yaml)
+
+### Canonical Routes (正解経路)
+
+| ID | Operation | Path | Source |
+|----|-----------|------|--------|
+| CR-001 | 予約キャンセル | Handler → QueueService.DequeueAsync | domain-ordered-queue.yaml |
+
+### Forbidden Actions (禁止事項)
+
+| ID | Forbidden | Reason | Severity |
+|----|-----------|--------|----------|
+| FA-001 | reservation.Cancel() 直接呼び出し | Position繰り上げなし | critical |
+
+### Spec-Derived Guardrails
+
+| ID | FR Ref | Rule | Scope |
+|----|--------|------|-------|
+| GR-001 | FR-021 | Ready 予約者が最優先 | LoanBoundaryService |
+```
+
+#### 0.25.1 Legacy Mode: SPEC からの直接抽出
+
+**guardrails.yaml が存在しない場合のみ実行**。
 
 > **詳細**: `catalog/AI_GUARDRAILS.md` の「Phase 0.25: Guardrails 抽出」を参照
 
@@ -70,7 +122,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 **警告**: Guardrails が0件の場合、spec に前提条件が明示されていない可能性がある。
 
-#### 0.25.1 Guardrail-FR Cross-Reference Check (U2 対策)
+> **推奨**: guardrails.yaml が存在しない場合は、先に `/speckit.guardrails` を実行することを検討。
+
+#### 0.25.2 Guardrail-FR Cross-Reference Check (U2 対策)
 
 **ルール**: Guardrail に記載した機能は、対応する FR が Spec に存在しなければならない。
 

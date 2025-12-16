@@ -47,10 +47,20 @@ This ensures:
 ## Step 1: Load Context
 
 1. Read plan.md
-2. Extract **Guardrails** section（必須）
-3. Extract **Catalog Binding** section
-4. Extract **Query Semantics** section（Query タスクの場合）
-5. Identify all Pattern IDs with status `matched` or `auto-applied`
+2. **Read guardrails.yaml**（存在する場合）
+   ```
+   Read: specs/{feature}/{slice}.guardrails.yaml
+
+   Extract:
+   - canonical_routes → CR-XXX
+   - forbidden_actions → FA-XXX
+   - spec_derived_guardrails → GR-XXX
+   - acceptance_criteria → AC-XXX
+   ```
+3. Extract **Guardrails** section from plan.md（guardrails.yaml がない場合）
+4. Extract **Catalog Binding** section
+5. Extract **Query Semantics** section（Query タスクの場合）
+6. Identify all Pattern IDs with status `matched` or `auto-applied`
 
 ---
 
@@ -83,7 +93,38 @@ For each implementation task, determine:
 
 ### Guardrail-to-Task Mapping（必須）
 
-**ルール**: すべての Guardrail は最低1つのタスクに紐付ける。
+**ルール**: すべての Guardrail（CR/FA/GR/AC）は最低1つのタスクに紐付ける。
+
+#### guardrails.yaml が存在する場合
+
+```markdown
+### Guardrail → Task Mapping
+
+#### Canonical Routes (正解経路)
+| ID | Operation | Target Task |
+|----|-----------|-------------|
+| CR-001 | 予約キャンセル | CancelReservationCommandHandler 実装 |
+
+#### Forbidden Actions (禁止事項)
+| ID | Forbidden | Target Task |
+|----|-----------|-------------|
+| FA-001 | reservation.Cancel() 直接呼び出し | CancelReservationCommandHandler 実装 |
+| FA-002 | CheckAndPromoteNextAsync で代用 | CancelReservationCommandHandler 実装 |
+
+#### Spec-Derived Guardrails
+| ID | FR Ref | Target Task |
+|----|--------|-------------|
+| GR-001 | FR-021 | LoanBoundaryService 実装 |
+| GR-002 | FR-017 | ReservationValidationService 実装 |
+
+#### Acceptance Criteria
+| ID | Criterion | Target Task |
+|----|-----------|-------------|
+| AC-001 | Ready予約者優先 | LoanBoundaryService 実装 |
+| AC-002 | Position繰り上げ | CancelReservationCommandHandler 実装 |
+```
+
+#### guardrails.yaml がない場合（Legacy）
 
 ```markdown
 | Guardrail | 対象タスク |
@@ -93,7 +134,9 @@ For each implementation task, determine:
 | GR-003 (FR-018) | Reservation Entity 実装 |
 ```
 
-**警告**: Guardrail が紐付いていないタスクがある場合、エラーとする。
+**エラー条件**:
+- Guardrail（CR/FA/GR/AC）が1つもタスクに紐付いていない → **ERROR**
+- タスクが正解経路（CR）に従わない構造 → **WARNING**
 
 ### UI-IR-to-Task Mapping（UIがある場合は必須）
 
@@ -193,10 +236,12 @@ For each implementation task, determine:
 
 Each task MUST include:
 
+### 基本テンプレート
+
 ```markdown
 ## Task N: {TaskName}
 
-**Guardrails:** {GR-XXX (FR-YYY)} ← 関連する Guardrail があれば必須
+**Guardrails:** {FA-XXX, CR-XXX, GR-XXX, AC-XXX} ← 関連するものをすべて記載
 **関連 FR:** FR-XXX, FR-YYY
 
 **Pattern:** {pattern-id}
@@ -210,6 +255,47 @@ Each task MUST include:
 - [ ] {constraint 1 が守られている}
 - [ ] {constraint 2 が守られている}
 - [ ] **GR-XXX を満たしている** ← Guardrail がある場合は必須
+```
+
+### guardrails.yaml がある場合の拡張テンプレート
+
+```markdown
+## Task N: CancelReservationCommandHandler 実装
+
+**Guardrails:** FA-001, FA-002, CR-001, GR-003, AC-002
+**関連 FR:** FR-018
+
+**Pattern:** transaction-behavior
+**YAML:** `catalog/patterns/transaction-behavior.yaml`
+
+### Canonical Route (CR-001)
+
+> CancelReservationCommandHandler
+>   → IReservationQueueService.DequeueAsync(reservationId, ct)
+>     → Reservation.Cancel()
+>     → PromotePositions(後続)
+>     → PromoteNext(新しい先頭)
+
+### Forbidden Actions
+
+> - ❌ **FA-001**: reservation.Cancel() を直接呼ぶ
+>   - 理由: Position繰り上げが行われない
+> - ❌ **FA-002**: CheckAndPromoteNextAsync() で代用する
+>   - 理由: Position再インデックスが行われない
+
+### Catalog Constraints
+
+> - Handler内でSaveChangesAsyncを呼ばない
+> - Result<T> を返す
+
+### Acceptance Criteria
+
+- [ ] **CR-001** の正解経路に従っている（DequeueAsync を呼んでいる）
+- [ ] **FA-001** を違反していない（Entity.Cancel() 直接呼び出しなし）
+- [ ] **FA-002** を違反していない（CheckAndPromoteNextAsync 使用なし）
+- [ ] **AC-002** のテストが通る（Position繰り上げ確認）
+- [ ] SaveChangesAsync() を呼んでいない
+- [ ] Result<T> を返している
 ```
 
 ### ValidationService タスクの追加要素

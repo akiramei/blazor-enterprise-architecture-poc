@@ -205,6 +205,101 @@ UI-IR の `maturity.level` と `uiPolicy.denied_widgets` は遵守すること�
 
 > **参照**: UI 強化時の入力要件は `catalog/skills/vsa-ui-enhancer/input-requirements.md` を参照
 
+### Step 0.5: Load Guardrails (CRITICAL - NEW)
+
+**このステップは guardrails.yaml が存在する場合の必須ステップです。**
+
+#### 0.5.1 guardrails.yaml 存在チェック
+
+```
+Check: specs/{feature}/{slice}.guardrails.yaml exists?
+```
+
+**存在する場合**:
+
+```
+Read: specs/{feature}/{slice}.guardrails.yaml
+
+Extract:
+- canonical_routes → 「この操作の正解経路」として表示
+- forbidden_actions → 「やってはいけないこと」として表示
+- negative_examples → 「禁止コード例」として表示
+- acceptance_criteria → 検証チェックリストとして使用
+```
+
+#### 0.5.2 正解経路の表示（Canonical Routes）
+
+**必須**: canonical_routes が存在する操作を実装する場合、正解経路を明示すること。
+
+```markdown
+## Implementation Notes - Guardrails
+
+### Canonical Route for この操作
+
+**CR-001: 予約キャンセル**
+
+> **正解経路:**
+> ```
+> CancelReservationCommandHandler
+>   → IReservationQueueService.DequeueAsync(reservationId, ct)
+>     → Reservation.Cancel()
+>     → PromotePositions(後続の Position を -1)
+>     → PromoteNext(新しい先頭を Ready に)
+> ```
+>
+> **★ 重要**: Handler は DequeueAsync を呼ぶだけ。
+> 内部の Cancel/PromotePositions/PromoteNext は QueueService が担当。
+```
+
+#### 0.5.3 禁止事項の表示（Forbidden Actions）
+
+**必須**: forbidden_actions をタスクの冒頭に表示すること。
+
+```markdown
+### Forbidden Actions (やってはいけないこと)
+
+> ❌ **FA-001**: reservation.Cancel() を直接呼ぶ
+>    - 理由: Position繰り上げが行われない
+>    - 検出パターン: `reservation\.Cancel\(\)`
+>
+> ❌ **FA-002**: CheckAndPromoteNextAsync() で DequeueAsync() を代用する
+>    - 理由: Position再インデックスが行われない
+>    - 検出パターン: `CheckAndPromoteNextAsync.*Cancel`
+```
+
+#### 0.5.4 ネガティブ例の表示（Negative Examples）
+
+**推奨**: negative_examples がある場合、実装前に表示すること。
+
+```markdown
+### What NOT to Do (禁止コード例)
+
+**NE-001: Entity.Cancel()直接呼び出し**
+
+```csharp
+// ❌ 禁止
+var reservation = await _reservationRepository.GetByIdAsync(id, ct);
+reservation.Cancel();
+// これだけでは後続のPosition繰り上げが行われない
+```
+
+```csharp
+// ✅ 正しい
+await _queueService.DequeueAsync(reservationId, ct);
+// DequeueAsync内部でCancel + PromotePositions + PromoteNextが実行される
+```
+```
+
+#### 0.5.5 guardrails.yaml がない場合
+
+**フォールバック**: plan.md の Guardrails セクションを参照。
+
+```
+1. plan.md の Guardrails セクションを読む
+2. GR-XXX を実装時の制約として使用
+3. Guardrails がない場合は WARNING（計画フェーズの見直しを推奨）
+```
+
 ---
 
 ## Phase 1: Implementation Plan
@@ -264,7 +359,9 @@ After Phase 1 plan is documented, proceed with implementation.
 
 ## Phase 3: Verification
 
-After implementation, verify against catalog checklist:
+After implementation, verify against catalog checklist AND guardrails.
+
+### 3.1 Catalog Constraints Verification
 
 ```markdown
 ## Post-Implementation Verification
@@ -275,6 +372,45 @@ After implementation, verify against catalog checklist:
 | Entity.CanXxx() returns BoundaryDecision | ✅ | Book.cs:120 |
 | BoundaryService delegates to Entity | ✅ | BookBoundaryService.cs:35 |
 ```
+
+### 3.2 Guardrails Verification (guardrails.yaml がある場合)
+
+**必須**: forbidden_actions のパターン検索で自己検証を行う。
+
+```markdown
+## Guardrails Self-Verification
+
+### Canonical Route Compliance (CR-XXX)
+
+| ID | Expected Route | Actual Implementation | Status |
+|----|---------------|----------------------|:------:|
+| CR-001 | Handler → DequeueAsync | `await _queueService.DequeueAsync(...)` | ✅ |
+
+### Forbidden Actions Check (FA-XXX)
+
+| ID | Pattern | Search Result | Status |
+|----|---------|--------------|:------:|
+| FA-001 | `reservation\.Cancel\(\)` | 0 matches (excluding QueueService) | ✅ |
+| FA-002 | `CheckAndPromoteNextAsync.*Cancel` | 0 matches | ✅ |
+
+### Acceptance Criteria (AC-XXX)
+
+| ID | Criterion | Evidence | Status |
+|----|-----------|----------|:------:|
+| AC-001 | Ready予約者優先 | CanBorrow() テスト通過 | ✅ |
+| AC-002 | Position繰り上げ | DequeueAsync テスト通過 | ✅ |
+```
+
+**自動検証スクリプト実行（オプション）**:
+
+```powershell
+# verification/check-guardrails.ps1 を実行
+pwsh -File verification/check-guardrails.ps1 -SourcePath src
+```
+
+**検証失敗時の対応**:
+- ❌ がある場合 → 実装を修正してから続行
+- 修正不可能な場合 → **ERROR** で停止し、原因を報告
 
 ---
 

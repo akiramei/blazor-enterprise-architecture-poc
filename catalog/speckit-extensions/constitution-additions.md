@@ -61,6 +61,99 @@ spec を読む際に以下をチェック：
 - Guardrail が紐付いていないタスクがある場合 → **エラー**
 - Guardrail を満たさない実装 → **仕様違反**
 
+## Guardrails Phase (NON-NEGOTIABLE) - NEW
+
+### 概要
+
+**「曖昧化する前に」ガードレールを固定する**ための独立フェーズ。
+
+Library9ドッグフーディングで発見された問題：
+- 仕様は正しかった（DequeueAsync を使うべき）
+- 計画段階で「どのAPIか」が曖昧になった
+- AIが名前から推測して誤用（CheckAndPromoteNextAsync を選択）
+
+**解決策**: Specify 直後に guardrails.yaml を生成し、Plan 以降で参照させる。
+
+### ワークフロー
+
+```
+specify → guardrails → plan → tasks → implement
+         ↑NEW
+```
+
+### コマンド
+
+`/speckit.guardrails`
+
+### 出力先
+
+`specs/{feature}/{slice}.guardrails.yaml`
+
+### guardrails.yaml 必須セクション
+
+| セクション | 説明 | 空の場合 |
+|-----------|------|---------|
+| `canonical_routes` | 唯一の正しい実装経路 | **ERROR** |
+| `forbidden_actions` | 禁止アクション | WARNING |
+| `spec_derived_guardrails` | FR番号付きビジネスルール | WARNING |
+| `acceptance_criteria` | 受け入れ条件（テスト生成用） | WARNING |
+| `negative_examples` | やってはいけないコード例 | WARNING |
+
+### 正解経路（canonical_routes）の重要性
+
+```yaml
+# ★ これが最も重要
+canonical_routes:
+  - id: CR-001
+    operation: "予約キャンセル"
+    path:
+      - caller: "CancelReservationCommandHandler"
+        method: "IReservationQueueService.DequeueAsync"
+        params: ["reservationId", "ct"]
+    anti_patterns:
+      - pattern: "Handler → reservation.Cancel()"
+        problem: "後続処理が行われない"
+```
+
+**正解経路がないと AI が迷う。空の場合は ERROR で停止。**
+
+### 禁止事項（forbidden_actions）
+
+```yaml
+forbidden_actions:
+  - id: FA-001
+    forbidden: "reservation.Cancel() を直接呼ぶ"
+    reason: "Position繰り上げが行われない"
+    severity: critical
+    detection:
+      pattern: "reservation\\.Cancel\\(\\)"
+```
+
+### 伝播ルール
+
+guardrails.yaml は以下のフェーズで参照される：
+
+| フェーズ | 参照方法 |
+|---------|---------|
+| `/speckit.plan` | Guardrails セクションに引用 |
+| `/speckit.tasks` | タスクに Guardrail ID 紐付け |
+| `/speckit.implement` | canonical_routes を正解経路として提示 |
+| テスト生成 | acceptance_criteria から xUnit テスト生成 |
+
+### 違反時の扱い
+
+| 状況 | 結果 |
+|------|------|
+| `canonical_routes` が空 | **ERROR**: パターン不完全 |
+| 実装が `canonical_route` に従わない | **仕様違反** |
+| 実装が `forbidden_actions` に該当 | **実装エラー** |
+
+### 参照ファイル
+
+- `catalog/scaffolds/guardrails-template.yaml` - テンプレート
+- `catalog/speckit-extensions/commands/speckit.guardrails.md` - コマンド定義
+- `catalog/speckit-extensions/verification-rules-guide.md` - 検証ガイド
+
 ## Validation Contract（検証契約）
 
 ValidationService 実装時は以下を必須とする：

@@ -1,0 +1,326 @@
+# guardrails-template.yaml
+# ガードレールテンプレート - AI実装ミス防止のための構造化ルール定義
+
+id: guardrails-template
+version: 1.0.0
+name: ガードレールテンプレート
+category: scaffold
+intent: AI実装ミス防止のためのガードレール定義テンプレート
+
+description: |
+  このテンプレートは、Specify後に実行されるガードレールフェーズで使用される。
+  SPECとカタログパターンから抽出したルールを構造化し、
+  Plan → Tasks → Implement まで確実に伝播させる。
+
+  ## 背景（Library9ドッグフーディング問題）
+  - 仕様は正しかったが、AIが実装時にメソッドを誤用
+  - 計画段階で「どのAPIを呼ぶか」が曖昧になり、AIが名前から推測して誤用
+  - 「曖昧化する前に」ガードレールを固定する必要がある
+
+  ## このテンプレートの目的
+  1. 禁止事項（forbidden_actions）を明示
+  2. 唯一の正解経路（canonical_routes）を定義
+  3. 受け入れ条件（acceptance_criteria）からテスト生成
+  4. ネガティブ例（negative_examples）でAIの誤学習を防止
+
+# ============================================================================
+# 出力ファイルパス
+# ============================================================================
+
+output_path: "specs/{feature}/{slice}.guardrails.yaml"
+
+# ============================================================================
+# テンプレート構造
+# ============================================================================
+
+template: |
+  # {Feature}/{Slice} ガードレール定義
+  # 生成日時: {generated_at}
+  # SPECファイル: {spec_ref}
+
+  meta:
+    feature: "{Feature}"
+    slice: "{Slice}"
+    spec_ref: "specs/{feature}/{slice}.spec.yaml"
+    catalog_patterns: []  # 適用されたパターンID一覧
+    generated_at: "{ISO8601_TIMESTAMP}"
+
+  # ============================================================================
+  # 禁止事項（Forbidden Actions）
+  # ============================================================================
+  # パターンYAMLのforbidden_actions/anti_patternsから抽出
+  # severity: critical > high > medium > low
+
+  forbidden_actions: []
+  # 例:
+  # - id: FA-001
+  #   source: "domain-ordered-queue.yaml"
+  #   scope: "CancelReservationCommandHandler"
+  #   forbidden: "reservation.Cancel() を直接呼ぶ"
+  #   reason: "Position繰り上げが行われない"
+  #   severity: critical
+  #   detection:
+  #     pattern: "reservation\\.Cancel\\(\\)"
+  #     exclude_in: ["*QueueService.cs"]
+
+  # ============================================================================
+  # 正解経路（Canonical Routes）
+  # ============================================================================
+  # 操作ごとの「唯一の正しい実装経路」
+  # パターンYAMLのcanonical_call_pathsから抽出
+  # ★ 最低1件必須（空の場合ERROR）
+
+  canonical_routes: []
+  # 例:
+  # - id: CR-001
+  #   operation: "予約キャンセル"
+  #   source: "domain-ordered-queue.yaml"
+  #   path:
+  #     - caller: "CancelReservationCommandHandler"
+  #       method: "IReservationQueueService.DequeueAsync"
+  #       params: ["reservationId", "ct"]
+  #       note: "QueueService経由で呼ぶこと"
+  #   anti_patterns:
+  #     - pattern: "Handler → reservation.Cancel()"
+  #       problem: "後続処理が行われない"
+
+  # ============================================================================
+  # Spec由来ガードレール（Spec-Derived Guardrails）
+  # ============================================================================
+  # SPECの「〜のみ可能」「〜が優先」等のルールをFR番号付きで追跡
+
+  spec_derived_guardrails: []
+  # 例:
+  # - id: GR-001
+  #   fr_ref: "FR-021"
+  #   rule: "Ready 状態の予約者が最優先で貸出権を持つ"
+  #   scope: "LoanBoundaryService"
+  #   violation_impact: "Ready 予約者以外に貸出してしまう"
+  #   enforcement:
+  #     entity_method: "BookCopy.CanBorrow(memberId, readyReserverId)"
+  #     check_location: "LoanBoundaryService.ValidateBorrowAsync"
+
+  # ============================================================================
+  # 受け入れ条件（Acceptance Criteria）
+  # ============================================================================
+  # テスト生成用のGiven/When/Then形式
+  # spec-test-template.yaml と連携
+
+  acceptance_criteria: []
+  # 例:
+  # - id: AC-001
+  #   gr_ref: "GR-001"
+  #   criterion: "Ready予約者がいる場合、他の会員は貸出不可"
+  #   test_derivation:
+  #     given:
+  #       - "Book A に Ready 予約（Member X）がある"
+  #       - "BookCopy A1 が Available"
+  #     when: "Member Y が Book A を借りようとする"
+  #     then: "Deny(予約者に優先権があります)"
+
+  # ============================================================================
+  # ネガティブ例（Negative Examples）
+  # ============================================================================
+  # AIが「やってはいけない」コード例
+  # bad_code と good_code を対比
+
+  negative_examples: []
+  # 例:
+  # - id: NE-001
+  #   title: "Entity.Cancel()直接呼び出し"
+  #   bad_code: |
+  #     // ❌ 禁止
+  #     var reservation = await _reservationRepository.GetByIdAsync(id, ct);
+  #     reservation.Cancel();
+  #     // これだけでは後続のPosition繰り上げが行われない
+  #   good_code: |
+  #     // ✅ 正しい
+  #     await _queueService.DequeueAsync(reservationId, ct);
+  #     // DequeueAsync内部でCancel + PromotePositions + PromoteNextが実行される
+  #   detection_hint: "reservation.Cancel() がQueueService外で呼ばれていないか"
+
+  # ============================================================================
+  # 検証ルール（Verification Rules）
+  # ============================================================================
+  # 静的検査とテスト生成のヒント
+
+  verification_rules:
+    static_checks: []
+    # 例:
+    # - id: SC-001
+    #   type: "grep_prohibition"
+    #   pattern: "reservation\\.Cancel\\(\\)"
+    #   exclude_paths: ["*QueueService.cs", "*Tests.cs"]
+    #   message: "Entity.Cancel()の直接呼び出しは禁止。QueueService.DequeueAsync()を使用してください。"
+
+    test_generation_hints: []
+    # 例:
+    # - guardrail_id: "GR-001"
+    #   test_type: "boundary_decision"
+    #   template_ref: "spec-test-template.yaml#boundary_test"
+
+# ============================================================================
+# 必須セクション定義
+# ============================================================================
+
+required_sections:
+  - id: forbidden_actions
+    name: 禁止事項
+    description: パターンYAMLから抽出した禁止アクション
+    minimum_count: 0
+    warning_if_empty: true
+    error_if_empty: false
+
+  - id: canonical_routes
+    name: 正解経路
+    description: 操作ごとの唯一の正しい実装経路
+    minimum_count: 1
+    warning_if_empty: false
+    error_if_empty: true  # ★ 正解経路がないとAIが迷う
+
+  - id: spec_derived_guardrails
+    name: Spec由来ガードレール
+    description: FR番号付きのビジネスルール
+    minimum_count: 0
+    warning_if_empty: true
+    error_if_empty: false
+
+  - id: acceptance_criteria
+    name: 受け入れ条件
+    description: テスト生成用のGiven/When/Then
+    minimum_count: 0
+    warning_if_empty: true
+    error_if_empty: false
+
+  - id: negative_examples
+    name: ネガティブ例
+    description: やってはいけないコード例
+    minimum_count: 0
+    warning_if_empty: true
+    error_if_empty: false
+
+# ============================================================================
+# AI抽出ルール
+# ============================================================================
+
+ai_guidance:
+  extraction_rules:
+    # 禁止事項の抽出元
+    forbidden_actions:
+      sources:
+        - location: "pattern.ai_guidance.orchestration_rules[].forbidden_actions"
+          description: "オーケストレーションルールの禁止アクション"
+        - location: "pattern.ai_guidance.canonical_call_paths[].anti_patterns"
+          description: "正解経路のアンチパターン"
+        - location: "pattern.ai_guidance.common_mistakes"
+          filter: "severity in [critical, high]"
+          description: "重大度が高い頻出ミス"
+
+    # 正解経路の抽出元
+    canonical_routes:
+      sources:
+        - location: "pattern.ai_guidance.orchestration_rules[].required_action"
+          description: "必須アクション"
+        - location: "pattern.ai_guidance.canonical_call_paths[].path"
+          description: "正解経路（DAG形式）"
+        - location: "pattern.ai_guidance.orchestration_rules[].code_example"
+          filter: "contains ✅"
+          description: "正しいコード例"
+
+    # Spec由来ガードレールの抽出キーワード
+    spec_derived:
+      keywords:
+        - pattern: "〜のみ可能"
+          type: "precondition"
+          description: "前提条件ガードレール"
+        - pattern: "〜の場合のみ"
+          type: "precondition"
+          description: "前提条件ガードレール"
+        - pattern: "〜が優先"
+          type: "priority"
+          description: "優先権ガードレール"
+        - pattern: "〜が先"
+          type: "priority"
+          description: "優先権ガードレール"
+        - pattern: "〜先着"
+          type: "ordering"
+          description: "順序ガードレール"
+
+    # 受け入れ条件の抽出元
+    acceptance_criteria:
+      sources:
+        - location: "pattern.ai_guidance.orchestration_rules[].test_case"
+          description: "オーケストレーションルールのテストケース"
+        - location: "pattern.ai_guidance.orchestration_rules[].skip_consequence"
+          description: "スキップ時の結果（失敗ケーステスト）"
+
+    # ネガティブ例の抽出元
+    negative_examples:
+      sources:
+        - location: "pattern.ai_guidance.orchestration_rules[].code_example"
+          filter: "contains ❌"
+          description: "禁止コード例"
+
+  # 検証チェック
+  validation_checks:
+    - check: "canonical_routes is not empty"
+      severity: error
+      message: "正解経路が定義されていません。パターンYAMLを確認してください。"
+
+    - check: "all forbidden_actions have detection.pattern"
+      severity: warning
+      message: "禁止事項に検出パターンがありません。静的検査が機能しない可能性があります。"
+
+    - check: "all spec_derived_guardrails have fr_ref"
+      severity: warning
+      message: "Spec由来ガードレールにFR番号がありません。追跡が困難になります。"
+
+# ============================================================================
+# ワークフロー統合
+# ============================================================================
+
+workflow_integration:
+  # このファイルが参照されるフェーズ
+  consumed_by:
+    - phase: "plan"
+      usage: "Guardrailsセクションに引用"
+      file: "speckit.plan.md"
+
+    - phase: "tasks"
+      usage: "各タスクにGuardrail IDを紐付け"
+      file: "speckit.tasks.md"
+
+    - phase: "implement"
+      usage: "canonical_routesを正解経路として提示"
+      file: "speckit.implement.md"
+
+    - phase: "test"
+      usage: "acceptance_criteriaからテスト生成"
+      file: "spec-test-template.yaml"
+
+  # 違反時の扱い
+  violation_handling:
+    canonical_routes_empty:
+      action: "ERROR"
+      message: "正解経路が定義されていません。パターンが不完全です。"
+
+    implementation_violates_canonical_route:
+      action: "SPEC_VIOLATION"
+      message: "実装が正解経路に従っていません。"
+
+    implementation_matches_forbidden_action:
+      action: "IMPLEMENTATION_ERROR"
+      message: "禁止アクションに該当する実装があります。"
+
+# ============================================================================
+# 変更履歴
+# ============================================================================
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-17
+    changes:
+      - "初版リリース"
+      - "Library9ドッグフーディング問題の対策として作成"
+      - "forbidden_actions, canonical_routes, spec_derived_guardrails 定義"
+      - "AI抽出ルールとワークフロー統合を追加"
