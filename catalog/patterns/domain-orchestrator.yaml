@@ -1,0 +1,403 @@
+id: domain-orchestrator
+version: 1.0.0
+name: Domain Orchestrator Pattern
+category: domain-pattern
+intent: 複数エンティティにまたがる操作を型で閉じ込め、誤用を構造的に防止するパターン
+
+description: |
+  複雑なドメイン操作を「Orchestrator」クラスに閉じ込めるパターン。
+  Application層がOrchestratorしか呼べないようにすることで、
+  「間違った呼び方」が構造的に不可能になる。
+
+  ## いつ使うか
+  - 複数エンティティの状態変更が必要な操作
+  - 順序依存の処理（A→B→Cの順で呼ばないと整合性が壊れる）
+  - 同じ操作を複数箇所から呼ぶ可能性がある
+
+  ## 問題の背景（Library9ドッグフーディング）
+  AIが以下の誤実装をした:
+  - Entity.Cancel() を直接呼び、後続のPromotePosition()を忘れた
+  - CheckAndPromoteNextAsync() で DequeueAsync() を代用した
+
+  原因: Entity のメソッドが public で、どこからでも呼べてしまった
+
+  ## 解決策
+  - 複合操作を Orchestrator に閉じ込める
+  - Entity の状態変更メソッドを internal にする
+  - Application層は Orchestrator 経由でしか操作できない
+
+scope: domain-pattern
+layers:
+  - domain
+  - application
+
+applicability:
+  required_characteristics:
+    - op:multi-entity-mutation
+    - op:ordered-steps
+  recommended_for:
+    - domain:workflow
+    - domain:queue
+    - domain:transaction
+  typical_scenarios:
+    - "予約のキャンセル（Cancel + PromotePosition + PromoteNext）"
+    - "注文の確定（Order.Confirm + Stock.Reserve + Payment.Process）"
+    - "承認フロー（Approve + NotifyNext + UpdateStatus）"
+
+ai_selection_hints:
+  trigger_phrases:
+    - "複数エンティティの更新"
+    - "順番に処理"
+    - "整合性を保つ"
+    - "一連の操作"
+    - "ワークフロー"
+
+  confidence_keywords:
+    high: ["Orchestrator", "Transaction", "Workflow", "一連の操作"]
+    medium: ["複合操作", "順序依存", "整合性"]
+    low: ["複数更新", "まとめて"]
+
+  anti_patterns:
+    - "単一エンティティの状態変更のみ"  # → Entity method で十分
+    - "読み取り専用の操作"              # → Query で十分
+
+relationship:
+  works_with:
+    - domain-ordered-queue (キュー操作のOrchestration)
+    - domain-state-machine (状態遷移の制御)
+    - transaction-behavior (トランザクション境界)
+
+  dependencies:
+    - IRepository<T>
+
+file_structure: |
+  src/Domain/{BoundedContext}/Orchestrators/
+  └── {Operation}Orchestrator.cs          # Orchestrator実装
+
+  src/Domain/{BoundedContext}/{Entity}s/
+  └── {Entity}.cs                          # internal メソッドを持つEntity
+
+implementation:
+  # ===== Orchestrator =====
+  orchestrator:
+    file_path: "src/Domain/{BoundedContext}/Orchestrators/{Operation}Orchestrator.cs"
+    template: |
+      using Domain.{BoundedContext}.{Entity}s;
+
+      namespace Domain.{BoundedContext}.Orchestrators;
+
+      /// <summary>
+      /// {Operation}オーケストレーター
+      ///
+      /// 【パターン: Domain Orchestrator】
+      ///
+      /// 複数エンティティにまたがる操作を閉じ込め、誤用を構造的に防止する。
+      /// Application層はこのクラス経由でしか操作できない。
+      ///
+      /// ★ 重要:
+      /// - Entity の状態変更メソッドは internal にする
+      /// - Orchestrator 外から Entity.Cancel() 等を呼べないようにする
+      /// </summary>
+      public sealed class {Operation}Orchestrator
+      {
+          private readonly I{Entity}Repository _entityRepository;
+          private readonly I{RelatedEntity}Repository _relatedRepository;
+
+          public {Operation}Orchestrator(
+              I{Entity}Repository entityRepository,
+              I{RelatedEntity}Repository relatedRepository)
+          {
+              _entityRepository = entityRepository;
+              _relatedRepository = relatedRepository;
+          }
+
+          /// <summary>
+          /// {Operation}を実行
+          ///
+          /// 内部で以下を順番に実行:
+          /// 1. Entity の状態変更
+          /// 2. 関連エンティティの更新
+          /// 3. 後続処理のトリガー
+          /// </summary>
+          public async Task ExecuteAsync({Entity}Id entityId, CancellationToken ct = default)
+          {
+              var entity = await _entityRepository.GetByIdAsync(entityId, ct);
+              if (entity == null)
+                  throw new DomainException("{Entity}が見つかりません");
+
+              // Step 1: メインエンティティの状態変更
+              entity.{InternalMethod}();  // internal メソッド
+
+              // Step 2: 関連エンティティの更新
+              var related = await _relatedRepository.GetByXxxAsync(..., ct);
+              if (related != null)
+              {
+                  related.{UpdateMethod}();
+              }
+
+              // Step 3: 後続処理
+              await ProcessFollowUpAsync(entity, ct);
+          }
+
+          private async Task ProcessFollowUpAsync({Entity} entity, CancellationToken ct)
+          {
+              // 後続処理をここに実装
+          }
+      }
+
+  # ===== Entity with internal methods =====
+  entity_with_internal:
+    description: |
+      Entity の状態変更メソッドを internal にすることで、
+      Orchestrator 外からの直接呼び出しを防止する。
+    template: |
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      public class {Entity} : AggregateRoot<{Entity}Id>
+      {
+          // 外部から呼べるメソッド（読み取り専用）
+          public bool CanCancel() => Status == {Entity}Status.Pending || Status == {Entity}Status.Ready;
+
+          // ★ internal: Orchestrator からのみ呼び出し可能
+          internal void Cancel()
+          {
+              if (!CanCancel())
+                  throw new DomainException("キャンセルできません");
+
+              Status = {Entity}Status.Cancelled;
+              Position = null;
+          }
+
+          internal void Fulfill()
+          {
+              if (Status != {Entity}Status.Ready)
+                  throw new DomainException("Ready状態でなければ完了できません");
+
+              Status = {Entity}Status.Fulfilled;
+              Position = null;
+          }
+
+          internal void PromotePosition()
+          {
+              if (!Position.HasValue || Position <= 1)
+                  throw new DomainException("繰り上げできません");
+
+              Position--;
+
+              if (Position == 1)
+              {
+                  MakeReady();
+              }
+          }
+
+          internal void MakeReady()
+          {
+              Status = {Entity}Status.Ready;
+              ReadyAt = DateTime.UtcNow;
+              ExpiresAt = DateTime.UtcNow.AddHours(48);
+          }
+      }
+
+  # ===== Example: ReservationQueue =====
+  example_reservation:
+    description: "図書館予約キューのOrchestrator例"
+    template: |
+      namespace Domain.Library.Orchestrators;
+
+      /// <summary>
+      /// 予約キューオーケストレーター
+      ///
+      /// 予約の追加・削除・繰り上げを一元管理。
+      /// Application層（Handler）はこのクラス経由でしか操作できない。
+      /// </summary>
+      public sealed class ReservationQueueOrchestrator
+      {
+          private readonly IReservationRepository _reservationRepo;
+          private readonly IBookCopyRepository _bookCopyRepo;
+
+          public ReservationQueueOrchestrator(
+              IReservationRepository reservationRepo,
+              IBookCopyRepository bookCopyRepo)
+          {
+              _reservationRepo = reservationRepo;
+              _bookCopyRepo = bookCopyRepo;
+          }
+
+          /// <summary>
+          /// 予約をキャンセル（Complete/Cancelの統合メソッド）
+          ///
+          /// 内部で以下を実行:
+          /// 1. Reservation.Cancel() または .Fulfill()
+          /// 2. 後続の Position を繰り上げ
+          /// 3. 新しい先頭を Ready 状態に
+          /// 4. BookCopy の状態を更新
+          /// </summary>
+          public async Task DequeueAsync(ReservationId reservationId, CancellationToken ct = default)
+          {
+              var reservation = await _reservationRepo.GetByIdAsync(reservationId, ct);
+              if (reservation == null) return;
+
+              var bookId = reservation.BookId;
+              var removedPosition = reservation.Position;
+
+              // Step 1: 状態変更
+              if (reservation.Status == ReservationStatus.Ready)
+              {
+                  reservation.Fulfill();  // internal
+              }
+              else
+              {
+                  reservation.Cancel();   // internal
+              }
+
+              // Step 2: Position繰り上げ
+              if (removedPosition.HasValue)
+              {
+                  var followers = await _reservationRepo
+                      .GetByBookIdWithPositionGreaterThanAsync(bookId, removedPosition.Value, ct);
+
+                  foreach (var follower in followers)
+                  {
+                      follower.PromotePosition();  // internal
+                  }
+              }
+
+              // Step 3: 新しい先頭を Ready に（必要に応じて）
+              var newFirst = await _reservationRepo.GetFirstInQueueAsync(bookId, ct);
+              if (newFirst != null && newFirst.Position == 1 && newFirst.Status == ReservationStatus.Pending)
+              {
+                  newFirst.MakeReady();  // internal
+              }
+          }
+
+          /// <summary>
+          /// 返却時の処理
+          ///
+          /// 返却時専用メソッド。DequeueAsync とは異なるロジック。
+          /// </summary>
+          /// <returns>予約者がいる場合 true</returns>
+          public async Task<bool> CheckAndPromoteNextAsync(BookId bookId, CancellationToken ct = default)
+          {
+              // 期限切れチェック
+              var readyReservation = await _reservationRepo.GetReadyByBookIdAsync(bookId, ct);
+              if (readyReservation?.IsExpired() == true)
+              {
+                  await ExpireAndPromoteAsync(readyReservation.Id, ct);
+                  readyReservation = null;
+              }
+
+              // Waiting があれば Ready に
+              if (readyReservation == null)
+              {
+                  var firstWaiting = await _reservationRepo.GetFirstWaitingByBookIdAsync(bookId, ct);
+                  if (firstWaiting != null)
+                  {
+                      firstWaiting.MakeReady();  // internal
+                      return true;
+                  }
+              }
+
+              return readyReservation != null;
+          }
+
+          private async Task ExpireAndPromoteAsync(ReservationId reservationId, CancellationToken ct)
+          {
+              // 期限切れ処理...
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "複数エンティティの状態変更が必要な操作"
+    - "順序依存の処理（A→B→Cの順で呼ばないと壊れる）"
+    - "Entity のメソッドを直接呼ぶと整合性が壊れる可能性がある"
+    - "同じ複合操作を複数の Handler から呼ぶ"
+
+  when_not_to_use:
+    - "単一エンティティの状態変更のみ"
+    - "読み取り専用の操作"
+    - "単純な CRUD"
+
+  key_benefits:
+    - "誤用が構造的に不可能になる（Entity method が internal）"
+    - "複合操作の一貫性が保証される"
+    - "Handler が単純になる（Orchestrator.Execute() を呼ぶだけ）"
+    - "テストしやすい（Orchestrator 単体でテスト可能）"
+
+  implementation_steps:
+    - step: 1
+      description: "Orchestrator クラスを作成"
+      files: ["{Operation}Orchestrator.cs"]
+    - step: 2
+      description: "Entity の状態変更メソッドを internal に変更"
+      files: ["{Entity}.cs"]
+    - step: 3
+      description: "Handler を Orchestrator 経由に書き換え"
+      files: ["{Feature}CommandHandler.cs"]
+    - step: 4
+      description: "DI 登録を追加"
+      files: ["DependencyInjection.cs"]
+
+  common_mistakes:
+    - mistake: "Entity の状態変更メソッドを public のままにする"
+      solution: "internal に変更し、Orchestrator からのみ呼び出せるようにする"
+      severity: critical
+
+    - mistake: "Orchestrator が太りすぎる"
+      solution: "操作単位で Orchestrator を分割する（CancelOrchestrator, CompleteOrchestrator）"
+      severity: medium
+
+    - mistake: "Orchestrator に SaveChangesAsync を書く"
+      solution: "SaveChangesAsync は TransactionBehavior に任せる"
+      severity: high
+
+  design_decision:
+    internal_vs_private: |
+      Entity のメソッドを internal にする理由:
+
+      internal: 同じアセンブリ（プロジェクト）内からアクセス可能
+      → Orchestrator（同じ Domain プロジェクト内）から呼べる
+      → Application 層（別プロジェクト）からは呼べない
+
+      private: クラス内からのみアクセス可能
+      → Orchestrator からも呼べない（NG）
+
+      ★ Domain プロジェクト内に Orchestrator を配置することで、
+        internal メソッドにアクセスできる
+
+    orchestrator_vs_service: |
+      Orchestrator と DomainService の違い:
+
+      DomainService:
+      - 単一の責務（例: 重複チェック）
+      - ステートレス
+      - 複数の Handler から共有して使う
+
+      Orchestrator:
+      - 複合操作の一連の流れを管理
+      - 順序依存の処理を保証
+      - Handler の代わりに複雑なロジックを持つ
+
+      使い分け:
+      - 重複チェックだけ → DomainService
+      - Cancel + PromotePosition + PromoteNext → Orchestrator
+
+wiring:
+  service_registrations:
+    - "services.AddScoped<{Operation}Orchestrator>();"
+
+evidence:
+  note: |
+    Library9 ドッグフーディングの「DequeueAsync 未使用」問題対応として作成。
+    Entity.Cancel() が public だったため、Handler から直接呼んでしまい、
+    PromotePosition() が漏れた。
+
+    Orchestrator パターンで Entity method を internal にすることで、
+    「誤用が書けなくなる」構造を実現。
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-16
+    changes:
+      - "初版リリース"
+      - "Library9 ドッグフーディング問題の構造的対策として作成"

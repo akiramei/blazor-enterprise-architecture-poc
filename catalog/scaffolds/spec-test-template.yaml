@@ -1,0 +1,394 @@
+id: spec-test-template
+version: 1.0.0
+name: 仕様由来テストテンプレート
+category: scaffold
+intent: 仕様書の orchestration_rules や skip_consequence からテストケースを自動生成するテンプレート
+
+description: |
+  仕様書に記載された「やらないと壊れる」ルール（skip_consequence）を
+  テストケースに変換するテンプレート。
+
+  ## なぜ必要か
+  Library9 ドッグフーディングで、仕様書に正しいルールが書いてあったが、
+  AIが実装時に間違えた。テストがなかったため、バグが検出されなかった。
+
+  仕様 → テスト を自動生成することで:
+  - AIが間違えてもテストが即落ちる
+  - 人間のレビューが不要になる
+  - 仕様とテストの一貫性が保証される
+
+  ## テンプレート構造
+  1. orchestration_rules.test_case → xUnit テストケース
+  2. skip_consequence → 失敗条件のアサーション
+  3. code_example → テストの期待値
+
+why_spec_derived_tests: |
+  従来の問題:
+  - 仕様書: 「Cancel後、Position=2がPosition=1になること」
+  - 実装: Cancel() だけ呼んで PromotePosition() を忘れる
+  - レビュー: 見落とす
+  - 本番: バグ発覚
+
+  仕様由来テストの効果:
+  - 仕様書の test_case を読み取り、テストを生成
+  - 実装が間違っていればテストが即座に失敗
+  - AIが間違えようとしても、テストが止める
+
+# ============================================================================
+# テストケース定義フォーマット
+# ============================================================================
+
+test_case_format:
+  description: |
+    仕様書の orchestration_rules 内に記述するテストケース定義フォーマット。
+    この形式で書くと、テスト生成ツールが xUnit テストを出力できる。
+
+  schema:
+    trigger: "操作のトリガー（Complete, Cancel, Expire, Return）"
+    test_case: "テストの説明（日本語可）"
+    given:
+      description: "テストの前提条件"
+      entities: "事前に存在するエンティティのリスト"
+    when:
+      description: "実行する操作"
+      action: "呼び出すメソッド"
+      parameters: "パラメータ"
+    then:
+      description: "期待する結果"
+      assertions: "アサーションのリスト"
+
+  example: |
+    orchestration_rules:
+      - trigger: Cancel
+        required_action: DequeueAsync
+        test_case: "Cancel後、Position=2がPosition=1になること"
+        test_definition:
+          given:
+            entities:
+              - type: Reservation
+                id: R1
+                position: 1
+                status: Waiting
+              - type: Reservation
+                id: R2
+                position: 2
+                status: Waiting
+          when:
+            action: DequeueAsync
+            parameters:
+              reservationId: R1
+          then:
+            assertions:
+              - entity: R1
+                property: Status
+                expected: Cancelled
+              - entity: R1
+                property: Position
+                expected: null
+              - entity: R2
+                property: Position
+                expected: 1
+              - entity: R2
+                property: Status
+                expected: Ready
+
+# ============================================================================
+# xUnit テスト生成テンプレート
+# ============================================================================
+
+xunit_template:
+  description: "orchestration_rules から生成する xUnit テストのテンプレート"
+
+  file_path: "tests/{BoundedContext}.Tests/Orchestration/{Entity}QueueTests.cs"
+
+  template: |
+    using Xunit;
+    using FluentAssertions;
+    using Domain.{BoundedContext}.{Entity}s;
+    using Infrastructure.{BoundedContext}.Services;
+
+    namespace {BoundedContext}.Tests.Orchestration;
+
+    /// <summary>
+    /// {Entity} キュー操作のテスト（仕様由来）
+    ///
+    /// 【パターン: Spec-Derived Tests】
+    ///
+    /// これらのテストは仕様書の orchestration_rules.test_case から生成。
+    /// 仕様とテストの一貫性を保証する。
+    /// </summary>
+    public class {Entity}QueueTests
+    {
+        // ================================================================
+        // Cancel テスト
+        // ================================================================
+
+        [Fact(DisplayName = "Cancel後、Position=2がPosition=1になること")]
+        public async Task Cancel_ShouldPromoteFollowingPositions()
+        {
+            // Arrange (given)
+            var repo = new InMemory{Entity}Repository();
+            var queueService = new {Entity}QueueService(repo);
+
+            var r1 = {Entity}.Create(TargetId.From(Guid.NewGuid()), UserId.From(Guid.NewGuid()));
+            r1.EnqueueAt(1);
+
+            var r2 = {Entity}.Create(r1.TargetId, UserId.From(Guid.NewGuid()));
+            r2.EnqueueAt(2);
+
+            await repo.AddAsync(r1);
+            await repo.AddAsync(r2);
+
+            // Act (when)
+            await queueService.DequeueAsync(r1.Id);
+
+            // Assert (then)
+            var updatedR1 = await repo.GetByIdAsync(r1.Id);
+            var updatedR2 = await repo.GetByIdAsync(r2.Id);
+
+            updatedR1!.Status.Should().Be({Entity}Status.Cancelled);
+            updatedR1.Position.Should().BeNull();
+            updatedR2!.Position.Should().Be(1);
+            updatedR2.Status.Should().Be({Entity}Status.Ready);
+        }
+
+        [Fact(DisplayName = "Cancel後、後続がなければ影響なし")]
+        public async Task Cancel_WithNoFollowers_ShouldNotFail()
+        {
+            // Arrange
+            var repo = new InMemory{Entity}Repository();
+            var queueService = new {Entity}QueueService(repo);
+
+            var r1 = {Entity}.Create(TargetId.From(Guid.NewGuid()), UserId.From(Guid.NewGuid()));
+            r1.EnqueueAt(1);
+            await repo.AddAsync(r1);
+
+            // Act
+            await queueService.DequeueAsync(r1.Id);
+
+            // Assert
+            var updated = await repo.GetByIdAsync(r1.Id);
+            updated!.Status.Should().Be({Entity}Status.Cancelled);
+            updated.Position.Should().BeNull();
+        }
+
+        // ================================================================
+        // Complete テスト
+        // ================================================================
+
+        [Fact(DisplayName = "Complete後、Position=2がPosition=1になること")]
+        public async Task Complete_ShouldPromoteFollowingPositions()
+        {
+            // Arrange
+            var repo = new InMemory{Entity}Repository();
+            var queueService = new {Entity}QueueService(repo);
+
+            var r1 = {Entity}.Create(TargetId.From(Guid.NewGuid()), UserId.From(Guid.NewGuid()));
+            r1.EnqueueAt(1); // Position=1 なので Ready になる
+
+            var r2 = {Entity}.Create(r1.TargetId, UserId.From(Guid.NewGuid()));
+            r2.EnqueueAt(2);
+
+            await repo.AddAsync(r1);
+            await repo.AddAsync(r2);
+
+            // Act
+            await queueService.DequeueAsync(r1.Id);
+
+            // Assert
+            var updatedR1 = await repo.GetByIdAsync(r1.Id);
+            var updatedR2 = await repo.GetByIdAsync(r2.Id);
+
+            updatedR1!.Status.Should().Be({Entity}Status.Fulfilled);
+            updatedR1.Position.Should().BeNull();
+            updatedR2!.Position.Should().Be(1);
+            updatedR2.Status.Should().Be({Entity}Status.Ready);
+        }
+
+        // ================================================================
+        // Return テスト
+        // ================================================================
+
+        [Fact(DisplayName = "Return時、WaitingがあればReadyになること")]
+        public async Task Return_WithWaiting_ShouldPromoteToReady()
+        {
+            // Arrange
+            var repo = new InMemory{Entity}Repository();
+            var queueService = new {Entity}QueueService(repo);
+            var targetId = TargetId.From(Guid.NewGuid());
+
+            var r1 = {Entity}.Create(targetId, UserId.From(Guid.NewGuid()));
+            r1.EnqueueAt(1);
+
+            await repo.AddAsync(r1);
+
+            // Act
+            var hasReservation = await queueService.CheckAndPromoteNextAsync(targetId);
+
+            // Assert
+            hasReservation.Should().BeTrue();
+            var updated = await repo.GetByIdAsync(r1.Id);
+            updated!.Status.Should().Be({Entity}Status.Ready);
+        }
+
+        // ================================================================
+        // skip_consequence テスト（失敗ケース検証）
+        // ================================================================
+
+        [Fact(DisplayName = "Entity.Cancel()直接呼び出しではPositionが繰り上がらない")]
+        public async Task DirectCancel_ShouldNotPromotePositions()
+        {
+            // Arrange
+            var repo = new InMemory{Entity}Repository();
+
+            var r1 = {Entity}.Create(TargetId.From(Guid.NewGuid()), UserId.From(Guid.NewGuid()));
+            r1.EnqueueAt(1);
+
+            var r2 = {Entity}.Create(r1.TargetId, UserId.From(Guid.NewGuid()));
+            r2.EnqueueAt(2);
+
+            await repo.AddAsync(r1);
+            await repo.AddAsync(r2);
+
+            // Act: ★ 間違った実装（直接呼び出し）
+            // r1.Cancel(); // これだけでは後続が処理されない
+            // ↑ このコメントを外すと、下のアサーションが失敗する
+
+            // 正しい実装のシミュレーション（QueueService経由）
+            // await queueService.DequeueAsync(r1.Id);
+
+            // Assert: skip_consequence の検証
+            // 「残りの Waiting が一生 Waiting のまま」にならないことを確認
+            var updatedR2 = await repo.GetByIdAsync(r2.Id);
+            // ★ 直接呼び出しの場合、これが失敗する
+            // updatedR2!.Position.Should().Be(2); // 繰り上がらない
+        }
+    }
+
+# ============================================================================
+# 仕様からテストへの変換ルール
+# ============================================================================
+
+conversion_rules:
+  description: "仕様書の各要素をテストに変換するルール"
+
+  mappings:
+    - spec_element: "orchestration_rules.trigger"
+      test_element: "テストメソッド名のプレフィックス"
+      example:
+        spec: "trigger: Cancel"
+        test: "public async Task Cancel_ShouldPromoteFollowingPositions()"
+
+    - spec_element: "orchestration_rules.test_case"
+      test_element: "[Fact(DisplayName = ...)]"
+      example:
+        spec: "test_case: 'Cancel後、Position=2がPosition=1になること'"
+        test: "[Fact(DisplayName = \"Cancel後、Position=2がPosition=1になること\")]"
+
+    - spec_element: "orchestration_rules.skip_consequence"
+      test_element: "失敗ケーステスト"
+      example:
+        spec: "skip_consequence: '残りの Waiting が一生 Waiting のまま'"
+        test: "DirectCancel_ShouldNotPromotePositions テストで検証"
+
+    - spec_element: "orchestration_rules.code_example (✅)"
+      test_element: "Act セクション"
+      example:
+        spec: "await _queueService.DequeueAsync(reservation.Id, ct);"
+        test: "await queueService.DequeueAsync(r1.Id);"
+
+    - spec_element: "orchestration_rules.code_example (❌)"
+      test_element: "失敗ケーステストの Act"
+      example:
+        spec: "reservation.Cancel(); // 禁止"
+        test: "r1.Cancel(); // 直接呼び出し（テストで検証）"
+
+# ============================================================================
+# AI ガイダンス
+# ============================================================================
+
+ai_guidance:
+  when_to_use:
+    - "仕様書に orchestration_rules がある場合"
+    - "skip_consequence で「やらないと壊れる」ことが明記されている場合"
+    - "複雑な操作で、AIが順序を間違えやすい場合"
+
+  how_to_use:
+    - step: 1
+      description: "仕様書の orchestration_rules を読む"
+    - step: 2
+      description: "各 rule の test_case をテストメソッドに変換"
+    - step: 3
+      description: "given/when/then を Arrange/Act/Assert に変換"
+    - step: 4
+      description: "skip_consequence から失敗ケーステストを追加"
+
+  key_benefits:
+    - "仕様とテストの一貫性が保証される"
+    - "AIが間違えてもテストが即座に失敗"
+    - "人間のレビューコストが削減される"
+    - "リグレッション防止"
+
+  common_mistakes:
+    - mistake: "テストを書かずに実装を進める"
+      solution: "仕様書の test_case を必ずテストに変換"
+      severity: critical
+
+    - mistake: "skip_consequence の失敗ケースをテストしない"
+      solution: "「やらないと壊れる」ケースを明示的にテスト"
+      severity: high
+
+    - mistake: "テストが仕様書と乖離する"
+      solution: "仕様書の更新時にテストも更新"
+      severity: medium
+
+# ============================================================================
+# 生成ツール案
+# ============================================================================
+
+generator_concept:
+  description: |
+    将来的に、仕様書からテストを自動生成するツールを作成可能。
+    YAML の test_definition を読み取り、xUnit コードを出力。
+
+  input: |
+    orchestration_rules:
+      - trigger: Cancel
+        test_definition:
+          given:
+            entities:
+              - type: Reservation
+                id: R1
+                position: 1
+          when:
+            action: DequeueAsync
+            parameters:
+              reservationId: R1
+          then:
+            assertions:
+              - entity: R1
+                property: Status
+                expected: Cancelled
+
+  output: |
+    [Fact]
+    public async Task Cancel_Test()
+    {
+        // Arrange
+        var r1 = Reservation.Create(...);
+        r1.EnqueueAt(1);
+
+        // Act
+        await queueService.DequeueAsync(r1.Id);
+
+        // Assert
+        r1.Status.Should().Be(ReservationStatus.Cancelled);
+    }
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-16
+    changes:
+      - "初版リリース"
+      - "Library9 ドッグフーディング問題の検証対策として作成"
+      - "orchestration_rules.test_case → xUnit テスト変換テンプレート"

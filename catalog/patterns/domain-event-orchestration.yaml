@@ -1,0 +1,432 @@
+id: domain-event-orchestration
+version: 1.0.0
+name: Domain Event Orchestration Pattern
+category: domain-pattern
+intent: ドメインイベントを使って複合操作の順序を自動化し、「正しい順序で呼ぶ」ことをAI/人間に期待しない設計
+
+description: |
+  複合操作をイベント駆動で自動化するパターン。
+  Entity は「何をしたか」をイベントとして発火し、
+  EventHandler が「その後に何をすべきか」を自動実行する。
+
+  ## いつ使うか
+  - 複数のステップが順序依存の場合
+  - 「AをしたらBも必ずする」というルールがある場合
+  - Handler が複雑になりすぎて、順序ミスのリスクがある場合
+
+  ## 問題の背景（Library9ドッグフーディング）
+  現状の問題:
+  - Handler が「Cancel() → PromotePosition() → PromoteNext()」を正しい順序で呼ぶ必要がある
+  - AIがこの順序を間違えやすい
+  - 「CheckAndPromoteNextAsync で代用」のような誤用が発生
+
+  イベント駆動の解決策:
+  - Entity は「ReservationCancelled」イベントを発火するだけ
+  - EventHandler が PromotePosition() と PromoteNext() を自動実行
+  - Handler は「何をするか」だけ指示し、「どう後処理するか」は知らない
+
+  ## Orchestrator パターンとの違い
+
+  | 観点 | Orchestrator | Event Orchestration |
+  |------|-------------|---------------------|
+  | 順序制御 | Orchestrator が明示的に呼ぶ | EventHandler が自動実行 |
+  | 結合度 | 中（Orchestrator に依存） | 低（イベント経由で疎結合） |
+  | 拡張性 | Orchestrator を修正 | 新しい Handler を追加 |
+  | 複雑さ | 低〜中 | 中〜高 |
+
+  ## 推奨
+  - 単純なケース: Orchestrator パターン
+  - 複雑なケース / 拡張性重視: Event Orchestration パターン
+
+scope: domain-pattern
+layers:
+  - domain
+  - application
+  - infrastructure
+
+applicability:
+  required_characteristics:
+    - op:multi-step-operation
+    - op:event-driven
+  recommended_for:
+    - domain:workflow
+    - domain:saga
+    - domain:eventual-consistency
+  typical_scenarios:
+    - "予約キャンセル → Position繰り上げ → 通知"
+    - "注文確定 → 在庫引当 → 決済 → 発送指示"
+    - "承認 → 次のステップへ遷移 → 通知"
+
+ai_selection_hints:
+  trigger_phrases:
+    - "イベント駆動"
+    - "〜したら〜する"
+    - "自動で後処理"
+    - "順序を意識せず"
+    - "疎結合"
+
+  confidence_keywords:
+    high: ["DomainEvent", "EventHandler", "イベント駆動", "Pub/Sub"]
+    medium: ["自動実行", "後処理", "トリガー"]
+    low: ["連鎖", "派生処理"]
+
+  anti_patterns:
+    - "単純な状態変更のみ"           # → Entity method で十分
+    - "同期的に結果が必要"            # → Orchestrator パターン
+    - "トランザクション内で完結すべき"  # → Orchestrator パターン
+
+relationship:
+  works_with:
+    - domain-orchestrator (単純なケースではこちらを使用)
+    - outbox-pattern (分散トランザクション)
+    - domain-state-machine (状態遷移のトリガー)
+
+  dependencies:
+    - MediatR.INotification (イベント発火)
+    - MediatR.INotificationHandler (イベント購読)
+
+file_structure: |
+  src/Domain/{BoundedContext}/Events/
+  ├── {Entity}Cancelled.cs           # ドメインイベント
+  ├── {Entity}Completed.cs
+  └── {Entity}Expired.cs
+
+  src/Application/Features/{Feature}/EventHandlers/
+  ├── {Entity}CancelledHandler.cs    # イベントハンドラ
+  └── ...
+
+  src/Shared/Shared.Kernel/
+  └── IDomainEvent.cs                # イベント基底インターフェース
+
+implementation:
+  # ===== Domain Event Base =====
+  domain_event_interface:
+    file_path: "src/Shared/Shared.Kernel/IDomainEvent.cs"
+    template: |
+      using MediatR;
+
+      namespace Shared.Kernel;
+
+      /// <summary>
+      /// ドメインイベント基底インターフェース
+      ///
+      /// 【パターン: Domain Event Orchestration】
+      ///
+      /// MediatR の INotification を継承し、
+      /// Publish/Subscribe パターンでイベントを配信する。
+      /// </summary>
+      public interface IDomainEvent : INotification
+      {
+          /// <summary>イベント発生日時</summary>
+          DateTime OccurredAt { get; }
+      }
+
+  # ===== Concrete Domain Event =====
+  domain_event:
+    file_path: "src/Domain/{BoundedContext}/Events/{Entity}Dequeued.cs"
+    template: |
+      using Shared.Kernel;
+
+      namespace Domain.{BoundedContext}.Events;
+
+      /// <summary>
+      /// {Entity}がキューから削除されたイベント
+      ///
+      /// 【パターン: Domain Event Orchestration】
+      ///
+      /// このイベントを購読する Handler が後処理を自動実行:
+      /// 1. 後続の Position を繰り上げ
+      /// 2. 新しい先頭を Ready 状態に
+      /// </summary>
+      public sealed record {Entity}Dequeued(
+          {Entity}Id EntityId,
+          {Target}Id TargetId,
+          int? RemovedPosition,
+          {Entity}Status PreviousStatus,
+          DateTime OccurredAt
+      ) : IDomainEvent
+      {
+          public static {Entity}Dequeued Create({Entity} entity, int? removedPosition)
+          {
+              return new {Entity}Dequeued(
+                  entity.Id,
+                  entity.TargetId,
+                  removedPosition,
+                  entity.Status,
+                  DateTime.UtcNow);
+          }
+      }
+
+  # ===== Entity with Event Raising =====
+  entity_with_events:
+    file_path: "src/Domain/{BoundedContext}/{Entity}s/{Entity}.cs"
+    template: |
+      using Shared.Kernel;
+      using Domain.{BoundedContext}.Events;
+
+      namespace Domain.{BoundedContext}.{Entity}s;
+
+      /// <summary>
+      /// {Entity}（イベント発火対応）
+      ///
+      /// 【パターン: Domain Event Orchestration】
+      ///
+      /// 状態変更時にドメインイベントを発火する。
+      /// 後続処理は EventHandler が自動実行するため、
+      /// このクラスは「何をしたか」を通知するだけ。
+      /// </summary>
+      public class {Entity} : AggregateRoot<{Entity}Id>
+      {
+          private readonly List<IDomainEvent> _domainEvents = new();
+          public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+          public void ClearDomainEvents() => _domainEvents.Clear();
+
+          // ================================================================
+          // 状態変更メソッド（イベントを発火）
+          // ================================================================
+
+          /// <summary>
+          /// キューから削除（イベント発火）
+          ///
+          /// 状態変更後にイベントを発火。
+          /// 後続処理（PromotePosition, PromoteNext）は Handler が実行。
+          /// </summary>
+          public void MarkDequeued()
+          {
+              var removedPosition = Position;
+
+              // 状態変更
+              if (Status == {Entity}Status.Ready)
+              {
+                  Status = {Entity}Status.Fulfilled;
+              }
+              else
+              {
+                  Status = {Entity}Status.Cancelled;
+              }
+              Position = null;
+
+              // ★ イベント発火（後処理は Handler が自動実行）
+              _domainEvents.Add({Entity}Dequeued.Create(this, removedPosition));
+          }
+      }
+
+  # ===== Event Handler =====
+  event_handler:
+    file_path: "src/Application/Features/{Feature}/EventHandlers/{Entity}DequeuedHandler.cs"
+    template: |
+      using MediatR;
+      using Domain.{BoundedContext}.Events;
+      using Domain.{BoundedContext}.{Entity}s;
+
+      namespace Application.Features.{Feature}.EventHandlers;
+
+      /// <summary>
+      /// {Entity}Dequeued イベントハンドラ
+      ///
+      /// 【パターン: Domain Event Orchestration】
+      ///
+      /// 予約/キュー削除後の後処理を自動実行:
+      /// 1. 後続の Position を繰り上げ
+      /// 2. 新しい先頭を Ready 状態に
+      ///
+      /// ★ Handler 側がこの順序を知る必要がない
+      /// ★ イベントを発火するだけで、後処理が自動実行される
+      /// </summary>
+      public sealed class {Entity}DequeuedHandler : INotificationHandler<{Entity}Dequeued>
+      {
+          private readonly I{Entity}Repository _repository;
+
+          public {Entity}DequeuedHandler(I{Entity}Repository repository)
+          {
+              _repository = repository;
+          }
+
+          public async Task Handle({Entity}Dequeued notification, CancellationToken ct)
+          {
+              // Step 1: 後続の Position を繰り上げ
+              if (notification.RemovedPosition.HasValue)
+              {
+                  var followers = await _repository
+                      .GetByTargetIdWithPositionGreaterThanAsync(
+                          notification.TargetId,
+                          notification.RemovedPosition.Value,
+                          ct);
+
+                  foreach (var follower in followers)
+                  {
+                      follower.PromotePosition();
+                  }
+              }
+
+              // Step 2: 新しい先頭を Ready 状態に
+              var newFirst = await _repository.GetFirstInQueueAsync(notification.TargetId, ct);
+              if (newFirst != null &&
+                  newFirst.Position == 1 &&
+                  newFirst.Status == {Entity}Status.Pending)
+              {
+                  newFirst.MakeReady();
+              }
+          }
+      }
+
+  # ===== Simplified Command Handler =====
+  simplified_handler:
+    file_path: "src/Application/Features/{Feature}/Cancel{Entity}CommandHandler.cs"
+    template: |
+      using MediatR;
+      using Domain.{BoundedContext}.{Entity}s;
+      using Shared.Kernel;
+
+      namespace Application.Features.{Feature};
+
+      /// <summary>
+      /// キャンセルコマンドハンドラ（イベント駆動版）
+      ///
+      /// 【パターン: Domain Event Orchestration】
+      ///
+      /// このハンドラは「キャンセル」だけを実行。
+      /// 後続処理（PromotePosition, PromoteNext）は EventHandler が自動実行。
+      ///
+      /// ★ シンプル: 順序を意識する必要がない
+      /// ★ 安全: 後処理漏れが構造的に防止される
+      /// </summary>
+      public sealed class Cancel{Entity}CommandHandler
+          : IRequestHandler<Cancel{Entity}Command, Result<Unit>>
+      {
+          private readonly I{Entity}Repository _repository;
+          private readonly IMediator _mediator;
+
+          public Cancel{Entity}CommandHandler(
+              I{Entity}Repository repository,
+              IMediator mediator)
+          {
+              _repository = repository;
+              _mediator = mediator;
+          }
+
+          public async Task<Result<Unit>> Handle(
+              Cancel{Entity}Command request,
+              CancellationToken ct)
+          {
+              var entity = await _repository.GetByIdAsync(
+                  {Entity}Id.From(request.EntityId), ct);
+
+              if (entity == null)
+                  return Result.Fail<Unit>("見つかりません");
+
+              // Boundary 判定
+              if (!entity.CanCancel())
+                  return Result.Fail<Unit>("キャンセルできません");
+
+              // ★ 状態変更（内部でイベント発火）
+              entity.MarkDequeued();
+
+              // ★ イベントを Publish（EventHandler が後処理を自動実行）
+              foreach (var domainEvent in entity.DomainEvents)
+              {
+                  await _mediator.Publish(domainEvent, ct);
+              }
+              entity.ClearDomainEvents();
+
+              return Result.Success(Unit.Value);
+          }
+      }
+
+ai_guidance:
+  when_to_use:
+    - "複合操作の順序を AI/人間に期待したくない"
+    - "後処理が複数あり、漏れやすい"
+    - "将来的に後処理を追加する可能性がある"
+    - "疎結合を重視する設計"
+
+  when_not_to_use:
+    - "単純な状態変更のみ（Entity method で十分）"
+    - "同期的に結果が必要（Orchestrator パターンを使用）"
+    - "トランザクション内で完結すべき（Orchestrator パターンを使用）"
+    - "オーバーエンジニアリングになる（単純なケース）"
+
+  comparison_with_orchestrator: |
+    ## Orchestrator vs Event Orchestration
+
+    ### Orchestrator パターン
+    ```csharp
+    // Handler
+    await _orchestrator.DequeueAsync(reservationId, ct);
+    // Orchestrator 内で Cancel → PromotePosition → PromoteNext を明示的に呼ぶ
+    ```
+    ✅ シンプル
+    ✅ デバッグしやすい
+    ❌ Orchestrator が太りやすい
+
+    ### Event Orchestration パターン
+    ```csharp
+    // Handler
+    entity.MarkDequeued();  // イベント発火
+    await _mediator.Publish(entity.DomainEvents, ct);
+    // EventHandler が PromotePosition → PromoteNext を自動実行
+    ```
+    ✅ Handler がシンプル
+    ✅ 拡張性が高い（新しい Handler を追加するだけ）
+    ❌ 処理の流れが追いにくい
+    ❌ 複雑さが増す
+
+    ### 推奨
+    - **初期実装**: Orchestrator パターン（シンプルさ優先）
+    - **拡張が必要になったら**: Event Orchestration に移行
+
+  implementation_steps:
+    - step: 1
+      description: "IDomainEvent インターフェースを追加"
+      files: ["IDomainEvent.cs"]
+    - step: 2
+      description: "具体的なドメインイベントを作成"
+      files: ["{Entity}Dequeued.cs", "{Entity}Expired.cs"]
+    - step: 3
+      description: "Entity にイベント発火ロジックを追加"
+      files: ["{Entity}.cs"]
+    - step: 4
+      description: "EventHandler を作成"
+      files: ["{Entity}DequeuedHandler.cs"]
+    - step: 5
+      description: "Handler を簡略化"
+      files: ["Cancel{Entity}CommandHandler.cs"]
+
+  common_mistakes:
+    - mistake: "イベントを Publish し忘れる"
+      solution: "Handler の最後で entity.DomainEvents を Publish"
+      severity: critical
+
+    - mistake: "ClearDomainEvents を呼び忘れる"
+      solution: "Publish 後に必ず ClearDomainEvents() を呼ぶ"
+      severity: high
+
+    - mistake: "EventHandler 内で SaveChangesAsync を呼ぶ"
+      solution: "TransactionBehavior に任せる"
+      severity: high
+
+    - mistake: "イベントの順序に依存する設計"
+      solution: "各 EventHandler は独立して動作するよう設計"
+      severity: medium
+
+wiring:
+  service_registrations:
+    - "services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ApplicationAssembly).Assembly));"
+
+evidence:
+  note: |
+    Library9 ドッグフーディングの「順序依存の呼び出しミス」問題対応として作成。
+
+    Orchestrator パターンは「順序を Orchestrator に閉じ込める」アプローチ。
+    Event Orchestration パターンは「順序をイベント駆動で自動化」するアプローチ。
+
+    プロジェクトの複雑さに応じて選択する。
+
+changelog:
+  - version: 1.0.0
+    date: 2025-12-16
+    changes:
+      - "初版リリース"
+      - "Library9 ドッグフーディング問題の対策として作成"
+      - "Orchestrator パターンとの比較ガイドを追加"

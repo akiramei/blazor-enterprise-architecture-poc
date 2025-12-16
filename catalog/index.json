@@ -1,8 +1,8 @@
 {
   "$schema": "consumer-example/patterns.manifest.schema.json",
-  "version": "v2025.12.13.1",
-  "last_updated": "2025-12-13",
-  "changelog_summary": "UI-IR vNext導入（成熟度ベースのUI語彙制約）、ui-ir-schema/lint-rules追加、ui-maturityパターン追加",
+  "version": "v2025.12.16.1",
+  "last_updated": "2025-12-16",
+  "changelog_summary": "AI誤用防止パターン追加（forbidden_actions、Orchestrator、Event Orchestration、spec-test-template、命名ガイドライン）",
   "description": "Blazor Enterprise Architecture PoC - Pattern Catalog",
   "repository": "https://github.com/akiramei/blazor-enterprise-architecture-poc",
   "runtime_requirements": {
@@ -901,6 +901,28 @@
       "tags": ["domain", "queue", "position", "ready-state", "reservation", "waiting-list", "priority"],
       "stability": "stable",
       "note": "図書館ドッグフーディングFR-018対策として追加。予約の順番管理が完全に未実装だった問題を解決。"
+    },
+    {
+      "id": "domain-orchestrator",
+      "name": "Domain Orchestrator Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-orchestrator.yaml",
+      "intent": "複数エンティティにまたがる操作を型で閉じ込め、誤用を構造的に防止するパターン",
+      "tags": ["domain", "orchestrator", "transaction", "workflow", "internal-methods", "encapsulation"],
+      "stability": "stable",
+      "note": "Library9ドッグフーディングで「DequeueAsync未使用」問題の構造的対策として追加。Entity methodをinternalにして誤用を防止。"
+    },
+    {
+      "id": "domain-event-orchestration",
+      "name": "Domain Event Orchestration Pattern",
+      "category": "domain-pattern",
+      "version": "1.0.0",
+      "file": "patterns/domain-event-orchestration.yaml",
+      "intent": "ドメインイベントを使って複合操作の順序を自動化し、順序依存の呼び出しミスを防止",
+      "tags": ["domain", "event", "orchestration", "pub-sub", "event-driven", "automation"],
+      "stability": "stable",
+      "note": "Library9ドッグフーディングで「順序依存の呼び出しミス」問題の対策として追加。イベント駆動で後処理を自動化。"
     }
   ],
   "recommended_combinations": [

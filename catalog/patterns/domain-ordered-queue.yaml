@@ -551,20 +551,129 @@ ai_guidance:
 
     rules:
       - trigger: "Complete（予約者が借りた）"
-        required_action: "PromoteNext() - 後続をReady状態に"
+        required_action: "DequeueAsync() - QueueService経由で処理"
+        caller: "LendBookCommandHandler / CheckoutReservedCopyCommandHandler"
+        forbidden_actions:
+          - "reservation.Complete() を直接呼ぶ"
+          - "CheckAndPromoteNextAsync() で代用する"
+        rationale: |
+          Complete() だけでは Position 繰り上げが行われない。
+          DequeueAsync() は内部で Fulfill + PromotePosition + PromoteNext を実行する。
         skip_consequence: "残りの Waiting が一生 Waiting のまま"
+        code_example: |
+          // ✅ 正しい実装
+          await _queueService.DequeueAsync(reservation.Id, ct);
+
+          // ❌ 禁止（Position繰り上げが行われない）
+          reservation.Complete();
+          await _queueService.CheckAndPromoteNextAsync(bookId, ct);
+        test_case: "Complete後、Position=2がPosition=1になること"
 
       - trigger: "Cancel（予約者がキャンセル）"
-        required_action: "PromoteNext() - 後続をReady状態に"
+        required_action: "DequeueAsync() - QueueService経由で処理"
+        caller: "CancelReservationCommandHandler"
+        forbidden_actions:
+          - "reservation.Cancel() を直接呼ぶ"
+          - "CheckAndPromoteNextAsync() で代用する"
+        rationale: |
+          Cancel() だけでは Position 繰り上げが行われない。
+          DequeueAsync() は内部で Cancel + PromotePosition + PromoteNext を実行する。
         skip_consequence: "残りの Waiting が一生 Waiting のまま"
+        code_example: |
+          // ✅ 正しい実装
+          await _queueService.DequeueAsync(reservation.Id, ct);
+
+          // ❌ 禁止（Position繰り上げが行われない）
+          reservation.Cancel();
+          await _queueService.CheckAndPromoteNextAsync(bookId, ct);
+        test_case: "Cancel後、Position=2がPosition=1になること"
 
       - trigger: "Expire（Ready状態の期限切れ）"
-        required_action: "PromoteNext() - 後続をReady状態に"
+        required_action: "ExpireAndPromoteNextAsync() - 期限切れ専用メソッド"
+        caller: "ReservationExpirationJob / ReturnBookCommandHandler"
+        forbidden_actions:
+          - "reservation.Expire() を直接呼ぶ"
+        rationale: |
+          Expire() だけでは次のWaitingがReadyにならない。
+          ExpireAndPromoteNextAsync() で期限切れ+繰り上げを一括処理する。
         skip_consequence: "期限切れの予約がReady状態のまま、キュー詰まり"
+        code_example: |
+          // ✅ 正しい実装
+          await _queueService.ExpireAndPromoteNextAsync(reservation.Id, ct);
+        test_case: "Expire後、次のWaitingがReadyになること"
 
       - trigger: "Return（図書返却）"
-        required_action: "CheckAndPromoteNext() - Waitingがあれば先頭をReadyに"
+        required_action: "CheckAndPromoteNextAsync() - 返却専用メソッド"
+        caller: "ReturnBookCommandHandler"
+        forbidden_actions:
+          - "Ready予約なしで何もしない"
+        rationale: |
+          返却時に予約キューを確認し、WaitingがあればReadyに遷移させる。
+          また、予約がある場合はBookCopyをReservedに設定する。
         skip_consequence: "返却後に予約者への通知/Ready遷移が行われない"
+        code_example: |
+          // ✅ 正しい実装（ReturnBookCommandHandler内）
+          loan.Return();
+
+          var hasReservation = await _queueService.CheckAndPromoteNextAsync(loan.BookId, ct);
+          if (hasReservation)
+          {
+              copy.SetReserved();  // 予約者用に確保
+          }
+          else
+          {
+              copy.SetAvailable();
+          }
+        test_case: "返却後、予約者がいればBookCopyがReservedになること"
+
+  # ================================================================
+  # 唯一の正解ルート（DAG形式）
+  # ================================================================
+  canonical_call_paths:
+    description: |
+      各操作の「唯一の正しい実装経路」を定義。
+      AIはこのルート以外の実装を選択してはならない。
+      テキストDAG形式（LLMはこの形式を正確に解釈できる）。
+
+    cancel:
+      description: "予約キャンセルの正解ルート"
+      path: |
+        CancelReservationCommandHandler
+          → IReservationQueueService.DequeueAsync(reservationId)
+            → Reservation.Cancel()
+            → PromotePositions(後続の Position を -1)
+            → PromoteNext(新しい先頭を Ready に)
+      anti_patterns:
+        - path: "Handler → reservation.Cancel() → CheckAndPromoteNextAsync()"
+          problem: "PromotePositions が呼ばれず、Position が繰り上がらない"
+        - path: "Handler → reservation.Cancel() のみ"
+          problem: "後続の処理が一切行われない"
+
+    complete:
+      description: "予約完了（貸出）の正解ルート"
+      path: |
+        LendBookCommandHandler
+          → IReservationQueueService.DequeueAsync(reservationId)
+            → Reservation.Fulfill()
+            → PromotePositions(後続の Position を -1)
+            → PromoteNext(新しい先頭を Ready に)
+      anti_patterns:
+        - path: "Handler → reservation.Complete() → CheckAndPromoteNextAsync()"
+          problem: "PromotePositions が呼ばれず、Position が繰り上がらない"
+
+    return:
+      description: "図書返却の正解ルート"
+      path: |
+        ReturnBookCommandHandler
+          → Loan.Return()
+          → IReservationQueueService.CheckAndPromoteNextAsync(bookId)
+            → 期限切れReady予約があれば ExpireAndPromoteNext
+            → WaitingがあればMakeReady
+          → 予約ありなら BookCopy.SetReserved()
+          → 予約なしなら BookCopy.SetAvailable()
+      anti_patterns:
+        - path: "Handler → Loan.Return() → copy.SetAvailable() のみ"
+          problem: "予約者がいても BookCopy が Reserved にならない"
 
     implementation_pattern: |
       // ❌ NG: Entity メソッドを直接呼ぶ
@@ -572,12 +681,13 @@ ai_guidance:
 
       // ✅ OK: QueueService 経由で呼ぶ
       await _queueService.DequeueAsync(reservation.Id, ct);
-      // DequeueAsync が内部で Complete + PromoteNext を実行
+      // DequeueAsync が内部で Complete + PromotePositions + PromoteNext を実行
 
     checklist:
       - "Complete/Cancel/Expire を直接呼んでいないか？"
       - "QueueService 経由で操作しているか？"
       - "返却時に CheckAndPromoteNext を呼んでいるか？"
+      - "返却時に予約有無で BookCopy の状態を分岐しているか？"
 
   when_to_use:
     - "予約の順番を管理する必要がある場合"

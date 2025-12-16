@@ -1108,5 +1108,195 @@ public async Task<Result<Unit>> Handle(ReturnCopyCommand request, CancellationTo
 
 ---
 
-**最終更新: 2025-12-09**
-**カタログバージョン: v2025.12.09**
+---
+
+## 🚨 メソッド命名によるAI誤用防止（CRITICAL）
+
+**メソッド名が曖昧だと、AIが役割を誤解して誤用する問題が発生します。**
+
+### 背景（Library9ドッグフーディング）
+
+```
+問題: AIが CheckAndPromoteNextAsync() で DequeueAsync() を代用した
+
+原因:
+- CheckAndPromoteNextAsync という名前から「Position繰り上げも含む」と推測
+- 実際は「次のWaitingをReadyにする」だけで、Position繰り上げは含まない
+- DequeueAsync が「正しい選択」だと気づかなかった
+```
+
+### 命名ガイドライン
+
+**メソッド名だけで、何をするか・何をしないかを明確にする**
+
+| 旧（曖昧） | 新（明確） | 改善点 |
+|-----------|-----------|--------|
+| `CheckAndPromoteNextAsync` | `PromoteNextWithoutReindexAsync` | 「Reindexしない」ことを明示 |
+| `DequeueAsync` | `DequeueAndReindexAsync` | 「Reindexも含む」ことを明示 |
+| `ProcessAsync` | `ProcessAndNotifyAsync` | 「通知も含む」ことを明示 |
+| `UpdateAsync` | `UpdatePositionsAndPromoteAsync` | 複合操作を明示 |
+
+### 命名パターン
+
+| パターン | 意味 | 例 |
+|---------|------|-----|
+| `XxxAndYyyAsync` | XxxとYyyの両方を実行 | `DequeueAndReindexAsync` |
+| `XxxWithoutYyyAsync` | XxxはするがYyyはしない | `PromoteNextWithoutReindexAsync` |
+| `XxxOnlyAsync` | Xxxだけを実行（他は含まない） | `CancelOnlyAsync` |
+| `XxxIfNeededAsync` | 条件を満たせばXxxを実行 | `ExpireIfNeededAsync` |
+
+### 実装例
+
+```csharp
+/// <summary>
+/// キューから削除し、Position を再インデックスする
+///
+/// ★ メソッド名で「Reindexも含む」ことが明確
+/// ★ AIがこのメソッドを「Position繰り上げなし」と誤解することはない
+/// </summary>
+public async Task DequeueAndReindexAsync(ReservationId id, CancellationToken ct)
+{
+    var reservation = await _repository.GetByIdAsync(id, ct);
+    if (reservation == null) return;
+
+    var removedPosition = reservation.Position;
+
+    // 1. 状態変更
+    reservation.Cancel();
+
+    // 2. Position 再インデックス（★ メソッド名に含まれているので忘れない）
+    if (removedPosition.HasValue)
+    {
+        await ReindexPositionsAsync(reservation.BookId, removedPosition.Value, ct);
+    }
+
+    // 3. 次の人を Ready に
+    await PromoteNextWithoutReindexAsync(reservation.BookId, ct);
+}
+
+/// <summary>
+/// 次の Waiting を Ready にする（Position再インデックスなし）
+///
+/// ★ メソッド名で「Reindexしない」ことが明確
+/// ★ AIがこのメソッドで「Position繰り上げも含む」と誤解することはない
+/// </summary>
+public async Task PromoteNextWithoutReindexAsync(BookId bookId, CancellationToken ct)
+{
+    var firstWaiting = await _repository.GetFirstWaitingByBookIdAsync(bookId, ct);
+    if (firstWaiting != null && firstWaiting.Position == 1)
+    {
+        firstWaiting.MakeReady();
+    }
+    // ★ Position の再インデックスは行わない（名前に明記）
+}
+```
+
+### チェックリスト
+
+```
+□ メソッド名だけで「何をするか」が分かるか？
+□ 「何をしないか」も名前から推測できるか？
+□ 複合操作なら「XxxAndYyyAsync」形式か？
+□ 部分操作なら「XxxWithoutYyyAsync」または「XxxOnlyAsync」形式か？
+□ AIが名前から役割を誤解する余地がないか？
+```
+
+### 禁止パターン
+
+| 禁止 | 問題点 | 代替 |
+|-----|--------|------|
+| `ProcessAsync` | 何をするか不明 | `ProcessAndNotifyAsync` |
+| `UpdateAsync` | 何を更新するか不明 | `UpdatePositionsAsync` |
+| `HandleAsync` | 何をハンドルするか不明 | `HandleCancelAndPromoteAsync` |
+| `CheckAsync` | チェック後に何をするか不明 | `CheckAndExpireIfNeededAsync` |
+
+### 理由
+
+```
+AIの推論プロセス:
+1. メソッド名を見る
+2. 名前から役割を推測する
+3. 推測に基づいて使用する/しないを決定
+
+名前が曖昧だと:
+- 「CheckAndPromoteNextAsync」→ 「Promoteするなら繰り上げも含むだろう」と誤推測
+- 結果: DequeueAsync を使わず、CheckAndPromoteNextAsync で代用
+
+名前が明確だと:
+- 「PromoteNextWithoutReindexAsync」→ 「Reindexしないなら別のメソッドが必要」と正しく推測
+- 結果: DequeueAndReindexAsync を使用
+```
+
+---
+
+## 🚨 QueueService の DequeueAsync 未使用（CRITICAL）
+
+**Complete() や Cancel() を直接呼び、DequeueAsync を経由しない問題。**
+
+### 症状
+
+```csharp
+// ❌ 間違い: Entity メソッドを直接呼ぶ
+reservation.Cancel();
+await _queueService.CheckAndPromoteNextAsync(bookId, ct);
+
+// 結果: Position繰り上げが行われず、後続予約が永遠にWaitingのまま
+```
+
+### 正しいパターン
+
+```csharp
+// ✅ 正しい: QueueService 経由で呼ぶ
+await _queueService.DequeueAsync(reservation.Id, ct);
+
+// DequeueAsync 内部で:
+// 1. Cancel() または Fulfill()
+// 2. 後続の Position を繰り上げ
+// 3. 新しい先頭を Ready に
+```
+
+### 検出方法
+
+コードベースを検索:
+```
+reservation.Complete()
+reservation.Cancel()
+reservation.Fulfill()
+```
+
+これらが Handler 内で直接呼ばれていたら、QueueService 経由に修正する。
+
+### 自動検証スクリプト
+
+```powershell
+# PowerShell: DequeueAsync が使われているか検証
+$handlers = Get-ChildItem -Path "src/Application" -Recurse -Filter "*Handler.cs"
+foreach ($handler in $handlers) {
+    $content = Get-Content $handler.FullName -Raw
+    if ($content -match "\.Cancel\(\)" -or $content -match "\.Complete\(\)" -or $content -match "\.Fulfill\(\)") {
+        if ($content -notmatch "DequeueAsync") {
+            Write-Warning "Missing DequeueAsync in $($handler.Name)"
+        }
+    }
+}
+```
+
+```bash
+# Bash: 同等のスクリプト
+grep -rn "\.Cancel()\|\.Complete()\|\.Fulfill()" src/Application --include="*Handler.cs" | while read line; do
+    file=$(echo $line | cut -d: -f1)
+    if ! grep -q "DequeueAsync" "$file"; then
+        echo "WARNING: Missing DequeueAsync in $file"
+    fi
+done
+```
+
+### 参照
+
+- `catalog/patterns/domain-ordered-queue.yaml` - orchestration_rules
+- `catalog/patterns/domain-orchestrator.yaml` - Orchestrator パターン
+
+---
+
+**最終更新: 2025-12-16**
+**カタログバージョン: v2025.12.16**
