@@ -1,0 +1,158 @@
+# Guardrails for: {{task_id}}
+# Extracted from: specs/{{feature_name}}/{{slice_name}}.guardrails.yaml
+
+meta:
+  task_id: "{{task_id}}"
+  feature: "{{feature_name}}"
+  slice: "{{slice_name}}"
+  extracted_from: "specs/{{feature_name}}/{{slice_name}}.guardrails.yaml"
+  extracted_at: "{{extracted_at}}"
+
+# ============================================================
+# Canonical Routes (正解経路) - REQUIRED
+# ============================================================
+# このタスクで従うべき正しい呼び出し経路
+canonical_routes:
+  - id: "CR-001"
+    operation: "{{operation_name}}"
+    path:
+      - caller: "{{caller_class}}"
+        method: "{{method_name}}"
+        params: ["{{param_1}}", "{{param_2}}"]
+        note: "{{route_note}}"
+    anti_patterns:
+      - pattern: "{{anti_pattern}}"
+        problem: "{{anti_pattern_problem}}"
+
+# ============================================================
+# Forbidden Actions (禁止事項)
+# ============================================================
+# このタスクで絶対にやってはいけないこと
+forbidden_actions:
+  - id: "FA-001"
+    scope: "{{scope_class_or_method}}"
+    forbidden: "{{forbidden_action}}"
+    reason: "{{forbidden_reason}}"
+    severity: "critical"  # critical | high | medium
+    detection:
+      pattern: "{{regex_pattern}}"
+      exclude_in: ["{{exclude_file_pattern}}"]
+
+  # 共通禁止事項（常に適用）
+  - id: "FA-COMMON-001"
+    scope: "*Handler.cs"
+    forbidden: "SaveChangesAsync() を Handler 内で呼ぶ"
+    reason: "TransactionBehavior が自動実行する"
+    severity: "critical"
+    detection:
+      pattern: "\\.SaveChangesAsync\\("
+      exclude_in: ["*Behavior.cs", "*DbContext.cs"]
+
+  - id: "FA-COMMON-002"
+    scope: "*BoundaryService.cs"
+    forbidden: "業務ロジック（if文での判定）を書く"
+    reason: "Entity.CanXxx() に委譲すべき"
+    severity: "high"
+    detection:
+      pattern: "if\\s*\\([^)]*Status|State"
+
+  - id: "FA-COMMON-003"
+    scope: "*.cs"
+    forbidden: "throw new で例外を投げてエラーを伝播"
+    reason: "Result<T> パターンを使用すべき"
+    severity: "high"
+    detection:
+      pattern: "throw new \\w+Exception"
+      exclude_in: ["*Tests.cs"]
+
+# ============================================================
+# Spec-Derived Guardrails (仕様由来ルール)
+# ============================================================
+# SPEC の domain_rules から導出されるガードレール
+spec_derived_guardrails:
+  - id: "GR-001"
+    fr_ref: "{{fr_id}}"
+    rule: "{{business_rule}}"
+    scope: "{{applicable_scope}}"
+    violation_impact: "{{impact_description}}"
+    enforcement:
+      entity_method: "{{entity_can_method}}"
+      check_location: "{{check_class}}"
+
+# ============================================================
+# Negative Examples (やってはいけないコード例)
+# ============================================================
+# 反面教師として具体的なコード例を提示
+negative_examples:
+  - id: "NE-001"
+    title: "{{example_title}}"
+    bad_code: |
+      // WRONG - Do NOT do this
+      {{bad_code_example}}
+    good_code: |
+      // CORRECT - Do this instead
+      {{good_code_example}}
+    explanation: "{{explanation}}"
+
+  # 共通ネガティブ例
+  - id: "NE-COMMON-001"
+    title: "Handler内でSaveChangesAsync"
+    bad_code: |
+      // WRONG
+      public async Task<Result<Guid>> Handle(CreateXxxCommand request, CancellationToken ct)
+      {
+          var entity = new Xxx(...);
+          await _repository.AddAsync(entity, ct);
+          await _dbContext.SaveChangesAsync(ct);  // NG!
+          return Result.Success(entity.Id);
+      }
+    good_code: |
+      // CORRECT
+      public async Task<Result<Guid>> Handle(CreateXxxCommand request, CancellationToken ct)
+      {
+          var entity = new Xxx(...);
+          await _repository.AddAsync(entity, ct);
+          return Result.Success(entity.Id);  // SaveChangesAsync は呼ばない
+      }
+    explanation: "TransactionBehavior が自動的に SaveChangesAsync を実行する"
+
+  - id: "NE-COMMON-002"
+    title: "BoundaryServiceに業務ロジック"
+    bad_code: |
+      // WRONG
+      public async Task<BoundaryDecision> ValidateXxxAsync(XxxId id, CancellationToken ct)
+      {
+          var entity = await _repository.GetByIdAsync(id, ct);
+          if (entity.Status == XxxStatus.Completed)  // NG! 業務ロジック
+              return BoundaryDecision.Deny("完了済みです");
+          return BoundaryDecision.Allow();
+      }
+    good_code: |
+      // CORRECT
+      public async Task<BoundaryDecision> ValidateXxxAsync(XxxId id, CancellationToken ct)
+      {
+          var entity = await _repository.GetByIdAsync(id, ct);
+          if (entity == null)
+              return BoundaryDecision.Deny("見つかりません");
+          return entity.CanXxx();  // Entity に委譲
+      }
+    explanation: "業務ロジックは Entity.CanXxx() に集約する"
+
+# ============================================================
+# Acceptance Criteria Verification
+# ============================================================
+# 出力コードがこれらを満たすか自己検証する
+acceptance_criteria:
+  - id: "AC-001"
+    criterion: "{{acceptance_criterion}}"
+    verification: "{{verification_method}}"
+
+# ============================================================
+# Template Variables
+# ============================================================
+# {{task_id}}: タスクID
+# {{feature_name}}: 機能名
+# {{slice_name}}: スライス名
+# {{extracted_at}}: 抽出日時（ISO 8601）
+# {{operation_name}}: 操作名
+# {{forbidden_action}}: 禁止アクション

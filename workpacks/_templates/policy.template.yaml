@@ -1,0 +1,114 @@
+# Policy for: {{task_id}}
+# Generated from: decisions.yaml + manifest.yaml
+
+meta:
+  task_id: "{{task_id}}"
+  feature: "{{feature_name}}"
+  slice: "{{slice_name}}"
+  generated_from:
+    decisions: "specs/{{feature_name}}/{{slice_name}}.decisions.yaml"
+    manifest: "manifests/{{feature_name}}/{{slice_name}}.manifest.yaml"
+  generated_at: "{{generated_at}}"
+
+# ============================================================
+# Layer 1: Core Discretization (from decisions.yaml)
+# ============================================================
+# 曖昧さを解消した具体的な値
+core_values:
+  # 例: enforcement_level, threshold_days など
+  # {{decision_key}}: {{decision_value}}
+  example_threshold: 5
+  example_period_days: 14
+
+# ============================================================
+# Layer 2: Rules (from command-spec.yaml or spec.yaml)
+# ============================================================
+rules:
+  # 状態遷移ルール
+  state_transitions:
+    - from: "{{state_from}}"
+      to: "{{state_to}}"
+      when: "{{transition_condition}}"
+      action: "{{transition_action}}"
+
+  # 前提条件
+  preconditions:
+    - field: "{{field_name}}"
+      rule: "{{validation_rule}}"
+      error_code: "{{error_code}}"
+
+  # ドメインルール
+  domain_rules:
+    - id: "{{dr_id}}"
+      rule: "{{domain_rule_description}}"
+      implementation: "{{entity_method}}"
+
+# ============================================================
+# Pattern Bindings (from manifest.yaml catalog_binding)
+# ============================================================
+patterns:
+  primary:
+    id: "{{primary_pattern_id}}"
+    yaml: "catalog/patterns/{{primary_pattern_id}}.yaml"
+    constraints:
+      - "{{constraint_1}}"
+      - "{{constraint_2}}"
+
+  supporting:
+    - id: "{{supporting_pattern_id}}"
+      yaml: "catalog/patterns/{{supporting_pattern_id}}.yaml"
+      role: "{{pattern_role}}"
+
+# ============================================================
+# Non-Creative Bindings (from manifest.yaml)
+# ============================================================
+# これらはパターンテンプレート通りに実装（創造性不要）
+non_creative:
+  command_structure:
+    provider: "feature-create-entity"
+    notes: "Command + Handler + Validator の構造"
+
+  validation_pipeline:
+    provider: "validation-behavior"
+    notes: "FluentValidation による自動検証"
+
+  transaction_management:
+    provider: "transaction-behavior"
+    notes: "SaveChangesAsync は Handler 内で呼ばない"
+
+  result_pattern:
+    provider: "result-pattern"
+    notes: "すべての戻り値は Result<T>"
+
+# ============================================================
+# Generation Notes (CRITICAL)
+# ============================================================
+generation_notes:
+  must_do:
+    - "ICommand<Result<T>> を使用する"
+    - "Result<T> パターンでエラーを返す"
+    - "サービスのライフタイムは Scoped"
+
+  must_not_do:
+    - "Handler 内で SaveChangesAsync() を呼ばない"
+    - "BoundaryService に業務ロジック（if文）を書かない"
+    - "例外を throw してエラーを伝播しない"
+
+# ============================================================
+# Characteristics (from spec.yaml)
+# ============================================================
+characteristics:
+  - "{{characteristic_1}}"
+  - "{{characteristic_2}}"
+  # 例: op:mutates-state, xcut:auth, xcut:audit
+
+# ============================================================
+# Template Variables
+# ============================================================
+# {{task_id}}: タスクID
+# {{feature_name}}: 機能名
+# {{slice_name}}: スライス名
+# {{generated_at}}: 生成日時（ISO 8601）
+# {{decision_key}}: 離散化された設定キー
+# {{decision_value}}: 離散化された設定値
+# {{primary_pattern_id}}: 主要パターンID

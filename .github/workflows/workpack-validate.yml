@@ -1,0 +1,98 @@
+name: Workpack Validation
+
+on:
+  push:
+    paths:
+      - 'workpacks/active/**'
+  pull_request:
+    paths:
+      - 'workpacks/active/**'
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: 'Task ID to validate (e.g., T001-create-book-entity)'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find workpacks to validate
+        id: find-workpacks
+        run: |
+          if [ -n "${{ inputs.task_id }}" ]; then
+            # Manual trigger with specific task
+            echo "task_ids=${{ inputs.task_id }}" >> $GITHUB_OUTPUT
+          else
+            # Auto-detect from changed files
+            TASK_IDS=$(ls -d workpacks/active/*/ 2>/dev/null | xargs -I{} basename {} | tr '\n' ' ')
+            echo "task_ids=$TASK_IDS" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate each workpack
+        run: |
+          FAILED=0
+
+          for TASK_ID in ${{ steps.find-workpacks.outputs.task_ids }}; do
+            WORKPACK_DIR="workpacks/active/$TASK_ID"
+
+            if [ ! -d "$WORKPACK_DIR" ]; then
+              echo "::warning::Workpack not found: $WORKPACK_DIR"
+              continue
+            fi
+
+            echo "=== Validating: $TASK_ID ==="
+
+            # Check 1: violations.md should NOT exist
+            if [ -f "$WORKPACK_DIR/violations.md" ]; then
+              echo "::error::Guardrail violations detected in $TASK_ID"
+              cat "$WORKPACK_DIR/violations.md"
+              FAILED=1
+            else
+              echo "✓ No violations.md (guardrails passed)"
+            fi
+
+            # Check 2: output.diff should exist and be applicable
+            if [ -f "$WORKPACK_DIR/output.diff" ]; then
+              echo "Checking if diff can be applied..."
+              if git apply --check "$WORKPACK_DIR/output.diff" 2>&1; then
+                echo "✓ git apply --check passed"
+              else
+                echo "::error::git apply --check failed for $TASK_ID"
+                FAILED=1
+              fi
+            else
+              echo "::warning::No output.diff found for $TASK_ID (not yet executed?)"
+            fi
+
+            # Check 3: reproducibility.yaml should exist
+            if [ -f "$WORKPACK_DIR/reproducibility.yaml" ]; then
+              echo "✓ reproducibility.yaml exists"
+            else
+              echo "::warning::No reproducibility.yaml found for $TASK_ID"
+            fi
+
+            echo ""
+          done
+
+          if [ $FAILED -ne 0 ]; then
+            echo "::error::Validation failed"
+            exit 1
+          fi
+
+      - name: Upload workpack artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: workpack-outputs
+          path: |
+            workpacks/active/*/output.diff
+            workpacks/active/*/reproducibility.yaml
+            workpacks/active/*/violations.md
+            workpacks/active/*/verification.md
+          retention-days: 30
+          if-no-files-found: ignore
