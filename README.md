@@ -293,6 +293,199 @@ podman rm spec-kit-work
 
 ---
 
+## 🔄 再現性のある実装（workpacks）
+
+仕様が確定した後、**再現性のある方法**で実装したい場合は workpacks を使います。
+
+### workpacks とは？
+
+```
+通常の対話           workpacks
+    ↓                   ↓
+「〇〇を作って」      workpack（5ファイル）
+    ↓                   ↓
+  対話しながら        claude -p でステートレス実行
+    ↓                   ↓
+  コード生成          unified diff を出力
+```
+
+| 比較項目 | 通常の対話 | workpacks |
+|---------|-----------|-----------|
+| 再現性 | 低い（会話に依存） | 高い（同一入力→同一出力） |
+| レビュー | 会話ログを追う | diff をレビュー |
+| CI統合 | 難しい | 容易（exit code で判定） |
+| 用途 | 探索的・仕様策定 | 確定仕様の量産 |
+
+### いつ使う？
+
+```
+仕様が確定している？
+  → Yes → workpacks が効果的
+  → No  → 通常の対話（speckit.specify → plan → implement）
+```
+
+### Step by Step で試す
+
+以下は、カタログ追加済み（Step 3 完了）の状態から始めます。
+
+#### Step 1: サンプル workpack を作成
+
+まず、サンプルの specs と tasks を用意します：
+
+```bash
+mkdir -p specs/sample
+mkdir -p workpacks/active/T001-sample-entity
+```
+
+**specs/sample/CreateItem.spec.yaml** を作成：
+
+```yaml
+# 最小限のサンプル仕様
+meta:
+  id: "create-item"
+  feature: "sample"
+  slice: "CreateItem"
+
+summary: "アイテムを作成する機能"
+
+actor: "ユーザー"
+
+boundary:
+  intent: "新しいアイテムを登録したい"
+  input:
+    - name: "アイテム名"
+      type: string
+      required: true
+  output:
+    - id: "作成されたアイテムのID"
+
+domain_rules:
+  - id: "DR-001"
+    rule: "アイテム名は1文字以上100文字以下"
+
+scenarios:
+  happy_path:
+    - given: "ユーザーがログインしている"
+    - when: "アイテム名を入力して作成ボタンを押す"
+    - then: "アイテムが作成され、IDが返される"
+```
+
+**specs/sample/CreateItem.guardrails.yaml** を作成：
+
+```yaml
+# ガードレール
+meta:
+  feature: "sample"
+  slice: "CreateItem"
+
+forbidden_actions:
+  - id: "FA-001"
+    scope: "*Handler.cs"
+    forbidden: "SaveChangesAsync() を呼ぶ"
+    reason: "TransactionBehavior が自動実行"
+    severity: "critical"
+    detection:
+      pattern: "\\.SaveChangesAsync\\("
+```
+
+#### Step 2: workpack を生成
+
+Claude Code で以下を実行：
+
+```
+/workpack.generate -TaskId "T001-sample-entity" -SpecPath "specs/sample/CreateItem"
+```
+
+または PowerShell で直接：
+
+```powershell
+./scripts/generate-workpack.ps1 -TaskId "T001-sample-entity" -SpecPath "specs/sample/CreateItem"
+```
+
+生成される workpack：
+
+```
+workpacks/active/T001-sample-entity/
+├── task.md              # タスク定義
+├── spec.extract.md      # 仕様抽出
+├── policy.yaml          # 実装ポリシー
+├── guardrails.yaml      # 禁止事項
+└── repo.snapshot.md     # 既存コード参照
+```
+
+#### Step 3: ステートレス実行（Dry Run で確認）
+
+まず Dry Run で確認：
+
+```
+/workpack.run -TaskId "T001-sample-entity" -DryRun
+```
+
+プロンプトの組み立て結果を確認できます。
+
+#### Step 4: 実行
+
+```
+/workpack.run -TaskId "T001-sample-entity"
+```
+
+生成される成果物：
+
+```
+workpacks/active/T001-sample-entity/
+├── assembled-prompt.md   # 実行に使ったプロンプト
+├── reproducibility.yaml  # 再現性メタ（モデル、温度、commit hash）
+├── output.diff           # 生成された diff
+└── violations.md         # ガードレール違反（あれば）
+```
+
+#### Step 5: diff を適用
+
+まず Dry Run：
+
+```
+/workpack.apply -TaskId "T001-sample-entity" -DryRun
+```
+
+問題なければ適用：
+
+```
+/workpack.apply -TaskId "T001-sample-entity"
+```
+
+適用後：
+
+```bash
+# 変更を確認
+git diff
+
+# 問題なければコミット
+git add .
+git commit -m "feat: T001-sample-entity"
+```
+
+### 成功/失敗の判定
+
+| 条件 | 結果 |
+|-----|------|
+| `violations.md` が存在 | ❌ ガードレール違反あり → 修正が必要 |
+| `git apply --check` 失敗 | ❌ diff 適用不可 → workpack を修正 |
+| `dotnet build` 失敗 | ❌ ビルドエラー → コードを修正 |
+| すべて成功 | ✅ コミット可能 |
+
+### CI で自動検証
+
+workpack をプッシュすると、GitHub Actions が自動で検証します：
+
+```yaml
+# .github/workflows/workpack-validate.yml が自動実行
+# - violations.md があれば fail
+# - git apply --check が失敗したら fail
+# - 成果物を artifact として保存
+```
+
+---
+
 ## 🧠 AI Skills（Claude Code 統合）
 
 このカタログは Claude Code の Skills と連携し、実装ミス防止・パターン選択支援・Boundary モデリングを自動化できます。
