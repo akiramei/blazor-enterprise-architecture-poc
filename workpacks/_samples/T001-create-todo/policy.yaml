@@ -1,0 +1,71 @@
+# Policy for: T001-create-todo
+# Generated from: specs/_samples/CreateTodo.manifest.yaml
+
+meta:
+  task_id: "T001-create-todo"
+  feature: "todo"
+  slice: "CreateTodo"
+  generated_from:
+    spec: "specs/_samples/CreateTodo.spec.yaml"
+    manifest: "specs/_samples/CreateTodo.manifest.yaml"
+  generated_at: "2025-01-01T00:00:00Z"
+
+# ============================================================
+# Pattern Bindings (from manifest.yaml catalog_binding)
+# ============================================================
+patterns:
+  primary:
+    id: "feature-create-entity"
+    yaml: "catalog/patterns/feature-create-entity.yaml"
+    constraints:
+      - "Handler内でSaveChangesAsync()を呼ばない"
+      - "Result<T>パターンでエラーを返す"
+
+  supporting:
+    - id: "result-pattern"
+      yaml: "catalog/kernel/result-pattern.yaml"
+      role: "エラーハンドリング基盤"
+
+# ============================================================
+# Non-Creative Bindings (from manifest.yaml)
+# ============================================================
+# これらはパターンテンプレート通りに実装（創造性不要）
+non_creative:
+  command_structure:
+    provider: "feature-create-entity"
+    notes: "Command + Handler + Validator の構造"
+
+  validation_pipeline:
+    provider: "validation-behavior"
+    notes: "FluentValidation による自動検証"
+
+  transaction_management:
+    provider: "transaction-behavior"
+    notes: "SaveChangesAsync は Handler 内で呼ばない"
+
+  result_pattern:
+    provider: "result-pattern"
+    notes: "すべての戻り値は Result<T>"
+
+# ============================================================
+# Generation Notes (CRITICAL)
+# ============================================================
+generation_notes:
+  must_do:
+    - "ICommand<Result<Guid>> を使用する"
+    - "Result<T> パターンでエラーを返す"
+    - "サービスのライフタイムは Scoped"
+    - "Todo.Create() ファクトリメソッドでエンティティを生成"
+
+  must_not_do:
+    - "Handler 内で SaveChangesAsync() を呼ばない"
+    - "throw new で例外を投げない"
+    - "IRequest<T> を直接使用しない"
+
+# ============================================================
+# Characteristics (from spec.yaml)
+# ============================================================
+characteristics:
+  - "op:mutates-state"
+  - "xcut:validation"
+  - "xcut:transaction"

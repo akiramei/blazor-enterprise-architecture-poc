@@ -1,0 +1,48 @@
+# CreateTodo.spec.yaml - workpack チュートリアル用サンプル
+# このファイルは workpack の動作確認用です。
+
+meta:
+  id: "create-todo"
+  feature: "todo"
+  slice: "CreateTodo"
+
+summary: "TODOアイテムを作成する"
+
+actor: "ユーザー"
+
+boundary:
+  intent: "新しいTODOを登録したい"
+  input:
+    - name: "Title"
+      type: string
+      required: true
+      validation: "1文字以上100文字以下"
+    - name: "DueDate"
+      type: "DateOnly?"
+      required: false
+  output:
+    - id: "作成されたTODOのID (Guid)"
+  errors:
+    - code: "VALIDATION_ERROR"
+      message: "タイトルが空または100文字超過"
+
+domain_rules:
+  - id: "DR-001"
+    rule: "タイトルは1文字以上100文字以下"
+  - id: "DR-002"
+    rule: "期限日は今日以降（指定する場合）"
+
+scenarios:
+  happy_path:
+    - given: "ユーザーがログインしている"
+    - when: "タイトル「買い物」で作成"
+    - then: "TODOが作成され、IDが返される"
+  exceptions:
+    - id: "EX-001"
+      when: "タイトルが空"
+      then: "VALIDATION_ERROR"
+
+characteristics:
+  - "op:mutates-state"
+  - "xcut:validation"
+  - "xcut:transaction"

@@ -1,0 +1,24 @@
+# CreateTodo.guardrails.yaml - workpack チュートリアル用サンプル
+# このファイルは workpack の動作確認用です。
+
+meta:
+  feature: "todo"
+  slice: "CreateTodo"
+
+forbidden_actions:
+  - id: "FA-001"
+    scope: "*Handler.cs"
+    forbidden: "SaveChangesAsync() を呼ぶ"
+    reason: "TransactionBehavior が自動実行"
+    severity: "critical"
+    detection:
+      pattern: "\\.SaveChangesAsync\\("
+
+  - id: "FA-002"
+    scope: "*.cs"
+    forbidden: "throw new で例外を投げる"
+    reason: "Result<T> パターンを使用"
+    severity: "high"
+    detection:
+      pattern: "throw new \\w+Exception"
+      exclude_in: ["*Tests.cs"]

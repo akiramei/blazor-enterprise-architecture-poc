@@ -328,84 +328,35 @@ podman rm spec-kit-work
 
 以下は、カタログ追加済み（Step 3 完了）の状態から始めます。
 
-#### Step 1: サンプル workpack を作成
+> **すぐ試したい場合**: サンプルが用意されています。手動でYAML作成は不要です。
 
-まず、サンプルの specs と tasks を用意します：
+#### Step 1: サンプルを確認
+
+workpacks にはすぐ動くサンプルが用意されています：
+
+- `specs/_samples/` - サンプル仕様（spec, guardrails, manifest）
+- `workpacks/_samples/` - 生成済みワークパック
+
+まずサンプルで動作確認し、その後独自のspecを作成してください。
+
+#### Step 2: workpack を準備
+
+**パターンA: 生成済みサンプルを使う（推奨）**
 
 ```bash
-mkdir -p specs/sample
-mkdir -p workpacks/active/T001-sample-entity
+cp -r workpacks/_samples/T001-create-todo workpacks/active/
 ```
 
-**specs/sample/CreateItem.spec.yaml** を作成：
-
-```yaml
-# 最小限のサンプル仕様
-meta:
-  id: "create-item"
-  feature: "sample"
-  slice: "CreateItem"
-
-summary: "アイテムを作成する機能"
-
-actor: "ユーザー"
-
-boundary:
-  intent: "新しいアイテムを登録したい"
-  input:
-    - name: "アイテム名"
-      type: string
-      required: true
-  output:
-    - id: "作成されたアイテムのID"
-
-domain_rules:
-  - id: "DR-001"
-    rule: "アイテム名は1文字以上100文字以下"
-
-scenarios:
-  happy_path:
-    - given: "ユーザーがログインしている"
-    - when: "アイテム名を入力して作成ボタンを押す"
-    - then: "アイテムが作成され、IDが返される"
-```
-
-**specs/sample/CreateItem.guardrails.yaml** を作成：
-
-```yaml
-# ガードレール
-meta:
-  feature: "sample"
-  slice: "CreateItem"
-
-forbidden_actions:
-  - id: "FA-001"
-    scope: "*Handler.cs"
-    forbidden: "SaveChangesAsync() を呼ぶ"
-    reason: "TransactionBehavior が自動実行"
-    severity: "critical"
-    detection:
-      pattern: "\\.SaveChangesAsync\\("
-```
-
-#### Step 2: workpack を生成
-
-Claude Code で以下を実行：
+**パターンB: spec から生成する**
 
 ```
-/workpack.generate -TaskId "T001-sample-entity" -SpecPath "specs/sample/CreateItem"
-```
-
-または PowerShell で直接：
-
-```powershell
-./scripts/generate-workpack.ps1 -TaskId "T001-sample-entity" -SpecPath "specs/sample/CreateItem"
+/workpack.generate -TaskId "T002-create-todo" -SpecPath "specs/_samples/CreateTodo"
 ```
 
 生成される workpack：
 
 ```
-workpacks/active/T001-sample-entity/
+workpacks/active/T001-create-todo/
 ├── task.md              # タスク定義
 ├── spec.extract.md      # 仕様抽出
 ├── policy.yaml          # 実装ポリシー
@@ -418,7 +369,7 @@ workpacks/active/T001-sample-entity/
 まず Dry Run で確認：
 
 ```
-/workpack.run -TaskId "T001-sample-entity" -DryRun
+/workpack.run -TaskId "T001-create-todo" -DryRun
 ```
 
 プロンプトの組み立て結果を確認できます。
@@ -426,13 +377,13 @@ workpacks/active/T001-sample-entity/
 #### Step 4: 実行
 
 ```
-/workpack.run -TaskId "T001-sample-entity"
+/workpack.run -TaskId "T001-create-todo"
 ```
 
 生成される成果物：
 
 ```
-workpacks/active/T001-sample-entity/
+workpacks/active/T001-create-todo/
 ├── assembled-prompt.md   # 実行に使ったプロンプト
 ├── reproducibility.yaml  # 再現性メタ（モデル、温度、commit hash）
 ├── output.diff           # 生成された diff
@@ -444,13 +395,13 @@ workpacks/active/T001-sample-entity/
 まず Dry Run：
 
 ```
-/workpack.apply -TaskId "T001-sample-entity" -DryRun
+/workpack.apply -TaskId "T001-create-todo" -DryRun
 ```
 
 問題なければ適用：
 
 ```
-/workpack.apply -TaskId "T001-sample-entity"
+/workpack.apply -TaskId "T001-create-todo"
 ```
 
 適用後：
@@ -461,8 +412,27 @@ git diff
 
 # 問題なければコミット
 git add .
-git commit -m "feat: T001-sample-entity"
+git commit -m "feat: T001-create-todo"
 ```
+
+### workpack 生成に必要なファイル
+
+| ファイル | 必須 | 説明 |
+|---------|:----:|------|
+| `{Slice}.spec.yaml` | ✅ | 仕様定義（boundary, domain_rules, scenarios） |
+| `{Slice}.guardrails.yaml` | ✅ | 禁止事項（forbidden_actions） |
+| `{Slice}.manifest.yaml` | ⚪ | パターン指定（省略時はデフォルト適用） |
+
+**テンプレート**: `workpacks/_templates/` に各ファイルのテンプレートがあります。
+
+### トラブルシューティング
+
+| 問題 | 原因 | 対処 |
+|------|------|------|
+| `violations.md` が生成された | ガードレール違反 | 違反箇所を修正し `/workpack.run` を再実行 |
+| `git apply` 失敗 | base commit 不一致 | `-SkipBaseCommitCheck` で再実行 |
+| spec.yaml が見つからない | パスが間違っている | `.spec.yaml` を除いたパスを指定 |
+| workpack が生成されない | 必須ファイル不足 | spec.yaml と guardrails.yaml を確認 |
 
 ### 成功/失敗の判定
 

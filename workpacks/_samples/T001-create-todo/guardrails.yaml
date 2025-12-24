@@ -1,0 +1,117 @@
+# Guardrails for: T001-create-todo
+# Extracted from: specs/_samples/CreateTodo.guardrails.yaml
+
+meta:
+  task_id: "T001-create-todo"
+  feature: "todo"
+  slice: "CreateTodo"
+  extracted_from: "specs/_samples/CreateTodo.guardrails.yaml"
+  extracted_at: "2025-01-01T00:00:00Z"
+
+# ============================================================
+# Forbidden Actions (禁止事項)
+# ============================================================
+# このタスクで絶対にやってはいけないこと
+forbidden_actions:
+  # Spec由来の禁止事項
+  - id: "FA-001"
+    scope: "*Handler.cs"
+    forbidden: "SaveChangesAsync() を Handler 内で呼ぶ"
+    reason: "TransactionBehavior が自動実行する"
+    severity: "critical"
+    detection:
+      pattern: "\\.SaveChangesAsync\\("
+      exclude_in: ["*Behavior.cs", "*DbContext.cs"]
+
+  - id: "FA-002"
+    scope: "*.cs"
+    forbidden: "throw new で例外を投げてエラーを伝播"
+    reason: "Result<T> パターンを使用すべき"
+    severity: "high"
+    detection:
+      pattern: "throw new \\w+Exception"
+      exclude_in: ["*Tests.cs"]
+
+  # 共通禁止事項（常に適用）
+  - id: "FA-COMMON-001"
+    scope: "*Handler.cs"
+    forbidden: "SaveChangesAsync() を Handler 内で呼ぶ"
+    reason: "TransactionBehavior が自動実行する"
+    severity: "critical"
+    detection:
+      pattern: "\\.SaveChangesAsync\\("
+      exclude_in: ["*Behavior.cs", "*DbContext.cs"]
+
+  - id: "FA-COMMON-002"
+    scope: "*BoundaryService.cs"
+    forbidden: "業務ロジック（if文での判定）を書く"
+    reason: "Entity.CanXxx() に委譲すべき"
+    severity: "high"
+    detection:
+      pattern: "if\\s*\\([^)]*Status|State"
+
+  - id: "FA-COMMON-003"
+    scope: "*.cs"
+    forbidden: "throw new で例外を投げてエラーを伝播"
+    reason: "Result<T> パターンを使用すべき"
+    severity: "high"
+    detection:
+      pattern: "throw new \\w+Exception"
+      exclude_in: ["*Tests.cs"]
+
+# ============================================================
+# Negative Examples (やってはいけないコード例)
+# ============================================================
+negative_examples:
+  - id: "NE-001"
+    title: "Handler内でSaveChangesAsync"
+    bad_code: |
+      // WRONG
+      public async Task<Result<Guid>> Handle(CreateTodoCommand request, CancellationToken ct)
+      {
+          var todo = Todo.Create(request.Title, request.DueDate);
+          await _repository.AddAsync(todo, ct);
+          await _dbContext.SaveChangesAsync(ct);  // NG!
+          return Result.Success(todo.Id.Value);
+      }
+    good_code: |
+      // CORRECT
+      public async Task<Result<Guid>> Handle(CreateTodoCommand request, CancellationToken ct)
+      {
+          var todo = Todo.Create(request.Title, request.DueDate);
+          await _repository.AddAsync(todo, ct);
+          return Result.Success(todo.Id.Value);  // SaveChangesAsync は呼ばない
+      }
+    explanation: "TransactionBehavior が自動的に SaveChangesAsync を実行する"
+
+  - id: "NE-002"
+    title: "例外をthrowする"
+    bad_code: |
+      // WRONG
+      if (string.IsNullOrEmpty(title))
+      {
+          throw new ValidationException("タイトルは必須です");  // NG!
+      }
+    good_code: |
+      // CORRECT
+      if (string.IsNullOrEmpty(title))
+      {
+          return Result.Failure<Guid>("タイトルは必須です");
+      }
+    explanation: "例外ではなく Result<T> でエラーを返す"
+
+# ============================================================
+# Acceptance Criteria Verification
+# ============================================================
+acceptance_criteria:
+  - id: "AC-001"
+    criterion: "Handler内でSaveChangesAsync()を呼んでいない"
+    verification: "grep -r 'SaveChangesAsync' src/Application/Features/CreateTodo/"
+
+  - id: "AC-002"
+    criterion: "throw new が使われていない"
+    verification: "grep -r 'throw new' src/Application/Features/CreateTodo/"
+
+  - id: "AC-003"
+    criterion: "ICommand<Result<Guid>>を使用している"
+    verification: "grep 'ICommand<Result<Guid>>' src/Application/Features/CreateTodo/"

@@ -1,0 +1,25 @@
+# CreateTodo.manifest.yaml - workpack チュートリアル用サンプル
+# このファイルは workpack の動作確認用です。
+
+meta:
+  feature: "todo"
+  slice: "CreateTodo"
+
+catalog_binding:
+  from_catalog:
+    - "feature-create-entity"
+    - "result-pattern"
+  hints:
+    pattern_notes: "シンプルなエンティティ作成"
+
+non_creative:
+  command_structure:
+    provider: "feature-create-entity"
+  validation_pipeline:
+    provider: "validation-behavior"
+  transaction_management:
+    provider: "transaction-behavior"
+
+creative:
+  domain_model: true
+  validation_logic: true
